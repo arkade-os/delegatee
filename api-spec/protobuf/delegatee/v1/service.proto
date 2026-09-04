@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+package delegatee.v1;
+
+import "meshapi/gateway/annotations.proto";
+
+// DelegateeService renews covenant-locked VTXOs on behalf of offline users.
+service DelegateeService {
+  // GetInfo returns everything a wallet needs to build a delegate address
+  // for a given renewal window: the delegate cosigner pubkey, the covenant
+  // and the delegate tapscript.
+  rpc GetInfo(GetInfoRequest) returns (GetInfoResponse) {
+    option (meshapi.gateway.http) = {
+      get: "/v1/info"
+    };
+  }
+
+  // RegisterDelegation starts renewing the VTXOs locked at the address
+  // derived from the given tapscripts. The tapscripts must contain the
+  // delegate tapscript for the given renewal window and an exit leaf.
+  rpc RegisterDelegation(RegisterDelegationRequest) returns (RegisterDelegationResponse) {
+    option (meshapi.gateway.http) = {
+      post: "/v1/delegate"
+      body: "*"
+    };
+  }
+
+}
+
+// AdminService is served on the admin port only.
+service AdminService {
+  // ListDelegations returns every registered delegation.
+  rpc ListDelegations(ListDelegationsRequest) returns (ListDelegationsResponse) {
+    option (meshapi.gateway.http) = {
+      get: "/v1/admin/delegate"
+    };
+  }
+
+  // GetDelegation returns a delegation with its spendable VTXOs (live from
+  // the arkd indexer) and its renewal history.
+  rpc GetDelegation(GetDelegationRequest) returns (GetDelegationResponse) {
+    option (meshapi.gateway.http) = {
+      get: "/v1/admin/delegate/{address}"
+    };
+  }
+
+  // CancelDelegation stops renewing the address. Register again to resume.
+  rpc CancelDelegation(CancelDelegationRequest) returns (CancelDelegationResponse) {
+    option (meshapi.gateway.http) = {
+      delete: "/v1/admin/delegate/{address}"
+    };
+  }
+}
+
+message GetInfoRequest {
+  // seconds before expiry from which a VTXO may be renewed. Defaults to 1024.
+  int64 renewal_window = 1;
+}
+message GetInfoResponse {
+  string version = 1;
+  string network = 2;
+  // hex-encoded compressed pubkey of the vtxo tree cosigner pinned in the covenant.
+  string delegate_pubkey = 3;
+  // hex-encoded compressed pubkey of the arkd signer.
+  string server_pubkey = 4;
+  // hex-encoded compressed pubkey of the emulator.
+  string emulator_pubkey = 5;
+  // emulator pubkey tweaked with the covenant hash, second key of the delegate leaf.
+  string emulator_tweaked_pubkey = 6;
+  // hex-encoded arkade script executed by the emulator before co-signing.
+  string arkade_script = 7;
+  // hex-encoded tapscript of the delegate leaf: [server_pubkey, emulator_tweaked_pubkey].
+  string delegate_tapscript = 8;
+  int64 renewal_window = 9;
+}
+
+message RegisterDelegationRequest {
+  // hex-encoded tapscripts of the vtxo script, as encoded by the SDKs.
+  repeated string tapscripts = 1;
+  // the renewal window the delegate tapscript was built for. Defaults to 1024.
+  int64 renewal_window = 2;
+}
+message RegisterDelegationResponse {
+  Delegation delegation = 1;
+}
+
+message ListDelegationsRequest {}
+message ListDelegationsResponse {
+  repeated Delegation delegations = 1;
+}
+
+message GetDelegationRequest {
+  string address = 1;
+}
+message GetDelegationResponse {
+  Delegation delegation = 1;
+  repeated Vtxo vtxos = 2;
+  repeated Renewal renewals = 3;
+}
+
+message CancelDelegationRequest {
+  string address = 1;
+}
+message CancelDelegationResponse {}
+
+message Delegation {
+  int64 id = 1;
+  string address = 2;
+  // active | cancelled
+  string status = 3;
+  repeated string tapscripts = 4;
+  int64 created_at = 5;
+  int64 updated_at = 6;
+  int64 renewal_window = 7;
+}
+
+message Vtxo {
+  // txid:vout
+  string outpoint = 1;
+  uint64 amount = 2;
+  int64 expires_at = 3;
+  bool preconfirmed = 4;
+  repeated Asset assets = 5;
+}
+
+message Asset {
+  string asset_id = 1;
+  uint64 amount = 2;
+}
+
+message Renewal {
+  repeated string outpoints = 1;
+  string commitment_txid = 2;
+  bool success = 3;
+  string error = 4;
+  int64 attempted_at = 5;
+}

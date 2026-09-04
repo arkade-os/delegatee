@@ -1,0 +1,153 @@
+# Full regtest stack for delegateed on the nigiri network: run `nigiri start`
+# first (bitcoin, electrs, chopsticks on :3000). The arkd + emulator services
+# mirror the emulator repo's docker-compose.regtest.yml; stop that one before
+# starting this, they share container names and ports.
+services:
+  pgnbxplorer:
+    restart: unless-stopped
+    image: postgres:16
+    container_name: pgnbxplorer
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - type: tmpfs
+        target: /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nbxplorer -h 127.0.0.1 -p 5432"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  nbxplorer:
+    restart: unless-stopped
+    container_name: nbxplorer
+    image: nicolasdorier/nbxplorer:2.5.30
+    environment:
+      - NBXPLORER_NETWORK=regtest
+      - NBXPLORER_CHAINS=btc
+      - NBXPLORER_BTCRPCURL=http://bitcoin:18443
+      - NBXPLORER_BTCNODEENDPOINT=bitcoin:18444
+      - NBXPLORER_BTCRPCUSER=admin1
+      - NBXPLORER_BTCRPCPASSWORD=123
+      - NBXPLORER_BIND=0.0.0.0:32838
+      - NBXPLORER_TRIMEVENTS=10000
+      - NBXPLORER_SIGNALFILESDIR=/datadir
+      - NBXPLORER_POSTGRES=User ID=postgres;Host=pgnbxplorer;Port=5432;Application Name=nbxplorer;MaxPoolSize=20;Database=nbxplorer
+      - NBXPLORER_EXPOSERPC=1
+      - NBXPLORER_NOAUTH=1
+    volumes:
+      - type: tmpfs
+        target: /datadir
+    depends_on:
+      pgnbxplorer:
+        condition: service_healthy
+
+  arkd-wallet:
+    restart: unless-stopped
+    image: ghcr.io/arkade-os/arkd-wallet:v0.9.13
+    container_name: arkd-wallet
+    depends_on:
+      - nbxplorer
+    ports:
+      - "6060:6060"
+    environment:
+      - ARKD_WALLET_LOG_LEVEL=5
+      - ARKD_WALLET_NBXPLORER_URL=http://nbxplorer:32838
+      - ARKD_WALLET_DATADIR=./data/regtest
+      - ARKD_WALLET_NETWORK=regtest
+      - ARKD_WALLET_SIGNER_KEY=afcd3fa10f82a05fddc9574fdb13b3991b568e89cc39a72ba4401df8abef35f0
+    volumes:
+      - type: tmpfs
+        target: /app/data
+
+  arkd:
+    image: ghcr.io/arkade-os/arkd:v0.9.13
+    container_name: arkd
+    restart: unless-stopped
+    depends_on:
+      - arkd-wallet
+    ports:
+      - "7070:7070"
+      - "7071:7071"
+    environment:
+      - ARKD_LOG_LEVEL=6
+      - ARKD_NO_MACAROONS=true
+      - ARKD_VTXO_TREE_EXPIRY=512
+      - ARKD_SCHEDULER_TYPE=block
+      - ARKD_UNILATERAL_EXIT_DELAY=512
+      - ARKD_BOARDING_EXIT_DELAY=1024
+      - ARKD_CHECKPOINT_EXIT_DELAY=512
+      - ARKD_DATADIR=./data/regtest
+      - ARKD_WALLET_ADDR=arkd-wallet:6060
+      - ARKD_ESPLORA_URL=http://chopsticks:3000
+      - ARKD_ROUND_MIN_PARTICIPANTS_COUNT=1
+      - ARKD_ROUND_MAX_PARTICIPANTS_COUNT=128
+      - ARKD_VTXO_MIN_AMOUNT=1
+      - ARKD_LIVE_STORE_TYPE=inmemory
+      - ARKD_EVENT_DB_TYPE=badger
+      - ARKD_DB_TYPE=sqlite
+      - ARKD_SESSION_DURATION=10
+      - ARKD_BAN_THRESHOLD=1
+    volumes:
+      - type: tmpfs
+        target: /app/data
+
+  emulator:
+    image: ghcr.io/arkade-os/emulator:${EMULATOR_VERSION:-v0.0.8-rc.0}
+    container_name: emulator
+    restart: unless-stopped
+    ports:
+      - "7073:7073"
+    environment:
+      - EMULATOR_SECRET_KEY=5646b2e23bbb82491fb4ef262079ff17594d5e873fc6bcea5f1453edbe1029b1
+      - EMULATOR_ARKD_URL=arkd:7070
+    depends_on:
+      - arkd
+
+  pg:
+    restart: unless-stopped
+    image: postgres:17.8
+    container_name: delegatee-pg
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=delegatee
+    volumes:
+      - type: tmpfs
+        target: /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d delegatee -h 127.0.0.1 -p 5432"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # the service itself, opt-in: `docker compose --profile delegatee up -d`
+  delegatee:
+    profiles: [delegatee]
+    build: .
+    container_name: delegatee
+    restart: unless-stopped
+    depends_on:
+      pg:
+        condition: service_healthy
+      emulator:
+        condition: service_started
+    ports:
+      - "7080:7080"
+      - "127.0.0.1:7081:7081"
+    environment:
+      - DELEGATEE_LOG_LEVEL=5
+      - DELEGATEE_DATABASE_URL=postgres://postgres@pg:5432/delegatee?sslmode=disable
+      - DELEGATEE_ARK_URL=arkd:7070
+      - DELEGATEE_EMULATOR_URL=emulator:7073
+      - DELEGATEE_SECRET_KEY=${DELEGATEE_SECRET_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      - DELEGATEE_PORT=7080
+      - DELEGATEE_ADMIN_PORT=7081
+      - DELEGATEE_POLL_INTERVAL=10s
+
+networks:
+  default:
+    name: nigiri
+    external: true

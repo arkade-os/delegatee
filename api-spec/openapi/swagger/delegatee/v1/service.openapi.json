@@ -1,0 +1,481 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "",
+    "version": "version not set"
+  },
+  "paths": {
+    "/v1/admin/delegate": {
+      "get": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "ListDelegations returns every registered delegation.",
+        "operationId": "AdminService_ListDelegations",
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDelegationsResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/delegate/{address}": {
+      "get": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "GetDelegation returns a delegation with its spendable VTXOs (live from\nthe arkd indexer) and its renewal history.",
+        "operationId": "AdminService_GetDelegation",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetDelegationResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "CancelDelegation stops renewing the address. Register again to resume.",
+        "operationId": "AdminService_CancelDelegation",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelDelegationResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/delegate": {
+      "post": {
+        "tags": [
+          "DelegateeService"
+        ],
+        "description": "RegisterDelegation starts renewing the VTXOs locked at the address\nderived from the given tapscripts. The tapscripts must contain the\ndelegate tapscript for the given renewal window and an exit leaf.",
+        "operationId": "DelegateeService_RegisterDelegation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDelegationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterDelegationResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/info": {
+      "get": {
+        "tags": [
+          "DelegateeService"
+        ],
+        "description": "GetInfo returns everything a wallet needs to build a delegate address\nfor a given renewal window: the delegate cosigner pubkey, the covenant\nand the delegate tapscript.",
+        "operationId": "DelegateeService_GetInfo",
+        "parameters": [
+          {
+            "name": "renewalWindow",
+            "in": "query",
+            "description": "seconds before expiry from which a VTXO may be renewed. Defaults to 1024.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetInfoResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Any": {
+        "type": "object",
+        "description": "Any contains an arbitrary schema along with a URL to help identify the type of the schema.",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "description": "A URL/resource name that uniquely identifies the type of the schema."
+          }
+        }
+      },
+      "Asset": {
+        "title": "Asset",
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "assetId": {
+            "type": "string"
+          }
+        }
+      },
+      "CancelDelegationRequest": {
+        "title": "CancelDelegationRequest",
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          }
+        }
+      },
+      "CancelDelegationResponse": {
+        "title": "CancelDelegationResponse",
+        "type": "object"
+      },
+      "Delegation": {
+        "title": "Delegation",
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "renewalWindow": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "description": "active | cancelled"
+          },
+          "tapscripts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updatedAt": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "GetDelegationRequest": {
+        "title": "GetDelegationRequest",
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          }
+        }
+      },
+      "GetDelegationResponse": {
+        "title": "GetDelegationResponse",
+        "type": "object",
+        "properties": {
+          "delegation": {
+            "$ref": "#/components/schemas/Delegation"
+          },
+          "renewals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Renewal"
+            }
+          },
+          "vtxos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Vtxo"
+            }
+          }
+        }
+      },
+      "GetInfoRequest": {
+        "title": "GetInfoRequest",
+        "type": "object",
+        "properties": {
+          "renewalWindow": {
+            "type": "integer",
+            "description": "seconds before expiry from which a VTXO may be renewed. Defaults to 1024.",
+            "format": "int64"
+          }
+        }
+      },
+      "GetInfoResponse": {
+        "title": "GetInfoResponse",
+        "type": "object",
+        "properties": {
+          "arkadeScript": {
+            "type": "string",
+            "description": "hex-encoded arkade script executed by the emulator before co-signing."
+          },
+          "delegatePubkey": {
+            "type": "string",
+            "description": "hex-encoded compressed pubkey of the vtxo tree cosigner pinned in the covenant."
+          },
+          "delegateTapscript": {
+            "type": "string",
+            "description": "hex-encoded tapscript of the delegate leaf: [server_pubkey, emulator_tweaked_pubkey]."
+          },
+          "emulatorPubkey": {
+            "type": "string",
+            "description": "hex-encoded compressed pubkey of the emulator."
+          },
+          "emulatorTweakedPubkey": {
+            "type": "string",
+            "description": "emulator pubkey tweaked with the covenant hash, second key of the delegate leaf."
+          },
+          "network": {
+            "type": "string"
+          },
+          "renewalWindow": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "serverPubkey": {
+            "type": "string",
+            "description": "hex-encoded compressed pubkey of the arkd signer."
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "ListDelegationsRequest": {
+        "title": "ListDelegationsRequest",
+        "type": "object"
+      },
+      "ListDelegationsResponse": {
+        "title": "ListDelegationsResponse",
+        "type": "object",
+        "properties": {
+          "delegations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Delegation"
+            }
+          }
+        }
+      },
+      "RegisterDelegationRequest": {
+        "title": "RegisterDelegationRequest",
+        "type": "object",
+        "properties": {
+          "renewalWindow": {
+            "type": "integer",
+            "description": "the renewal window the delegate tapscript was built for. Defaults to 1024.",
+            "format": "int64"
+          },
+          "tapscripts": {
+            "type": "array",
+            "description": "hex-encoded tapscripts of the vtxo script, as encoded by the SDKs.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RegisterDelegationResponse": {
+        "title": "RegisterDelegationResponse",
+        "type": "object",
+        "properties": {
+          "delegation": {
+            "$ref": "#/components/schemas/Delegation"
+          }
+        }
+      },
+      "Renewal": {
+        "title": "Renewal",
+        "type": "object",
+        "properties": {
+          "attemptedAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "commitmentTxid": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "outpoints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Status": {
+        "title": "Status",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Any"
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Vtxo": {
+        "title": "Vtxo",
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Asset"
+            }
+          },
+          "expiresAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "outpoint": {
+            "type": "string",
+            "description": "txid:vout"
+          },
+          "preconfirmed": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "DelegateeService"
+    },
+    {
+      "name": "AdminService"
+    }
+  ]
+}
