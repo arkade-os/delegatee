@@ -84,19 +84,16 @@ func (c *Config) AppService(ctx context.Context) (application.Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
-	ark, err := grpcclient.NewClient(c.ArkURL, "delegateed")
+	arkURL := strings.TrimSuffix(c.ArkURL, "/")
+	ark, err := grpcclient.NewClient(arkURL, "delegateed")
 	if err != nil {
 		return nil, fmt.Errorf("connect to arkd: %w", err)
 	}
-	indexerSvc, err := grpcindexer.NewClient(c.ArkURL)
+	indexerSvc, err := grpcindexer.NewClient(arkURL)
 	if err != nil {
 		return nil, fmt.Errorf("connect to indexer: %w", err)
 	}
-	creds := insecure.NewCredentials()
-	if strings.HasPrefix(c.EmulatorURL, "https://") {
-		creds = credentials.NewTLS(nil)
-	}
-	emuURL := strings.TrimPrefix(strings.TrimPrefix(c.EmulatorURL, "https://"), "http://")
+	emuURL, creds := grpcTarget(c.EmulatorURL)
 	emuConn, err := grpc.NewClient(emuURL, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return nil, fmt.Errorf("connect to emulator: %w", err)
@@ -105,6 +102,22 @@ func (c *Config) AppService(ctx context.Context) (application.Service, error) {
 		ctx, repo, ark, indexerSvc, emulatorclient.NewGRPCClient(emuConn),
 		c.SecretKey, c.PollInterval, c.RenewalTimeout, c.MaxVtxosPerIntent,
 	)
+}
+
+// grpcTarget turns a URL like https://host/ into host:443 with TLS, and
+// http://host or host:port into a plaintext target, like the arkd client does.
+func grpcTarget(url string) (string, credentials.TransportCredentials) {
+	creds := insecure.NewCredentials()
+	port := "80"
+	if strings.HasPrefix(url, "https://") {
+		creds = credentials.NewTLS(nil)
+		port = "443"
+	}
+	target := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(url, "https://"), "http://"), "/")
+	if !strings.Contains(target, ":") {
+		target += ":" + port
+	}
+	return target, creds
 }
 
 func loadSecretKey() (*btcec.PrivateKey, error) {

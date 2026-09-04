@@ -25,4 +25,13 @@ func TestLoad(t *testing.T) {
 	require.Equal(t, uint32(7080), cfg.Port)
 	require.Equal(t, 5*time.Second, cfg.PollInterval)
 	require.NotNil(t, cfg.SecretKey)
+
+	for url, want := range map[string]string{
+		"https://emulator.mutinynet.arkade.sh/": "emulator.mutinynet.arkade.sh:443",
+		"http://emulator:7073":                  "emulator:7073",
+		"localhost:7073":                        "localhost:7073",
+	} {
+		target, _ := grpcTarget(url)
+		require.Equal(t, want, target)
+	}
 }
