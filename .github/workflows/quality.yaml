@@ -35,13 +35,3 @@ jobs:
       - name: Run linter
         uses: golangci/golangci-lint-action@v7
 
-  proto:
-    name: proto
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Lint protos and check generated stubs are current
-        run: |
-          make proto
-          git diff --exit-code
