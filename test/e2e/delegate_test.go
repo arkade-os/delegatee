@@ -7,9 +7,9 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -21,20 +21,16 @@ import (
 	singlekeywallet "github.com/arkade-os/arkd/pkg/client-lib/identity/singlekey"
 	inmemorystore "github.com/arkade-os/arkd/pkg/client-lib/identity/singlekey/store/inmemory"
 	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
-	grpcindexer "github.com/arkade-os/arkd/pkg/client-lib/indexer/grpc"
 	"github.com/arkade-os/arkd/pkg/client-lib/types"
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/config"
 	"github.com/arkade-os/delegatee/internal/core/application"
-	grpcservice "github.com/arkade-os/delegatee/internal/interface/grpc"
 	arksdk "github.com/arkade-os/go-sdk"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
@@ -56,44 +52,8 @@ func TestDelegateRenewal(t *testing.T) {
 	ctx := t.Context()
 
 	// --- delegateed in-process on a free port, real dependencies
-	dsn := os.Getenv("DELEGATEE_DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://postgres@localhost:5432/delegatee?sslmode=disable"
-	}
-	delegateKey, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	port, adminPort := freePort(t), freePort(t)
-	svc, err := grpcservice.NewService("e2e", &config.Config{
-		ArkURL:            arkURL,
-		EmulatorURL:       emulatorURL,
-		DatabaseURL:       dsn,
-		Port:              port,
-		AdminPort:         adminPort,
-		SecretKey:         delegateKey,
-		PollInterval:      2 * time.Second,
-		RenewalTimeout:    2 * time.Minute,
-		MaxVtxosPerIntent: 16,
-	})
-	require.NoError(t, err)
-	require.NoError(t, svc.Start())
-	t.Cleanup(svc.Stop)
-
-	addr := net.JoinHostPort("localhost", strconv.Itoa(int(port)))
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = conn.Close() })
-	client := delegateev1.NewDelegateeServiceClient(conn)
-	adminConn, err := grpc.NewClient(
-		net.JoinHostPort("localhost", strconv.Itoa(int(adminPort))),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = adminConn.Close() })
-	admin := delegateev1.NewAdminServiceClient(adminConn)
-
-	indexerSvc, err := grpcindexer.NewClient(arkURL)
-	require.NoError(t, err)
-	t.Cleanup(indexerSvc.Close)
+	d := startDelegatee(t)
+	client, admin, indexerSvc := d.client, d.admin, d.indexer
 
 	// --- alice: funded sdk wallet, the user who delegates
 	alice, alicePubKey := setupAlice(t)
@@ -106,32 +66,29 @@ func TestDelegateRenewal(t *testing.T) {
 	var restInfo struct {
 		DelegatePubkey string `json:"delegatePubkey"`
 	}
-	getJSON(t, "http://"+addr+"/v1/info?renewalWindow="+strconv.Itoa(renewalWindow), &restInfo)
+	getJSON(t, "http://"+d.addr+"/v1/info?renewalWindow="+strconv.Itoa(renewalWindow), &restInfo)
 	require.Equal(t, info.GetDelegatePubkey(), restInfo.DelegatePubkey)
 	var health struct{ Status string }
-	getJSON(t, "http://"+addr+"/healthz", &health)
+	getJSON(t, "http://"+d.addr+"/healthz", &health)
 	require.Equal(t, "SERVING", health.Status)
+	// the operator UI lives on the admin port only
+	adminURL := "http://" + d.adminAddr
+	resp, err := http.Get(adminURL + "/")
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Contains(t, resp.Header.Get("Content-Type"), "text/html")
+	resp, err = http.Get("http://" + d.addr + "/")
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	getJSON(t, adminURL+"/v1/info", &restInfo)
 
 	serverPubKey, err := application.PubKeyFromHex(info.GetServerPubkey())
 	require.NoError(t, err)
-	tweakedPubKey, err := application.PubKeyFromHex(info.GetEmulatorTweakedPubkey())
-	require.NoError(t, err)
 
-	delegateScript := script.TapscriptsVtxoScript{
-		Closures: []script.Closure{
-			&script.MultisigClosure{PubKeys: []*btcec.PublicKey{serverPubKey, tweakedPubKey}},
-			&script.CSVMultisigClosure{
-				MultisigClosure: script.MultisigClosure{PubKeys: []*btcec.PublicKey{alicePubKey}},
-				Locktime:        arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: exitDelay},
-			},
-		},
-	}
-	tapscripts, err := delegateScript.Encode()
-	require.NoError(t, err)
-	require.Contains(t, tapscripts, info.GetDelegateTapscript())
-	tapKey, _, err := delegateScript.TapTree()
-	require.NoError(t, err)
-	pkScript, err := script.P2TRScript(tapKey)
+	vtxoScript, tapscripts, pkScript := delegateScript(t, info, alicePubKey)
+	tapKey, _, err := vtxoScript.TapTree()
 	require.NoError(t, err)
 
 	// --- register
@@ -186,7 +143,7 @@ func TestDelegateRenewal(t *testing.T) {
 	})
 	t.Logf("asset renewal: %s", renewedAsset.Outpoint.String())
 
-	detail, err := admin.GetDelegation(ctx, &delegateev1.GetDelegationRequest{Address: address})
+	detail, err := client.GetDelegation(ctx, &delegateev1.GetDelegationRequest{Address: address})
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(detail.GetRenewals()), 3)
 	for _, ren := range detail.GetRenewals() {
@@ -200,7 +157,7 @@ func TestDelegateRenewal(t *testing.T) {
 	// --- cancel stops renewals, re-registering resumes them
 	_, err = admin.CancelDelegation(ctx, &delegateev1.CancelDelegationRequest{Address: address})
 	require.NoError(t, err)
-	detail, err = admin.GetDelegation(ctx, &delegateev1.GetDelegationRequest{Address: address})
+	detail, err = client.GetDelegation(ctx, &delegateev1.GetDelegationRequest{Address: address})
 	require.NoError(t, err)
 	require.Equal(t, "cancelled", detail.GetDelegation().GetStatus())
 	_, err = admin.CancelDelegation(ctx, &delegateev1.CancelDelegationRequest{Address: "tark1unknown"})
@@ -209,9 +166,33 @@ func TestDelegateRenewal(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "active", reg.GetDelegation().GetStatus())
 
-	list, err := admin.ListDelegations(ctx, &delegateev1.ListDelegationsRequest{})
+	// the list carries what the scanner saw: this delegation is ours and holds two vtxos
+	require.Eventually(t, func() bool {
+		list, err := admin.ListDelegations(ctx, &delegateev1.ListDelegationsRequest{})
+		if err != nil {
+			return false
+		}
+		for _, listed := range list.GetDelegations() {
+			if listed.GetAddress() == address {
+				return listed.GetManaged() && listed.GetVtxoCount() == 2 && listed.GetTotalAmount() == 2*delegateAmount &&
+					listed.GetNextExpiry() > 0 && listed.GetNextRenewalAt() > 0 && listed.GetLastRenewal().GetSuccess()
+			}
+		}
+		return false
+	}, 30*time.Second, time.Second, "holdings not reported")
+	resp, err = http.Get(adminURL + "/metrics")
 	require.NoError(t, err)
-	require.NotEmpty(t, list.GetDelegations())
+	metrics, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	require.NoError(t, err)
+	require.Regexp(t, `delegatee_renewals_total\{result="ok"\} [1-9]`, string(metrics))
+	require.Contains(t, string(metrics), "delegatee_vtxos_late 0")
+	require.Contains(t, string(metrics), `delegatee_dependency_up{name="scanner"} 1`)
+	st, err := admin.GetStatus(ctx, &delegateev1.GetStatusRequest{})
+	require.NoError(t, err)
+	require.Positive(t, st.GetLastScanAt())
+	require.Equal(t, int64(2), st.GetPollInterval())
+	require.NotNil(t, st.GetIntentFees())
 }
 
 // waitForRenewedVtxo polls the indexer until a settled (non-preconfirmed),
@@ -314,55 +295,13 @@ func TestConcurrentDelegations(t *testing.T) {
 	ctx := t.Context()
 	const n = 10
 
-	dsn := os.Getenv("DELEGATEE_DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://postgres@localhost:5432/delegatee?sslmode=disable"
-	}
-	delegateKey, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	port, adminPort := freePort(t), freePort(t)
-	svc, err := grpcservice.NewService("e2e", &config.Config{
-		ArkURL:            arkURL,
-		EmulatorURL:       emulatorURL,
-		DatabaseURL:       dsn,
-		Port:              port,
-		AdminPort:         adminPort,
-		SecretKey:         delegateKey,
-		PollInterval:      2 * time.Second,
-		RenewalTimeout:    2 * time.Minute,
-		MaxVtxosPerIntent: 16,
-	})
-	require.NoError(t, err)
-	require.NoError(t, svc.Start())
-	t.Cleanup(svc.Stop)
-
-	conn, err := grpc.NewClient(
-		net.JoinHostPort("localhost", strconv.Itoa(int(port))),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = conn.Close() })
-	client := delegateev1.NewDelegateeServiceClient(conn)
-	adminConn, err := grpc.NewClient(
-		net.JoinHostPort("localhost", strconv.Itoa(int(adminPort))),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = adminConn.Close() })
-	admin := delegateev1.NewAdminServiceClient(adminConn)
-
-	indexerSvc, err := grpcindexer.NewClient(arkURL)
-	require.NoError(t, err)
-	t.Cleanup(indexerSvc.Close)
+	d := startDelegatee(t)
+	client, admin, indexerSvc := d.client, d.admin, d.indexer
 
 	alice, _ := setupAlice(t)
 	fundAndSettle(t, alice, 200_000)
 
 	info, err := client.GetInfo(ctx, &delegateev1.GetInfoRequest{RenewalWindow: renewalWindow})
-	require.NoError(t, err)
-	serverPubKey, err := application.PubKeyFromHex(info.GetServerPubkey())
-	require.NoError(t, err)
-	tweakedPubKey, err := application.PubKeyFromHex(info.GetEmulatorTweakedPubkey())
 	require.NoError(t, err)
 
 	// one delegate address per user, all funded by a single tx
@@ -371,21 +310,8 @@ func TestConcurrentDelegations(t *testing.T) {
 	for i := range n {
 		userKey, err := btcec.NewPrivateKey()
 		require.NoError(t, err)
-		vtxoScript := script.TapscriptsVtxoScript{
-			Closures: []script.Closure{
-				&script.MultisigClosure{PubKeys: []*btcec.PublicKey{serverPubKey, tweakedPubKey}},
-				&script.CSVMultisigClosure{
-					MultisigClosure: script.MultisigClosure{PubKeys: []*btcec.PublicKey{userKey.PubKey()}},
-					Locktime:        arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: exitDelay},
-				},
-			},
-		}
-		tapscripts, err := vtxoScript.Encode()
-		require.NoError(t, err)
-		tapKey, _, err := vtxoScript.TapTree()
-		require.NoError(t, err)
-		pkScripts[i], err = script.P2TRScript(tapKey)
-		require.NoError(t, err)
+		var tapscripts []string
+		_, tapscripts, pkScripts[i] = delegateScript(t, info, userKey.PubKey())
 
 		reg, err := client.RegisterDelegation(ctx, &delegateev1.RegisterDelegationRequest{Tapscripts: tapscripts, RenewalWindow: renewalWindow})
 		require.NoError(t, err)
@@ -420,46 +346,8 @@ func TestRenewalWindows(t *testing.T) {
 	}
 	ctx := t.Context()
 
-	dsn := os.Getenv("DELEGATEE_DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://postgres@localhost:5432/delegatee?sslmode=disable"
-	}
-	delegateKey, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	port, adminPort := freePort(t), freePort(t)
-	svc, err := grpcservice.NewService("e2e", &config.Config{
-		ArkURL:            arkURL,
-		EmulatorURL:       emulatorURL,
-		DatabaseURL:       dsn,
-		Port:              port,
-		AdminPort:         adminPort,
-		SecretKey:         delegateKey,
-		PollInterval:      2 * time.Second,
-		RenewalTimeout:    2 * time.Minute,
-		MaxVtxosPerIntent: 16,
-	})
-	require.NoError(t, err)
-	require.NoError(t, svc.Start())
-	t.Cleanup(svc.Stop)
-
-	conn, err := grpc.NewClient(
-		net.JoinHostPort("localhost", strconv.Itoa(int(port))),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = conn.Close() })
-	client := delegateev1.NewDelegateeServiceClient(conn)
-	adminConn, err := grpc.NewClient(
-		net.JoinHostPort("localhost", strconv.Itoa(int(adminPort))),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = adminConn.Close() })
-	admin := delegateev1.NewAdminServiceClient(adminConn)
-
-	indexerSvc, err := grpcindexer.NewClient(arkURL)
-	require.NoError(t, err)
-	t.Cleanup(indexerSvc.Close)
+	d := startDelegatee(t)
+	client, admin, indexerSvc := d.client, d.admin, d.indexer
 
 	alice, alicePubKey := setupAlice(t)
 	fundAndSettle(t, alice, 100_000)
@@ -485,25 +373,7 @@ func TestRenewalWindows(t *testing.T) {
 	for _, window := range []int64{600, 3000, 0, 60} {
 		info, err := client.GetInfo(ctx, &delegateev1.GetInfoRequest{RenewalWindow: window})
 		require.NoError(t, err)
-		serverPubKey, err := application.PubKeyFromHex(info.GetServerPubkey())
-		require.NoError(t, err)
-		tweakedPubKey, err := application.PubKeyFromHex(info.GetEmulatorTweakedPubkey())
-		require.NoError(t, err)
-		vtxoScript := script.TapscriptsVtxoScript{
-			Closures: []script.Closure{
-				&script.MultisigClosure{PubKeys: []*btcec.PublicKey{serverPubKey, tweakedPubKey}},
-				&script.CSVMultisigClosure{
-					MultisigClosure: script.MultisigClosure{PubKeys: []*btcec.PublicKey{alicePubKey}},
-					Locktime:        arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: exitDelay},
-				},
-			},
-		}
-		tapscripts, err := vtxoScript.Encode()
-		require.NoError(t, err)
-		tapKey, _, err := vtxoScript.TapTree()
-		require.NoError(t, err)
-		pkScript, err := script.P2TRScript(tapKey)
-		require.NoError(t, err)
+		_, tapscripts, pkScript := delegateScript(t, info, alicePubKey)
 
 		reg, err := client.RegisterDelegation(ctx, &delegateev1.RegisterDelegationRequest{
 			Tapscripts: tapscripts, RenewalWindow: window,
@@ -544,7 +414,7 @@ func TestRenewalWindows(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resp.Vtxos, 1)
 	require.Equal(t, fundingTxid, resp.Vtxos[0].Txid)
-	detail, err := admin.GetDelegation(ctx, &delegateev1.GetDelegationRequest{Address: small.address})
+	detail, err := client.GetDelegation(ctx, &delegateev1.GetDelegationRequest{Address: small.address})
 	require.NoError(t, err)
 	require.Empty(t, detail.GetRenewals())
 }
@@ -556,57 +426,20 @@ func TestManyDelegations(t *testing.T) {
 		t.Skip("requires the regtest stack")
 	}
 	ctx := t.Context()
-	const n, perIntent = 48, 16
+	// 8 intents: twice as many as are built and finalized at once
+	const n, perIntent = 128, 16
 
-	dsn := os.Getenv("DELEGATEE_DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://postgres@localhost:5432/delegatee?sslmode=disable"
-	}
-	delegateKey, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	port, adminPort := freePort(t), freePort(t)
-	svc, err := grpcservice.NewService("e2e", &config.Config{
-		ArkURL:            arkURL,
-		EmulatorURL:       emulatorURL,
-		DatabaseURL:       dsn,
-		Port:              port,
-		AdminPort:         adminPort,
-		SecretKey:         delegateKey,
-		PollInterval:      15 * time.Second, // first scan after all funding txs landed
-		RenewalTimeout:    3 * time.Minute,
-		MaxVtxosPerIntent: perIntent,
+	d := startDelegatee(t, func(c *config.Config) {
+		c.PollInterval = 40 * time.Second // first scan after all funding txs landed
+		c.RenewalTimeout = 3 * time.Minute
+		c.MaxVtxosPerIntent = perIntent
 	})
-	require.NoError(t, err)
-	require.NoError(t, svc.Start())
-	t.Cleanup(svc.Stop)
-
-	conn, err := grpc.NewClient(
-		net.JoinHostPort("localhost", strconv.Itoa(int(port))),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = conn.Close() })
-	client := delegateev1.NewDelegateeServiceClient(conn)
-	adminConn, err := grpc.NewClient(
-		net.JoinHostPort("localhost", strconv.Itoa(int(adminPort))),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = adminConn.Close() })
-	admin := delegateev1.NewAdminServiceClient(adminConn)
-
-	indexerSvc, err := grpcindexer.NewClient(arkURL)
-	require.NoError(t, err)
-	t.Cleanup(indexerSvc.Close)
+	client, admin, indexerSvc := d.client, d.admin, d.indexer
 
 	alice, _ := setupAlice(t)
-	fundAndSettle(t, alice, 1_000_000)
+	fundAndSettle(t, alice, 2_000_000)
 
 	info, err := client.GetInfo(ctx, &delegateev1.GetInfoRequest{})
-	require.NoError(t, err)
-	serverPubKey, err := application.PubKeyFromHex(info.GetServerPubkey())
-	require.NoError(t, err)
-	tweakedPubKey, err := application.PubKeyFromHex(info.GetEmulatorTweakedPubkey())
 	require.NoError(t, err)
 
 	pkScripts := make([][]byte, n)
@@ -614,21 +447,8 @@ func TestManyDelegations(t *testing.T) {
 	for i := range n {
 		userKey, err := btcec.NewPrivateKey()
 		require.NoError(t, err)
-		vtxoScript := script.TapscriptsVtxoScript{
-			Closures: []script.Closure{
-				&script.MultisigClosure{PubKeys: []*btcec.PublicKey{serverPubKey, tweakedPubKey}},
-				&script.CSVMultisigClosure{
-					MultisigClosure: script.MultisigClosure{PubKeys: []*btcec.PublicKey{userKey.PubKey()}},
-					Locktime:        arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: exitDelay},
-				},
-			},
-		}
-		tapscripts, err := vtxoScript.Encode()
-		require.NoError(t, err)
-		tapKey, _, err := vtxoScript.TapTree()
-		require.NoError(t, err)
-		pkScripts[i], err = script.P2TRScript(tapKey)
-		require.NoError(t, err)
+		var tapscripts []string
+		_, tapscripts, pkScripts[i] = delegateScript(t, info, userKey.PubKey())
 		reg, err := client.RegisterDelegation(ctx, &delegateev1.RegisterDelegationRequest{Tapscripts: tapscripts})
 		require.NoError(t, err)
 		address := reg.GetDelegation().GetAddress()

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
+	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
 	"github.com/arkade-os/arkd/pkg/ark-lib/asset"
 	"github.com/arkade-os/arkd/pkg/ark-lib/extension"
 	"github.com/arkade-os/arkd/pkg/ark-lib/intent"
@@ -28,6 +29,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 // renewalResult is the outcome for one group of inputs: the batch that
@@ -43,28 +45,65 @@ type renewalResult struct {
 // every registered intent has been included.
 func (s *service) renew(ctx context.Context, inputs []renewalInput) []renewalResult {
 	var results []renewalResult
-	var pending []*pendingIntent
-	for start := 0; start < len(inputs); start += s.maxVtxosPerIntent {
-		chunk := inputs[start:min(start+s.maxVtxosPerIntent, len(inputs))]
-		p, err := s.buildIntent(ctx, chunk)
+	// arkd's fee programs can change at any time: read them every cycle, and
+	// settle first which inputs can pay so they don't sink a whole intent
+	fees, err := s.feeEstimator(ctx)
+	if err != nil {
+		return []renewalResult{{inputs: inputs, err: err}}
+	}
+	payable := make([]renewalInput, 0, len(inputs))
+	for _, in := range inputs {
+		fee, err := fees.of(in)
 		if err == nil {
-			pending = append(pending, p)
+			in.output, err = renewalOutput(in.vtxo, in.pkScript, in.delegation.Params, fee)
+		}
+		if err != nil {
+			results = append(results, renewalResult{inputs: []renewalInput{in}, err: err})
 			continue
 		}
-		if len(chunk) == 1 {
-			results = append(results, renewalResult{inputs: chunk, err: err})
-			continue
-		}
-		// one bad vtxo must not block its neighbours: retry them one by one
-		log.WithError(err).WithField("count", len(chunk)).Warn("intent rejected, retrying per vtxo")
-		for _, in := range chunk {
-			single := []renewalInput{in}
-			if p, err := s.buildIntent(ctx, single); err != nil {
-				results = append(results, renewalResult{inputs: single, err: err})
-			} else {
-				pending = append(pending, p)
+		payable = append(payable, in)
+	}
+	inputs = payable
+
+	// intents are independent: build a few at a time, keep them in order
+	type built struct {
+		pending []*pendingIntent
+		failed  []renewalResult
+	}
+	chunks := slices.Collect(slices.Chunk(inputs, s.maxVtxosPerIntent))
+	builds := make([]built, len(chunks))
+	var g errgroup.Group
+	g.SetLimit(concurrency)
+	for i, chunk := range chunks {
+		g.Go(func() error {
+			b := &builds[i]
+			p, err := s.buildIntent(ctx, chunk)
+			if err == nil {
+				b.pending = append(b.pending, p)
+				return nil
 			}
-		}
+			if len(chunk) == 1 {
+				b.failed = append(b.failed, renewalResult{inputs: chunk, err: err})
+				return nil
+			}
+			// one bad vtxo must not block its neighbours: retry them one by one
+			log.WithError(err).WithField("count", len(chunk)).Warn("intent rejected, retrying per vtxo")
+			for _, in := range chunk {
+				single := []renewalInput{in}
+				if p, err := s.buildIntent(ctx, single); err != nil {
+					b.failed = append(b.failed, renewalResult{inputs: single, err: err})
+				} else {
+					b.pending = append(b.pending, p)
+				}
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
+	var pending []*pendingIntent
+	for _, b := range builds {
+		pending = append(pending, b.pending...)
+		results = append(results, b.failed...)
 	}
 	if len(pending) == 0 {
 		return results
@@ -149,7 +188,7 @@ func (s *service) buildIntent(ctx context.Context, inputs []renewalInput) (*pend
 			Sequence:    wire.MaxTxInSequenceNum,
 			WitnessUtxo: &wire.TxOut{Value: int64(in.vtxo.Amount), PkScript: in.pkScript},
 		}
-		outputs[i] = &wire.TxOut{Value: int64(in.vtxo.Amount), PkScript: in.pkScript}
+		outputs[i] = in.output
 		vtxos[i] = in.vtxo
 	}
 	proof, err := intent.New(message, proofInputs, outputs)
@@ -158,6 +197,10 @@ func (s *service) buildIntent(ctx context.Context, inputs []renewalInput) (*pend
 	}
 	ptx := &proof.Packet
 
+	prevTxs, err := s.virtualTxs(ctx, inputs)
+	if err != nil {
+		return nil, err
+	}
 	entries := make([]arkade.EmulatorEntry, 0, len(inputs))
 	for i := range ptx.Inputs {
 		in := inputs[max(i-1, 0)] // input 0 is the bip322 message, it shares input 1's script
@@ -170,11 +213,7 @@ func (s *service) buildIntent(ctx context.Context, inputs []renewalInput) (*pend
 		if i == 0 {
 			continue
 		}
-		prevTx, err := s.virtualTx(ctx, in.vtxo.Txid)
-		if err != nil {
-			return nil, err
-		}
-		if err := txutils.SetArkPsbtField(ptx, i, arkade.PrevArkTxField, *prevTx); err != nil {
+		if err := txutils.SetArkPsbtField(ptx, i, arkade.PrevArkTxField, *prevTxs[in.vtxo.Txid]); err != nil {
 			return nil, err
 		}
 		entries = append(entries, arkade.EmulatorEntry{Vin: uint16(i), Script: in.arkadeScript})
@@ -209,6 +248,39 @@ func (s *service) buildIntent(ctx context.Context, inputs []renewalInput) (*pend
 		intent: emulatorclient.Intent{Proof: signedProof, Message: message},
 		inputs: inputs,
 	}, nil
+}
+
+// feeEstimator prices one input and the output it pays, the way arkd will.
+type feeEstimator struct{ *arkfee.Estimator }
+
+func (s *service) feeEstimator(ctx context.Context) (*feeEstimator, error) {
+	config, err := s.IntentFees(ctx)
+	if err != nil {
+		return nil, err
+	}
+	estimator, err := arkfee.New(config)
+	if err != nil {
+		return nil, fmt.Errorf("arkd intent fees: %w", err)
+	}
+	return &feeEstimator{estimator}, nil
+}
+
+func (f *feeEstimator) of(in renewalInput) (int64, error) {
+	inFee, err := f.EvalOffchainInput(types.VtxoWithTapTree{Vtxo: in.vtxo}.ToArkFeeInput())
+	if err != nil {
+		return 0, fmt.Errorf("intent input fee: %w", err)
+	}
+	// ponytail: priced on the input amount, not the output's. A fee program
+	// that charges small outputs more underpays and arkd rejects the intent;
+	// iterate to a fixed point if such a program ever ships.
+	outFee, err := f.EvalOffchainOutput(arkfee.Output{
+		Amount: in.vtxo.Amount, Script: hex.EncodeToString(in.pkScript),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("intent output fee: %w", err)
+	}
+	// rounded up per input: arkd rounds the total, which is never more
+	return inFee.ToSatoshis() + outFee.ToSatoshis(), nil
 }
 
 // assetPacketFor moves the assets of proof input i to output i-1.
@@ -257,19 +329,33 @@ func assetPacketFor(vtxos []types.Vtxo) (asset.Packet, error) {
 	return asset.NewPacket(groups)
 }
 
-func (s *service) virtualTx(ctx context.Context, txid string) (*wire.MsgTx, error) {
-	resp, err := s.indexer.GetVirtualTxs(ctx, []string{txid})
+// virtualTxs fetches the txs that created the inputs, in one request. The
+// indexer owes no order, so they are matched by their own txid.
+func (s *service) virtualTxs(ctx context.Context, inputs []renewalInput) (map[string]*wire.MsgTx, error) {
+	txids := make([]string, 0, len(inputs))
+	for _, in := range inputs {
+		if !slices.Contains(txids, in.vtxo.Txid) {
+			txids = append(txids, in.vtxo.Txid)
+		}
+	}
+	resp, err := s.indexer.GetVirtualTxs(ctx, txids)
 	if err != nil {
-		return nil, fmt.Errorf("get virtual tx %s: %w", txid, err)
+		return nil, fmt.Errorf("get virtual txs: %w", err)
 	}
-	if resp == nil || len(resp.Txs) == 0 {
-		return nil, fmt.Errorf("virtual tx %s not found", txid)
+	txs := make(map[string]*wire.MsgTx, len(txids))
+	for _, raw := range resp.Txs {
+		ptx, err := psbt.NewFromRawBytes(strings.NewReader(raw), true)
+		if err != nil {
+			return nil, fmt.Errorf("virtual tx: %w", err)
+		}
+		txs[ptx.UnsignedTx.TxHash().String()] = ptx.UnsignedTx
 	}
-	ptx, err := psbt.NewFromRawBytes(strings.NewReader(resp.Txs[0]), true)
-	if err != nil {
-		return nil, err
+	for _, txid := range txids {
+		if txs[txid] == nil {
+			return nil, fmt.Errorf("virtual tx %s not found", txid)
+		}
 	}
-	return ptx.UnsignedTx, nil
+	return txs, nil
 }
 
 // batchHandler is the tree cosigner for one batch session. pending holds
@@ -336,20 +422,16 @@ func (h *batchHandler) OnTreeSigningStarted(
 	if !slices.Contains(event.CosignersPubkeys, h.signerSession.GetPublicKey()) {
 		return true, nil
 	}
-	sweepScript, err := (&script.CSVMultisigClosure{
-		MultisigClosure: script.MultisigClosure{PubKeys: []*btcec.PublicKey{h.svc.forfeitPubKey}},
-		Locktime:        h.batchExpiry,
-	}).Script()
+	root, err := sweepTapTreeRoot(h.svc.forfeitPubKey, h.batchExpiry)
 	if err != nil {
 		return false, err
 	}
-	root := txscript.AssembleTaprootScriptTree(txscript.NewBaseTapLeaf(sweepScript)).RootNode.TapHash()
 
 	commitmentTx, err := psbt.NewFromRawBytes(strings.NewReader(event.UnsignedCommitmentTx), true)
 	if err != nil {
 		return false, err
 	}
-	if err := h.signerSession.Init(root.CloneBytes(), commitmentTx.UnsignedTx.TxOut[0].Value, vtxoTree); err != nil {
+	if err := h.signerSession.Init(root, commitmentTx.UnsignedTx.TxOut[0].Value, vtxoTree); err != nil {
 		return false, err
 	}
 	nonces, err := h.signerSession.GetNonces()
@@ -370,40 +452,131 @@ func (h *batchHandler) OnTreeNoncesAggregated(ctx context.Context, event client.
 }
 
 func (h *batchHandler) OnBatchFinalization(
-	ctx context.Context, event client.BatchFinalizationEvent, _, connectorTree *tree.TxTree,
+	ctx context.Context, event client.BatchFinalizationEvent, vtxoTree, connectorTree *tree.TxTree,
 ) ([]string, error) {
-	if connectorTree == nil {
-		return nil, fmt.Errorf("connector tree is nil")
+	// the point of no return: a forfeit hands the old vtxo to arkd, so the
+	// batch must verifiably contain the new one. The users are not here to check.
+	var outputs []*wire.TxOut
+	for _, p := range h.inBatch {
+		for _, in := range p.inputs {
+			outputs = append(outputs, in.output)
+		}
+	}
+	if err := validateBatch(event.Tx, vtxoTree, connectorTree, h.svc.forfeitPubKey, h.batchExpiry, outputs); err != nil {
+		return nil, fmt.Errorf("refusing to forfeit: %w", err)
 	}
 	flatConnectorTree, err := connectorTree.Serialize()
 	if err != nil {
 		return nil, err
 	}
 	// arkd only streams the connector leaves assigned to our vtxos; any
-	// unused one is valid for any of them, so hand them out in order
+	// unused one is valid for any of them, so hand them out in order. Then
+	// finalize the intents side by side: arkd waits for forfeits only so long.
 	connectors := connectorTree.Leaves()
-	var signed []string
-	for _, p := range h.inBatch {
+	forfeitsByIntent := make([][]string, len(h.inBatch))
+	for i, p := range h.inBatch {
 		if len(connectors) < len(p.inputs) {
 			return nil, fmt.Errorf("got %d connectors for %d vtxos", len(connectors), len(p.inputs))
 		}
-		forfeits, err := h.buildForfeits(p.inputs, connectors[:len(p.inputs)])
-		if err != nil {
+		if forfeitsByIntent[i], err = h.buildForfeits(p.inputs, connectors[:len(p.inputs)]); err != nil {
 			return nil, err
 		}
 		connectors = connectors[len(p.inputs):]
-		signedForfeits, signedCommitmentTx, err := h.svc.emulator.SubmitFinalization(
-			ctx, p.intent, forfeits, flatConnectorTree, event.Tx,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("emulator finalization: %w", err)
-		}
-		if err := h.svc.ark.SubmitSignedForfeitTxs(ctx, signedForfeits, signedCommitmentTx); err != nil {
-			return nil, err
-		}
-		signed = append(signed, signedForfeits...)
 	}
+	// nothing is sent before every forfeit could be built
+	signedByIntent := make([][]string, len(h.inBatch))
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(concurrency)
+	for i, p := range h.inBatch {
+		g.Go(func() error {
+			signedForfeits, signedCommitmentTx, err := h.svc.emulator.SubmitFinalization(
+				ctx, p.intent, forfeitsByIntent[i], flatConnectorTree, event.Tx,
+			)
+			if err != nil {
+				return fmt.Errorf("emulator finalization: %w", err)
+			}
+			signedByIntent[i] = signedForfeits
+			return h.svc.ark.SubmitSignedForfeitTxs(ctx, signedForfeits, signedCommitmentTx)
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+	signed := slices.Concat(signedByIntent...)
 	return signed, nil
+}
+
+// sweepTapTreeRoot is the script path of every vtxo tree output: arkd alone,
+// once the batch has expired.
+func sweepTapTreeRoot(forfeitPubKey *btcec.PublicKey, batchExpiry arklib.RelativeLocktime) ([]byte, error) {
+	sweepScript, err := (&script.CSVMultisigClosure{
+		MultisigClosure: script.MultisigClosure{PubKeys: []*btcec.PublicKey{forfeitPubKey}},
+		Locktime:        batchExpiry,
+	}).Script()
+	if err != nil {
+		return nil, err
+	}
+	root := txscript.AssembleTaprootScriptTree(txscript.NewBaseTapLeaf(sweepScript)).RootNode.TapHash()
+	return root.CloneBytes(), nil
+}
+
+// validateBatch checks what arkd proposes before any forfeit is signed: a
+// well-formed vtxo tree hanging off the commitment tx, one distinct leaf
+// output per expected output, and connectors created by that same tx, so the
+// forfeits are only ever valid together with the new vtxos.
+func validateBatch(
+	commitmentTx string, vtxoTree, connectorTree *tree.TxTree,
+	forfeitPubKey *btcec.PublicKey, batchExpiry arklib.RelativeLocktime, outputs []*wire.TxOut,
+) error {
+	if vtxoTree == nil || vtxoTree.Root == nil {
+		return fmt.Errorf("vtxo tree is missing")
+	}
+	if connectorTree == nil || connectorTree.Root == nil {
+		return fmt.Errorf("connector tree is missing")
+	}
+	commitment, err := psbt.NewFromRawBytes(strings.NewReader(commitmentTx), true)
+	if err != nil {
+		return fmt.Errorf("commitment tx: %w", err)
+	}
+	commitmentTxid := commitment.UnsignedTx.TxHash()
+
+	if err := tree.ValidateVtxoTree(vtxoTree, commitment, forfeitPubKey, batchExpiry); err != nil {
+		return fmt.Errorf("vtxo tree: %w", err)
+	}
+	if root := vtxoTree.Root.UnsignedTx.TxIn[0].PreviousOutPoint; root.Hash != commitmentTxid || root.Index != 0 {
+		return fmt.Errorf("vtxo tree spends %s, not the batch output of commitment tx %s", root, commitmentTxid)
+	}
+	if err := connectorTree.Validate(); err != nil {
+		return fmt.Errorf("connector tree: %w", err)
+	}
+	if root := connectorTree.Root.UnsignedTx.TxIn[0].PreviousOutPoint; root.Hash != commitmentTxid {
+		return fmt.Errorf("connectors spend %s, not commitment tx %s", root, commitmentTxid)
+	}
+
+	return leavesPay(vtxoTree.Leaves(), outputs)
+}
+
+// leavesPay reports the first expected output no leaf pays. Two vtxos of the
+// same script and amount need two leaf outputs.
+func leavesPay(leaves []*psbt.Packet, outputs []*wire.TxOut) error {
+	type output struct {
+		script string
+		value  int64
+	}
+	available := map[output]int{}
+	for _, leaf := range leaves {
+		for _, out := range leaf.UnsignedTx.TxOut {
+			available[output{string(out.PkScript), out.Value}]++
+		}
+	}
+	for _, out := range outputs {
+		k := output{string(out.PkScript), out.Value}
+		if available[k] == 0 {
+			return fmt.Errorf("no leaf pays %d sats to %x", out.Value, out.PkScript)
+		}
+		available[k]--
+	}
+	return nil
 }
 
 func (h *batchHandler) buildForfeits(inputs []renewalInput, connectors []*psbt.Packet) ([]string, error) {

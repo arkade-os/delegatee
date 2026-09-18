@@ -7,20 +7,49 @@ package queries
 
 import (
 	"context"
+	"time"
 
 	"github.com/lib/pq"
 )
 
 const cancelDelegation = `-- name: CancelDelegation :execrows
-UPDATE delegations SET status = 'cancelled', updated_at = NOW() WHERE address = $1
+UPDATE delegations SET status = $1, updated_at = NOW() WHERE address = $2
 `
 
-func (q *Queries) CancelDelegation(ctx context.Context, address string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, cancelDelegation, address)
+type CancelDelegationParams struct {
+	Status  string
+	Address string
+}
+
+func (q *Queries) CancelDelegation(ctx context.Context, arg CancelDelegationParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, cancelDelegation, arg.Status, arg.Address)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const countActiveDelegations = `-- name: CountActiveDelegations :one
+SELECT COUNT(*) FROM delegations WHERE status = 'active'
+`
+
+func (q *Queries) CountActiveDelegations(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countActiveDelegations)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const deleteRenewalsBefore = `-- name: DeleteRenewalsBefore :exec
+DELETE FROM renewals r WHERE r.attempted_at < $1
+    -- a failure is stored once: keep it while it is the delegation's latest state
+    AND EXISTS (SELECT 1 FROM renewals newer
+                WHERE newer.delegation_id = r.delegation_id AND newer.attempted_at > r.attempted_at)
+`
+
+func (q *Queries) DeleteRenewalsBefore(ctx context.Context, before time.Time) error {
+	_, err := q.db.ExecContext(ctx, deleteRenewalsBefore, before)
+	return err
 }
 
 const insertRenewal = `-- name: InsertRenewal :exec
@@ -48,7 +77,7 @@ func (q *Queries) InsertRenewal(ctx context.Context, arg InsertRenewalParams) er
 }
 
 const selectDelegation = `-- name: SelectDelegation :one
-SELECT id, address, tapscripts, renewal_window, status, created_at, updated_at FROM delegations WHERE address = $1
+SELECT id, address, tapscripts, renewal_window, status, created_at, updated_at, max_fee FROM delegations WHERE address = $1
 `
 
 func (q *Queries) SelectDelegation(ctx context.Context, address string) (Delegation, error) {
@@ -62,12 +91,13 @@ func (q *Queries) SelectDelegation(ctx context.Context, address string) (Delegat
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MaxFee,
 	)
 	return i, err
 }
 
 const selectDelegations = `-- name: SelectDelegations :many
-SELECT id, address, tapscripts, renewal_window, status, created_at, updated_at FROM delegations
+SELECT id, address, tapscripts, renewal_window, status, created_at, updated_at, max_fee FROM delegations
 WHERE $1::text = '' OR status = $1::text
 ORDER BY created_at DESC
 `
@@ -89,6 +119,43 @@ func (q *Queries) SelectDelegations(ctx context.Context, status string) ([]Deleg
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.MaxFee,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const selectLastRenewals = `-- name: SelectLastRenewals :many
+SELECT DISTINCT ON (delegation_id) id, delegation_id, outpoints, commitment_txid, success, error, attempted_at FROM renewals
+ORDER BY delegation_id, attempted_at DESC
+`
+
+func (q *Queries) SelectLastRenewals(ctx context.Context) ([]Renewal, error) {
+	rows, err := q.db.QueryContext(ctx, selectLastRenewals)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Renewal
+	for rows.Next() {
+		var i Renewal
+		if err := rows.Scan(
+			&i.ID,
+			&i.DelegationID,
+			pq.Array(&i.Outpoints),
+			&i.CommitmentTxid,
+			&i.Success,
+			&i.Error,
+			&i.AttemptedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -147,21 +214,27 @@ func (q *Queries) SelectRenewals(ctx context.Context, arg SelectRenewalsParams) 
 }
 
 const upsertDelegation = `-- name: UpsertDelegation :one
-INSERT INTO delegations (address, tapscripts, renewal_window)
-VALUES ($1, $2, $3)
+INSERT INTO delegations (address, tapscripts, renewal_window, max_fee)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT (address) DO UPDATE SET status = 'active', updated_at = NOW()
-    WHERE delegations.status = 'cancelled'
-RETURNING id, address, tapscripts, renewal_window, status, created_at, updated_at
+    WHERE delegations.status <> 'active'
+RETURNING id, address, tapscripts, renewal_window, status, created_at, updated_at, max_fee
 `
 
 type UpsertDelegationParams struct {
 	Address       string
 	Tapscripts    []string
 	RenewalWindow int64
+	MaxFee        int64
 }
 
 func (q *Queries) UpsertDelegation(ctx context.Context, arg UpsertDelegationParams) (Delegation, error) {
-	row := q.db.QueryRowContext(ctx, upsertDelegation, arg.Address, pq.Array(arg.Tapscripts), arg.RenewalWindow)
+	row := q.db.QueryRowContext(ctx, upsertDelegation,
+		arg.Address,
+		pq.Array(arg.Tapscripts),
+		arg.RenewalWindow,
+		arg.MaxFee,
+	)
 	var i Delegation
 	err := row.Scan(
 		&i.ID,
@@ -171,6 +244,7 @@ func (q *Queries) UpsertDelegation(ctx context.Context, arg UpsertDelegationPara
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MaxFee,
 	)
 	return i, err
 }

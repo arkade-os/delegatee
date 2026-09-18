@@ -16,6 +16,7 @@ type Delegation struct {
 	Status        string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	MaxFee        int64
 }
 
 type Renewal struct {

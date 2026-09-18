@@ -56,16 +56,7 @@ func request_DelegateeService_RegisterDelegation_0(ctx context.Context, marshale
 
 }
 
-func request_AdminService_ListDelegations_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq ListDelegationsRequest
-	var metadata gateway.ServerMetadata
-
-	msg, err := client.ListDelegations(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-
-}
-
-func request_AdminService_GetDelegation_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+func request_DelegateeService_GetDelegation_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client DelegateeServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
 	var protoReq GetDelegationRequest
 	var metadata gateway.ServerMetadata
 
@@ -86,6 +77,53 @@ func request_AdminService_GetDelegation_0(ctx context.Context, marshaler gateway
 	}
 
 	msg, err := client.GetDelegation(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
+func request_DelegateeService_RevokeDelegation_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client DelegateeServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq RevokeDelegationRequest
+	var metadata gateway.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
+		return nil, metadata, gateway.ErrMarshal{Err: err, Inbound: true}
+	}
+
+	var (
+		val string
+		err error
+		_   = err
+	)
+
+	val = pathParams.ByName("address")
+	if val == "" {
+		return nil, metadata, gateway.ErrPathParameterMissing{Name: "address"}
+	}
+
+	protoReq.Address, err = protoconvert.String(val)
+	if err != nil {
+		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "address"}
+	}
+
+	msg, err := client.RevokeDelegation(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
+func request_AdminService_ListDelegations_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq ListDelegationsRequest
+	var metadata gateway.ServerMetadata
+
+	msg, err := client.ListDelegations(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
+func request_AdminService_GetStatus_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq GetStatusRequest
+	var metadata gateway.ServerMetadata
+
+	msg, err := client.GetStatus(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 
 }
@@ -198,6 +236,50 @@ func RegisterDelegateeServiceHandlerClient(ctx context.Context, mux *gateway.Ser
 		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
 	})
 
+	mux.HandleWithParams("GET", "/v1/delegate/:address", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.DelegateeService/GetDelegation", gateway.WithHTTPPathPattern("/v1/delegate/{address}"))
+		if err != nil {
+			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
+			return
+		}
+
+		resp, md, err := request_DelegateeService_GetDelegation_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
+			return
+		}
+
+		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
+	})
+
+	mux.HandleWithParams("POST", "/v1/delegate/:address/revoke", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.DelegateeService/RevokeDelegation", gateway.WithHTTPPathPattern("/v1/delegate/{address}/revoke"))
+		if err != nil {
+			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
+			return
+		}
+
+		resp, md, err := request_DelegateeService_RevokeDelegation_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
+			return
+		}
+
+		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
+	})
+
 }
 
 // RegisterAdminServiceHandlerFromEndpoint is same as RegisterAdminServiceHandler but
@@ -261,19 +343,19 @@ func RegisterAdminServiceHandlerClient(ctx context.Context, mux *gateway.ServeMu
 		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
 	})
 
-	mux.HandleWithParams("GET", "/v1/admin/delegate/:address", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+	mux.HandleWithParams("GET", "/v1/admin/status", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/GetDelegation", gateway.WithHTTPPathPattern("/v1/admin/delegate/{address}"))
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/GetStatus", gateway.WithHTTPPathPattern("/v1/admin/status"))
 		if err != nil {
 			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
 			return
 		}
 
-		resp, md, err := request_AdminService_GetDelegation_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		resp, md, err := request_AdminService_GetStatus_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
 		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)

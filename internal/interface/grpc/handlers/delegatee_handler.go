@@ -25,7 +25,9 @@ func New(version string, svc application.Service) delegateev1.DelegateeServiceSe
 func (h *handler) GetInfo(
 	_ context.Context, req *delegateev1.GetInfoRequest,
 ) (*delegateev1.GetInfoResponse, error) {
-	info, err := h.svc.Info(req.GetRenewalWindow())
+	info, err := h.svc.Info(domain.Params{
+		RenewalWindow: req.GetRenewalWindow(), MaxFee: req.GetMaxFee(),
+	})
 	if err != nil {
 		return nil, toStatus(err)
 	}
@@ -38,7 +40,8 @@ func (h *handler) GetInfo(
 		EmulatorTweakedPubkey: info.EmulatorTweakedPubKey,
 		ArkadeScript:          info.ArkadeScript,
 		DelegateTapscript:     info.DelegateTapscript,
-		RenewalWindow:         info.RenewalWindow,
+		RenewalWindow:         info.Params.RenewalWindow,
+		MaxFee:                info.Params.MaxFee,
 	}, nil
 }
 
@@ -48,11 +51,50 @@ func (h *handler) RegisterDelegation(
 	if len(req.GetTapscripts()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing tapscripts")
 	}
-	d, err := h.svc.RegisterDelegation(ctx, req.GetTapscripts(), req.GetRenewalWindow())
+	d, err := h.svc.RegisterDelegation(ctx, req.GetTapscripts(), domain.Params{
+		RenewalWindow: req.GetRenewalWindow(), MaxFee: req.GetMaxFee(),
+	})
 	if err != nil {
 		return nil, toStatus(err)
 	}
 	return &delegateev1.RegisterDelegationResponse{Delegation: toDelegation(d)}, nil
+}
+
+func (h *handler) GetDelegation(
+	ctx context.Context, req *delegateev1.GetDelegationRequest,
+) (*delegateev1.GetDelegationResponse, error) {
+	if req.GetAddress() == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing address")
+	}
+	d, err := h.svc.GetDelegation(ctx, req.GetAddress())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	vtxos, err := h.svc.Vtxos(ctx, d)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	renewals, err := h.svc.ListRenewals(ctx, d)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &delegateev1.GetDelegationResponse{
+		Delegation: toDelegation(d),
+		Vtxos:      h.toVtxos(d, vtxos),
+		Renewals:   toRenewals(renewals),
+	}, nil
+}
+
+func (h *handler) RevokeDelegation(
+	ctx context.Context, req *delegateev1.RevokeDelegationRequest,
+) (*delegateev1.RevokeDelegationResponse, error) {
+	if req.GetAddress() == "" || req.GetPubkey() == "" || req.GetSignature() == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing address, pubkey or signature")
+	}
+	if err := h.svc.RevokeDelegation(ctx, req.GetAddress(), req.GetPubkey(), req.GetSignature(), req.GetTimestamp()); err != nil {
+		return nil, toStatus(err)
+	}
+	return &delegateev1.RevokeDelegationResponse{}, nil
 }
 
 func toStatus(err error) error {
@@ -61,6 +103,10 @@ func toStatus(err error) error {
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, domain.ErrDelegationAlreadyExists):
 		return status.Error(codes.AlreadyExists, err.Error())
+	case errors.Is(err, application.ErrFull):
+		return status.Error(codes.ResourceExhausted, err.Error())
+	case errors.Is(err, application.ErrInvalidSignature):
+		return status.Error(codes.PermissionDenied, err.Error())
 	case errors.Is(err, application.ErrInvalidScript):
 		return status.Error(codes.InvalidArgument, err.Error())
 	default:
@@ -76,12 +122,13 @@ func toDelegation(d *domain.Delegation) *delegateev1.Delegation {
 		Status:        d.Status,
 		Tapscripts:    d.Tapscripts,
 		RenewalWindow: d.RenewalWindow,
+		MaxFee:        d.MaxFee,
 		CreatedAt:     d.CreatedAt.Unix(),
 		UpdatedAt:     d.UpdatedAt.Unix(),
 	}
 }
 
-func toVtxos(vtxos []types.Vtxo) []*delegateev1.Vtxo {
+func (h *handler) toVtxos(d *domain.Delegation, vtxos []types.Vtxo) []*delegateev1.Vtxo {
 	out := make([]*delegateev1.Vtxo, len(vtxos))
 	for i, v := range vtxos {
 		assets := make([]*delegateev1.Asset, len(v.Assets))
@@ -92,6 +139,8 @@ func toVtxos(vtxos []types.Vtxo) []*delegateev1.Vtxo {
 			Outpoint:     v.Outpoint.String(),
 			Amount:       v.Amount,
 			ExpiresAt:    v.ExpiresAt.Unix(),
+			CreatedAt:    v.CreatedAt.Unix(),
+			RenewableAt:  h.svc.DueAt(d, v).Unix(),
 			Preconfirmed: v.Preconfirmed,
 			Assets:       assets,
 		}
@@ -102,13 +151,17 @@ func toVtxos(vtxos []types.Vtxo) []*delegateev1.Vtxo {
 func toRenewals(renewals []domain.Renewal) []*delegateev1.Renewal {
 	out := make([]*delegateev1.Renewal, len(renewals))
 	for i, r := range renewals {
-		out[i] = &delegateev1.Renewal{
-			Outpoints:      r.Outpoints,
-			CommitmentTxid: r.CommitmentTxid,
-			Success:        r.Success,
-			Error:          r.Error,
-			AttemptedAt:    r.AttemptedAt.Unix(),
-		}
+		out[i] = toRenewal(r)
 	}
 	return out
+}
+
+func toRenewal(r domain.Renewal) *delegateev1.Renewal {
+	return &delegateev1.Renewal{
+		Outpoints:      r.Outpoints,
+		CommitmentTxid: r.CommitmentTxid,
+		Success:        r.Success,
+		Error:          r.Error,
+		AttemptedAt:    r.AttemptedAt.Unix(),
+	}
 }

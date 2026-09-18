@@ -35,6 +35,15 @@ type Config struct {
 	// MaxVtxosPerIntent: the covenant runs 4 OP_INSPECTINTENTMESSAGE per input
 	// and the emulator allows 64 per request, so 16 is the ceiling.
 	MaxVtxosPerIntent int
+	// MaxDelegations caps active delegations, so that flooding the public
+	// API cannot delay the renewals of the ones already registered.
+	MaxDelegations int
+	// PublicRateLimit is the requests per second one client IP may make on
+	// the public port, with a burst of ten times that. 0 disables it.
+	PublicRateLimit float64
+	// AdminPassword, when set, is required on the admin port (HTTP basic
+	// auth, user "admin"). Empty leaves the port open: private networks only.
+	AdminPassword string
 }
 
 func LoadConfig() (*Config, error) {
@@ -73,6 +82,13 @@ func LoadConfig() (*Config, error) {
 	if cfg.MaxVtxosPerIntent, err = envInt("MAX_VTXOS_PER_INTENT", 16); err != nil {
 		return nil, err
 	}
+	if cfg.MaxDelegations, err = envInt("MAX_DELEGATIONS", 50_000); err != nil {
+		return nil, err
+	}
+	cfg.AdminPassword = os.Getenv(envPrefix + "ADMIN_PASSWORD")
+	if cfg.PublicRateLimit, err = envFloat("PUBLIC_RATE_LIMIT", 5); err != nil {
+		return nil, err
+	}
 	if cfg.SecretKey, err = loadSecretKey(); err != nil {
 		return nil, err
 	}
@@ -98,10 +114,19 @@ func (c *Config) AppService(ctx context.Context) (application.Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("connect to emulator: %w", err)
 	}
-	return application.NewService(
+	svc, err := application.NewService(
 		ctx, repo, ark, indexerSvc, emulatorclient.NewGRPCClient(emuConn),
-		c.SecretKey, c.PollInterval, c.RenewalTimeout, c.MaxVtxosPerIntent,
+		c.SecretKey, c.PollInterval, c.RenewalTimeout, c.MaxVtxosPerIntent, c.MaxDelegations,
 	)
+	if err != nil {
+		// main retries until arkd and the emulator are up: don't leak a pool per attempt
+		_ = repo.Close()
+		_ = emuConn.Close()
+		ark.Close()
+		indexerSvc.Close()
+		return nil, err
+	}
+	return svc, nil
 }
 
 // grpcTarget turns a URL like https://host/ into host:443 with TLS, and
@@ -120,8 +145,18 @@ func grpcTarget(url string) (string, credentials.TransportCredentials) {
 	return target, creds
 }
 
+// loadSecretKey reads SECRET_KEY, or the file SECRET_KEY_FILE points to
+// (docker and kubernetes secrets), which wins when both are set.
 func loadSecretKey() (*btcec.PrivateKey, error) {
-	raw, err := hex.DecodeString(os.Getenv(envPrefix + "SECRET_KEY"))
+	keyHex := os.Getenv(envPrefix + "SECRET_KEY")
+	if path := os.Getenv(envPrefix + "SECRET_KEY_FILE"); path != "" {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("%sSECRET_KEY_FILE: %w", envPrefix, err)
+		}
+		keyHex = strings.TrimSpace(string(content))
+	}
+	raw, err := hex.DecodeString(keyHex)
 	if err != nil || len(raw) != 32 {
 		return nil, fmt.Errorf("%sSECRET_KEY must be 32 bytes hex", envPrefix)
 	}
@@ -140,6 +175,18 @@ func envInt(key string, def int) (int, error) {
 	v, err := strconv.Atoi(s)
 	if err != nil {
 		return 0, fmt.Errorf("%s%s must be an integer: %w", envPrefix, key, err)
+	}
+	return v, nil
+}
+
+func envFloat(key string, def float64) (float64, error) {
+	s := os.Getenv(envPrefix + key)
+	if s == "" {
+		return def, nil
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil || v < 0 {
+		return 0, fmt.Errorf("%s%s must be a non-negative number", envPrefix, key)
 	}
 	return v, nil
 }

@@ -3,6 +3,9 @@ package handlers
 import (
 	"context"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/arkade-os/delegatee/internal/core/application"
 	grpchealth "google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -28,7 +31,7 @@ func (h *healthHandler) Check(
 }
 
 func (h *healthHandler) Watch(_ *grpchealth.HealthCheckRequest, _ grpchealth.Health_WatchServer) error {
-	return nil
+	return status.Error(codes.Unimplemented, "watch is not supported, poll Check")
 }
 
 func (h *healthHandler) List(

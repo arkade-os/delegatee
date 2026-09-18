@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"time"
 
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/core/application"
@@ -24,36 +25,54 @@ func (h *adminHandler) ListDelegations(
 	if err != nil {
 		return nil, toStatus(err)
 	}
+	last, err := h.svc.LastRenewals(ctx)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	st := h.svc.Status()
 	out := make([]*delegateev1.Delegation, len(ds))
 	for i := range ds {
 		out[i] = toDelegation(&ds[i])
+		out[i].Tapscripts = nil // most of a row's bytes, and only GetDelegation's callers use them
+		if ren, ok := last[ds[i].ID]; ok {
+			out[i].LastRenewal = toRenewal(ren)
+		}
+		if held, ok := st.Holdings[ds[i].ID]; ok {
+			out[i].Managed = true
+			out[i].VtxoCount = int32(held.Vtxos)
+			out[i].TotalAmount = held.Amount
+			if !held.NextExpiry.IsZero() {
+				out[i].NextExpiry = held.NextExpiry.Unix()
+				out[i].NextRenewalAt = held.NextDue.Unix()
+			}
+		}
 	}
 	return &delegateev1.ListDelegationsResponse{Delegations: out}, nil
 }
 
-func (h *adminHandler) GetDelegation(
-	ctx context.Context, req *delegateev1.GetDelegationRequest,
-) (*delegateev1.GetDelegationResponse, error) {
-	if req.GetAddress() == "" {
-		return nil, status.Error(codes.InvalidArgument, "missing address")
+func (h *adminHandler) GetStatus(
+	ctx context.Context, _ *delegateev1.GetStatusRequest,
+) (*delegateev1.GetStatusResponse, error) {
+	st := h.svc.Status()
+	resp := &delegateev1.GetStatusResponse{
+		RenewingVtxos: int32(st.RenewingVtxos),
+		PollInterval:  int64(st.PollInterval.Seconds()),
 	}
-	d, err := h.svc.GetDelegation(ctx, req.GetAddress())
-	if err != nil {
-		return nil, toStatus(err)
+	// bounded and optional: the UI polls this, also while arkd is down
+	feesCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	if f, err := h.svc.IntentFees(feesCtx); err == nil {
+		resp.IntentFees = &delegateev1.IntentFees{
+			OffchainInput:  f.IntentOffchainInputProgram,
+			OnchainInput:   f.IntentOnchainInputProgram,
+			OffchainOutput: f.IntentOffchainOutputProgram,
+			OnchainOutput:  f.IntentOnchainOutputProgram,
+		}
 	}
-	vtxos, err := h.svc.Vtxos(ctx, d)
-	if err != nil {
-		return nil, toStatus(err)
+	if !st.LastScan.IsZero() {
+		resp.LastScanAt = st.LastScan.Unix()
 	}
-	renewals, err := h.svc.ListRenewals(ctx, d)
-	if err != nil {
-		return nil, toStatus(err)
-	}
-	return &delegateev1.GetDelegationResponse{
-		Delegation: toDelegation(d),
-		Vtxos:      toVtxos(vtxos),
-		Renewals:   toRenewals(renewals),
-	}, nil
+	return resp, nil
 }
 
 func (h *adminHandler) CancelDelegation(

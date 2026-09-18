@@ -8,11 +8,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
+	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
 	"github.com/arkade-os/arkd/pkg/ark-lib/tree"
 	"github.com/arkade-os/arkd/pkg/client-lib/client"
@@ -25,12 +27,30 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/psbt"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
-var ErrInvalidScript = errors.New("invalid vtxo script")
+var (
+	ErrInvalidScript = errors.New("invalid vtxo script")
+	// ErrInvalidSignature is a revocation the owner did not sign.
+	ErrInvalidSignature = errors.New("invalid revocation")
+	// ErrFull protects the delegations already registered: every active one
+	// costs an indexer lookup per poll, so an unbounded table delays renewals.
+	ErrFull = errors.New("this delegatee accepts no more delegations")
+)
 
-// Info is what a wallet needs to build a delegate address for one renewal window.
+// a vtxo script is a handful of small leaves; anything bigger is not one
+const (
+	maxTapscripts   = 32
+	maxTapscriptLen = 2048 // hex chars
+)
+
+// renewalsRetention bounds the history; the latest renewal of a delegation is always kept.
+const renewalsRetention = 30 * 24 * time.Hour
+
+// Info is what a wallet needs to build a delegate address for one set of params.
 type Info struct {
 	Network               string
 	DelegatePubKey        string
@@ -39,19 +59,54 @@ type Info struct {
 	EmulatorTweakedPubKey string
 	ArkadeScript          string
 	DelegateTapscript     string
-	RenewalWindow         int64
+	Params                domain.Params
+}
+
+// Holdings is what the last scan saw at one delegation.
+type Holdings struct {
+	Vtxos      int
+	Amount     uint64
+	NextExpiry time.Time // zero without vtxos
+	NextDue    time.Time // when the first of them becomes renewable
+	// Late counts vtxos renewable for a while and still not renewed: past
+	// the last quarter of the time between renewable and expiry.
+	Late       int
+	LateAmount uint64
+}
+
+// Status is the scanner's state, for operators. It never depends on arkd:
+// it must stay visible during an outage.
+type Status struct {
+	LastScan      time.Time // zero until the first scan completes
+	RenewingVtxos int       // vtxos in the batch session in flight, if any
+	PollInterval  time.Duration
+	// Renewed and Failed count vtxo renewals since the process started.
+	Renewed, Failed uint64
+	// Holdings by delegation id, for the active delegations this key can
+	// renew. An active delegation missing here was registered under another key.
+	Holdings map[int64]Holdings
 }
 
 type Service interface {
 	Start()
 	Stop()
-	Info(renewalWindow int64) (Info, error)
-	RegisterDelegation(ctx context.Context, tapscripts []string, renewalWindow int64) (*domain.Delegation, error)
+	// Info and RegisterDelegation default a zero renewal window to DefaultRenewalWindow.
+	Info(params domain.Params) (Info, error)
+	RegisterDelegation(ctx context.Context, tapscripts []string, params domain.Params) (*domain.Delegation, error)
 	CancelDelegation(ctx context.Context, address string) error
+	// RevokeDelegation is CancelDelegation for the owner, who proves it with an exit key.
+	RevokeDelegation(ctx context.Context, address, pubKeyHex, signatureHex string, timestamp int64) error
 	GetDelegation(ctx context.Context, address string) (*domain.Delegation, error)
 	ListDelegations(ctx context.Context) ([]domain.Delegation, error)
 	ListRenewals(ctx context.Context, d *domain.Delegation) ([]domain.Renewal, error)
+	LastRenewals(ctx context.Context) (map[int64]domain.Renewal, error)
+	Status() Status
+	CountActive(ctx context.Context) (int64, error)
+	// IntentFees is what arkd charges right now.
+	IntentFees(ctx context.Context) (arkfee.Config, error)
 	Vtxos(ctx context.Context, d *domain.Delegation) ([]types.Vtxo, error)
+	// DueAt is when one of the delegation's vtxos becomes renewable.
+	DueAt(d *domain.Delegation, v types.Vtxo) time.Time
 	Health(ctx context.Context) map[string]error
 }
 
@@ -64,6 +119,7 @@ type service struct {
 	pollInterval      time.Duration
 	renewalTimeout    time.Duration
 	maxVtxosPerIntent int
+	maxDelegations    int
 
 	network           arklib.Network
 	serverPubKey      *btcec.PublicKey
@@ -72,10 +128,36 @@ type service struct {
 	emulatorPubKey    *btcec.PublicKey
 	delegatePubKeyHex string
 
-	renewing atomic.Bool
-	wg       sync.WaitGroup
-	stop     context.CancelFunc
-	stopped  chan struct{}
+	renewing atomic.Int64 // vtxos in the batch session in flight
+	renewed  atomic.Uint64
+	failed   atomic.Uint64
+	started  time.Time
+	// lastFailure is the last error per outpoint, only touched by the one
+	// renewal goroutine. Lost on restart: the failure is then reported again.
+	lastFailure map[string]string
+
+	// watched caches what scan derives from a delegation (covenant, leaf
+	// proof, script): it never changes, and deriving it is most of a scan's
+	// cpu. nil for a delegation of another key. Only touched by scan.
+	watched map[int64]*watched
+
+	// mu guards what the last completed scan saw, for Status
+	mu       sync.Mutex
+	lastScan time.Time
+	holdings map[int64]Holdings
+
+	wg      sync.WaitGroup
+	stop    context.CancelFunc
+	stopped chan struct{}
+}
+
+// watched is an active delegation this key can renew, ready to build intents.
+type watched struct {
+	delegation domain.Delegation
+	pkScript   []byte
+	script     string // hex pkScript, as the indexer keys vtxos
+	leaf       *psbt.TaprootTapLeafScript
+	covenant   *covenant
 }
 
 type renewalInput struct {
@@ -84,9 +166,10 @@ type renewalInput struct {
 	pkScript     []byte
 	leaf         *psbt.TaprootTapLeafScript
 	arkadeScript []byte
+	output       *wire.TxOut // set by renew once the fee is known
 }
 
-// covenant is the delegate leaf for one renewal window.
+// covenant is the delegate leaf for one set of params.
 type covenant struct {
 	arkadeScript []byte
 	tweakedKey   *btcec.PublicKey
@@ -101,10 +184,10 @@ func NewService(
 	emulator emulatorclient.TransportClient,
 	key *btcec.PrivateKey,
 	pollInterval, renewalTimeout time.Duration,
-	maxVtxosPerIntent int,
+	maxVtxosPerIntent, maxDelegations int,
 ) (Service, error) {
-	if maxVtxosPerIntent <= 0 {
-		return nil, fmt.Errorf("max vtxos per intent must be positive")
+	if maxVtxosPerIntent <= 0 || maxDelegations <= 0 {
+		return nil, fmt.Errorf("max vtxos per intent and max delegations must be positive")
 	}
 	arkInfo, err := ark.GetInfo(ctx)
 	if err != nil {
@@ -148,20 +231,24 @@ func NewService(
 		pollInterval:      pollInterval,
 		renewalTimeout:    renewalTimeout,
 		maxVtxosPerIntent: maxVtxosPerIntent,
+		maxDelegations:    maxDelegations,
 		network:           network,
 		serverPubKey:      serverPubKey,
 		forfeitPubKey:     forfeitPubKey,
 		forfeitPkScript:   forfeitPkScript,
 		emulatorPubKey:    emuPubKey,
 		delegatePubKeyHex: tree.NewTreeSignerSession(key).GetPublicKey(),
+		lastFailure:       map[string]string{},
+		watched:           map[int64]*watched{},
+		started:           time.Now(),
 	}, nil
 }
 
-func (s *service) covenantFor(renewalWindow int64) (*covenant, error) {
-	if renewalWindow < 0 {
-		return nil, fmt.Errorf("%w: renewal window must be positive", ErrInvalidScript)
+func (s *service) covenantFor(params domain.Params) (*covenant, error) {
+	if err := validateParams(params); err != nil {
+		return nil, err
 	}
-	arkadeScript, err := buildArkadeScript(s.delegatePubKeyHex, renewalWindow)
+	arkadeScript, err := buildArkadeScript(s.delegatePubKeyHex, params)
 	if err != nil {
 		return nil, err
 	}
@@ -175,11 +262,16 @@ func (s *service) covenantFor(renewalWindow int64) (*covenant, error) {
 	return &covenant{arkadeScript: arkadeScript, tweakedKey: tweaked, tapscript: tapscript}, nil
 }
 
-func (s *service) Info(renewalWindow int64) (Info, error) {
-	if renewalWindow == 0 {
-		renewalWindow = DefaultRenewalWindow
+func withDefaults(params domain.Params) domain.Params {
+	if params.RenewalWindow == 0 {
+		params.RenewalWindow = DefaultRenewalWindow
 	}
-	c, err := s.covenantFor(renewalWindow)
+	return params
+}
+
+func (s *service) Info(params domain.Params) (Info, error) {
+	params = withDefaults(params)
+	c, err := s.covenantFor(params)
 	if err != nil {
 		return Info{}, err
 	}
@@ -191,7 +283,7 @@ func (s *service) Info(renewalWindow int64) (Info, error) {
 		EmulatorTweakedPubKey: hex.EncodeToString(c.tweakedKey.SerializeCompressed()),
 		ArkadeScript:          hex.EncodeToString(c.arkadeScript),
 		DelegateTapscript:     hex.EncodeToString(c.tapscript),
-		RenewalWindow:         renewalWindow,
+		Params:                params,
 	}, nil
 }
 
@@ -246,12 +338,18 @@ func (s *service) Stop() {
 }
 
 func (s *service) RegisterDelegation(
-	ctx context.Context, tapscripts []string, renewalWindow int64,
+	ctx context.Context, tapscripts []string, params domain.Params,
 ) (*domain.Delegation, error) {
-	if renewalWindow == 0 {
-		renewalWindow = DefaultRenewalWindow
+	if len(tapscripts) > maxTapscripts {
+		return nil, fmt.Errorf("%w: more than %d tapscripts", ErrInvalidScript, maxTapscripts)
 	}
-	c, err := s.covenantFor(renewalWindow)
+	for _, ts := range tapscripts {
+		if len(ts) > maxTapscriptLen {
+			return nil, fmt.Errorf("%w: tapscript longer than %d bytes", ErrInvalidScript, maxTapscriptLen/2)
+		}
+	}
+	params = withDefaults(params)
+	c, err := s.covenantFor(params)
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +367,14 @@ func (s *service) RegisterDelegation(
 	if err != nil {
 		return nil, err
 	}
-	d, err := s.repo.Create(ctx, addr, tapscripts, renewalWindow)
+	// ponytail: count then insert, so concurrent registrations can overshoot
+	// the cap by a few. It is a flood guard, not a quota.
+	if active, err := s.repo.CountActive(ctx); err != nil {
+		return nil, err
+	} else if active >= int64(s.maxDelegations) {
+		return nil, ErrFull
+	}
+	d, err := s.repo.Create(ctx, addr, tapscripts, params)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +383,7 @@ func (s *service) RegisterDelegation(
 }
 
 func (s *service) CancelDelegation(ctx context.Context, address string) error {
-	return s.repo.Cancel(ctx, address)
+	return s.repo.Cancel(ctx, address, domain.DelegationStatusCancelled)
 }
 
 func (s *service) GetDelegation(ctx context.Context, address string) (*domain.Delegation, error) {
@@ -287,6 +392,39 @@ func (s *service) GetDelegation(ctx context.Context, address string) (*domain.De
 
 func (s *service) ListDelegations(ctx context.Context) ([]domain.Delegation, error) {
 	return s.repo.List(ctx, "")
+}
+
+func (s *service) CountActive(ctx context.Context) (int64, error) {
+	return s.repo.CountActive(ctx)
+}
+
+func (s *service) Status() Status {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return Status{
+		LastScan:      s.lastScan,
+		RenewingVtxos: int(s.renewing.Load()),
+		PollInterval:  s.pollInterval,
+		Renewed:       s.renewed.Load(),
+		Failed:        s.failed.Load(),
+		Holdings:      maps.Clone(s.holdings),
+	}
+}
+
+func (s *service) IntentFees(ctx context.Context) (arkfee.Config, error) {
+	info, err := s.ark.GetInfo(ctx)
+	if err != nil {
+		return arkfee.Config{}, fmt.Errorf("arkd info: %w", err)
+	}
+	return info.Fees.IntentFees, nil
+}
+
+func (s *service) DueAt(d *domain.Delegation, v types.Vtxo) time.Time {
+	return dueAt(v, d.Params)
+}
+
+func (s *service) LastRenewals(ctx context.Context) (map[int64]domain.Renewal, error) {
+	return s.repo.LastRenewals(ctx)
 }
 
 func (s *service) ListRenewals(ctx context.Context, d *domain.Delegation) ([]domain.Renewal, error) {
@@ -306,24 +444,44 @@ func (s *service) Vtxos(ctx context.Context, d *domain.Delegation) ([]types.Vtxo
 	return byScript[script], nil
 }
 
-// spendableVtxos queries the indexer for many scripts at once, in chunks
-// that keep each response small, and groups the result by script.
+// how many requests to arkd, the indexer or the emulator run at once: enough
+// to hide their latency, not enough to look like a flood
+const concurrency = 4
+
+// spendableVtxos queries the indexer for many scripts, a few chunks of 100
+// at a time, and groups the result by script.
 func (s *service) spendableVtxos(ctx context.Context, scripts []string) (map[string][]types.Vtxo, error) {
 	const chunk = 100
+	var mu sync.Mutex
 	out := make(map[string][]types.Vtxo)
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(concurrency)
 	for start := 0; start < len(scripts); start += chunk {
-		resp, err := s.indexer.GetVtxos(ctx,
-			indexer.WithScripts(scripts[start:min(start+chunk, len(scripts))]),
-			indexer.WithSpendableOnly(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		for _, v := range resp.Vtxos {
-			out[v.Script] = append(out[v.Script], v)
-		}
+		batch := scripts[start:min(start+chunk, len(scripts))]
+		g.Go(func() error {
+			// arkd answers an unpaged request in full; should that change, follow the pages
+			for page := int32(0); ; {
+				opts := []indexer.GetVtxosOption{indexer.WithScripts(batch), indexer.WithSpendableOnly()}
+				if page > 0 {
+					opts = append(opts, indexer.WithVtxosPage(&indexer.PageRequest{Index: page}))
+				}
+				resp, err := s.indexer.GetVtxos(ctx, opts...)
+				if err != nil {
+					return err
+				}
+				mu.Lock()
+				for _, v := range resp.Vtxos {
+					out[v.Script] = append(out[v.Script], v)
+				}
+				mu.Unlock()
+				if resp.Page == nil || resp.Page.Next <= resp.Page.Current {
+					return nil
+				}
+				page = resp.Page.Next
+			}
+		})
 	}
-	return out, nil
+	return out, g.Wait()
 }
 
 func (s *service) Health(ctx context.Context) map[string]error {
@@ -333,7 +491,32 @@ func (s *service) Health(ctx context.Context) map[string]error {
 		"database": s.repo.Ping(ctx),
 		"ark":      arkErr,
 		"emulator": emuErr,
+		"scanner":  s.scannerHealth(time.Now()),
 	}
+}
+
+// scannerHealth fails when scans stopped: a wedged loop looks alive otherwise.
+func (s *service) scannerHealth(now time.Time) error {
+	if s.renewing.Load() > 0 {
+		return nil // scans pause during a batch, by design
+	}
+	s.mu.Lock()
+	last := s.lastScan
+	s.mu.Unlock()
+	if last.IsZero() {
+		last = s.started
+	}
+	if grace := max(3*s.pollInterval, time.Minute); now.Sub(last) > grace {
+		return fmt.Errorf("no scan for %s", now.Sub(last).Round(time.Second))
+	}
+	return nil
+}
+
+// late reports a vtxo renewable for a while and still there: less than a
+// quarter of the time between renewable and expiry is left.
+func late(v types.Vtxo, due, now time.Time) bool {
+	room := v.ExpiresAt.Sub(due)
+	return room > 0 && v.ExpiresAt.Sub(now) < room/4
 }
 
 func (s *service) parseScript(tapscripts []string, c *covenant) (script.VtxoScript, error) {
@@ -373,8 +556,11 @@ func (s *service) scriptOf(d *domain.Delegation) ([]byte, script.VtxoScript, err
 }
 
 func (s *service) scan(ctx context.Context) {
-	if s.renewing.Load() {
+	if s.renewing.Load() > 0 {
 		return
+	}
+	if err := s.repo.PruneRenewals(ctx, time.Now().Add(-renewalsRetention)); err != nil {
+		log.WithError(err).Warn("prune renewals")
 	}
 	delegations, err := s.repo.List(ctx, domain.DelegationStatusActive)
 	if err != nil {
@@ -382,66 +568,78 @@ func (s *service) scan(ctx context.Context) {
 		return
 	}
 
-	type watched struct {
-		delegation *domain.Delegation
-		covenant   *covenant
-		leaf       *psbt.TaprootTapLeafScript
-	}
-	byScript := make(map[string]watched, len(delegations))
+	byScript := make(map[string]*watched, len(delegations))
 	scripts := make([]string, 0, len(delegations))
+	cache := make(map[int64]*watched, len(delegations)) // rebuilt, so cancelled ones drop out
 	for i := range delegations {
 		d := &delegations[i]
-		c, err := s.covenantFor(d.RenewalWindow)
-		if err != nil {
-			log.WithError(err).WithField("address", d.Address).Error("covenant")
-			continue
+		w, known := s.watched[d.ID]
+		if !known {
+			if w, err = s.watch(d); err != nil {
+				log.WithError(err).WithField("address", d.Address).Error("unusable delegation")
+			}
 		}
-		// skip delegations registered under another key
-		if !hasLeaf(d.Tapscripts, c.tapscript) {
-			continue
+		cache[d.ID] = w
+		if w != nil {
+			byScript[w.script] = w
+			scripts = append(scripts, w.script)
 		}
-		pkScript, leaf, err := s.delegateLeaf(d, c)
-		if err != nil {
-			log.WithError(err).WithField("address", d.Address).Error("delegate leaf")
-			continue
-		}
-		script := hex.EncodeToString(pkScript)
-		byScript[script] = watched{delegation: d, covenant: c, leaf: leaf}
-		scripts = append(scripts, script)
 	}
-	if len(scripts) == 0 {
-		return
-	}
+	s.watched = cache
 	vtxosByScript, err := s.spendableVtxos(ctx, scripts)
 	if err != nil {
 		log.WithError(err).Error("list vtxos")
 		return
 	}
 
-	now := time.Now().Unix()
+	now := time.Now()
+	holdings := make(map[int64]Holdings, len(scripts))
 	var inputs []renewalInput
 	for _, script := range scripts {
 		w := byScript[script]
-		pkScript, _ := hex.DecodeString(script)
+		h := Holdings{Vtxos: len(vtxosByScript[script])}
 		for _, v := range vtxosByScript[script] {
-			if v.ExpiresAt.Unix()-now <= w.delegation.RenewalWindow {
+			h.Amount += v.Amount
+			if h.NextExpiry.IsZero() || v.ExpiresAt.Before(h.NextExpiry) {
+				h.NextExpiry = v.ExpiresAt
+			}
+			due := dueAt(v, w.delegation.Params)
+			if h.NextDue.IsZero() || due.Before(h.NextDue) {
+				h.NextDue = due
+			}
+			if late(v, due, now) {
+				h.Late++
+				h.LateAmount += v.Amount
+			}
+			if !now.Before(due) {
 				inputs = append(inputs, renewalInput{
-					vtxo: v, delegation: w.delegation, pkScript: pkScript,
+					vtxo: v, delegation: &w.delegation, pkScript: w.pkScript,
 					leaf: w.leaf, arkadeScript: w.covenant.arkadeScript,
 				})
 			}
 		}
+		holdings[w.delegation.ID] = h
 	}
+	var lateVtxos int
+	for _, h := range holdings {
+		lateVtxos += h.Late
+	}
+	if lateVtxos > 0 {
+		log.WithField("count", lateVtxos).Warn("vtxos renewable for a while and not renewed: are arkd rounds running?")
+	}
+	s.mu.Lock()
+	s.lastScan, s.holdings = now, holdings
+	s.mu.Unlock()
 	if len(inputs) == 0 {
 		return
 	}
 	// one cosigner key means one batch session at a time: renew everything together.
 	// Stop waits for it rather than cancelling: an abandoned intent stalls arkd rounds.
-	s.renewing.Store(true)
+	s.renewing.Store(int64(len(inputs)))
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		defer s.renewing.Store(false)
+		defer s.renewing.Store(0)
 		s.renewAndRecord(context.Background(), inputs)
 	}()
 }
@@ -453,6 +651,16 @@ func (s *service) renewAndRecord(ctx context.Context, inputs []renewalInput) {
 	defer cancel()
 	results := s.renew(renewCtx, inputs)
 
+	// forget outpoints that are gone, so lastFailure stays as small as the due set
+	due := make(map[string]string, len(inputs))
+	for _, in := range inputs {
+		if msg, ok := s.lastFailure[in.vtxo.Outpoint.String()]; ok {
+			due[in.vtxo.Outpoint.String()] = msg
+		}
+	}
+	s.lastFailure = due
+
+	// one renewal row per delegation and outcome
 	type key struct {
 		delegation int64
 		commitment string
@@ -466,6 +674,14 @@ func (s *service) renewAndRecord(ctx context.Context, inputs []renewalInput) {
 			errMsg = res.err.Error()
 		}
 		for _, in := range res.inputs {
+			// a vtxo failing the same way every poll is reported once
+			outpoint := in.vtxo.Outpoint.String()
+			if errMsg != "" && s.lastFailure[outpoint] == errMsg {
+				continue
+			}
+			if delete(s.lastFailure, outpoint); errMsg != "" {
+				s.lastFailure[outpoint] = errMsg
+			}
 			k := key{in.delegation.ID, res.commitmentTxid, errMsg}
 			ren, ok := byDelegation[k]
 			if !ok {
@@ -476,21 +692,42 @@ func (s *service) renewAndRecord(ctx context.Context, inputs []renewalInput) {
 				byDelegation[k] = ren
 				order = append(order, k)
 			}
-			ren.Outpoints = append(ren.Outpoints, in.vtxo.Outpoint.String())
+			ren.Outpoints = append(ren.Outpoints, outpoint)
 		}
 	}
 	for _, k := range order {
 		ren := byDelegation[k]
 		logger := log.WithFields(log.Fields{"delegation": ren.DelegationID, "vtxos": ren.Outpoints})
 		if ren.Success {
+			s.renewed.Add(uint64(len(ren.Outpoints)))
 			logger.WithField("commitment_txid", ren.CommitmentTxid).Info("vtxos renewed")
 		} else {
+			s.failed.Add(uint64(len(ren.Outpoints)))
 			logger.WithField("error", ren.Error).Error("renewal failed")
 		}
 		if err := s.repo.RecordRenewal(context.WithoutCancel(ctx), *ren); err != nil {
 			logger.WithError(err).Error("record renewal")
 		}
 	}
+}
+
+// watch derives what is needed to renew d, or nil when it was registered
+// under another key.
+func (s *service) watch(d *domain.Delegation) (*watched, error) {
+	c, err := s.covenantFor(d.Params)
+	if err != nil {
+		return nil, err
+	}
+	if !hasLeaf(d.Tapscripts, c.tapscript) {
+		return nil, nil
+	}
+	pkScript, leaf, err := s.delegateLeaf(d, c)
+	if err != nil {
+		return nil, err
+	}
+	return &watched{
+		delegation: *d, pkScript: pkScript, script: hex.EncodeToString(pkScript), leaf: leaf, covenant: c,
+	}, nil
 }
 
 func (s *service) delegateLeaf(d *domain.Delegation, c *covenant) ([]byte, *psbt.TaprootTapLeafScript, error) {

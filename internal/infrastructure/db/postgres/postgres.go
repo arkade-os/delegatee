@@ -29,6 +29,11 @@ func NewRepository(ctx context.Context, dsn string) (domain.DelegationRepository
 	if err != nil {
 		return nil, err
 	}
+	// the service runs a handful of queries at a time: don't let a burst of
+	// API calls take every connection the server has
+	db.SetMaxOpenConns(16)
+	db.SetMaxIdleConns(4)
+	db.SetConnMaxIdleTime(5 * time.Minute)
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := db.PingContext(pingCtx); err != nil {
@@ -63,10 +68,11 @@ func (r *repository) Close() error                   { return r.db.Close() }
 func (r *repository) Ping(ctx context.Context) error { return r.db.PingContext(ctx) }
 
 func (r *repository) Create(
-	ctx context.Context, address string, tapscripts []string, renewalWindow int64,
+	ctx context.Context, address string, tapscripts []string, params domain.Params,
 ) (*domain.Delegation, error) {
 	row, err := r.querier.UpsertDelegation(ctx, queries.UpsertDelegationParams{
-		Address: address, Tapscripts: tapscripts, RenewalWindow: renewalWindow,
+		Address: address, Tapscripts: tapscripts,
+		RenewalWindow: params.RenewalWindow, MaxFee: params.MaxFee,
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrDelegationAlreadyExists
@@ -100,8 +106,12 @@ func (r *repository) List(ctx context.Context, status string) ([]domain.Delegati
 	return out, nil
 }
 
-func (r *repository) Cancel(ctx context.Context, address string) error {
-	n, err := r.querier.CancelDelegation(ctx, address)
+func (r *repository) CountActive(ctx context.Context) (int64, error) {
+	return r.querier.CountActiveDelegations(ctx)
+}
+
+func (r *repository) Cancel(ctx context.Context, address, status string) error {
+	n, err := r.querier.CancelDelegation(ctx, queries.CancelDelegationParams{Address: address, Status: status})
 	if err != nil {
 		return err
 	}
@@ -121,6 +131,10 @@ func (r *repository) RecordRenewal(ctx context.Context, ren domain.Renewal) erro
 	})
 }
 
+func (r *repository) PruneRenewals(ctx context.Context, before time.Time) error {
+	return r.querier.DeleteRenewalsBefore(ctx, before)
+}
+
 func (r *repository) ListRenewals(ctx context.Context, delegationID int64, limit int) ([]domain.Renewal, error) {
 	rows, err := r.querier.SelectRenewals(ctx, queries.SelectRenewalsParams{
 		DelegationID: delegationID, MaxRows: int32(limit),
@@ -130,27 +144,43 @@ func (r *repository) ListRenewals(ctx context.Context, delegationID int64, limit
 	}
 	out := make([]domain.Renewal, len(rows))
 	for i, row := range rows {
-		out[i] = domain.Renewal{
-			ID:             row.ID,
-			DelegationID:   row.DelegationID,
-			Outpoints:      row.Outpoints,
-			CommitmentTxid: row.CommitmentTxid,
-			Success:        row.Success,
-			Error:          row.Error,
-			AttemptedAt:    row.AttemptedAt,
-		}
+		out[i] = toRenewal(row)
 	}
 	return out, nil
 }
 
+func (r *repository) LastRenewals(ctx context.Context) (map[int64]domain.Renewal, error) {
+	rows, err := r.querier.SelectLastRenewals(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]domain.Renewal, len(rows))
+	for _, row := range rows {
+		out[row.DelegationID] = toRenewal(row)
+	}
+	return out, nil
+}
+
+func toRenewal(row queries.Renewal) domain.Renewal {
+	return domain.Renewal{
+		ID:             row.ID,
+		DelegationID:   row.DelegationID,
+		Outpoints:      row.Outpoints,
+		CommitmentTxid: row.CommitmentTxid,
+		Success:        row.Success,
+		Error:          row.Error,
+		AttemptedAt:    row.AttemptedAt,
+	}
+}
+
 func toDelegation(row queries.Delegation) *domain.Delegation {
 	return &domain.Delegation{
-		ID:            row.ID,
-		Address:       row.Address,
-		Tapscripts:    row.Tapscripts,
-		RenewalWindow: row.RenewalWindow,
-		Status:        row.Status,
-		CreatedAt:     row.CreatedAt,
-		UpdatedAt:     row.UpdatedAt,
+		ID:         row.ID,
+		Address:    row.Address,
+		Tapscripts: row.Tapscripts,
+		Params:     domain.Params{RenewalWindow: row.RenewalWindow, MaxFee: row.MaxFee},
+		Status:     row.Status,
+		CreatedAt:  row.CreatedAt,
+		UpdatedAt:  row.UpdatedAt,
 	}
 }

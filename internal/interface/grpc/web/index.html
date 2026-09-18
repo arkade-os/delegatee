@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>delegateed operator</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --paper: #f6f7f9; --surface: #ffffff; --ink: #14213d; --muted: #5f6b7e; --line: #dde1e8; --hover: #eef1f6; --current: #e3e9f6;
+  --ok: #1f7a55; --window: #a56a00; --window-a: #fff3d1; --window-b: #f7dc93; --bad: #b3261e; --track: #e6eaf2; --elapsed: rgba(20, 33, 61, .3);
+  --accent: #2346a0; --bar: #14213d; --bar-ink: #ffffff; --bar-muted: #c3cbe0;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0e1524; --surface: #141d30; --ink: #e6eaf3; --muted: #94a0b8; --line: #27324a; --hover: #1a2439; --current: #22304f;
+    --ok: #5fd0a0; --window: #f0b94a; --window-a: #4a3a12; --window-b: #6b5318; --bad: #ff8a80; --track: #222c42; --elapsed: rgba(230, 234, 243, .28);
+    --accent: #8fb0ff; --bar: #0a101c; --bar-ink: #e6eaf3; --bar-muted: #94a0b8;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--sans); }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: .35rem .75rem; }
+button:hover { border-color: var(--ink); }
+button.danger { color: var(--bad); }
+button.danger:hover { border-color: var(--bad); }
+button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+button.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hash { font-family: var(--mono); font-size: .85em; word-break: break-all; }
+.n { font-variant-numeric: tabular-nums; }
+kbd { font: .8em var(--mono); border: 1px solid var(--line); border-radius: 4px; padding: 0 .3rem; }
+
+header { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center; padding: .7rem 1.25rem; background: var(--bar); color: var(--bar-ink); }
+header h1 { font-size: 1rem; margin: 0; font-weight: 650; }
+header h1 button { all: unset; cursor: pointer; }
+header .meta { color: var(--bar-muted); font-size: .85rem; display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; }
+header .meta button { background: none; border: 0; padding: 0; color: var(--bar-ink); text-decoration: underline dotted; }
+#health { margin-left: auto; font-size: .85rem; display: flex; align-items: center; gap: .4rem; }
+#health i, .pulse { width: .6rem; height: .6rem; border-radius: 50%; background: #8b94a8; display: inline-block; flex: none; }
+#health.ok i { background: #4cd49a; } #health.down i { background: #ff7a70; }
+
+/* what the scanner is doing, always visible */
+#status { display: flex; flex-wrap: wrap; gap: .25rem 2rem; padding: .55rem 1.25rem; background: var(--surface); border-bottom: 1px solid var(--line); font-size: .88rem; color: var(--muted); }
+#status b { color: var(--ink); font-weight: 600; }
+#status .warn, #status .warn b { color: var(--bad); }
+#status .busy, #status .busy b { color: var(--window); }
+.pulse { background: var(--window); margin-right: .35rem; animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+
+main { display: grid; grid-template-columns: minmax(20rem, 27rem) minmax(0, 1fr); min-height: calc(100vh - 6rem); }
+#list { border-right: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-width: 0; max-height: calc(100vh - 6rem); position: sticky; top: 0; }
+.filters { display: flex; border-bottom: 1px solid var(--line); }
+.filters button { flex: 1; border: 0; border-radius: 0; border-bottom: 2px solid transparent; padding: .6rem .25rem; color: var(--muted); font-size: .85rem; background: none; }
+.filters button[aria-pressed=true] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+.filters .alert .n { color: var(--bad); }
+#search { margin: .6rem; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
+#rows { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+#rows li button { display: grid; grid-template-columns: .6rem minmax(0, 1fr) auto; gap: .1rem .6rem; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: .55rem .8rem; background: none; }
+#rows li button:hover { background: var(--hover); }
+#rows li button[aria-current=true] { background: var(--current); }
+.dot { width: .55rem; height: .55rem; border-radius: 50%; align-self: center; background: var(--line); }
+.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); } .dot.late { background: var(--window); } .dot.off { background: none; border: 1px solid var(--muted); }
+#rows .when, #rows .sub { color: var(--muted); font-size: .8rem; white-space: nowrap; }
+#rows .sub { grid-column: 2 / 4; overflow: hidden; text-overflow: ellipsis; }
+#rows .sub.bad { color: var(--bad); } #rows .sub.late { color: var(--window); }
+.empty { padding: 1.5rem 1.25rem; color: var(--muted); max-width: 36rem; }
+#hint { padding: .4rem .8rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .78rem; }
+
+#detail { padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 3rem; min-width: 0; }
+#detail h2 { font-size: 1.05rem; margin: 0 0 .25rem; font-weight: 600; }
+#detail h3 { font-size: .95rem; margin: 2rem 0 .5rem; font-weight: 600; }
+#detail h3 + p { margin: 0 0 .75rem; color: var(--muted); font-size: .9rem; max-width: 44rem; }
+.title { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-start; justify-content: space-between; }
+.title .hash { font-size: .95rem; max-width: 46rem; }
+.actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.facts { display: flex; flex-wrap: wrap; gap: .4rem 2rem; margin: .75rem 0 0; color: var(--muted); font-size: .9rem; }
+.facts b { color: var(--ink); font-weight: 600; }
+.badge { border-radius: 99px; padding: .05rem .55rem; font-size: .8rem; border: 1px solid currentColor; font-weight: 400; }
+.badge.ok { color: var(--ok); } .badge.off { color: var(--muted); } .badge.bad { color: var(--bad); }
+.note { border-left: 3px solid var(--bad); padding: .5rem .9rem; margin: 1rem 0 0; background: var(--surface); max-width: 46rem; font-size: .9rem; }
+.note.info { border-left-color: var(--line); color: var(--muted); }
+details { margin-top: 1.5rem; font-size: .88rem; } details summary { cursor: pointer; color: var(--muted); } details .hash { display: block; margin: .4rem 0; }
+
+/* the lifetime bar: birth to expiry, renewal window hatched at the end, a marker for now */
+.vtxo { padding: .75rem 0; border-bottom: 1px solid var(--line); }
+.vtxo .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; }
+.vtxo .amount { font-weight: 600; }
+.life { position: relative; height: .7rem; margin: .5rem 0 .3rem; background: var(--track); border-radius: 3px; overflow: hidden; }
+.life .elapsed { position: absolute; inset: 0 auto 0 0; background: var(--elapsed); z-index: 1; }
+.life .window { position: absolute; inset: 0 0 0 auto; background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
+.life .now { position: absolute; z-index: 2; top: 0; bottom: 0; width: 2px; background: var(--ink); }
+.state { font-size: .82rem; color: var(--muted); }
+.state.in { color: var(--window); font-weight: 600; } .state.late { color: var(--bad); font-weight: 600; }
+
+/* overview: every address on one time axis, from now to the furthest expiry */
+.horizon { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto; gap: .35rem 1rem; align-items: center; font-size: .85rem; }
+.horizon button { all: unset; font: .85em var(--mono); cursor: pointer; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.horizon button:focus-visible { outline: 2px solid var(--accent); }
+.horizon .lane { display: flex; height: .6rem; background: var(--track); border-radius: 3px; overflow: hidden; }
+.horizon .lane .left { background: var(--elapsed); }
+.horizon .lane .window { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
+.horizon .t { color: var(--muted); white-space: nowrap; text-align: right; }
+.horizon .t.in { color: var(--window); font-weight: 600; } .horizon .t.late { color: var(--bad); font-weight: 600; }
+
+table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+th { text-align: left; font-weight: 600; color: var(--muted); padding: .35rem .75rem .35rem 0; border-bottom: 1px solid var(--line); }
+td { padding: .45rem .75rem .45rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.res { white-space: nowrap; } td.res.ok { color: var(--ok); } td.res.bad { color: var(--bad); }
+.scroll { overflow-x: auto; }
+
+dialog { border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem 1.5rem; max-width: 30rem; color: var(--ink); background: var(--surface); }
+dialog::backdrop { background: rgba(10, 16, 28, .55); }
+dialog h2 { font-size: 1.05rem; margin: 0; }
+dialog p { margin: .5rem 0 1.25rem; color: var(--muted); }
+dialog .actions { justify-content: flex-end; }
+#toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: .5rem 1rem; border-radius: 6px; font-size: .9rem; z-index: 10; }
+#toast.bad { background: var(--bad); color: #fff; }
+
+@media (max-width: 800px) {
+  main { grid-template-columns: minmax(0, 1fr); }
+  #health { margin-left: 0; }
+  #list { border-right: 0; position: static; max-height: 45vh; }
+  #hint { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1><button id="home" title="Overview">delegateed</button></h1>
+  <div class="meta" id="meta"></div>
+  <div id="health" role="status"><i></i><span>checking…</span></div>
+</header>
+<div id="status" role="status"></div>
+<main>
+  <section id="list" aria-label="Delegations">
+    <div class="filters" id="filters"></div>
+    <input id="search" type="search" placeholder="Find an address" aria-label="Find an address">
+    <ul id="rows"></ul>
+    <div id="hint"><kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>/</kbd> find, <kbd>Esc</kbd> overview</div>
+  </section>
+  <section id="detail" aria-live="polite"></section>
+</main>
+<dialog id="confirm">
+  <h2>Stop renewing this address?</h2>
+  <p id="confirm-text"></p>
+  <div class="actions"><button value="no">Keep renewing</button><button class="danger" id="confirm-yes">Stop renewing</button></div>
+</dialog>
+<div id="toast" hidden></div>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const short = (s, n = 10) => (s.length > 2 * n + 1 ? s.slice(0, n) + "…" + s.slice(-n) : s);
+const num = (v) => Number(v || 0); // the gateway encodes int64 as strings
+const sats = (v) => num(v).toLocaleString() + " sats";
+const nowSecs = () => Date.now() / 1000;
+
+let delegations = [], status = null, filter = null, selected = location.hash.slice(1), detail = null;
+
+// --- what state is a delegation in? one place, used by the list, the filters and the overview
+function stateOf(d) {
+  const r = d.lastRenewal;
+  if (d.status !== "active") return { key: "off", dot: "off", text: d.status === "revoked" ? "stopped by owner" : "stopped" };
+  if (foreign(d))
+    return { key: "bad", dot: "bad", text: "different key", why: "Registered under another secret key: this instance cannot renew it." };
+  if (r && !r.success) return { key: "bad", dot: "bad", text: "failed " + ago(r.attemptedAt), why: r.error };
+  // late: three quarters of the way from "renewable" to "expired" and still there
+  const left = num(d.nextExpiry) - nowSecs(), room = num(d.nextExpiry) - num(d.nextRenewalAt);
+  if (num(d.nextExpiry) && left < room / 4)
+    return { key: "late", dot: "late", text: left <= 0 ? "expired" : "expires " + ago(d.nextExpiry),
+      why: left <= 0 ? "A VTXO expired without being renewed." : "Renewable for a while and not renewed yet. Check that arkd rounds are running." };
+  if (!r) return { key: "ok", dot: "", text: "not renewed yet" };
+  return { key: "ok", dot: "ok", text: "renewed " + ago(r.attemptedAt) };
+}
+// not seen by a scan that ran after it was (re)registered: it is under another key
+const foreign = (d) => d.status === "active" && !d.managed && num(status?.lastScanAt) > num(d.updatedAt);
+const MAX_ROWS = 300; // the list is sorted by urgency, so what matters is always in it
+const URGENCY = { bad: 0, late: 1, ok: 2, off: 3 };
+const FILTERS = [
+  ["attention", "Needs attention", (d) => ["bad", "late"].includes(stateOf(d).key)],
+  ["active", "Active", (d) => d.status === "active"],
+  ["cancelled", "Stopped", (d) => d.status !== "active"],
+  ["all", "All", () => true],
+];
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.message || res.statusText);
+  return body;
+}
+
+function toast(msg, bad) {
+  const t = $("toast");
+  t.textContent = msg; t.className = bad ? "bad" : ""; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => (t.hidden = true), 4000);
+}
+
+function span(s) {
+  s = Math.abs(s);
+  const [n, u] = s < 90 ? [s, " s"] : s < 5400 ? [s / 60, " min"] : s < 129600 ? [s / 3600, " h"] : [s / 86400, " d"];
+  return Math.round(n) + u;
+}
+function ago(ts) {
+  const s = nowSecs() - num(ts);
+  return s < 0 ? "in " + span(s) : span(s) + " ago";
+}
+
+async function loadMeta() {
+  try {
+    const i = await api("/v1/info");
+    $("meta").innerHTML = `<span>${esc(i.network)}</span><span>${esc(i.version)}</span>
+      <span>delegate key <button class="hash" title="Copy delegate public key" data-copy="${esc(i.delegatePubkey)}">${esc(short(i.delegatePubkey, 8))}</button></span>`;
+  } catch { /* the health badge says why */ }
+}
+
+async function loadHealth() {
+  const h = $("health");
+  try {
+    const r = await fetch("/healthz"), ok = r.ok && (await r.json()).status === "SERVING";
+    h.className = ok ? "ok" : "down";
+    h.lastElementChild.textContent = ok ? "arkd, emulator and database reachable" : "a dependency is unreachable, check the logs";
+  } catch {
+    h.className = "down"; h.lastElementChild.textContent = "delegateed is unreachable";
+  }
+}
+
+async function loadList() {
+  try {
+    [status, { delegations = [] }] = await Promise.all([api("/v1/admin/status"), api("/v1/admin/delegate")]);
+  } catch (e) { return toast("Could not load delegations: " + e.message, true); }
+  if (!filter) filter = delegations.some(FILTERS[0][2]) ? "attention" : "active";
+  renderStatus(); renderList();
+  if (!selected) renderOverview();
+}
+
+function renderStatus() {
+  const poll = num(status.pollInterval), last = num(status.lastScanAt), busy = status.renewingVtxos > 0;
+  const stale = !busy && last > 0 && nowSecs() - last > Math.max(3 * poll, 30);
+  const active = delegations.filter((d) => d.status === "active" && d.managed);
+  const total = active.reduce((a, d) => a + num(d.totalAmount), 0), vtxos = active.reduce((a, d) => a + num(d.vtxoCount), 0);
+  const fees = status.intentFees, charged = fees && Object.values(fees).some(Boolean);
+  $("status").innerHTML = [
+    busy ? `<span class="busy"><i class="pulse"></i>Renewing <b>${status.renewingVtxos}</b> VTXO${status.renewingVtxos > 1 ? "s" : ""} in a batch now, scans resume after</span>`
+      : !last ? `<span>First scan pending</span>`
+      : `<span class="${stale ? "warn" : ""}">Scanned <b>${ago(last)}</b>, ${stale ? `expected every ${span(poll)}: check the logs` : `every ${span(poll)}`}</span>`,
+    `<span>Watching <b class="n">${sats(total)}</b> in <b class="n">${vtxos}</b> VTXO${vtxos === 1 ? "" : "s"} at <b class="n">${active.length}</b> address${active.length === 1 ? "" : "es"}</span>`,
+    !fees ? `<span class="warn">arkd fees unknown, arkd is unreachable</span>`
+      : `<span>arkd ${charged ? `<b>charges intent fees</b>, <button class="link" id="see-fees">see them</button>` : "charges no intent fee"}</span>`,
+  ].join("");
+}
+
+function visibleRows() {
+  const q = $("search").value.trim().toLowerCase(), fn = FILTERS.find((f) => f[0] === filter)[2];
+  return delegations.filter((d) => fn(d) && d.address.toLowerCase().includes(q))
+    .sort((a, b) => URGENCY[stateOf(a).key] - URGENCY[stateOf(b).key]
+      || (num(a.nextExpiry) || Infinity) - (num(b.nextExpiry) || Infinity));
+}
+
+function renderList() {
+  $("filters").innerHTML = FILTERS.map(([id, label, fn]) => {
+    const n = delegations.filter(fn).length;
+    return `<button data-filter="${id}" aria-pressed="${id === filter}" class="${id === "attention" && n ? "alert" : ""}">${label} <span class="n">${n}</span></button>`;
+  }).join("");
+  const rows = visibleRows();
+  if (!rows.length) {
+    $("rows").innerHTML = `<li class="empty">${$("search").value.trim() ? "No address matches your search."
+      : filter === "attention" ? "Nothing needs attention: every active delegation is renewed on time."
+      : delegations.length ? "No delegations here."
+      : "No delegations yet. Wallets register one with POST /v1/delegate on the public port."}</li>`;
+    return;
+  }
+  const more = rows.length - MAX_ROWS;
+  $("rows").innerHTML = rows.slice(0, MAX_ROWS).map((d) => {
+    const st = stateOf(d);
+    const holds = d.status !== "active" || !d.managed ? ""
+      : num(d.vtxoCount) ? `${sats(d.totalAmount)} in ${d.vtxoCount} VTXO${d.vtxoCount > 1 ? "s" : ""}, next expiry ${ago(d.nextExpiry)}` : "no VTXO at this address";
+    return `<li><button data-address="${esc(d.address)}" aria-current="${d.address === selected}">
+      <span class="dot ${st.dot}"></span><span class="hash">${esc(short(d.address, 12))}</span><span class="when">${st.text}</span>
+      ${st.why ? `<span class="sub ${st.key}" title="${esc(st.why)}">${esc(st.why)}</span>` : holds ? `<span class="sub n">${holds}</span>` : ""}</button></li>`;
+  }).join("") + (more > 0 ? `<li class="empty">${more.toLocaleString()} more, by urgency. Find an address to narrow down.</li>` : "");
+  $("rows").querySelector("[aria-current=true]")?.scrollIntoView({ block: "nearest" });
+}
+
+// --- right pane, nothing selected: the horizon and arkd's fees
+function renderOverview() {
+  const held = delegations.filter((d) => d.status === "active" && d.managed && num(d.nextExpiry))
+    .sort((a, b) => num(a.nextExpiry) - num(b.nextExpiry));
+  const now = nowSecs(), shown = held.slice(0, 12);
+  const far = Math.max(...shown.map((d) => num(d.nextExpiry) - now), 1);
+  const pct = (x) => Math.min(100, Math.max(0, (x / far) * 100));
+  const lanes = shown.map((d) => {
+    const left = num(d.nextExpiry) - now, win = num(d.nextExpiry) - num(d.nextRenewalAt), st = stateOf(d);
+    const cls = left <= 0 || st.key !== "ok" ? "late" : left <= win ? "in" : "";
+    return `<button data-address="${esc(d.address)}" class="hash" title="${esc(d.address)}">${esc(short(d.address, 8))}</button>
+      <div class="lane" role="img" aria-label="expires ${ago(d.nextExpiry)}">
+        <div class="left" style="width:${pct(left - win)}%"></div><div class="window" style="width:${pct(Math.min(win, left))}%"></div></div>
+      <span class="t n ${cls}">${left <= 0 ? "expired" : st.key === "bad" ? "not renewing, " + span(left) + " left" : left <= win ? "renewable now, " + span(left) + " left" : "renewable " + ago(d.nextRenewalAt)}</span>`;
+  }).join("");
+
+  const f = status?.intentFees, rows = f && [["each VTXO renewed", f.offchainInput], ["each output created", f.offchainOutput]].filter((r) => r[1]);
+  const strangers = delegations.filter(foreign).length;
+  $("detail").innerHTML = `
+    <h2>Overview</h2>
+    ${strangers ? `<p class="note"><b>${strangers}</b> active delegation${strangers > 1 ? "s were" : " was"} registered under another secret key and cannot be renewed by this instance. If the key was rotated by mistake, restore the previous DELEGATEE_SECRET_KEY.</p>` : ""}
+    <h3>Next to expire</h3>
+    <p>Each bar runs from now to the address's earliest expiry; the hatched end is when it can be renewed. A bar that is all hatch is renewable now.</p>
+    ${shown.length ? `<div class="horizon">${lanes}</div>${held.length > shown.length ? `<p class="state">and ${held.length - shown.length} more, later</p>` : ""}`
+      : `<p class="empty">No VTXO is being watched yet. They show up here after the next scan once coins sit at a registered address.</p>`}
+    <h3>What arkd charges</h3>
+    ${!f ? `<p>Unknown: arkd is unreachable.</p>`
+      : !rows.length ? `<p>Nothing. Every delegation can be renewed, whatever its max fee.</p>`
+      : `<p>A renewal pays every line below. A delegation whose max fee is lower is skipped and shows up under Needs attention until the fee drops.</p>
+        <div class="scroll"><table><thead><tr><th>For</th><th>Fee program, in sats</th></tr></thead><tbody>
+        ${rows.map(([k, v]) => `<tr><td>${k}</td><td class="hash">${esc(v)}</td></tr>`).join("")}</tbody></table></div>`}`;
+}
+
+async function loadDetail() {
+  if (!selected) { detail = null; return status && renderOverview(); }
+  try {
+    detail = await api("/v1/delegate/" + encodeURIComponent(selected));
+  } catch (e) {
+    $("detail").innerHTML = `<p class="empty">Could not load ${esc(short(selected, 12))}: ${esc(e.message)}. <button class="link" id="home2">Back to the overview</button></p>`;
+    return;
+  }
+  renderDetail();
+}
+
+function lifeBar(v) {
+  const now = nowSecs(), born = num(v.createdAt), dies = num(v.expiresAt), windowSecs = dies - num(v.renewableAt);
+  const life = Math.max(dies - born, 1), pct = (x) => Math.min(100, Math.max(0, (x / life) * 100)), left = dies - now;
+  const [cls, text] = left <= 0 ? ["late", `expired ${ago(dies)}`]
+    : left <= windowSecs ? ["in", `renewable now, expires ${ago(dies)}`]
+    : ["", `renewable ${ago(v.renewableAt)}, expires ${ago(dies)}`];
+  return `<div class="life" role="img" aria-label="${esc(text)}">
+      <div class="elapsed" style="width:${pct(now - born)}%"></div>
+      <div class="window" style="width:${pct(windowSecs)}%"></div>
+      <div class="now" style="left:${pct(now - born)}%"></div>
+    </div><div class="state ${cls}">${text}${v.preconfirmed ? ", not in a batch yet" : ""}</div>`;
+}
+
+function renderDetail() {
+  const d = detail.delegation, vtxos = detail.vtxos || [], renewals = detail.renewals || [];
+  const active = d.status === "active", windowSecs = num(d.renewalWindow);
+  const inList = delegations.find((x) => x.address === d.address), st = inList && stateOf(inList);
+  const life = vtxos.length ? Math.max(...vtxos.map((v) => num(v.expiresAt) - num(v.createdAt))) : 0;
+  $("detail").innerHTML = `
+    <div class="title">
+      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : "ok"}">${!active ? (d.status === "revoked" ? "stopped by its owner" : "stopped by an operator") : st?.text === "different key" ? "different key" : st?.key === "bad" ? "not renewing" : "renewing"}</span></h2>
+        <div class="hash">${esc(d.address)}</div></div>
+      <div class="actions"><button data-copy="${esc(d.address)}">Copy address</button>
+        ${active ? `<button class="danger" id="stop">Stop renewing</button>` : `<button class="primary" id="resume">Resume renewing</button>`}</div>
+    </div>
+    <div class="facts"><span>renewable <b>${span(windowSecs)}</b> before expiry</span>
+      <span>pays up to <b class="n">${sats(d.maxFee)}</b> of arkd fee per renewal</span>
+      <span>registered <b>${ago(d.createdAt)}</b></span></div>
+    ${st?.why && active ? `<p class="note">${esc(st.why)}</p>` : ""}
+    ${active && num(d.maxFee) > 0 && life && windowSecs > life / 2 ? `<p class="note info">The renewal window (${span(windowSecs)}) is more than half the VTXO lifetime (${span(life)}). Because this delegation can pay fees, it is only renewed in the second half of a VTXO's life, so it doesn't pay in every round.</p>` : ""}
+    <h3>VTXOs at this address</h3>
+    ${vtxos.length ? vtxos.map((v) => `<div class="vtxo"><div class="top"><span class="hash">${esc(v.outpoint)}</span>
+        <span class="amount n">${sats(v.amount)}${(v.assets || []).map((a) => ` + ${num(a.amount).toLocaleString()} of ${esc(short(a.assetId, 6))}`).join("")}</span></div>
+        ${lifeBar(v)}</div>`).join("")
+      : `<p class="empty">Nothing to renew: no spendable VTXO sits at this address right now.</p>`}
+    <h3>Renewal attempts</h3>
+    ${renewals.length ? `<div class="scroll"><table><thead><tr><th>When</th><th>Result</th><th>VTXOs</th><th>Batch or reason</th></tr></thead><tbody>
+      ${renewals.map((r) => `<tr><td title="${new Date(num(r.attemptedAt) * 1000).toLocaleString()}">${ago(r.attemptedAt)}</td>
+        <td class="res ${r.success ? "ok" : "bad"}">${r.success ? "renewed" : "failed"}</td>
+        <td class="hash">${(r.outpoints || []).map((o) => esc(short(o, 8))).join("<br>")}</td>
+        <td class="${r.success ? "hash" : ""}">${r.success ? `<button class="link hash" data-copy="${esc(r.commitmentTxid)}" title="Copy commitment txid">${esc(short(r.commitmentTxid, 12))}</button>` : esc(r.error)}</td></tr>`).join("")}
+      </tbody></table></div>
+      <p class="state">A failure that repeats is listed once, at the time it first happened.</p>`
+      : `<p class="empty">No attempt yet. A VTXO is first renewed when it enters its renewal window.</p>`}
+    <details><summary>Tapscripts</summary>${(d.tapscripts || []).map((t) => `<span class="hash">${esc(t)}</span>`).join("")}</details>`;
+}
+
+async function setRenewing(on) {
+  const d = detail.delegation;
+  try {
+    if (on) {
+      await api("/v1/delegate", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tapscripts: d.tapscripts, renewalWindow: d.renewalWindow, maxFee: d.maxFee }) });
+    } else {
+      await api("/v1/admin/delegate/" + encodeURIComponent(d.address), { method: "DELETE" });
+    }
+    toast(on ? "Renewing resumed" : "Renewing stopped");
+  } catch (e) { toast(`Could not ${on ? "resume" : "stop"} renewing: ${e.message}`, true); }
+  refresh();
+}
+
+function askStop() {
+  const held = delegations.find((x) => x.address === detail.delegation.address);
+  $("confirm-text").textContent = (num(held?.vtxoCount)
+    ? `${sats(held.totalAmount)} in ${held.vtxoCount} VTXO${held.vtxoCount > 1 ? "s" : ""}, the first expiring ${ago(held.nextExpiry)}, will expire`
+    : "Coins sent to it later will expire") + " unless the owner exits or you resume. Nothing is deleted.";
+  $("confirm").showModal();
+}
+
+const go = (address) => { location.hash = address || ""; if (!address) history.replaceState(null, "", location.pathname); };
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.filter) { filter = b.dataset.filter; renderList(); }
+  else if (b.dataset.address) go(b.dataset.address);
+  else if (b.dataset.copy) navigator.clipboard.writeText(b.dataset.copy).then(() => toast("Copied"), () => toast("Copy failed, select the text instead", true));
+  else if (b.id === "home" || b.id === "home2" || b.id === "see-fees") go("");
+  else if (b.id === "stop") askStop();
+  else if (b.id === "confirm-yes") { $("confirm").close(); setRenewing(false); }
+  else if (b.value === "no") $("confirm").close();
+  else if (b.id === "resume") setRenewing(true);
+});
+document.addEventListener("keydown", (e) => {
+  if ($("confirm").open || e.metaKey || e.ctrlKey || e.altKey) return;
+  const typing = e.target === $("search");
+  if (e.key === "/" && !typing) { e.preventDefault(); $("search").focus(); }
+  else if (e.key === "Escape") { typing ? $("search").blur() : go(""); }
+  else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !typing) {
+    const rows = visibleRows().slice(0, MAX_ROWS); if (!rows.length) return;
+    e.preventDefault();
+    const i = rows.findIndex((d) => d.address === selected), step = e.key === "ArrowDown" ? 1 : -1;
+    go(rows[Math.min(rows.length - 1, Math.max(0, i < 0 ? 0 : i + step))].address);
+  }
+});
+$("search").addEventListener("input", renderList);
+addEventListener("hashchange", () => { selected = location.hash.slice(1); renderList(); loadDetail(); });
+
+function refresh() { loadHealth(); loadList().then(loadDetail); }
+loadMeta(); refresh();
+setInterval(() => { if (!document.hidden && !$("confirm").open && !$("detail").querySelector("details[open]")) refresh(); }, 15000);
+</script>
+</body>
+</html>
