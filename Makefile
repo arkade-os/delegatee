@@ -16,14 +16,14 @@ build-all:
 clean:
 	rm -rf bin/ build/
 
-## unit tests (no infrastructure)
+## unit tests (no infrastructure), with coverage per package
 test:
-	go test -short -race ./...
+	go test -short -race -cover ./...
 
-## end-to-end against the regtest stack (make regtest-up first)
+## repository tests against postgres, then end-to-end against the regtest stack (make regtest-up first)
 test-e2e:
 	docker compose -f docker-compose.regtest.yml up -d --force-recreate --wait pg
-	go test -v -count=1 -timeout 15m ./test/e2e/...
+	go test -v -count=1 -timeout 25m ./internal/infrastructure/... ./test/e2e/...
 
 lint:
 	golangci-lint run ./...
@@ -55,15 +55,18 @@ deps:
 docker:
 	docker build -t ghcr.io/arkade-os/delegatee:$(VERSION) .
 
+# nigiri can believe it is running after a docker restart: trust the container
+NIGIRI_UP = docker ps --format '{{.Names}}' | grep -qx bitcoin || { nigiri stop >/dev/null 2>&1; nigiri start; }
+
 ## regtest-up: nigiri + arkd + emulator + postgres (delegateed runs from `make run` or the tests)
 regtest-up:
-	@nigiri start 2>/dev/null || true
+	@$(NIGIRI_UP)
 	docker compose -f docker-compose.regtest.yml up -d
 	./scripts/regtest-init.sh
 
 ## regtest-run: the same stack plus delegateed in docker (ports 7080 / 7081)
 regtest-run:
-	@nigiri start 2>/dev/null || true
+	@$(NIGIRI_UP)
 	docker compose -f docker-compose.regtest.yml --profile delegatee up -d --build
 	./scripts/regtest-init.sh
 
