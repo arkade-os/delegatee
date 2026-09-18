@@ -1,6 +1,9 @@
 package config
 
 import (
+	"encoding/hex"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -34,4 +37,61 @@ func TestLoad(t *testing.T) {
 		target, _ := grpcTarget(url)
 		require.Equal(t, want, target)
 	}
+}
+
+func TestLoadRejectsBadValues(t *testing.T) {
+	base := map[string]string{
+		"DELEGATEE_ARK_URL": "localhost:7070", "DELEGATEE_EMULATOR_URL": "localhost:7073",
+		"DELEGATEE_DATABASE_URL": "postgres://x",
+		"DELEGATEE_SECRET_KEY":   "0101010101010101010101010101010101010101010101010101010101010101",
+	}
+	for name, bad := range map[string]string{
+		"DELEGATEE_PORT": "http", "DELEGATEE_ADMIN_PORT": "x", "DELEGATEE_LOG_LEVEL": "debug",
+		"DELEGATEE_POLL_INTERVAL": "10", "DELEGATEE_RENEWAL_TIMEOUT": "soon",
+		"DELEGATEE_MAX_VTXOS_PER_INTENT": "many", "DELEGATEE_MAX_DELEGATIONS": "1e3",
+		"DELEGATEE_SECRET_KEY": "0000000000000000000000000000000000000000000000000000000000000000",
+		"DELEGATEE_ARK_URL":    "", "DELEGATEE_EMULATOR_URL": "", "DELEGATEE_DATABASE_URL": "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			for k, v := range base {
+				t.Setenv(k, v)
+			}
+			t.Setenv(name, bad)
+			_, err := LoadConfig()
+			require.ErrorContains(t, err, name)
+		})
+	}
+
+	for k, v := range base {
+		t.Setenv(k, v)
+	}
+	t.Setenv("DELEGATEE_PUBLIC_RATE_LIMIT", "-1")
+	_, err := LoadConfig()
+	require.ErrorContains(t, err, "PUBLIC_RATE_LIMIT")
+	t.Setenv("DELEGATEE_PUBLIC_RATE_LIMIT", "2.5")
+
+	// a key file wins over the variable, and must exist
+	keyFile := filepath.Join(t.TempDir(), "key")
+	require.NoError(t, os.WriteFile(keyFile, []byte("0202020202020202020202020202020202020202020202020202020202020202\n"), 0o600))
+	t.Setenv("DELEGATEE_SECRET_KEY_FILE", keyFile)
+	t.Setenv("DELEGATEE_ADMIN_PASSWORD", "hunter2")
+	t.Setenv("DELEGATEE_MAX_DELEGATIONS", "12")
+	cfg, err := LoadConfig()
+	require.NoError(t, err)
+	require.Equal(t, "hunter2", cfg.AdminPassword)
+	require.Equal(t, 2.5, cfg.PublicRateLimit)
+	require.Equal(t, "0202020202020202020202020202020202020202020202020202020202020202", hex.EncodeToString(cfg.SecretKey.Serialize()))
+	t.Setenv("DELEGATEE_SECRET_KEY_FILE", keyFile+".missing")
+	_, err = LoadConfig()
+	require.ErrorContains(t, err, "SECRET_KEY_FILE")
+	t.Setenv("DELEGATEE_SECRET_KEY_FILE", "")
+	require.Equal(t, 12, cfg.MaxDelegations)
+	require.Equal(t, uint32(7081), cfg.AdminPort)
+	require.Equal(t, 2*time.Hour, cfg.RenewalTimeout)
+	require.Equal(t, 16, cfg.MaxVtxosPerIntent)
+
+	// nothing listens there: wiring fails cleanly instead of hanging or leaking
+	cfg.DatabaseURL = "postgres://nobody@127.0.0.1:1/none?sslmode=disable&connect_timeout=1"
+	_, err = cfg.AppService(t.Context())
+	require.ErrorContains(t, err, "open database")
 }
