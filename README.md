@@ -79,9 +79,11 @@ curl 'http://localhost:7080/v1/info?renewalWindow=86400&maxFee=200'
 A careful wallet rebuilds `arkadeScript` itself ([docs/protocol.md](docs/protocol.md))
 instead of trusting the response: that script is the whole security model.
 
-**3. Build the VTXO script**: `delegateTapscript` plus your own exit leaf
-(`<user key> CHECKSIG` behind a CSV, like any Arkade VTXO). Encode the
-tapscripts the way the SDKs do.
+**3. Build the VTXO script**: `delegateTapscript` plus the leaves of a
+normal Arkade VTXO, your forfeit leaf (`<user key> <server key>`, so you can
+still spend the coin cooperatively) and your exit leaf (`<user key>` behind
+a CSV). Registration requires the delegate leaf and an exit leaf and accepts
+any other. Encode the tapscripts the way the SDKs do.
 
 **4. Register it** with the same params:
 
