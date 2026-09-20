@@ -40,6 +40,25 @@ func (q *Queries) CountActiveDelegations(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const revokeDelegation = `-- name: RevokeDelegation :execrows
+UPDATE delegations
+SET status = 'revoked', last_revocation_timestamp = $1, updated_at = NOW()
+WHERE address = $2 AND last_revocation_timestamp < $1
+`
+
+type RevokeDelegationParams struct {
+	Timestamp int64
+	Address   string
+}
+
+func (q *Queries) RevokeDelegation(ctx context.Context, arg RevokeDelegationParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, revokeDelegation, arg.Timestamp, arg.Address)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deleteRenewalsBefore = `-- name: DeleteRenewalsBefore :exec
 DELETE FROM renewals r WHERE r.attempted_at < $1
     -- a failure is stored once: keep it while it is the delegation's latest state
@@ -77,7 +96,7 @@ func (q *Queries) InsertRenewal(ctx context.Context, arg InsertRenewalParams) er
 }
 
 const selectDelegation = `-- name: SelectDelegation :one
-SELECT id, address, tapscripts, renewal_window, status, created_at, updated_at, max_fee FROM delegations WHERE address = $1
+SELECT id, address, tapscripts, renewal_window, status, created_at, updated_at, max_fee, last_revocation_timestamp FROM delegations WHERE address = $1
 `
 
 func (q *Queries) SelectDelegation(ctx context.Context, address string) (Delegation, error) {
@@ -92,12 +111,13 @@ func (q *Queries) SelectDelegation(ctx context.Context, address string) (Delegat
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.MaxFee,
+		&i.LastRevocationTimestamp,
 	)
 	return i, err
 }
 
 const selectDelegations = `-- name: SelectDelegations :many
-SELECT id, address, tapscripts, renewal_window, status, created_at, updated_at, max_fee FROM delegations
+SELECT id, address, tapscripts, renewal_window, status, created_at, updated_at, max_fee, last_revocation_timestamp FROM delegations
 WHERE $1::text = '' OR status = $1::text
 ORDER BY created_at DESC
 `
@@ -120,6 +140,7 @@ func (q *Queries) SelectDelegations(ctx context.Context, status string) ([]Deleg
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.MaxFee,
+			&i.LastRevocationTimestamp,
 		); err != nil {
 			return nil, err
 		}
@@ -218,7 +239,7 @@ INSERT INTO delegations (address, tapscripts, renewal_window, max_fee)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (address) DO UPDATE SET status = 'active', updated_at = NOW()
     WHERE delegations.status <> 'active'
-RETURNING id, address, tapscripts, renewal_window, status, created_at, updated_at, max_fee
+RETURNING id, address, tapscripts, renewal_window, status, created_at, updated_at, max_fee, last_revocation_timestamp
 `
 
 type UpsertDelegationParams struct {
@@ -245,6 +266,7 @@ func (q *Queries) UpsertDelegation(ctx context.Context, arg UpsertDelegationPara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.MaxFee,
+		&i.LastRevocationTimestamp,
 	)
 	return i, err
 }

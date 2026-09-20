@@ -115,6 +115,15 @@ func TestValidateBatch(t *testing.T) {
 		require.ErrorContains(t, validate(testBatch{batch.commitment, batch.vtxoTree, nil, 0}, ours), "connector tree is missing")
 		require.ErrorContains(t, validate(testBatch{batch.commitment, nil, batch.connectors, 0}, ours), "vtxo tree is missing")
 	})
+	t.Run("malformed tree is rejected without a panic", func(t *testing.T) {
+		malformed := &tree.TxTree{Root: &psbt.Packet{UnsignedTx: &wire.MsgTx{}}}
+		require.ErrorContains(t, validateBatch(batch.commitment, malformed, batch.connectors, env.svc.forfeitPubKey, testExpiry, ours), "no input")
+	})
+	t.Run("connectors must spend commitment output one", func(t *testing.T) {
+		wrong := buildBatch(t, env, ours, 3)
+		wrong.connectors.Root.UnsignedTx.TxIn[0].PreviousOutPoint.Index = 0
+		require.ErrorContains(t, validate(wrong, ours), "connector output 1")
+	})
 }
 
 // The whole cosigner role against an honest coordinator: nonces, signatures,

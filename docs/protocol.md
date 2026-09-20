@@ -74,8 +74,10 @@ Every `POLL_INTERVAL`:
    `max_fee` > 0, past half of their life, so that a window longer than the
    VTXO lifetime does not pay a fee in every round;
 3. read arkd's intent fee programs (`GetInfo`) and price each VTXO: input fee
-   plus output fee, each rounded up. A VTXO whose fee exceeds its `max_fee`
-   is dropped here with a recorded failure, so it cannot sink an intent;
+   plus output fee at the actual output amount, each rounded up. The service
+   solves that fee/output dependency and rejects non-convergent or invalid
+   fee programs. A VTXO whose fee exceeds its `max_fee` is dropped here with
+   a recorded failure, so it cannot sink an intent;
 4. build intents of up to `MAX_VTXOS_PER_INTENT` inputs, output *i−1* paying
    input *i*, attach the asset packet and the emulator packet (one covenant
    entry per input), and have the emulator co-sign each (`SubmitIntent`). A
@@ -85,8 +87,8 @@ Every `POLL_INTERVAL`:
 6. at finalization, **before signing anything**, check what arkd proposes
    (`validateBatch`): the VTXO tree is valid for the commitment tx and spends
    its batch output, each renewed coin has its own leaf output with the exact
-   script and amount, and the connector tree is rooted in the same commitment
-   tx. Otherwise no forfeit is produced and the renewal fails;
+   script, amount and assets, and the connector tree is rooted in the same
+   commitment tx. Otherwise no forfeit is produced and the renewal fails;
 7. build one forfeit per VTXO, have the emulator and arkd
    sign them (`SubmitFinalization`, `SubmitSignedForfeitTxs`);
 8. record one renewal row per delegation and outcome.

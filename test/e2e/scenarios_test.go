@@ -19,9 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestRestartAndKeys: coins funded while the service is down are renewed
-// after a restart with the same key. An instance with another key, on the
-// same database, leaves them alone and says they are not its own.
+// TestRestartAndKeys: a rotated service renews addresses made by its previous
+// key, while an unrelated key leaves them alone.
 func TestRestartAndKeys(t *testing.T) {
 	if testing.Short() {
 		t.Skip("requires the regtest stack")
@@ -60,13 +59,19 @@ func TestRestartAndKeys(t *testing.T) {
 	neverRenewed(t, stranger, reg.pkScript, fundingTxid)
 	stranger.stop()
 
-	second := startDelegatee(t, withKey)
+	rotatedKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	withRotatedKeys := func(c *config.Config) {
+		c.SecretKey = rotatedKey
+		c.SecretKeys = []*btcec.PrivateKey{rotatedKey, key}
+	}
+	second := startDelegatee(t, withRotatedKeys)
 	renewed := waitForRenewedVtxo(t, second.indexer, reg.pkScript, fundingTxid, func(types.Vtxo) bool { return true })
 	t.Logf("renewed after restart: %s", renewed.Outpoint.String())
-	// the address did not move with the restart
+	// new addresses use the rotated key; the old address keeps its old leaf.
 	again, err := second.client.GetInfo(ctx, &delegateev1.GetInfoRequest{RenewalWindow: renewalWindow})
 	require.NoError(t, err)
-	require.Contains(t, reg.tapscripts, again.GetDelegateTapscript())
+	require.NotContains(t, reg.tapscripts, again.GetDelegateTapscript())
 }
 
 // TestCancelStopsRenewals: a cancelled address is left alone, for real, until

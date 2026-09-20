@@ -37,9 +37,11 @@ func NewRepository(ctx context.Context, dsn string) (domain.DelegationRepository
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := db.PingContext(pingCtx); err != nil {
+		_ = db.Close()
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
 	if err := migrateUp(db); err != nil {
+		_ = db.Close()
 		return nil, err
 	}
 	return &repository{db: db, querier: queries.New(db)}, nil
@@ -121,6 +123,19 @@ func (r *repository) Cancel(ctx context.Context, address, status string) error {
 	return nil
 }
 
+func (r *repository) Revoke(ctx context.Context, address string, timestamp int64) error {
+	n, err := r.querier.RevokeDelegation(ctx, queries.RevokeDelegationParams{
+		Address: address, Timestamp: timestamp,
+	})
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return domain.ErrRevocationAlreadyUsed
+	}
+	return nil
+}
+
 func (r *repository) RecordRenewal(ctx context.Context, ren domain.Renewal) error {
 	return r.querier.InsertRenewal(ctx, queries.InsertRenewalParams{
 		DelegationID:   ren.DelegationID,
@@ -175,12 +190,13 @@ func toRenewal(row queries.Renewal) domain.Renewal {
 
 func toDelegation(row queries.Delegation) *domain.Delegation {
 	return &domain.Delegation{
-		ID:         row.ID,
-		Address:    row.Address,
-		Tapscripts: row.Tapscripts,
-		Params:     domain.Params{RenewalWindow: row.RenewalWindow, MaxFee: row.MaxFee},
-		Status:     row.Status,
-		CreatedAt:  row.CreatedAt,
-		UpdatedAt:  row.UpdatedAt,
+		ID:                      row.ID,
+		Address:                 row.Address,
+		Tapscripts:              row.Tapscripts,
+		Params:                  domain.Params{RenewalWindow: row.RenewalWindow, MaxFee: row.MaxFee},
+		Status:                  row.Status,
+		LastRevocationTimestamp: row.LastRevocationTimestamp,
+		CreatedAt:               row.CreatedAt,
+		UpdatedAt:               row.UpdatedAt,
 	}
 }

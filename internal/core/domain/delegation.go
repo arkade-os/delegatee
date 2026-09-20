@@ -9,6 +9,7 @@ import (
 var (
 	ErrDelegationNotFound      = errors.New("delegation not found")
 	ErrDelegationAlreadyExists = errors.New("address already registered")
+	ErrRevocationAlreadyUsed   = errors.New("revocation timestamp already used")
 )
 
 // A delegation is active, or stopped by the operator (cancelled) or by its
@@ -33,9 +34,10 @@ type Delegation struct {
 	Address    string
 	Tapscripts []string
 	Params
-	Status    string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	Status                  string
+	LastRevocationTimestamp int64
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
 }
 
 type Renewal struct {
@@ -56,6 +58,8 @@ type DelegationRepository interface {
 	List(ctx context.Context, status string) ([]Delegation, error)
 	// Cancel sets a non-active status.
 	Cancel(ctx context.Context, address, status string) error
+	// Revoke sets the owner-revoked status and atomically consumes a timestamp.
+	Revoke(ctx context.Context, address string, timestamp int64) error
 	CountActive(ctx context.Context) (int64, error)
 	RecordRenewal(ctx context.Context, renewal Renewal) error
 	ListRenewals(ctx context.Context, delegationID int64, limit int) ([]Renewal, error)

@@ -106,6 +106,23 @@ func (r *fakeRepo) Cancel(_ context.Context, address, status string) error {
 	return domain.ErrDelegationNotFound
 }
 
+func (r *fakeRepo) Revoke(_ context.Context, address string, timestamp int64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i := range r.delegations {
+		if r.delegations[i].Address != address {
+			continue
+		}
+		if timestamp <= r.delegations[i].LastRevocationTimestamp {
+			return domain.ErrRevocationAlreadyUsed
+		}
+		r.delegations[i].Status = domain.DelegationStatusRevoked
+		r.delegations[i].LastRevocationTimestamp = timestamp
+		return nil
+	}
+	return domain.ErrDelegationNotFound
+}
+
 func (r *fakeRepo) RecordRenewal(_ context.Context, ren domain.Renewal) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

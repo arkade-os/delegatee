@@ -41,6 +41,11 @@ var (
 	ErrFull = errors.New("this delegatee accepts no more delegations")
 )
 
+// MaxVtxosPerIntent is the emulator's current covenant-safe ceiling.
+const MaxVtxosPerIntent = 16
+
+const maxSignerKeys = 16
+
 // a vtxo script is a handful of small leaves; anything bigger is not one
 const (
 	maxTapscripts   = 32
@@ -49,6 +54,7 @@ const (
 
 // renewalsRetention bounds the history; the latest renewal of a delegation is always kept.
 const renewalsRetention = 30 * 24 * time.Hour
+const renewalsPruneInterval = time.Hour
 
 // Info is what a wallet needs to build a delegate address for one set of params.
 type Info struct {
@@ -82,8 +88,8 @@ type Status struct {
 	PollInterval  time.Duration
 	// Renewed and Failed count vtxo renewals since the process started.
 	Renewed, Failed uint64
-	// Holdings by delegation id, for the active delegations this key can
-	// renew. An active delegation missing here was registered under another key.
+	// Holdings by delegation id, for active delegations this keyring can renew.
+	// An active delegation missing here was registered under another key.
 	Holdings map[int64]Holdings
 }
 
@@ -116,10 +122,12 @@ type service struct {
 	indexer           indexer.Indexer
 	emulator          emulatorclient.TransportClient
 	key               *btcec.PrivateKey
+	cosigners         []*cosigner
 	pollInterval      time.Duration
 	renewalTimeout    time.Duration
 	maxVtxosPerIntent int
 	maxDelegations    int
+	registerMu        sync.Mutex
 
 	network           arklib.Network
 	serverPubKey      *btcec.PublicKey
@@ -135,6 +143,7 @@ type service struct {
 	// lastFailure is the last error per outpoint, only touched by the one
 	// renewal goroutine. Lost on restart: the failure is then reported again.
 	lastFailure map[string]string
+	lastPrune   time.Time
 
 	// watched caches what scan derives from a delegation (covenant, leaf
 	// proof, script): it never changes, and deriving it is most of a scan's
@@ -151,9 +160,15 @@ type service struct {
 	stopped chan struct{}
 }
 
-// watched is an active delegation this key can renew, ready to build intents.
+type cosigner struct {
+	key    *btcec.PrivateKey
+	pubKey string
+}
+
+// watched is an active delegation this keyring can renew, ready to build intents.
 type watched struct {
 	delegation domain.Delegation
+	cosigner   *cosigner
 	pkScript   []byte
 	script     string // hex pkScript, as the indexer keys vtxos
 	leaf       *psbt.TaprootTapLeafScript
@@ -163,6 +178,7 @@ type watched struct {
 type renewalInput struct {
 	vtxo         types.Vtxo
 	delegation   *domain.Delegation
+	cosigner     *cosigner
 	pkScript     []byte
 	leaf         *psbt.TaprootTapLeafScript
 	arkadeScript []byte
@@ -186,8 +202,46 @@ func NewService(
 	pollInterval, renewalTimeout time.Duration,
 	maxVtxosPerIntent, maxDelegations int,
 ) (Service, error) {
-	if maxVtxosPerIntent <= 0 || maxDelegations <= 0 {
-		return nil, fmt.Errorf("max vtxos per intent and max delegations must be positive")
+	return NewServiceWithKeys(ctx, repo, ark, indexerSvc, emulator, []*btcec.PrivateKey{key}, pollInterval, renewalTimeout, maxVtxosPerIntent, maxDelegations)
+}
+
+func NewServiceWithKeys(
+	ctx context.Context,
+	repo domain.DelegationRepository,
+	ark client.Client,
+	indexerSvc indexer.Indexer,
+	emulator emulatorclient.TransportClient,
+	keys []*btcec.PrivateKey,
+	pollInterval, renewalTimeout time.Duration,
+	maxVtxosPerIntent, maxDelegations int,
+) (Service, error) {
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("at least one tree cosigner key is required")
+	}
+	if len(keys) > maxSignerKeys {
+		return nil, fmt.Errorf("at most %d tree cosigner keys are supported", maxSignerKeys)
+	}
+	cosigners := make([]*cosigner, len(keys))
+	seen := make(map[string]struct{}, len(keys))
+	for i, key := range keys {
+		if key == nil {
+			return nil, fmt.Errorf("tree cosigner key %d is nil", i)
+		}
+		pubKey := tree.NewTreeSignerSession(key).GetPublicKey()
+		if _, ok := seen[pubKey]; ok {
+			return nil, fmt.Errorf("tree cosigner keys contain a duplicate key")
+		}
+		seen[pubKey] = struct{}{}
+		cosigners[i] = &cosigner{key: key, pubKey: pubKey}
+	}
+	if pollInterval <= 0 || renewalTimeout <= 0 {
+		return nil, fmt.Errorf("poll interval and renewal timeout must be positive")
+	}
+	if maxVtxosPerIntent <= 0 || maxVtxosPerIntent > MaxVtxosPerIntent {
+		return nil, fmt.Errorf("max vtxos per intent must be between 1 and %d", MaxVtxosPerIntent)
+	}
+	if maxDelegations <= 0 {
+		return nil, fmt.Errorf("max delegations must be positive")
 	}
 	arkInfo, err := ark.GetInfo(ctx)
 	if err != nil {
@@ -227,7 +281,8 @@ func NewService(
 		ark:               ark,
 		indexer:           indexerSvc,
 		emulator:          emulator,
-		key:               key,
+		key:               keys[0],
+		cosigners:         cosigners,
 		pollInterval:      pollInterval,
 		renewalTimeout:    renewalTimeout,
 		maxVtxosPerIntent: maxVtxosPerIntent,
@@ -237,7 +292,7 @@ func NewService(
 		forfeitPubKey:     forfeitPubKey,
 		forfeitPkScript:   forfeitPkScript,
 		emulatorPubKey:    emuPubKey,
-		delegatePubKeyHex: tree.NewTreeSignerSession(key).GetPublicKey(),
+		delegatePubKeyHex: cosigners[0].pubKey,
 		lastFailure:       map[string]string{},
 		watched:           map[int64]*watched{},
 		started:           time.Now(),
@@ -245,10 +300,14 @@ func NewService(
 }
 
 func (s *service) covenantFor(params domain.Params) (*covenant, error) {
+	return s.covenantForCosigner(params, s.cosigners[0])
+}
+
+func (s *service) covenantForCosigner(params domain.Params, cosigner *cosigner) (*covenant, error) {
 	if err := validateParams(params); err != nil {
 		return nil, err
 	}
-	arkadeScript, err := buildArkadeScript(s.delegatePubKeyHex, params)
+	arkadeScript, err := buildArkadeScript(cosigner.pubKey, params)
 	if err != nil {
 		return nil, err
 	}
@@ -367,8 +426,8 @@ func (s *service) RegisterDelegation(
 	if err != nil {
 		return nil, err
 	}
-	// ponytail: count then insert, so concurrent registrations can overshoot
-	// the cap by a few. It is a flood guard, not a quota.
+	s.registerMu.Lock()
+	defer s.registerMu.Unlock()
 	if active, err := s.repo.CountActive(ctx); err != nil {
 		return nil, err
 	} else if active >= int64(s.maxDelegations) {
@@ -485,10 +544,12 @@ func (s *service) spendableVtxos(ctx context.Context, scripts []string) (map[str
 }
 
 func (s *service) Health(ctx context.Context) map[string]error {
-	_, arkErr := s.ark.GetInfo(ctx)
-	_, emuErr := s.emulator.GetInfo(ctx)
+	healthCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	_, arkErr := s.ark.GetInfo(healthCtx)
+	_, emuErr := s.emulator.GetInfo(healthCtx)
 	return map[string]error{
-		"database": s.repo.Ping(ctx),
+		"database": s.repo.Ping(healthCtx),
 		"ark":      arkErr,
 		"emulator": emuErr,
 		"scanner":  s.scannerHealth(time.Now()),
@@ -559,8 +620,13 @@ func (s *service) scan(ctx context.Context) {
 	if s.renewing.Load() > 0 {
 		return
 	}
-	if err := s.repo.PruneRenewals(ctx, time.Now().Add(-renewalsRetention)); err != nil {
-		log.WithError(err).Warn("prune renewals")
+	now := time.Now()
+	if s.lastPrune.IsZero() || now.Sub(s.lastPrune) >= renewalsPruneInterval {
+		if err := s.repo.PruneRenewals(ctx, now.Add(-renewalsRetention)); err != nil {
+			log.WithError(err).Warn("prune renewals")
+		} else {
+			s.lastPrune = now
+		}
 	}
 	delegations, err := s.repo.List(ctx, domain.DelegationStatusActive)
 	if err != nil {
@@ -592,7 +658,6 @@ func (s *service) scan(ctx context.Context) {
 		return
 	}
 
-	now := time.Now()
 	holdings := make(map[int64]Holdings, len(scripts))
 	var inputs []renewalInput
 	for _, script := range scripts {
@@ -614,7 +679,7 @@ func (s *service) scan(ctx context.Context) {
 			if !now.Before(due) {
 				inputs = append(inputs, renewalInput{
 					vtxo: v, delegation: &w.delegation, pkScript: w.pkScript,
-					leaf: w.leaf, arkadeScript: w.covenant.arkadeScript,
+					leaf: w.leaf, arkadeScript: w.covenant.arkadeScript, cosigner: w.cosigner,
 				})
 			}
 		}
@@ -714,20 +779,24 @@ func (s *service) renewAndRecord(ctx context.Context, inputs []renewalInput) {
 // watch derives what is needed to renew d, or nil when it was registered
 // under another key.
 func (s *service) watch(d *domain.Delegation) (*watched, error) {
-	c, err := s.covenantFor(d.Params)
-	if err != nil {
-		return nil, err
+	for _, cosigner := range s.cosigners {
+		c, err := s.covenantForCosigner(d.Params, cosigner)
+		if err != nil {
+			return nil, err
+		}
+		if !hasLeaf(d.Tapscripts, c.tapscript) {
+			continue
+		}
+		pkScript, leaf, err := s.delegateLeaf(d, c)
+		if err != nil {
+			return nil, err
+		}
+		return &watched{
+			delegation: *d, cosigner: cosigner, pkScript: pkScript,
+			script: hex.EncodeToString(pkScript), leaf: leaf, covenant: c,
+		}, nil
 	}
-	if !hasLeaf(d.Tapscripts, c.tapscript) {
-		return nil, nil
-	}
-	pkScript, leaf, err := s.delegateLeaf(d, c)
-	if err != nil {
-		return nil, err
-	}
-	return &watched{
-		delegation: *d, pkScript: pkScript, script: hex.EncodeToString(pkScript), leaf: leaf, covenant: c,
-	}, nil
+	return nil, nil
 }
 
 func (s *service) delegateLeaf(d *domain.Delegation, c *covenant) ([]byte, *psbt.TaprootTapLeafScript, error) {

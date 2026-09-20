@@ -43,7 +43,7 @@ signature from the exit key.
 | the batch is verified before any forfeit is signed | the SDK does this for online users; the custom batch handler skipped it, so a dishonest arkd could have collected forfeits without delivering the new coins | `validateBatch`, `leavesPay` |
 | no policy/plugin abstraction | a teammate is building a template system where the user passes a description of how the contract may be spent; it replaces the hardwired covenant rather than extending a registry, so a plugin layer was removed | `TODO(templates)` in `covenant.go`, `docs/protocol.md` |
 | admin port serves public API + admin API + UI + metrics, without CORS | the UI needs a single origin; a CORS wildcard on the admin port let any page in the operator's browser cancel delegations | `internal/interface/grpc/service.go` |
-| admin auth is HTTP basic auth, optional | native browser prompt, zero UI code, works for grpc clients too; a shared password is enough behind TLS on a private network, not for several operators | `basicAuth`, `loopbackAuth` |
+| admin auth is file-backed per-operator HTTP Basic auth | native browser prompt, zero UI code, works for gRPC clients, bcrypt hashes never need to be sent to the service | `basicAuth`, `loopbackAuth` |
 | `revoked` (owner) vs `cancelled` (operator) statuses | operators need to know why a delegation stopped | `domain.DelegationStatus*` |
 | failures recorded once per distinct error; history pruned after 30 days keeping each delegation's latest row | a stuck coin wrote a row and an error log every poll; pruning must not hide a still-failing delegation | `renewAndRecord`, `PruneRenewals` |
 | derived per-delegation data cached across scans | 1.4 s of CPU per scan at 5,000 delegations, 1.4 ms with the cache | `service.watched`, `BenchmarkScan5000` |
@@ -55,7 +55,7 @@ signature from the exit key.
 
 - Anyone on the public API: register scripts, read a delegation by address,
   fill the cap. Cannot move or block coins.
-- The operator (holder of `DELEGATEE_SECRET_KEY`): stop renewing; take up to
+- The operator (holder of the configured secret keyring): stop renewing; take up to
   `max_fee` each time a coin is renewable. Cannot send coins elsewhere.
 - arkd: refuse service; charge fees (capped by `max_fee`). Cannot get a
   forfeit without delivering the new vtxo (`validateBatch`).
@@ -64,12 +64,10 @@ signature from the exit key.
   Inherent to emulator-enforced scripts; documented in the README.
 - The owner always has the unilateral exit.
 
-Known residuals: the asset packet of the new leaf is not re-verified at
-finalization (the covenant checks it on the intent); the output fee is
-estimated on the input amount (a fee program charging small outputs more
-would underpay and arkd would reject cleanly); the half-life rule is enforced
-by the honest service only, the covenant cannot (no age opcode in the
-emulator, worth requesting).
+Known residuals: the half-life rule is enforced by the honest service only,
+the covenant cannot (no age opcode in the emulator, worth requesting), and
+admin credentials are file-backed and require a restart to change; operators
+that terminate auth outside the service can explicitly disable this layer.
 
 ## What is left
 
@@ -93,13 +91,11 @@ Ordered by what blocks production.
    ±10 min) and the rule that `renewalWindow` stays well below the VTXO
    lifetime when `maxFee > 0`. The service documents the rule; only a wallet
    can enforce it.
-6. **Key management.** One key per instance, no rotation path: rotating
-   strands every existing address (they keep their exit). If rotation is a
-   requirement, the service would need to hold several keys and match each
-   delegation to its key; `watch()` already knows which delegations belong
-   to the current key.
-7. **Stronger admin auth** if several operators will use the UI (audit trail,
-   per-operator credentials). Basic auth is a single shared password.
+6. **Key management.** Rotation is supported with a keyring: the first key
+   is active for new addresses and retained keys renew existing addresses.
+   Remove old keys only after their addresses have been migrated or retired.
+7. **Admin credential lifecycle.** The users file has per-operator bcrypt
+   credentials, but changes require a restart and there is no audit trail.
 8. Nice to have: server-side pagination of `ListDelegations` (fine at 10k,
    not at 100k); failure dedupe survives restarts (today a still-failing coin
    is recorded once more after each restart); gzip on the admin list.

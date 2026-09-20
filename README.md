@@ -32,11 +32,15 @@ docker run -d --restart unless-stopped \
   -e DELEGATEE_EMULATOR_URL=https://emulator.example.com \
   -e DELEGATEE_DATABASE_URL=postgres://user:pass@db:5432/delegatee \
   -e DELEGATEE_SECRET_KEY=$(openssl rand -hex 32) \
-  -e DELEGATEE_ADMIN_PASSWORD=change-me \
+  -v "$PWD/admin-users:/run/secrets/admin-users:ro" \
+  -e DELEGATEE_ADMIN_AUTH=file \
+  -e DELEGATEE_ADMIN_USERS_FILE=/run/secrets/admin-users \
   ghcr.io/arkade-os/delegatee
 ```
 
-Keep the secret key (or mount it as a file with `DELEGATEE_SECRET_KEY_FILE`): it is pinned in every delegate address (see
+Create `admin-users` with one bcrypt record per operator, for example
+`htpasswd -B -C 12 -bn alice 'choose-a-password' > admin-users`. Keep the secret key
+(or keyring) mounted as a secret: keys are pinned in delegate addresses (see
 [Running in production](#running-in-production)). Then:
 
 - wallets talk to `http://host:7080` (gRPC and REST on the same port),
@@ -214,10 +218,15 @@ step, no external assets.
 - **Stop renewing** / **Resume renewing** per address, search by address,
   refresh every 15 s, health of arkd / emulator / postgres in the header.
 
-Set `DELEGATEE_ADMIN_PASSWORD` and the browser asks for it (user `admin`).
-It is HTTP basic auth: the password travels in clear unless TLS sits in front,
-so keep the port on localhost or a private network, or behind a TLS reverse
-proxy, even with a password. Without one the port is open to whoever reaches it.
+Set `DELEGATEE_ADMIN_USERS_FILE` to a file containing `username:bcrypt-hash`
+records. The browser asks for the operator's username and password, and gRPC
+clients send the same HTTP Basic credentials. Passwords are checked against
+the hashes and failed attempts are rate-limited. Set
+`DELEGATEE_ADMIN_AUTH=disabled` when a trusted reverse proxy or network policy
+owns authentication instead. Basic auth still needs TLS:
+keep the port on localhost or a private network, or put a TLS reverse proxy in
+front of it. `LoadConfig` requires either `ADMIN_AUTH=file` with a users file,
+or the explicit `ADMIN_AUTH=disabled` setting.
 
 ## Configuration
 
@@ -230,12 +239,15 @@ Environment variables only.
 | `DELEGATEE_DATABASE_URL` | postgres DSN; migrations run at startup | required |
 | `DELEGATEE_SECRET_KEY` | 32-byte hex; the vtxo tree cosigner key pinned in every delegate address | required, or the file |
 | `DELEGATEE_SECRET_KEY_FILE` | file holding that hex (docker / kubernetes secrets); wins over the variable | unset |
+| `DELEGATEE_SECRET_KEYS_FILE` | newline-separated keyring; first key is active for new addresses, remaining keys renew older addresses | unset |
+| `DELEGATEE_PREVIOUS_SECRET_KEYS` | comma-separated previous 32-byte hex keys, for rotation when using `SECRET_KEY` or `SECRET_KEY_FILE` | unset |
 | `DELEGATEE_PUBLIC_RATE_LIMIT` | requests per second per client IP on the public port, burst 10×; `0` disables. Applies to the connection's address: disable it and use the proxy's limits when one terminates connections | `5` |
 | `DELEGATEE_PORT` | public gRPC + REST port | `7080` |
 | `DELEGATEE_ADMIN_PORT` | admin gRPC + REST + UI port | `7081` |
 | `DELEGATEE_POLL_INTERVAL` | how often addresses are scanned | `1m` |
 | `DELEGATEE_RENEWAL_TIMEOUT` | max time from intent registration to batch finalization; must cover the gap between two arkd sessions | `2h` |
-| `DELEGATEE_ADMIN_PASSWORD` | when set, the admin port (UI, REST, gRPC) requires HTTP basic auth, user `admin` | unset: open |
+| `DELEGATEE_ADMIN_AUTH` | `file` enables per-operator auth; `disabled` delegates auth to a trusted proxy/network boundary | required |
+| `DELEGATEE_ADMIN_USERS_FILE` | newline-separated `username:bcrypt-hash` records when admin auth is `file` | required with `file` |
 | `DELEGATEE_MAX_DELEGATIONS` | cap on active delegations; registrations beyond it get `RESOURCE_EXHAUSTED` | `50000` |
 | `DELEGATEE_MAX_VTXOS_PER_INTENT` | inputs per intent. The emulator allows 64 `OP_INSPECTINTENTMESSAGE` per request and the covenant runs 4 per input, so 16 is the ceiling | `16` |
 | `DELEGATEE_LOG_LEVEL` | logrus level (5 = debug) | `4` |
@@ -245,9 +257,11 @@ testnet4, signet, mutinynet, mainnet.
 
 ## Running in production
 
-- **Back up `DELEGATEE_SECRET_KEY`.** Losing or rotating it strands every
-  existing delegate address: the service skips them and users must exit
-  unilaterally. One instance per key; in-flight renewals live in memory.
+- **Back up the secret keyring.** Put the new key first and retain the old key
+  below it during rotation. New addresses use the first key; existing
+  addresses continue renewing with any retained key. Remove an old key only
+  after its addresses have been migrated or deliberately retired. In-flight
+  renewals live in memory.
 - **Restart policy.** At startup the binary retries arkd and the emulator for
   ~2.5 min, then exits.
 - **Termination grace period ≥ `RENEWAL_TIMEOUT`.** Shutdown waits for the
@@ -258,7 +272,8 @@ testnet4, signet, mutinynet, mainnet.
 - **Exposure.** The public API only registers covenant scripts, which cannot
   move funds. It is rate-limited per client IP (`PUBLIC_RATE_LIMIT`), which
   only helps when clients connect directly: behind a reverse proxy, limit
-  there. Never expose the admin port, and give it a password.
+  there. Never expose the admin port directly; use the bcrypt-backed operator
+  file and TLS.
 - **Flooding.** Every active delegation costs an indexer lookup per poll, so
   junk registrations slow down real renewals. `MAX_DELEGATIONS` bounds that;
   when the cap is hit, look for addresses that never held a VTXO.
@@ -296,7 +311,7 @@ What each party can and cannot do to coins at a delegate address:
 | anyone on the public API | register scripts, read a delegation they know the address of, fill the delegation cap | move or block anyone's coins |
 | the owner (holder of an exit key) | stop and resume the delegation of their address; exit unilaterally | anything to other addresses |
 | the delegatee operator (this service, or whoever holds its key) | stop renewing (the owner then exits with their own key); take up to `maxFee` each time a coin is renewable, see [Fees](#fees) | send coins anywhere but back to the same script |
-| arkd | refuse service; charge fees, which the owner caps with `maxFee` | get a forfeit without delivering the new VTXO: before signing any forfeit the service checks that the batch's VTXO tree is well formed, hangs off the commitment tx, pays every renewed coin (script and amount) in its own leaf, and that the connectors come from that same tx |
+| arkd | refuse service; charge fees, which the owner caps with `maxFee` | get a forfeit without delivering the new VTXO: before signing any forfeit the service checks that the batch's VTXO tree is well formed, hangs off the commitment tx, pays every renewed coin (script, amount and assets) in its own leaf, and that the connectors come from that same tx |
 | the emulator | refuse to co-sign | sign alone: the delegate leaf also needs arkd's key |
 | **arkd and the emulator together** | **spend the delegate leaf**: it is a 2-of-2 between them, the covenant is only enforced by the emulator's honesty | touch the owner's exit leaf |
 
@@ -305,9 +320,9 @@ do not collude, exactly like any other emulator-enforced Arkade script. The
 owner's unilateral exit is the way out of every failure above, as long as
 they come back before expiry.
 
-Known limits: the asset packet of the new leaf is not re-verified at
-finalization (the covenant checks it on the intent); admin authentication is
-a single shared password.
+Known limits: the half-life rule for fee-paying delegations is enforced by
+the service rather than the covenant, and admin credentials are file-backed
+and require a restart to change.
 
 ## Repository Structure
 
@@ -360,7 +375,7 @@ The unit tests run the service against in-memory fakes of arkd, the indexer,
 the emulator and the repository: registration rules, scanning, fee handling,
 failure bookkeeping, the cosigner role against a real MuSig2 coordinator, and
 the pre-forfeit batch checks against real transaction trees, including the
-batches a dishonest arkd could propose. The gRPC, REST, UI and admin password
+batches a dishonest arkd could propose. The gRPC, REST, UI and per-operator admin auth
 paths are tested on real ports over a fake service.
 
 The e2e suite funds wallets through the faucet and covers, against the real

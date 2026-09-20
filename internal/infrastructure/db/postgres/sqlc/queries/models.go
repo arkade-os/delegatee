@@ -9,14 +9,15 @@ import (
 )
 
 type Delegation struct {
-	ID            int64
-	Address       string
-	Tapscripts    []string
-	RenewalWindow int64
-	Status        string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	MaxFee        int64
+	ID                      int64
+	Address                 string
+	Tapscripts              []string
+	RenewalWindow           int64
+	Status                  string
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	MaxFee                  int64
+	LastRevocationTimestamp int64
 }
 
 type Renewal struct {

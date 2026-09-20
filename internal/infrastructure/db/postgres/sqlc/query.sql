@@ -19,6 +19,11 @@ SELECT COUNT(*) FROM delegations WHERE status = 'active';
 -- name: CancelDelegation :execrows
 UPDATE delegations SET status = @status, updated_at = NOW() WHERE address = @address;
 
+-- name: RevokeDelegation :execrows
+UPDATE delegations
+SET status = 'revoked', last_revocation_timestamp = @timestamp, updated_at = NOW()
+WHERE address = @address AND last_revocation_timestamp < @timestamp;
+
 -- name: InsertRenewal :exec
 INSERT INTO renewals (delegation_id, outpoints, commitment_txid, success, error)
 VALUES (@delegation_id, @outpoints, @commitment_txid, @success, @error);

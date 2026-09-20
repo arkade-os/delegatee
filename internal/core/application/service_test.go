@@ -9,6 +9,7 @@ import (
 	"github.com/arkade-os/arkd/pkg/client-lib/types"
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	emulatorclient "github.com/arkade-os/emulator/pkg/client"
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -105,6 +106,24 @@ func TestRegisterDelegation(t *testing.T) {
 	list, err := env.svc.ListDelegations(ctx)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
+}
+
+func TestKeyRotationWatchesPreviousDelegations(t *testing.T) {
+	env := newTestEnv(t)
+	oldKey := env.svc.key
+	d := env.register(t, domain.Params{RenewalWindow: 600})
+	newKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	rotated, err := NewServiceWithKeys(
+		t.Context(), env.repo, env.ark, env.indexer, env.emulator,
+		[]*btcec.PrivateKey{newKey, oldKey}, time.Hour, time.Minute, 16, 100,
+	)
+	require.NoError(t, err)
+	rotatedSvc := rotated.(*service)
+	w, err := rotatedSvc.watch(d)
+	require.NoError(t, err)
+	require.NotNil(t, w)
+	require.Same(t, rotatedSvc.cosigners[1], w.cosigner)
 }
 
 func TestRegisterDelegationCap(t *testing.T) {

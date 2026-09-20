@@ -306,7 +306,7 @@ function renderOverview() {
   const strangers = delegations.filter(foreign).length;
   $("detail").innerHTML = `
     <h2>Overview</h2>
-    ${strangers ? `<p class="note"><b>${strangers}</b> active delegation${strangers > 1 ? "s were" : " was"} registered under another secret key and cannot be renewed by this instance. If the key was rotated by mistake, restore the previous DELEGATEE_SECRET_KEY.</p>` : ""}
+    ${strangers ? `<p class="note"><b>${strangers}</b> active delegation${strangers > 1 ? "s were" : " was"} registered under another secret key and cannot be renewed by this instance. If the key was rotated by mistake, restore the previous key in the configured keyring.</p>` : ""}
     <h3>Next to expire</h3>
     <p>Each bar runs from now to the address's earliest expiry; the hatched end is when it can be renewed. A bar that is all hatch is renewable now.</p>
     ${shown.length ? `<div class="horizon">${lanes}</div>${held.length > shown.length ? `<p class="state">and ${held.length - shown.length} more, later</p>` : ""}`

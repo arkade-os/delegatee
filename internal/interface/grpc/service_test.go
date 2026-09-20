@@ -19,6 +19,7 @@ import (
 	"github.com/arkade-os/delegatee/internal/core/application"
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -69,8 +70,17 @@ func freePort(t *testing.T) uint32 {
 
 // serveFake runs the real servers (grpc, gateway, UI) over a fake application.
 func serveFake(t *testing.T, password string) (public, admin string, app *fakeApp) {
+	return serveFakeUser(t, "admin", password)
+}
+
+func serveFakeUser(t *testing.T, username, password string) (public, admin string, app *fakeApp) {
 	t.Helper()
-	cfg := &config.Config{Port: freePort(t), AdminPort: freePort(t), AdminPassword: password}
+	cfg := &config.Config{Port: freePort(t), AdminPort: freePort(t)}
+	if password != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		require.NoError(t, err)
+		cfg.AdminUsers = []config.AdminUser{{Username: username, PasswordHash: string(hash)}}
+	}
 	svc, err := NewService("test", cfg)
 	require.NoError(t, err)
 	app = &fakeApp{}
@@ -182,7 +192,7 @@ func TestPortsAndRouting(t *testing.T) {
 }
 
 func TestAdminPassword(t *testing.T) {
-	public, admin, _ := serveFake(t, "s3cret")
+	public, admin, _ := serveFakeUser(t, "operator", "s3cret")
 	auth := func(user, pass string) func(*http.Request) {
 		return func(r *http.Request) { r.SetBasicAuth(user, pass) }
 	}
@@ -190,11 +200,11 @@ func TestAdminPassword(t *testing.T) {
 		resp, _ := do(t, http.MethodGet, "http://"+admin+path)
 		require.Equal(t, http.StatusUnauthorized, resp.StatusCode, path)
 		require.Contains(t, resp.Header.Get("WWW-Authenticate"), "Basic")
-		for _, bad := range [][2]string{{"admin", "wrong"}, {"root", "s3cret"}, {"admin", ""}} {
+		for _, bad := range [][2]string{{"operator", "wrong"}, {"root", "s3cret"}, {"operator", ""}} {
 			resp, _ = do(t, http.MethodGet, "http://"+admin+path, auth(bad[0], bad[1]))
 			require.Equal(t, http.StatusUnauthorized, resp.StatusCode, "%s %v", path, bad)
 		}
-		resp, _ = do(t, http.MethodGet, "http://"+admin+path, auth("admin", "s3cret"))
+		resp, _ = do(t, http.MethodGet, "http://"+admin+path, auth("operator", "s3cret"))
 		require.Equal(t, http.StatusOK, resp.StatusCode, path)
 	}
 	resp, _ := do(t, http.MethodGet, "http://"+public+"/v1/info")
@@ -206,7 +216,7 @@ func TestAdminPassword(t *testing.T) {
 	_, err = delegateev1.NewAdminServiceClient(conn).ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{})
 	require.Error(t, err)
 	authed, err := grpc.NewClient(admin, grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithPerRPCCredentials(loopbackAuth("s3cret")))
+		grpc.WithPerRPCCredentials(basicAuthCredentials{Username: "operator", Password: "s3cret"}))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = authed.Close() })
 	_, err = delegateev1.NewAdminServiceClient(authed).ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{})

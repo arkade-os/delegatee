@@ -8,6 +8,8 @@ import (
 	"time"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
+	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
+	"github.com/arkade-os/arkd/pkg/ark-lib/extension"
 	"github.com/arkade-os/arkd/pkg/ark-lib/txutils"
 	"github.com/arkade-os/arkd/pkg/client-lib/client"
 	"github.com/arkade-os/arkd/pkg/client-lib/types"
@@ -39,6 +41,29 @@ func TestLeavesPay(t *testing.T) {
 	// right script, short amount
 	require.ErrorContains(t, leavesPay(leaves, []*wire.TxOut{wire.NewTxOut(501, bob)}), "no leaf pays 501")
 	require.ErrorContains(t, leavesPay(nil, []*wire.TxOut{wire.NewTxOut(500, bob)}), "no leaf pays")
+}
+
+func TestLeavesPayChecksAssets(t *testing.T) {
+	const assetID = "abababababababababababababababababababababababababababababababab0000"
+	script := []byte{0x51, 0x02}
+	packet, err := assetPacketFor([]types.Vtxo{{Assets: []types.Asset{{AssetId: assetID, Amount: 5}}}})
+	require.NoError(t, err)
+	ext, err := (extension.Extension{packet}).TxOut()
+	require.NoError(t, err)
+	leaf := &psbt.Packet{UnsignedTx: &wire.MsgTx{TxOut: []*wire.TxOut{
+		wire.NewTxOut(1_000, script), ext,
+	}}}
+
+	require.NoError(t, leavesPayWithAssets(
+		[]*psbt.Packet{leaf},
+		[]*wire.TxOut{wire.NewTxOut(1_000, script)},
+		[][]types.Asset{{{AssetId: assetID, Amount: 5}}},
+	))
+	require.Error(t, leavesPayWithAssets(
+		[]*psbt.Packet{leaf},
+		[]*wire.TxOut{wire.NewTxOut(1_000, script)},
+		[][]types.Asset{{{AssetId: assetID, Amount: 6}}},
+	))
 }
 
 func dueInput(t *testing.T, env *testEnv, p domain.Params, n int, amount uint64) renewalInput {
@@ -81,6 +106,23 @@ func TestRenewPaysTheFeeOrRefuses(t *testing.T) {
 	require.Equal(t, pays.pkScript, proof.UnsignedTx.TxOut[0].PkScript)
 	require.Len(t, proof.UnsignedTx.TxIn, 2, "bip322 message input plus the vtxo")
 	require.Contains(t, env.emulator.submitted[0].Message, env.svc.delegatePubKeyHex)
+}
+
+func TestRenewPricesOutputFeeAtTheActualOutputAmount(t *testing.T) {
+	env := newTestEnv(t)
+	env.ark.info.Fees = types.FeeInfo{IntentFees: arkfee.Config{
+		IntentOffchainOutputProgram: "amount < 10000.0 ? 200.0 : 100.0",
+	}}
+	env.ark.streamErr = errBoom
+	in := dueInput(t, env, domain.Params{RenewalWindow: 600, MaxFee: 300}, 1, 10_000)
+
+	results := env.svc.renew(t.Context(), []renewalInput{in})
+	require.Len(t, results, 1)
+	require.ErrorContains(t, results[0].err, "event stream: boom")
+	require.Len(t, env.emulator.submitted, 1)
+	proof, err := psbt.NewFromRawBytes(strings.NewReader(env.emulator.submitted[0].Proof), true)
+	require.NoError(t, err)
+	require.Equal(t, int64(9_800), proof.UnsignedTx.TxOut[0].Value)
 }
 
 func TestRenewFeeErrors(t *testing.T) {

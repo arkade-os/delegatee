@@ -56,6 +56,8 @@ func TestRevokeDelegation(t *testing.T) {
 	got, err = env.svc.GetDelegation(ctx, d.Address)
 	require.NoError(t, err)
 	require.Equal(t, domain.DelegationStatusRevoked, got.Status)
+	err = env.svc.RevokeDelegation(ctx, d.Address, owner, sign(env.userKey, d.Address, now), now)
+	require.ErrorIs(t, err, ErrInvalidSignature, "an accepted revocation cannot be replayed")
 	require.NoError(t, env.svc.RevokeDelegation(ctx, other.Address, ownerCompressed, sign(env.userKey, other.Address, now), now))
 }
 

@@ -5,7 +5,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -44,6 +46,28 @@ type renewalResult struct {
 // cosigned by the emulator and registered, then follows batch sessions until
 // every registered intent has been included.
 func (s *service) renew(ctx context.Context, inputs []renewalInput) []renewalResult {
+	groups := make([][]renewalInput, len(s.cosigners))
+	indices := make(map[*cosigner]int, len(s.cosigners))
+	for i, cosigner := range s.cosigners {
+		indices[cosigner] = i
+	}
+	for _, in := range inputs {
+		cosigner := in.cosigner
+		if cosigner == nil {
+			cosigner = s.cosigners[0]
+		}
+		groups[indices[cosigner]] = append(groups[indices[cosigner]], in)
+	}
+	var results []renewalResult
+	for i, inputs := range groups {
+		if len(inputs) > 0 {
+			results = append(results, s.renewForCosigner(ctx, s.cosigners[i], inputs)...)
+		}
+	}
+	return results
+}
+
+func (s *service) renewForCosigner(ctx context.Context, cosigner *cosigner, inputs []renewalInput) []renewalResult {
 	var results []renewalResult
 	// arkd's fee programs can change at any time: read them every cycle, and
 	// settle first which inputs can pay so they don't sink a whole intent
@@ -77,7 +101,7 @@ func (s *service) renew(ctx context.Context, inputs []renewalInput) []renewalRes
 	for i, chunk := range chunks {
 		g.Go(func() error {
 			b := &builds[i]
-			p, err := s.buildIntent(ctx, chunk)
+			p, err := s.buildIntent(ctx, cosigner, chunk)
 			if err == nil {
 				b.pending = append(b.pending, p)
 				return nil
@@ -90,7 +114,7 @@ func (s *service) renew(ctx context.Context, inputs []renewalInput) []renewalRes
 			log.WithError(err).WithField("count", len(chunk)).Warn("intent rejected, retrying per vtxo")
 			for _, in := range chunk {
 				single := []renewalInput{in}
-				if p, err := s.buildIntent(ctx, single); err != nil {
+				if p, err := s.buildIntent(ctx, cosigner, single); err != nil {
 					b.failed = append(b.failed, renewalResult{inputs: single, err: err})
 				} else {
 					b.pending = append(b.pending, p)
@@ -115,7 +139,7 @@ func (s *service) renew(ctx context.Context, inputs []renewalInput) []renewalRes
 			outpoints = append(outpoints, in.vtxo.Outpoint)
 		}
 	}
-	signerSession := tree.NewTreeSignerSession(s.key)
+	signerSession := tree.NewTreeSignerSession(cosigner.key)
 	eventsCh, stop, err := s.ark.GetEventStream(ctx, clientlib.GetEventStreamTopics(
 		outpoints, []tree.SignerSession{signerSession},
 	))
@@ -141,7 +165,7 @@ func (s *service) renew(ctx context.Context, inputs []renewalInput) []renewalRes
 
 	h := &batchHandler{svc: s, pending: registered}
 	for len(h.pending) > 0 {
-		h.signerSession = tree.NewTreeSignerSession(s.key)
+		h.signerSession = tree.NewTreeSignerSession(cosigner.key)
 		commitmentTxid, _, _, _, _, err := clientlib.JoinBatchSession(ctx, eventsCh, h)
 		if err != nil {
 			for _, p := range append(h.inBatch, h.pending...) {
@@ -165,11 +189,11 @@ type pendingIntent struct {
 
 // buildIntent creates the self-send register intent for inputs and has the
 // emulator cosign it.
-func (s *service) buildIntent(ctx context.Context, inputs []renewalInput) (*pendingIntent, error) {
+func (s *service) buildIntent(ctx context.Context, cosigner *cosigner, inputs []renewalInput) (*pendingIntent, error) {
 	message, err := intent.RegisterMessage{
 		BaseMessage:          intent.BaseMessage{Type: intent.IntentMessageTypeRegister},
 		OnchainOutputIndexes: []int{}, // must encode as "[]"
-		CosignersPublicKeys:  []string{s.delegatePubKeyHex},
+		CosignersPublicKeys:  []string{cosigner.pubKey},
 	}.Encode()
 	if err != nil {
 		return nil, err
@@ -270,17 +294,54 @@ func (f *feeEstimator) of(in renewalInput) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("intent input fee: %w", err)
 	}
-	// ponytail: priced on the input amount, not the output's. A fee program
-	// that charges small outputs more underpays and arkd rejects the intent;
-	// iterate to a fixed point if such a program ever ships.
-	outFee, err := f.EvalOffchainOutput(arkfee.Output{
-		Amount: in.vtxo.Amount, Script: hex.EncodeToString(in.pkScript),
-	})
+	inputSats, err := feeSatoshis(inFee)
 	if err != nil {
-		return 0, fmt.Errorf("intent output fee: %w", err)
+		return 0, fmt.Errorf("intent input fee: %w", err)
 	}
-	// rounded up per input: arkd rounds the total, which is never more
-	return inFee.ToSatoshis() + outFee.ToSatoshis(), nil
+
+	// Solve the output-fee dependency at the actual output amount.
+	fee := inputSats
+	seen := make(map[int64]struct{}, 8)
+	for range 32 {
+		if fee >= int64(in.vtxo.Amount) {
+			return fee, nil
+		}
+		if _, ok := seen[fee]; ok {
+			return 0, fmt.Errorf("intent fee did not converge")
+		}
+		seen[fee] = struct{}{}
+		outFee, err := f.EvalOffchainOutput(arkfee.Output{
+			Amount: in.vtxo.Amount - uint64(fee), Script: hex.EncodeToString(in.pkScript),
+		})
+		if err != nil {
+			return 0, fmt.Errorf("intent output fee: %w", err)
+		}
+		outputSats, err := feeSatoshis(outFee)
+		if err != nil {
+			return 0, fmt.Errorf("intent output fee: %w", err)
+		}
+		if outputSats > math.MaxInt64-inputSats {
+			return 0, fmt.Errorf("intent fee overflows int64")
+		}
+		next := inputSats + outputSats
+		if next == fee {
+			return next, nil
+		}
+		fee = next
+	}
+	return 0, fmt.Errorf("intent fee did not converge")
+}
+
+func feeSatoshis(fee arkfee.FeeAmount) (int64, error) {
+	value := float64(fee)
+	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
+		return 0, fmt.Errorf("invalid fee amount %v", value)
+	}
+	sats := fee.ToSatoshis()
+	if sats < 0 {
+		return 0, fmt.Errorf("invalid fee amount %v", value)
+	}
+	return sats, nil
 }
 
 // assetPacketFor moves the assets of proof input i to output i-1.
@@ -431,6 +492,9 @@ func (h *batchHandler) OnTreeSigningStarted(
 	if err != nil {
 		return false, err
 	}
+	if commitmentTx.UnsignedTx == nil || len(commitmentTx.UnsignedTx.TxOut) == 0 {
+		return false, fmt.Errorf("commitment tx has no batch output")
+	}
 	if err := h.signerSession.Init(root, commitmentTx.UnsignedTx.TxOut[0].Value, vtxoTree); err != nil {
 		return false, err
 	}
@@ -457,12 +521,14 @@ func (h *batchHandler) OnBatchFinalization(
 	// the point of no return: a forfeit hands the old vtxo to arkd, so the
 	// batch must verifiably contain the new one. The users are not here to check.
 	var outputs []*wire.TxOut
+	var assets [][]types.Asset
 	for _, p := range h.inBatch {
 		for _, in := range p.inputs {
 			outputs = append(outputs, in.output)
+			assets = append(assets, in.vtxo.Assets)
 		}
 	}
-	if err := validateBatch(event.Tx, vtxoTree, connectorTree, h.svc.forfeitPubKey, h.batchExpiry, outputs); err != nil {
+	if err := validateBatchWithAssets(event.Tx, vtxoTree, connectorTree, h.svc.forfeitPubKey, h.batchExpiry, outputs, assets); err != nil {
 		return nil, fmt.Errorf("refusing to forfeit: %w", err)
 	}
 	flatConnectorTree, err := connectorTree.Serialize()
@@ -527,16 +593,39 @@ func sweepTapTreeRoot(forfeitPubKey *btcec.PublicKey, batchExpiry arklib.Relativ
 func validateBatch(
 	commitmentTx string, vtxoTree, connectorTree *tree.TxTree,
 	forfeitPubKey *btcec.PublicKey, batchExpiry arklib.RelativeLocktime, outputs []*wire.TxOut,
-) error {
+) (err error) {
+	return validateBatchWithAssets(commitmentTx, vtxoTree, connectorTree, forfeitPubKey, batchExpiry, outputs, nil)
+}
+
+func validateBatchWithAssets(
+	commitmentTx string, vtxoTree, connectorTree *tree.TxTree,
+	forfeitPubKey *btcec.PublicKey, batchExpiry arklib.RelativeLocktime, outputs []*wire.TxOut,
+	assets [][]types.Asset,
+) (err error) {
+	// Remote trees can be malformed; turn validator panics into errors.
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("malformed batch: %v", recovered)
+		}
+	}()
 	if vtxoTree == nil || vtxoTree.Root == nil {
 		return fmt.Errorf("vtxo tree is missing")
 	}
 	if connectorTree == nil || connectorTree.Root == nil {
 		return fmt.Errorf("connector tree is missing")
 	}
+	if err := validateTreePackets(vtxoTree, "vtxo"); err != nil {
+		return err
+	}
+	if err := validateTreePackets(connectorTree, "connector"); err != nil {
+		return err
+	}
 	commitment, err := psbt.NewFromRawBytes(strings.NewReader(commitmentTx), true)
 	if err != nil {
 		return fmt.Errorf("commitment tx: %w", err)
+	}
+	if commitment.UnsignedTx == nil || len(commitment.UnsignedTx.TxOut) < 2 {
+		return fmt.Errorf("commitment tx has no connector output")
 	}
 	commitmentTxid := commitment.UnsignedTx.TxHash()
 
@@ -546,43 +635,143 @@ func validateBatch(
 	if root := vtxoTree.Root.UnsignedTx.TxIn[0].PreviousOutPoint; root.Hash != commitmentTxid || root.Index != 0 {
 		return fmt.Errorf("vtxo tree spends %s, not the batch output of commitment tx %s", root, commitmentTxid)
 	}
+	if root := connectorTree.Root.UnsignedTx.TxIn[0].PreviousOutPoint; root.Hash != commitmentTxid || root.Index != 1 {
+		return fmt.Errorf("connectors spend %s, not connector output 1 of commitment tx %s", root, commitmentTxid)
+	}
 	if err := connectorTree.Validate(); err != nil {
 		return fmt.Errorf("connector tree: %w", err)
 	}
-	if root := connectorTree.Root.UnsignedTx.TxIn[0].PreviousOutPoint; root.Hash != commitmentTxid {
-		return fmt.Errorf("connectors spend %s, not commitment tx %s", root, commitmentTxid)
-	}
 
-	return leavesPay(vtxoTree.Leaves(), outputs)
+	return leavesPayWithAssets(vtxoTree.Leaves(), outputs, assets)
 }
 
-// leavesPay reports the first expected output no leaf pays. Two vtxos of the
-// same script and amount need two leaf outputs.
+func validateTreePackets(t *tree.TxTree, name string) error {
+	seen := make(map[*tree.TxTree]struct{})
+	var visit func(*tree.TxTree) error
+	visit = func(node *tree.TxTree) error {
+		if node == nil || node.Root == nil || node.Root.UnsignedTx == nil {
+			return fmt.Errorf("%s tree has a missing transaction", name)
+		}
+		if _, ok := seen[node]; ok {
+			return fmt.Errorf("%s tree contains a cycle or duplicate node", name)
+		}
+		seen[node] = struct{}{}
+		if len(node.Root.UnsignedTx.TxIn) == 0 {
+			return fmt.Errorf("%s tree transaction has no input", name)
+		}
+		for index, child := range node.Children {
+			if index >= uint32(len(node.Root.UnsignedTx.TxOut)) {
+				return fmt.Errorf("%s tree child output %d is out of bounds", name, index)
+			}
+			if err := visit(child); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return visit(t)
+}
+
+// leavesPay reports the first expected output no leaf pays. Finalization also
+// checks assets.
 func leavesPay(leaves []*psbt.Packet, outputs []*wire.TxOut) error {
+	return leavesPayWithAssets(leaves, outputs, nil)
+}
+
+func leavesPayWithAssets(leaves []*psbt.Packet, outputs []*wire.TxOut, expectedAssets [][]types.Asset) error {
+	if expectedAssets != nil && len(expectedAssets) != len(outputs) {
+		return fmt.Errorf("expected asset count %d does not match output count %d", len(expectedAssets), len(outputs))
+	}
 	type output struct {
 		script string
 		value  int64
 	}
-	available := map[output]int{}
-	for _, leaf := range leaves {
-		for _, out := range leaf.UnsignedTx.TxOut {
-			available[output{string(out.PkScript), out.Value}]++
+	type leafCandidate struct {
+		packet asset.Packet
+		index  int
+	}
+	available := make(map[output][]leafCandidate)
+	for _, leafPacket := range leaves {
+		if leafPacket == nil || leafPacket.UnsignedTx == nil {
+			return fmt.Errorf("vtxo tree has a missing leaf transaction")
+		}
+		ext, err := extension.NewExtensionFromTx(leafPacket.UnsignedTx)
+		if err != nil && !errors.Is(err, extension.ErrExtensionNotFound) {
+			return fmt.Errorf("vtxo tree leaf extension: %w", err)
+		}
+		var packet asset.Packet
+		if err == nil {
+			packet = ext.GetAssetPacket()
+		}
+		for index, out := range leafPacket.UnsignedTx.TxOut {
+			if out == nil {
+				return fmt.Errorf("vtxo tree has a missing leaf output")
+			}
+			key := output{string(out.PkScript), out.Value}
+			available[key] = append(available[key], leafCandidate{packet: packet, index: index})
 		}
 	}
-	for _, out := range outputs {
+	for i, out := range outputs {
+		if out == nil {
+			return fmt.Errorf("expected renewal output is missing")
+		}
 		k := output{string(out.PkScript), out.Value}
-		if available[k] == 0 {
+		candidates := available[k]
+		matched := -1
+		for j, candidate := range candidates {
+			if expectedAssets == nil || assetsAt(candidate.packet, candidate.index, expectedAssets[i]) {
+				matched = j
+				break
+			}
+		}
+		if matched < 0 {
 			return fmt.Errorf("no leaf pays %d sats to %x", out.Value, out.PkScript)
 		}
-		available[k]--
+		candidates[matched] = candidates[len(candidates)-1]
+		available[k] = candidates[:len(candidates)-1]
 	}
 	return nil
+}
+
+func assetsAt(packet asset.Packet, index int, expected []types.Asset) bool {
+	actual := make(map[string]uint64)
+	for _, group := range packet {
+		if group.IsIssuance() {
+			for _, assetOut := range group.Outputs {
+				if int(assetOut.Vout) == index {
+					return false
+				}
+			}
+			continue
+		}
+		for _, assetOut := range group.Outputs {
+			if int(assetOut.Vout) == index {
+				id := group.AssetId.String()
+				if _, exists := actual[id]; exists {
+					return false
+				}
+				actual[id] = assetOut.Amount
+			}
+		}
+	}
+	if len(actual) != len(expected) {
+		return false
+	}
+	for _, a := range expected {
+		if actual[a.AssetId] != a.Amount {
+			return false
+		}
+	}
+	return true
 }
 
 func (h *batchHandler) buildForfeits(inputs []renewalInput, connectors []*psbt.Packet) ([]string, error) {
 	forfeits := make([]string, 0, len(inputs))
 	for i, in := range inputs {
 		v := in.vtxo
+		if connectors[i] == nil || connectors[i].UnsignedTx == nil {
+			return nil, fmt.Errorf("connector %d is missing", i)
+		}
 		connectorTx := connectors[i].UnsignedTx
 		var connector *wire.TxOut
 		var connectorOutpoint *wire.OutPoint

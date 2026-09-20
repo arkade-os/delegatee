@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -53,13 +54,19 @@ func (s *service) RevokeDelegation(ctx context.Context, address, pubKeyHex, sign
 	if err != nil {
 		return err
 	}
+	if timestamp <= d.LastRevocationTimestamp {
+		return fmt.Errorf("%w: timestamp was already used", ErrInvalidSignature)
+	}
 	if !isExitKey(d.Tapscripts, pubKey) {
 		return fmt.Errorf("%w: not a key of the exit leaf", ErrInvalidSignature)
 	}
 	if !sig.Verify(RevocationHash(address, timestamp), pubKey) {
 		return ErrInvalidSignature
 	}
-	if err := s.repo.Cancel(ctx, address, domain.DelegationStatusRevoked); err != nil {
+	if err := s.repo.Revoke(ctx, address, timestamp); err != nil {
+		if errors.Is(err, domain.ErrRevocationAlreadyUsed) {
+			return fmt.Errorf("%w: timestamp was already used", ErrInvalidSignature)
+		}
 		return err
 	}
 	log.WithField("address", address).Info("delegation revoked by its owner")
