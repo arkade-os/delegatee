@@ -66,19 +66,6 @@ func TestLeavesPayChecksAssets(t *testing.T) {
 	))
 }
 
-func dueInput(t *testing.T, env *testEnv, p domain.Params, n int, amount uint64) renewalInput {
-	t.Helper()
-	d := env.register(t, p)
-	c, err := env.svc.covenantFor(d.Params)
-	require.NoError(t, err)
-	pkScript, leaf, err := env.svc.delegateLeaf(d, c)
-	require.NoError(t, err)
-	return renewalInput{
-		vtxo: env.vtxo(t, d, n, amount, time.Minute), delegation: d,
-		pkScript: pkScript, leaf: leaf, arkadeScript: c.arkadeScript,
-	}
-}
-
 func TestRenewPaysTheFeeOrRefuses(t *testing.T) {
 	env := newTestEnv(t)
 	env.setFees("200.0")
@@ -294,4 +281,17 @@ func TestForfeits(t *testing.T) {
 	// nothing is forfeited for a batch that cannot be verified
 	_, err = h.OnBatchFinalization(t.Context(), client.BatchFinalizationEvent{}, nil, nil)
 	require.ErrorContains(t, err, "refusing to forfeit")
+}
+
+func dueInput(t *testing.T, env *testEnv, p domain.Params, n int, amount uint64) renewalInput {
+	t.Helper()
+	d := env.register(t, p)
+	c, err := env.svc.covenantFor(d.Params)
+	require.NoError(t, err)
+	pkScript, leaf, err := env.svc.delegateLeaf(d, c)
+	require.NoError(t, err)
+	return renewalInput{
+		vtxo: env.vtxo(t, d, n, amount, time.Minute), delegation: d,
+		pkScript: pkScript, leaf: leaf, arkadeScript: c.arkadeScript,
+	}
 }

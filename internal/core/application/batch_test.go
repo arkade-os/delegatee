@@ -16,56 +16,6 @@ import (
 
 var testExpiry = arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: 1024}
 
-// testBatch is what an honest arkd proposes for the given outputs: a
-// commitment tx whose output 0 funds the vtxo tree and output 1 the connectors.
-type testBatch struct {
-	commitment string
-	vtxoTree   *tree.TxTree
-	connectors *tree.TxTree
-	amount     int64
-}
-
-func buildBatch(t *testing.T, env *testEnv, outputs []*wire.TxOut, connectors int) testBatch {
-	t.Helper()
-	sweepRoot, err := sweepTapTreeRoot(env.svc.forfeitPubKey, testExpiry)
-	require.NoError(t, err)
-	leaves := make([]tree.Leaf, len(outputs))
-	for i, out := range outputs {
-		leaves[i] = tree.Leaf{
-			Outputs:             []tree.LeafOutput{{Amount: uint64(out.Value), Script: hex.EncodeToString(out.PkScript)}},
-			CosignersPublicKeys: []string{env.svc.delegatePubKeyHex},
-		}
-	}
-	forfeitKey := hex.EncodeToString(env.svc.forfeitPubKey.SerializeCompressed())
-	connectorLeaves := make([]tree.Leaf, connectors)
-	for i := range connectorLeaves {
-		connectorLeaves[i] = tree.Leaf{
-			Outputs:             []tree.LeafOutput{{Amount: 330, Script: hex.EncodeToString(env.svc.forfeitPkScript)}},
-			CosignersPublicKeys: []string{forfeitKey},
-		}
-	}
-
-	batchScript, batchAmount, err := tree.BuildBatchOutput(leaves, sweepRoot)
-	require.NoError(t, err)
-	connectorScript, connectorAmount, err := tree.BuildConnectorOutput(connectorLeaves)
-	require.NoError(t, err)
-	tx := wire.NewMsgTx(3)
-	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Index: 7}, nil, nil))
-	tx.AddTxOut(wire.NewTxOut(batchAmount, batchScript))
-	tx.AddTxOut(wire.NewTxOut(connectorAmount, connectorScript))
-	commitment, err := psbt.NewFromUnsignedTx(tx)
-	require.NoError(t, err)
-	b64, err := commitment.B64Encode()
-	require.NoError(t, err)
-
-	txid := tx.TxHash()
-	vtxoTree, err := tree.BuildVtxoTree(&wire.OutPoint{Hash: txid, Index: 0}, leaves, sweepRoot, testExpiry)
-	require.NoError(t, err)
-	connectorTree, err := tree.BuildConnectorTree(&wire.OutPoint{Hash: txid, Index: 1}, connectorLeaves)
-	require.NoError(t, err)
-	return testBatch{b64, vtxoTree, connectorTree, batchAmount}
-}
-
 func TestValidateBatch(t *testing.T) {
 	env := newTestEnv(t)
 	alice, bob := append([]byte{0x51, 0x20}, make([]byte, 32)...), append([]byte{0x51, 0x20}, make([]byte, 32)...)
@@ -201,4 +151,54 @@ func TestBatchHandlerSignsAndForfeits(t *testing.T) {
 	env.emulator.infoErr = errBoom
 	_, err = h.OnBatchFinalization(ctx, client.BatchFinalizationEvent{Tx: batch.commitment}, batch.vtxoTree, batch.connectors)
 	require.ErrorContains(t, err, "emulator finalization")
+}
+
+// testBatch is what an honest arkd proposes for the given outputs: a
+// commitment tx whose output 0 funds the vtxo tree and output 1 the connectors.
+type testBatch struct {
+	commitment string
+	vtxoTree   *tree.TxTree
+	connectors *tree.TxTree
+	amount     int64
+}
+
+func buildBatch(t *testing.T, env *testEnv, outputs []*wire.TxOut, connectors int) testBatch {
+	t.Helper()
+	sweepRoot, err := sweepTapTreeRoot(env.svc.forfeitPubKey, testExpiry)
+	require.NoError(t, err)
+	leaves := make([]tree.Leaf, len(outputs))
+	for i, out := range outputs {
+		leaves[i] = tree.Leaf{
+			Outputs:             []tree.LeafOutput{{Amount: uint64(out.Value), Script: hex.EncodeToString(out.PkScript)}},
+			CosignersPublicKeys: []string{env.svc.delegatePubKeyHex},
+		}
+	}
+	forfeitKey := hex.EncodeToString(env.svc.forfeitPubKey.SerializeCompressed())
+	connectorLeaves := make([]tree.Leaf, connectors)
+	for i := range connectorLeaves {
+		connectorLeaves[i] = tree.Leaf{
+			Outputs:             []tree.LeafOutput{{Amount: 330, Script: hex.EncodeToString(env.svc.forfeitPkScript)}},
+			CosignersPublicKeys: []string{forfeitKey},
+		}
+	}
+
+	batchScript, batchAmount, err := tree.BuildBatchOutput(leaves, sweepRoot)
+	require.NoError(t, err)
+	connectorScript, connectorAmount, err := tree.BuildConnectorOutput(connectorLeaves)
+	require.NoError(t, err)
+	tx := wire.NewMsgTx(3)
+	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Index: 7}, nil, nil))
+	tx.AddTxOut(wire.NewTxOut(batchAmount, batchScript))
+	tx.AddTxOut(wire.NewTxOut(connectorAmount, connectorScript))
+	commitment, err := psbt.NewFromUnsignedTx(tx)
+	require.NoError(t, err)
+	b64, err := commitment.B64Encode()
+	require.NoError(t, err)
+
+	txid := tx.TxHash()
+	vtxoTree, err := tree.BuildVtxoTree(&wire.OutPoint{Hash: txid, Index: 0}, leaves, sweepRoot, testExpiry)
+	require.NoError(t, err)
+	connectorTree, err := tree.BuildConnectorTree(&wire.OutPoint{Hash: txid, Index: 1}, connectorLeaves)
+	require.NoError(t, err)
+	return testBatch{b64, vtxoTree, connectorTree, batchAmount}
 }

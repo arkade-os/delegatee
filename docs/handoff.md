@@ -78,11 +78,12 @@ Ordered by what blocks production.
    two places where a mistake costs users money.
 2. **CI.** `test.yaml` runs `make test` and `make test-e2e` on `regtest-up`;
    neither has run on a runner yet. Expect ~8 min for the e2e job.
-3. **A network other than regtest.** `test/e2e/mutinynet_test.go`
-   (`TestLiveDelegatee`, needs `DELEGATEE_URL` and `ARK_URL`) has not been
-   run since the pre-forfeit check was added. Partial trees streamed by other
-   arkd versions could make `validateBatch` reject (fails safe: no forfeit,
-   no renewal).
+3. **Emulator rc.1 compatibility.** TODO: introduce a versioned covenant using
+   `OP_CHECKTIME OP_VERIFY`; rc.1 changes the semantics of opcode `0xdc`, so
+   existing covenant bytes fail the clean-stack check. Preserve the old script
+   and coordinate new addresses with the SDK/API before upgrading the emulator.
+   The dedicated Mutinynet live test was removed; non-regtest renewal
+   verification remains outstanding.
 4. **Client side.** Nothing in the Arkade wallet or ts-sdk speaks this
    protocol; they integrate fulmine's older "delegator" (pre-signed intents,
    3-of-3 leaf, fee address). See "Client work" below.

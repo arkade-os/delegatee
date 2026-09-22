@@ -9,18 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// manyDelegations registers n delegations with distinct scripts (one window
-// each) and puts one vtxo, not yet due, at every one of them.
-func manyDelegations(t testing.TB, env *testEnv, n int) {
-	env.svc.maxDelegations = n + 1
-	vtxos := make([]types.Vtxo, 0, n)
-	for i := range n {
-		d := env.register(t, domain.Params{RenewalWindow: int64(i + 1)})
-		vtxos = append(vtxos, env.vtxo(t, d, i, 1000, 400*24*time.Hour))
-	}
-	env.indexer.serve(vtxos...)
-}
-
 func BenchmarkScan5000(b *testing.B) {
 	env := newTestEnv(b)
 	manyDelegations(b, env, 5000)
@@ -73,4 +61,16 @@ func TestScale(t *testing.T) {
 	require.NotContains(t, env.svc.watched, last.ID)
 	require.Same(t, first, env.svc.watched[1], "kept, not rebuilt")
 	require.Len(t, env.repo.recorded(), due, "nothing due, nothing new")
+}
+
+// manyDelegations registers n delegations with distinct scripts (one window
+// each) and puts one vtxo, not yet due, at every one of them.
+func manyDelegations(t testing.TB, env *testEnv, n int) {
+	env.svc.maxDelegations = n + 1
+	vtxos := make([]types.Vtxo, 0, n)
+	for i := range n {
+		d := env.register(t, domain.Params{RenewalWindow: int64(i + 1)})
+		vtxos = append(vtxos, env.vtxo(t, d, i, 1000, 400*24*time.Hour))
+	}
+	env.indexer.serve(vtxos...)
 }

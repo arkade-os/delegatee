@@ -11,15 +11,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func adminUsersFile(t *testing.T) string {
-	t.Helper()
-	hash, err := bcrypt.GenerateFromPassword([]byte("hunter2"), bcrypt.DefaultCost)
-	require.NoError(t, err)
-	path := filepath.Join(t.TempDir(), "admin-users")
-	require.NoError(t, os.WriteFile(path, []byte("admin:"+string(hash)+"\n"), 0o600))
-	return path
-}
-
 func TestLoad(t *testing.T) {
 	_, err := LoadConfig()
 	require.Error(t, err, "missing required vars")
@@ -158,4 +149,13 @@ func TestLoadAllowsExternalAdminAuth(t *testing.T) {
 	cfg, err := LoadConfig()
 	require.NoError(t, err)
 	require.Empty(t, cfg.AdminUsers)
+}
+
+func adminUsersFile(t *testing.T) string {
+	t.Helper()
+	hash, err := bcrypt.GenerateFromPassword([]byte("hunter2"), bcrypt.DefaultCost)
+	require.NoError(t, err)
+	path := filepath.Join(t.TempDir(), "admin-users")
+	require.NoError(t, os.WriteFile(path, []byte("admin:"+string(hash)+"\n"), 0o600))
+	return path
 }

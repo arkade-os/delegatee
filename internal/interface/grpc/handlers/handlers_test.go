@@ -17,78 +17,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// fakeService returns canned values, or err from every call that can fail.
-type fakeService struct {
-	application.Service
-	err        error
-	delegation domain.Delegation
-	gotParams  domain.Params
-	gotScripts []string
-	cancelled  string
-	feesErr    error
-	health     map[string]error
-}
-
-var (
-	t0      = time.Unix(1_700_000_000, 0)
-	errBoom = errors.New("boom")
-)
-
-func (f *fakeService) Info(p domain.Params) (application.Info, error) {
-	f.gotParams = p
-	return application.Info{Network: "regtest", DelegatePubKey: "02aa", DelegateTapscript: "20ac", Params: p}, f.err
-}
-func (f *fakeService) RegisterDelegation(_ context.Context, ts []string, p domain.Params) (*domain.Delegation, error) {
-	f.gotScripts, f.gotParams = ts, p
-	return &f.delegation, f.err
-}
-func (f *fakeService) GetDelegation(context.Context, string) (*domain.Delegation, error) {
-	return &f.delegation, f.err
-}
-func (f *fakeService) ListDelegations(context.Context) ([]domain.Delegation, error) {
-	return []domain.Delegation{f.delegation, {ID: 8, Address: "tark1other", Status: "cancelled"}}, f.err
-}
-func (f *fakeService) RevokeDelegation(_ context.Context, address, pubkey, sig string, ts int64) error {
-	f.cancelled = address + "/" + pubkey + "/" + sig
-	return f.err
-}
-func (f *fakeService) CancelDelegation(_ context.Context, address string) error {
-	f.cancelled = address
-	return f.err
-}
-func (f *fakeService) Vtxos(context.Context, *domain.Delegation) ([]types.Vtxo, error) {
-	return []types.Vtxo{{
-		Outpoint: types.Outpoint{Txid: "ab", VOut: 1}, Amount: 5000, CreatedAt: t0, ExpiresAt: t0.Add(time.Hour),
-		Preconfirmed: true, Assets: []types.Asset{{AssetId: "gold", Amount: 3}},
-	}}, nil
-}
-func (f *fakeService) DueAt(_ *domain.Delegation, v types.Vtxo) time.Time {
-	return v.ExpiresAt.Add(-10 * time.Minute)
-}
-func (f *fakeService) ListRenewals(context.Context, *domain.Delegation) ([]domain.Renewal, error) {
-	return []domain.Renewal{{Outpoints: []string{"ab:1"}, Error: "nope", AttemptedAt: t0}}, nil
-}
-func (f *fakeService) LastRenewals(context.Context) (map[int64]domain.Renewal, error) {
-	return map[int64]domain.Renewal{7: {Success: true, CommitmentTxid: "cc", AttemptedAt: t0}}, f.err
-}
-func (f *fakeService) Status() application.Status {
-	return application.Status{
-		LastScan: t0, RenewingVtxos: 2, PollInterval: time.Minute,
-		Holdings: map[int64]application.Holdings{7: {Vtxos: 2, Amount: 9000, NextExpiry: t0.Add(time.Hour), NextDue: t0}},
-	}
-}
-func (f *fakeService) IntentFees(context.Context) (arkfee.Config, error) {
-	return arkfee.Config{IntentOffchainInputProgram: "200.0"}, f.feesErr
-}
-func (f *fakeService) Health(context.Context) map[string]error { return f.health }
-
-func newFake() *fakeService {
-	return &fakeService{delegation: domain.Delegation{
-		ID: 7, Address: "tark1mine", Tapscripts: []string{"20ac"}, Status: "active",
-		Params: domain.Params{RenewalWindow: 600, MaxFee: 50}, CreatedAt: t0, UpdatedAt: t0.Add(time.Second),
-	}}
-}
-
 func TestPublicHandlers(t *testing.T) {
 	ctx := t.Context()
 	svc := newFake()
@@ -221,4 +149,76 @@ func TestHealth(t *testing.T) {
 	resp, err = h.Check(t.Context(), &grpchealth.HealthCheckRequest{})
 	require.NoError(t, err)
 	require.Equal(t, grpchealth.HealthCheckResponse_NOT_SERVING, resp.GetStatus())
+}
+
+var (
+	t0      = time.Unix(1_700_000_000, 0)
+	errBoom = errors.New("boom")
+)
+
+// fakeService returns canned values, or err from every call that can fail.
+type fakeService struct {
+	application.Service
+	err        error
+	delegation domain.Delegation
+	gotParams  domain.Params
+	gotScripts []string
+	cancelled  string
+	feesErr    error
+	health     map[string]error
+}
+
+func (f *fakeService) Info(p domain.Params) (application.Info, error) {
+	f.gotParams = p
+	return application.Info{Network: "regtest", DelegatePubKey: "02aa", DelegateTapscript: "20ac", Params: p}, f.err
+}
+func (f *fakeService) RegisterDelegation(_ context.Context, ts []string, p domain.Params) (*domain.Delegation, error) {
+	f.gotScripts, f.gotParams = ts, p
+	return &f.delegation, f.err
+}
+func (f *fakeService) GetDelegation(context.Context, string) (*domain.Delegation, error) {
+	return &f.delegation, f.err
+}
+func (f *fakeService) ListDelegations(context.Context) ([]domain.Delegation, error) {
+	return []domain.Delegation{f.delegation, {ID: 8, Address: "tark1other", Status: "cancelled"}}, f.err
+}
+func (f *fakeService) RevokeDelegation(_ context.Context, address, pubkey, sig string, ts int64) error {
+	f.cancelled = address + "/" + pubkey + "/" + sig
+	return f.err
+}
+func (f *fakeService) CancelDelegation(_ context.Context, address string) error {
+	f.cancelled = address
+	return f.err
+}
+func (f *fakeService) Vtxos(context.Context, *domain.Delegation) ([]types.Vtxo, error) {
+	return []types.Vtxo{{
+		Outpoint: types.Outpoint{Txid: "ab", VOut: 1}, Amount: 5000, CreatedAt: t0, ExpiresAt: t0.Add(time.Hour),
+		Preconfirmed: true, Assets: []types.Asset{{AssetId: "gold", Amount: 3}},
+	}}, nil
+}
+func (f *fakeService) DueAt(_ *domain.Delegation, v types.Vtxo) time.Time {
+	return v.ExpiresAt.Add(-10 * time.Minute)
+}
+func (f *fakeService) ListRenewals(context.Context, *domain.Delegation) ([]domain.Renewal, error) {
+	return []domain.Renewal{{Outpoints: []string{"ab:1"}, Error: "nope", AttemptedAt: t0}}, nil
+}
+func (f *fakeService) LastRenewals(context.Context) (map[int64]domain.Renewal, error) {
+	return map[int64]domain.Renewal{7: {Success: true, CommitmentTxid: "cc", AttemptedAt: t0}}, f.err
+}
+func (f *fakeService) Status() application.Status {
+	return application.Status{
+		LastScan: t0, RenewingVtxos: 2, PollInterval: time.Minute,
+		Holdings: map[int64]application.Holdings{7: {Vtxos: 2, Amount: 9000, NextExpiry: t0.Add(time.Hour), NextDue: t0}},
+	}
+}
+func (f *fakeService) IntentFees(context.Context) (arkfee.Config, error) {
+	return arkfee.Config{IntentOffchainInputProgram: "200.0"}, f.feesErr
+}
+func (f *fakeService) Health(context.Context) map[string]error { return f.health }
+
+func newFake() *fakeService {
+	return &fakeService{delegation: domain.Delegation{
+		ID: 7, Address: "tark1mine", Tapscripts: []string{"20ac"}, Status: "active",
+		Params: domain.Params{RenewalWindow: 600, MaxFee: 50}, CreatedAt: t0, UpdatedAt: t0.Add(time.Second),
+	}}
 }

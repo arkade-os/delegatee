@@ -26,99 +26,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type fakeApp struct {
-	application.Service
-	started, stopped bool
-	cancelled        string
-	arkDown          bool
-}
-
-func (f *fakeApp) Start() { f.started = true }
-func (f *fakeApp) Stop()  { f.stopped = true }
-func (f *fakeApp) Info(p domain.Params) (application.Info, error) {
-	return application.Info{Network: "regtest", Params: p}, nil
-}
-func (f *fakeApp) ListDelegations(context.Context) ([]domain.Delegation, error) {
-	return []domain.Delegation{{ID: 1, Address: "tark1x", Status: "active"}}, nil
-}
-func (f *fakeApp) LastRenewals(context.Context) (map[int64]domain.Renewal, error) { return nil, nil }
-func (f *fakeApp) Status() application.Status {
-	return application.Status{LastScan: time.Unix(1_700_000_000, 0), RenewingVtxos: 1, Renewed: 7, Failed: 2,
-		Holdings: map[int64]application.Holdings{1: {Vtxos: 3, Amount: 9000, Late: 1, LateAmount: 4000}}}
-}
-func (f *fakeApp) CountActive(context.Context) (int64, error)        { return 5, nil }
-func (f *fakeApp) IntentFees(context.Context) (arkfee.Config, error) { return arkfee.Config{}, nil }
-func (f *fakeApp) Health(context.Context) map[string]error {
-	h := map[string]error{"database": nil, "ark": nil}
-	if f.arkDown {
-		h["ark"] = errors.New("down")
-	}
-	return h
-}
-func (f *fakeApp) CancelDelegation(_ context.Context, address string) error {
-	f.cancelled = address
-	return nil
-}
-
-func freePort(t *testing.T) uint32 {
-	t.Helper()
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	defer func() { _ = lis.Close() }()
-	return uint32(lis.Addr().(*net.TCPAddr).Port)
-}
-
-// serveFake runs the real servers (grpc, gateway, UI) over a fake application.
-func serveFake(t *testing.T, password string) (public, admin string, app *fakeApp) {
-	return serveFakeUser(t, "admin", password)
-}
-
-func serveFakeUser(t *testing.T, username, password string) (public, admin string, app *fakeApp) {
-	t.Helper()
-	cfg := &config.Config{Port: freePort(t), AdminPort: freePort(t)}
-	if password != "" {
-		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-		require.NoError(t, err)
-		cfg.AdminUsers = []config.AdminUser{{Username: username, PasswordHash: string(hash)}}
-	}
-	svc, err := NewService("test", cfg)
-	require.NoError(t, err)
-	app = &fakeApp{}
-	require.NoError(t, svc.(*service).serve(t.Context(), app))
-	t.Cleanup(func() {
-		svc.Stop()
-		require.True(t, app.stopped)
-	})
-	require.True(t, app.started)
-	public, admin = fmt.Sprintf("127.0.0.1:%d", cfg.Port), fmt.Sprintf("127.0.0.1:%d", cfg.AdminPort)
-	require.Eventually(t, func() bool {
-		for _, addr := range []string{public, admin} {
-			conn, err := net.DialTimeout("tcp", addr, time.Second)
-			if err != nil {
-				return false
-			}
-			_ = conn.Close()
-		}
-		return true
-	}, 5*time.Second, 10*time.Millisecond)
-	return public, admin, app
-}
-
-func do(t *testing.T, method, url string, tweak ...func(*http.Request)) (*http.Response, string) {
-	t.Helper()
-	req, err := http.NewRequestWithContext(t.Context(), method, url, nil)
-	require.NoError(t, err)
-	for _, f := range tweak {
-		f(req)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	return resp, string(body)
-}
-
 func TestPortsAndRouting(t *testing.T) {
 	public, admin, app := serveFake(t, "")
 
@@ -299,4 +206,97 @@ func TestIsHttpRequest(t *testing.T) {
 		r.Header.Set("Content-Type", tc.contentType)
 		require.Equal(t, tc.want, isHttpRequest(r), "%s %s", tc.method, tc.contentType)
 	}
+}
+
+type fakeApp struct {
+	application.Service
+	started, stopped bool
+	cancelled        string
+	arkDown          bool
+}
+
+func (f *fakeApp) Start() { f.started = true }
+func (f *fakeApp) Stop()  { f.stopped = true }
+func (f *fakeApp) Info(p domain.Params) (application.Info, error) {
+	return application.Info{Network: "regtest", Params: p}, nil
+}
+func (f *fakeApp) ListDelegations(context.Context) ([]domain.Delegation, error) {
+	return []domain.Delegation{{ID: 1, Address: "tark1x", Status: "active"}}, nil
+}
+func (f *fakeApp) LastRenewals(context.Context) (map[int64]domain.Renewal, error) { return nil, nil }
+func (f *fakeApp) Status() application.Status {
+	return application.Status{LastScan: time.Unix(1_700_000_000, 0), RenewingVtxos: 1, Renewed: 7, Failed: 2,
+		Holdings: map[int64]application.Holdings{1: {Vtxos: 3, Amount: 9000, Late: 1, LateAmount: 4000}}}
+}
+func (f *fakeApp) CountActive(context.Context) (int64, error)        { return 5, nil }
+func (f *fakeApp) IntentFees(context.Context) (arkfee.Config, error) { return arkfee.Config{}, nil }
+func (f *fakeApp) Health(context.Context) map[string]error {
+	h := map[string]error{"database": nil, "ark": nil}
+	if f.arkDown {
+		h["ark"] = errors.New("down")
+	}
+	return h
+}
+func (f *fakeApp) CancelDelegation(_ context.Context, address string) error {
+	f.cancelled = address
+	return nil
+}
+
+func freePort(t *testing.T) uint32 {
+	t.Helper()
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = lis.Close() }()
+	return uint32(lis.Addr().(*net.TCPAddr).Port)
+}
+
+// serveFake runs the real servers (grpc, gateway, UI) over a fake application.
+func serveFake(t *testing.T, password string) (public, admin string, app *fakeApp) {
+	return serveFakeUser(t, "admin", password)
+}
+
+func serveFakeUser(t *testing.T, username, password string) (public, admin string, app *fakeApp) {
+	t.Helper()
+	cfg := &config.Config{Port: freePort(t), AdminPort: freePort(t)}
+	if password != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		require.NoError(t, err)
+		cfg.AdminUsers = []config.AdminUser{{Username: username, PasswordHash: string(hash)}}
+	}
+	svc, err := NewService("test", cfg)
+	require.NoError(t, err)
+	app = &fakeApp{}
+	require.NoError(t, svc.(*service).serve(t.Context(), app))
+	t.Cleanup(func() {
+		svc.Stop()
+		require.True(t, app.stopped)
+	})
+	require.True(t, app.started)
+	public, admin = fmt.Sprintf("127.0.0.1:%d", cfg.Port), fmt.Sprintf("127.0.0.1:%d", cfg.AdminPort)
+	require.Eventually(t, func() bool {
+		for _, addr := range []string{public, admin} {
+			conn, err := net.DialTimeout("tcp", addr, time.Second)
+			if err != nil {
+				return false
+			}
+			_ = conn.Close()
+		}
+		return true
+	}, 5*time.Second, 10*time.Millisecond)
+	return public, admin, app
+}
+
+func do(t *testing.T, method, url string, tweak ...func(*http.Request)) (*http.Response, string) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), method, url, nil)
+	require.NoError(t, err)
+	for _, f := range tweak {
+		f(req)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	return resp, string(body)
 }

@@ -22,8 +22,12 @@ How the covenant works, byte by byte, is in [docs/protocol.md](docs/protocol.md)
 
 ## Quick start
 
-You need an arkd, an emulator ≥ v0.0.8-rc.0 connected to it, and a postgres
+You need an arkd, an emulator v0.0.8-rc.0 connected to it, and a postgres
 database.
+
+Emulator v0.0.8-rc.1 changes `CHECKTIMEVERIFY` into `CHECKTIME` and rejects the
+current covenant with an extra stack item. Support requires a new covenant
+variant and address migration; see `TODO(emulator-rc1)` in `covenant.go`.
 
 ```sh
 docker run -d --restart unless-stopped \

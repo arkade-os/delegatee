@@ -195,99 +195,6 @@ func TestDelegateRenewal(t *testing.T) {
 	require.NotNil(t, st.GetIntentFees())
 }
 
-// waitForRenewedVtxo polls the indexer until a settled (non-preconfirmed),
-// unspent vtxo of delegateAmount other than prevTxid matching match sits at pkScript.
-func waitForRenewedVtxo(
-	t *testing.T, indexerSvc indexer.Indexer, pkScript []byte, prevTxid string, match func(types.Vtxo) bool,
-) types.Vtxo {
-	t.Helper()
-	var found types.Vtxo
-	require.Eventually(t, func() bool {
-		resp, err := indexerSvc.GetVtxos(t.Context(),
-			indexer.WithScripts([]string{hex.EncodeToString(pkScript)}),
-			indexer.WithSpendableOnly(),
-		)
-		if err != nil {
-			return false
-		}
-		for _, v := range resp.Vtxos {
-			if v.Txid != prevTxid && !v.Preconfirmed && !v.Spent && v.Amount == delegateAmount && match(v) {
-				found = v
-				return true
-			}
-		}
-		return false
-	}, 2*time.Minute, 500*time.Millisecond, "vtxo at %x not renewed after %s", pkScript, prevTxid)
-	return found
-}
-
-func setupAlice(t *testing.T) (arksdk.Wallet, *btcec.PublicKey) {
-	t.Helper()
-	ctx := t.Context()
-
-	store, err := inmemorystore.NewStore()
-	require.NoError(t, err)
-	identity, err := singlekeywallet.NewIdentity(store)
-	require.NoError(t, err)
-	privKey, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-
-	wallet, err := arksdk.NewWallet(t.TempDir(), arksdk.WithIdentity(identity))
-	require.NoError(t, err)
-	t.Cleanup(wallet.Stop)
-	require.NoError(t, wallet.Init(
-		ctx, arkURL, hex.EncodeToString(privKey.Serialize()), password,
-		arksdk.WithExplorerURL(explorerURL),
-	))
-	require.NoError(t, wallet.Unlock(ctx, password))
-	synced := <-wallet.IsSynced(ctx)
-	require.NoError(t, synced.Err)
-	require.True(t, synced.Synced)
-	log.SetLevel(log.InfoLevel) // the sdk lowers the global level
-	return wallet, privKey.PubKey()
-}
-
-func fundAndSettle(t *testing.T, wallet arksdk.Wallet, amount int64) {
-	t.Helper()
-	ctx := t.Context()
-	boardingAddr, err := wallet.NewBoardingAddress(ctx)
-	require.NoError(t, err)
-
-	amountBtc := strings.TrimSuffix(btcutil.Amount(amount).Format(btcutil.AmountBTC), " BTC")
-	out, err := exec.Command("nigiri", "faucet", boardingAddr, amountBtc).CombinedOutput()
-	require.NoError(t, err, string(out))
-
-	require.Eventually(t, func() bool {
-		balance, err := wallet.Balance(ctx)
-		return err == nil && balance.OnchainBalance.Total > 0
-	}, 30*time.Second, 500*time.Millisecond, "boarding utxo not detected")
-
-	_, err = wallet.Settle(ctx)
-	require.NoError(t, err)
-	require.Eventually(t, func() bool {
-		balance, err := wallet.Balance(ctx)
-		return err == nil && balance.OffchainBalance.Total > 0
-	}, 30*time.Second, 500*time.Millisecond, "offchain balance not available")
-}
-
-func getJSON(t *testing.T, url string, out any) {
-	t.Helper()
-	resp, err := http.Get(url)
-	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(out))
-}
-
-func freePort(t *testing.T) uint32 {
-	t.Helper()
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	port := lis.Addr().(*net.TCPAddr).Port
-	require.NoError(t, lis.Close())
-	return uint32(port)
-}
-
 func TestConcurrentDelegations(t *testing.T) {
 	if testing.Short() {
 		t.Skip("requires the regtest stack")
@@ -471,4 +378,97 @@ func TestManyDelegations(t *testing.T) {
 	}
 	t.Logf("renewed %d vtxos across %d batches", n, len(commitments))
 	require.Len(t, commitments, 1, "all intents should share one batch")
+}
+
+// waitForRenewedVtxo polls the indexer until a settled (non-preconfirmed),
+// unspent vtxo of delegateAmount other than prevTxid matching match sits at pkScript.
+func waitForRenewedVtxo(
+	t *testing.T, indexerSvc indexer.Indexer, pkScript []byte, prevTxid string, match func(types.Vtxo) bool,
+) types.Vtxo {
+	t.Helper()
+	var found types.Vtxo
+	require.Eventually(t, func() bool {
+		resp, err := indexerSvc.GetVtxos(t.Context(),
+			indexer.WithScripts([]string{hex.EncodeToString(pkScript)}),
+			indexer.WithSpendableOnly(),
+		)
+		if err != nil {
+			return false
+		}
+		for _, v := range resp.Vtxos {
+			if v.Txid != prevTxid && !v.Preconfirmed && !v.Spent && v.Amount == delegateAmount && match(v) {
+				found = v
+				return true
+			}
+		}
+		return false
+	}, 2*time.Minute, 500*time.Millisecond, "vtxo at %x not renewed after %s", pkScript, prevTxid)
+	return found
+}
+
+func setupAlice(t *testing.T) (arksdk.Wallet, *btcec.PublicKey) {
+	t.Helper()
+	ctx := t.Context()
+
+	store, err := inmemorystore.NewStore()
+	require.NoError(t, err)
+	identity, err := singlekeywallet.NewIdentity(store)
+	require.NoError(t, err)
+	privKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+
+	wallet, err := arksdk.NewWallet(t.TempDir(), arksdk.WithIdentity(identity))
+	require.NoError(t, err)
+	t.Cleanup(wallet.Stop)
+	require.NoError(t, wallet.Init(
+		ctx, arkURL, hex.EncodeToString(privKey.Serialize()), password,
+		arksdk.WithExplorerURL(explorerURL),
+	))
+	require.NoError(t, wallet.Unlock(ctx, password))
+	synced := <-wallet.IsSynced(ctx)
+	require.NoError(t, synced.Err)
+	require.True(t, synced.Synced)
+	log.SetLevel(log.InfoLevel) // the sdk lowers the global level
+	return wallet, privKey.PubKey()
+}
+
+func fundAndSettle(t *testing.T, wallet arksdk.Wallet, amount int64) {
+	t.Helper()
+	ctx := t.Context()
+	boardingAddr, err := wallet.NewBoardingAddress(ctx)
+	require.NoError(t, err)
+
+	amountBtc := strings.TrimSuffix(btcutil.Amount(amount).Format(btcutil.AmountBTC), " BTC")
+	out, err := exec.Command("nigiri", "faucet", boardingAddr, amountBtc).CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	require.Eventually(t, func() bool {
+		balance, err := wallet.Balance(ctx)
+		return err == nil && balance.OnchainBalance.Total > 0
+	}, 30*time.Second, 500*time.Millisecond, "boarding utxo not detected")
+
+	_, err = wallet.Settle(ctx)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		balance, err := wallet.Balance(ctx)
+		return err == nil && balance.OffchainBalance.Total > 0
+	}, 30*time.Second, 500*time.Millisecond, "offchain balance not available")
+}
+
+func getJSON(t *testing.T, url string, out any) {
+	t.Helper()
+	resp, err := http.Get(url)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(out))
+}
+
+func freePort(t *testing.T) uint32 {
+	t.Helper()
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := lis.Addr().(*net.TCPAddr).Port
+	require.NoError(t, lis.Close())
+	return uint32(port)
 }

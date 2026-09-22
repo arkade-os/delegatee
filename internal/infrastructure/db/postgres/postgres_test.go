@@ -12,24 +12,6 @@ import (
 )
 
 // Runs against the compose postgres (make regtest-up), like the e2e suite.
-func testRepo(t *testing.T) (domain.DelegationRepository, *sql.DB) {
-	t.Helper()
-	if testing.Short() {
-		t.Skip("requires postgres")
-	}
-	dsn := os.Getenv("DELEGATEE_DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://postgres@localhost:5432/delegatee?sslmode=disable"
-	}
-	repo, err := NewRepository(t.Context(), dsn)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = repo.Close() })
-	raw, err := sql.Open("postgres", dsn)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = raw.Close() })
-	return repo, raw
-}
-
 func TestDelegationLifecycle(t *testing.T) {
 	repo, _ := testRepo(t)
 	ctx := t.Context()
@@ -129,4 +111,23 @@ func TestNewRepositoryErrors(t *testing.T) {
 	}
 	_, err := NewRepository(t.Context(), "postgres://nobody@127.0.0.1:1/none?sslmode=disable&connect_timeout=1")
 	require.Error(t, err)
+}
+
+// Runs against the compose postgres (make regtest-up), like the e2e suite.
+func testRepo(t *testing.T) (domain.DelegationRepository, *sql.DB) {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("requires postgres")
+	}
+	dsn := os.Getenv("DELEGATEE_DATABASE_URL")
+	if dsn == "" {
+		dsn = "postgres://postgres@localhost:5432/delegatee?sslmode=disable"
+	}
+	repo, err := NewRepository(t.Context(), dsn)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = repo.Close() })
+	raw, err := sql.Open("postgres", dsn)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = raw.Close() })
+	return repo, raw
 }
