@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package delegatee.v1;
+
+import "meshapi/gateway/annotations.proto";
+import "delegatee/v1/service.proto";
+
+service AdminService {
+  rpc ListDelegations(ListDelegationsRequest) returns (ListDelegationsResponse) {
+    option (meshapi.gateway.http) = {
+      get: "/v1/admin/delegate"
+    };
+  }
+
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse) {
+    option (meshapi.gateway.http) = {
+      get: "/v1/admin/status"
+    };
+  }
+
+  rpc CancelDelegation(CancelDelegationRequest) returns (CancelDelegationResponse) {
+    option (meshapi.gateway.http) = {
+      delete: "/v1/admin/delegate/{address}"
+    };
+  }
+}
+
+message ListDelegationsRequest {}
+message ListDelegationsResponse {
+  repeated Delegation delegations = 1;
+}
+
+message GetStatusRequest {}
+message GetStatusResponse {
+  int64 last_scan_at = 1;
+  int32 renewing_vtxos = 2;
+  int64 poll_interval = 3;
+  IntentFees intent_fees = 4;
+}
+
+message IntentFees {
+  string offchain_input = 1;
+  string onchain_input = 2;
+  string offchain_output = 3;
+  string onchain_output = 4;
+}
+
+message CancelDelegationRequest {
+  string address = 1;
+}
+message CancelDelegationResponse {}

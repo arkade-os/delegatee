@@ -186,8 +186,6 @@ func (c *Config) AppService(ctx context.Context) (application.Service, error) {
 	return svc, nil
 }
 
-// grpcTarget turns a URL like https://host/ into host:443 with TLS, and
-// http://host or host:port into a plaintext target, like the arkd client does.
 func grpcTarget(url string) (string, credentials.TransportCredentials) {
 	creds := insecure.NewCredentials()
 	port := "80"
@@ -202,7 +200,6 @@ func grpcTarget(url string) (string, credentials.TransportCredentials) {
 	return target, creds
 }
 
-// loadSecretKeys reads a keyring file, or the active key plus previous keys.
 func loadSecretKeys() ([]*btcec.PrivateKey, error) {
 	if path := os.Getenv(envPrefix + "SECRET_KEYS_FILE"); path != "" {
 		if os.Getenv(envPrefix+"SECRET_KEY") != "" || os.Getenv(envPrefix+"SECRET_KEY_FILE") != "" || os.Getenv(envPrefix+"PREVIOUS_SECRET_KEYS") != "" {

@@ -1,1 +1,0 @@
-ALTER TABLE delegations DROP COLUMN IF EXISTS max_fee;

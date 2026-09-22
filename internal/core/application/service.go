@@ -56,7 +56,6 @@ const (
 const renewalsRetention = 30 * 24 * time.Hour
 const renewalsPruneInterval = time.Hour
 
-// Info is what a wallet needs to build a delegate address for one set of params.
 type Info struct {
 	Network               string
 	DelegatePubKey        string
@@ -68,7 +67,6 @@ type Info struct {
 	Params                domain.Params
 }
 
-// Holdings is what the last scan saw at one delegation.
 type Holdings struct {
 	Vtxos      int
 	Amount     uint64
@@ -96,11 +94,9 @@ type Status struct {
 type Service interface {
 	Start()
 	Stop()
-	// Info and RegisterDelegation default a zero renewal window to DefaultRenewalWindow.
 	Info(params domain.Params) (Info, error)
 	RegisterDelegation(ctx context.Context, tapscripts []string, params domain.Params) (*domain.Delegation, error)
 	CancelDelegation(ctx context.Context, address string) error
-	// RevokeDelegation is CancelDelegation for the owner, who proves it with an exit key.
 	RevokeDelegation(ctx context.Context, address, pubKeyHex, signatureHex string, timestamp int64) error
 	GetDelegation(ctx context.Context, address string) (*domain.Delegation, error)
 	ListDelegations(ctx context.Context) ([]domain.Delegation, error)
@@ -108,10 +104,8 @@ type Service interface {
 	LastRenewals(ctx context.Context) (map[int64]domain.Renewal, error)
 	Status() Status
 	CountActive(ctx context.Context) (int64, error)
-	// IntentFees is what arkd charges right now.
 	IntentFees(ctx context.Context) (arkfee.Config, error)
 	Vtxos(ctx context.Context, d *domain.Delegation) ([]types.Vtxo, error)
-	// DueAt is when one of the delegation's vtxos becomes renewable.
 	DueAt(d *domain.Delegation, v types.Vtxo) time.Time
 	Health(ctx context.Context) map[string]error
 }
@@ -165,7 +159,6 @@ type cosigner struct {
 	pubKey string
 }
 
-// watched is an active delegation this keyring can renew, ready to build intents.
 type watched struct {
 	delegation domain.Delegation
 	cosigner   *cosigner
@@ -185,7 +178,6 @@ type renewalInput struct {
 	output       *wire.TxOut // set by renew once the fee is known
 }
 
-// covenant is the delegate leaf for one set of params.
 type covenant struct {
 	arkadeScript []byte
 	tweakedKey   *btcec.PublicKey

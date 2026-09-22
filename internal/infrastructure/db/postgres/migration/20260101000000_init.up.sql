@@ -3,7 +3,9 @@ CREATE TABLE IF NOT EXISTS delegations (
     address TEXT NOT NULL UNIQUE,
     tapscripts TEXT[] NOT NULL,
     renewal_window BIGINT NOT NULL,
+    max_fee BIGINT NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'active',
+    last_revocation_timestamp BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -20,3 +22,4 @@ CREATE TABLE IF NOT EXISTS renewals (
 
 CREATE INDEX IF NOT EXISTS idx_delegations_status ON delegations(status);
 CREATE INDEX IF NOT EXISTS idx_renewals_delegation ON renewals(delegation_id, attempted_at DESC);
+CREATE INDEX IF NOT EXISTS idx_renewals_attempted_at ON renewals(attempted_at);

@@ -5,109 +5,6 @@
     "version": "version not set"
   },
   "paths": {
-    "/v1/admin/delegate": {
-      "get": {
-        "tags": [
-          "AdminService"
-        ],
-        "description": "ListDelegations returns every registered delegation.",
-        "operationId": "AdminService_ListDelegations",
-        "responses": {
-          "200": {
-            "description": "a successful response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListDelegationsResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Status"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/admin/delegate/{address}": {
-      "delete": {
-        "tags": [
-          "AdminService"
-        ],
-        "description": "CancelDelegation stops renewing the address. Register again to resume.",
-        "operationId": "AdminService_CancelDelegation",
-        "parameters": [
-          {
-            "name": "address",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "a successful response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CancelDelegationResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Status"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/admin/status": {
-      "get": {
-        "tags": [
-          "AdminService"
-        ],
-        "description": "GetStatus returns the scanner's state and what arkd charges right now.",
-        "operationId": "AdminService_GetStatus",
-        "responses": {
-          "200": {
-            "description": "a successful response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GetStatusResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Status"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/delegate": {
       "post": {
         "tags": [
@@ -215,16 +112,14 @@
                 "type": "object",
                 "properties": {
                   "pubkey": {
-                    "type": "string",
-                    "description": "hex, x-only or compressed: a key of the exit leaf of the vtxo script."
+                    "type": "string"
                   },
                   "signature": {
                     "type": "string",
-                    "description": "hex BIP340 signature by that key over\ntagged_hash(\"delegatee/revoke\", \"\u003caddress\u003e:\u003ctimestamp\u003e\")."
+                    "description": "TODO simplify ?"
                   },
                   "timestamp": {
                     "type": "integer",
-                    "description": "unix seconds, must be within 10 minutes of the server's clock.",
                     "format": "int64"
                   }
                 }
@@ -262,13 +157,12 @@
         "tags": [
           "DelegateeService"
         ],
-        "description": "GetInfo returns everything a wallet needs to build a delegate address\nfor the given params: the delegate cosigner pubkey, the covenant\nand the delegate tapscript.",
+        "description": "GetInfo returns everything a wallet needs to build a delegate address\nit also returns the address itself would derive from the given params, so the wallet can verify it.\nparams are optional, and default to the values the server is configured with.",
         "operationId": "DelegateeService_GetInfo",
         "parameters": [
           {
             "name": "renewalWindow",
             "in": "query",
-            "description": "seconds before expiry from which a VTXO may be renewed. Defaults to 1024.",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -277,7 +171,6 @@
           {
             "name": "maxFee",
             "in": "query",
-            "description": "most sats one renewal may deduct from a VTXO to pay the arkd intent fee.\nDefaults to 0: the VTXO is only renewed while arkd charges nothing for it.",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -334,19 +227,6 @@
           }
         }
       },
-      "CancelDelegationRequest": {
-        "title": "CancelDelegationRequest",
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          }
-        }
-      },
-      "CancelDelegationResponse": {
-        "title": "CancelDelegationResponse",
-        "type": "object"
-      },
       "Delegation": {
         "title": "Delegation",
         "type": "object",
@@ -363,12 +243,10 @@
             "format": "int64"
           },
           "lastRenewal": {
-            "$ref": "#/components/schemas/Renewal",
-            "description": "most recent renewal attempt, only set by ListDelegations."
+            "$ref": "#/components/schemas/Renewal"
           },
           "managed": {
-            "type": "boolean",
-            "description": "what the last scan saw at the address, only set by ListDelegations for\nactive delegations. managed is false when the delegation was registered\nunder another secret key: this instance cannot renew it."
+            "type": "boolean"
           },
           "maxFee": {
             "type": "integer",
@@ -376,12 +254,10 @@
           },
           "nextExpiry": {
             "type": "integer",
-            "description": "earliest expiry among its VTXOs, 0 without any.",
             "format": "int64"
           },
           "nextRenewalAt": {
             "type": "integer",
-            "description": "when the first of its VTXOs becomes renewable, 0 without any.",
             "format": "int64"
           },
           "renewalWindow": {
@@ -389,12 +265,10 @@
             "format": "int64"
           },
           "status": {
-            "type": "string",
-            "description": "active | cancelled (by the operator) | revoked (by the owner)"
+            "type": "string"
           },
           "tapscripts": {
             "type": "array",
-            "description": "not set by ListDelegations.",
             "items": {
               "type": "string"
             }
@@ -449,12 +323,10 @@
         "properties": {
           "maxFee": {
             "type": "integer",
-            "description": "most sats one renewal may deduct from a VTXO to pay the arkd intent fee.\nDefaults to 0: the VTXO is only renewed while arkd charges nothing for it.",
             "format": "int64"
           },
           "renewalWindow": {
             "type": "integer",
-            "description": "seconds before expiry from which a VTXO may be renewed. Defaults to 1024.",
             "format": "int64"
           }
         }
@@ -464,24 +336,19 @@
         "type": "object",
         "properties": {
           "arkadeScript": {
-            "type": "string",
-            "description": "hex-encoded arkade script executed by the emulator before co-signing."
+            "type": "string"
           },
           "delegatePubkey": {
-            "type": "string",
-            "description": "hex-encoded compressed pubkey of the vtxo tree cosigner pinned in the covenant."
+            "type": "string"
           },
           "delegateTapscript": {
-            "type": "string",
-            "description": "hex-encoded tapscript of the delegate leaf: [server_pubkey, emulator_tweaked_pubkey]."
+            "type": "string"
           },
           "emulatorPubkey": {
-            "type": "string",
-            "description": "hex-encoded compressed pubkey of the emulator."
+            "type": "string"
           },
           "emulatorTweakedPubkey": {
-            "type": "string",
-            "description": "emulator pubkey tweaked with the covenant hash, second key of the delegate leaf."
+            "type": "string"
           },
           "maxFee": {
             "type": "integer",
@@ -495,75 +362,10 @@
             "format": "int64"
           },
           "serverPubkey": {
-            "type": "string",
-            "description": "hex-encoded compressed pubkey of the arkd signer."
+            "type": "string"
           },
           "version": {
             "type": "string"
-          }
-        }
-      },
-      "GetStatusRequest": {
-        "title": "GetStatusRequest",
-        "type": "object"
-      },
-      "GetStatusResponse": {
-        "title": "GetStatusResponse",
-        "type": "object",
-        "properties": {
-          "intentFees": {
-            "$ref": "#/components/schemas/IntentFees",
-            "description": "unset when arkd is unreachable."
-          },
-          "lastScanAt": {
-            "type": "integer",
-            "description": "unix time of the last completed scan, 0 before the first one.",
-            "format": "int64"
-          },
-          "pollInterval": {
-            "type": "integer",
-            "description": "seconds between scans.",
-            "format": "int64"
-          },
-          "renewingVtxos": {
-            "type": "integer",
-            "description": "VTXOs in the batch session in flight, 0 when idle. Scans pause meanwhile.",
-            "format": "int32"
-          }
-        }
-      },
-      "IntentFees": {
-        "title": "IntentFees",
-        "type": "object",
-        "description": "IntentFees are arkd's fee programs (CEL), empty when nothing is charged.",
-        "properties": {
-          "offchainInput": {
-            "type": "string"
-          },
-          "offchainOutput": {
-            "type": "string"
-          },
-          "onchainInput": {
-            "type": "string"
-          },
-          "onchainOutput": {
-            "type": "string"
-          }
-        }
-      },
-      "ListDelegationsRequest": {
-        "title": "ListDelegationsRequest",
-        "type": "object"
-      },
-      "ListDelegationsResponse": {
-        "title": "ListDelegationsResponse",
-        "type": "object",
-        "properties": {
-          "delegations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Delegation"
-            }
           }
         }
       },
@@ -577,12 +379,10 @@
           },
           "renewalWindow": {
             "type": "integer",
-            "description": "the params the delegate tapscript was built for, same defaults as GetInfo.",
             "format": "int64"
           },
           "tapscripts": {
             "type": "array",
-            "description": "hex-encoded tapscripts of the vtxo script, as encoded by the SDKs.",
             "items": {
               "type": "string"
             }
@@ -631,16 +431,14 @@
             "type": "string"
           },
           "pubkey": {
-            "type": "string",
-            "description": "hex, x-only or compressed: a key of the exit leaf of the vtxo script."
+            "type": "string"
           },
           "signature": {
             "type": "string",
-            "description": "hex BIP340 signature by that key over\ntagged_hash(\"delegatee/revoke\", \"\u003caddress\u003e:\u003ctimestamp\u003e\")."
+            "description": "TODO simplify ?"
           },
           "timestamp": {
             "type": "integer",
-            "description": "unix seconds, must be within 10 minutes of the server's clock.",
             "format": "int64"
           }
         }
@@ -691,15 +489,13 @@
             "format": "int64"
           },
           "outpoint": {
-            "type": "string",
-            "description": "txid:vout"
+            "type": "string"
           },
           "preconfirmed": {
             "type": "boolean"
           },
           "renewableAt": {
             "type": "integer",
-            "description": "when it becomes renewable.",
             "format": "int64"
           }
         }
@@ -709,9 +505,6 @@
   "tags": [
     {
       "name": "DelegateeService"
-    },
-    {
-      "name": "AdminService"
     }
   ]
 }

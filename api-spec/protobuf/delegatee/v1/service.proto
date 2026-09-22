@@ -4,11 +4,10 @@ package delegatee.v1;
 
 import "meshapi/gateway/annotations.proto";
 
-// DelegateeService renews covenant-locked VTXOs on behalf of offline users.
 service DelegateeService {
   // GetInfo returns everything a wallet needs to build a delegate address
-  // for the given params: the delegate cosigner pubkey, the covenant
-  // and the delegate tapscript.
+  // it also returns the address itself would derive from the given params, so the wallet can verify it.
+  // params are optional, and default to the values the server is configured with.
   rpc GetInfo(GetInfoRequest) returns (GetInfoResponse) {
     option (meshapi.gateway.http) = {
       get: "/v1/info"
@@ -44,71 +43,30 @@ service DelegateeService {
   }
 }
 
-// AdminService is served on the admin port only, next to DelegateeService
-// and the operator web UI (GET /).
-service AdminService {
-  // ListDelegations returns every registered delegation.
-  rpc ListDelegations(ListDelegationsRequest) returns (ListDelegationsResponse) {
-    option (meshapi.gateway.http) = {
-      get: "/v1/admin/delegate"
-    };
-  }
-
-  // GetStatus returns the scanner's state and what arkd charges right now.
-  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse) {
-    option (meshapi.gateway.http) = {
-      get: "/v1/admin/status"
-    };
-  }
-
-  // CancelDelegation stops renewing the address. Register again to resume.
-  rpc CancelDelegation(CancelDelegationRequest) returns (CancelDelegationResponse) {
-    option (meshapi.gateway.http) = {
-      delete: "/v1/admin/delegate/{address}"
-    };
-  }
-}
-
 message GetInfoRequest {
-  // seconds before expiry from which a VTXO may be renewed. Defaults to 1024.
   int64 renewal_window = 1;
-  // most sats one renewal may deduct from a VTXO to pay the arkd intent fee.
-  // Defaults to 0: the VTXO is only renewed while arkd charges nothing for it.
   int64 max_fee = 2;
 }
 message GetInfoResponse {
   string version = 1;
   string network = 2;
-  // hex-encoded compressed pubkey of the vtxo tree cosigner pinned in the covenant.
   string delegate_pubkey = 3;
-  // hex-encoded compressed pubkey of the arkd signer.
   string server_pubkey = 4;
-  // hex-encoded compressed pubkey of the emulator.
   string emulator_pubkey = 5;
-  // emulator pubkey tweaked with the covenant hash, second key of the delegate leaf.
   string emulator_tweaked_pubkey = 6;
-  // hex-encoded arkade script executed by the emulator before co-signing.
   string arkade_script = 7;
-  // hex-encoded tapscript of the delegate leaf: [server_pubkey, emulator_tweaked_pubkey].
   string delegate_tapscript = 8;
   int64 renewal_window = 9;
   int64 max_fee = 10;
 }
 
 message RegisterDelegationRequest {
-  // hex-encoded tapscripts of the vtxo script, as encoded by the SDKs.
   repeated string tapscripts = 1;
-  // the params the delegate tapscript was built for, same defaults as GetInfo.
   int64 renewal_window = 2;
   int64 max_fee = 3;
 }
 message RegisterDelegationResponse {
   Delegation delegation = 1;
-}
-
-message ListDelegationsRequest {}
-message ListDelegationsResponse {
-  repeated Delegation delegations = 1;
 }
 
 message GetDelegationRequest {
@@ -120,77 +78,39 @@ message GetDelegationResponse {
   repeated Renewal renewals = 3;
 }
 
-message GetStatusRequest {}
-message GetStatusResponse {
-  // unix time of the last completed scan, 0 before the first one.
-  int64 last_scan_at = 1;
-  // VTXOs in the batch session in flight, 0 when idle. Scans pause meanwhile.
-  int32 renewing_vtxos = 2;
-  // seconds between scans.
-  int64 poll_interval = 3;
-  // unset when arkd is unreachable.
-  IntentFees intent_fees = 4;
-}
-
-// IntentFees are arkd's fee programs (CEL), empty when nothing is charged.
-message IntentFees {
-  string offchain_input = 1;
-  string onchain_input = 2;
-  string offchain_output = 3;
-  string onchain_output = 4;
-}
-
 message RevokeDelegationRequest {
   string address = 1;
-  // hex, x-only or compressed: a key of the exit leaf of the vtxo script.
   string pubkey = 2;
-  // hex BIP340 signature by that key over
-  // tagged_hash("delegatee/revoke", "<address>:<timestamp>").
+  // TODO simplify ?
   string signature = 3;
-  // unix seconds, must be within 10 minutes of the server's clock.
   int64 timestamp = 4;
 }
 message RevokeDelegationResponse {}
 
-message CancelDelegationRequest {
-  string address = 1;
-}
-message CancelDelegationResponse {}
-
 message Delegation {
   int64 id = 1;
   string address = 2;
-  // active | cancelled (by the operator) | revoked (by the owner)
   string status = 3;
-  // not set by ListDelegations.
   repeated string tapscripts = 4;
   int64 created_at = 5;
   int64 updated_at = 6;
   int64 renewal_window = 7;
   int64 max_fee = 8;
-  // most recent renewal attempt, only set by ListDelegations.
   Renewal last_renewal = 9;
-  // what the last scan saw at the address, only set by ListDelegations for
-  // active delegations. managed is false when the delegation was registered
-  // under another secret key: this instance cannot renew it.
   bool managed = 10;
   int32 vtxo_count = 11;
   uint64 total_amount = 12;
-  // earliest expiry among its VTXOs, 0 without any.
   int64 next_expiry = 13;
-  // when the first of its VTXOs becomes renewable, 0 without any.
   int64 next_renewal_at = 14;
 }
 
 message Vtxo {
-  // txid:vout
   string outpoint = 1;
   uint64 amount = 2;
   int64 expires_at = 3;
   bool preconfirmed = 4;
   repeated Asset assets = 5;
   int64 created_at = 6;
-  // when it becomes renewable.
   int64 renewable_at = 7;
 }
 

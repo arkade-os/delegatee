@@ -1,0 +1,304 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "",
+    "version": "version not set"
+  },
+  "paths": {
+    "/v1/admin/delegate": {
+      "get": {
+        "tags": [
+          "AdminService"
+        ],
+        "operationId": "AdminService_ListDelegations",
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDelegationsResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/delegate/{address}": {
+      "delete": {
+        "tags": [
+          "AdminService"
+        ],
+        "operationId": "AdminService_CancelDelegation",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelDelegationResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/status": {
+      "get": {
+        "tags": [
+          "AdminService"
+        ],
+        "operationId": "AdminService_GetStatus",
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetStatusResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Any": {
+        "type": "object",
+        "description": "Any contains an arbitrary schema along with a URL to help identify the type of the schema.",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "description": "A URL/resource name that uniquely identifies the type of the schema."
+          }
+        }
+      },
+      "CancelDelegationRequest": {
+        "title": "CancelDelegationRequest",
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          }
+        }
+      },
+      "CancelDelegationResponse": {
+        "title": "CancelDelegationResponse",
+        "type": "object"
+      },
+      "Delegation": {
+        "title": "Delegation",
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastRenewal": {
+            "$ref": "#/components/schemas/Renewal"
+          },
+          "managed": {
+            "type": "boolean"
+          },
+          "maxFee": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nextExpiry": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nextRenewalAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "renewalWindow": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tapscripts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "totalAmount": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "updatedAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vtxoCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "GetStatusRequest": {
+        "title": "GetStatusRequest",
+        "type": "object"
+      },
+      "GetStatusResponse": {
+        "title": "GetStatusResponse",
+        "type": "object",
+        "properties": {
+          "intentFees": {
+            "$ref": "#/components/schemas/IntentFees"
+          },
+          "lastScanAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pollInterval": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "renewingVtxos": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "IntentFees": {
+        "title": "IntentFees",
+        "type": "object",
+        "properties": {
+          "offchainInput": {
+            "type": "string"
+          },
+          "offchainOutput": {
+            "type": "string"
+          },
+          "onchainInput": {
+            "type": "string"
+          },
+          "onchainOutput": {
+            "type": "string"
+          }
+        }
+      },
+      "ListDelegationsRequest": {
+        "title": "ListDelegationsRequest",
+        "type": "object"
+      },
+      "ListDelegationsResponse": {
+        "title": "ListDelegationsResponse",
+        "type": "object",
+        "properties": {
+          "delegations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Delegation"
+            }
+          }
+        }
+      },
+      "Renewal": {
+        "title": "Renewal",
+        "type": "object",
+        "properties": {
+          "attemptedAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "commitmentTxid": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "outpoints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Status": {
+        "title": "Status",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Any"
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "AdminService"
+    }
+  ]
+}
