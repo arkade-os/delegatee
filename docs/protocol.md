@@ -23,7 +23,7 @@ Parameters: `delegate_pubkey` (this service's vtxo tree cosigner key, hex,
 compressed), `renewal_window` (seconds), `max_fee` (sats).
 
 ```
-OP_PUSHEXPIRY <renewal_window> OP_SUB OP_CHECKTIMEVERIFY
+OP_PUSHEXPIRY <renewal_window> OP_SUB OP_CHECKTIME OP_VERIFY
 "type"                    OP_INSPECTINTENTMESSAGE OP_VERIFY "register" OP_EQUALVERIFY
 "onchain_output_indexes"  OP_INSPECTINTENTMESSAGE OP_VERIFY "[]"       OP_EQUALVERIFY
 "cosigners_public_keys.0" OP_INSPECTINTENTMESSAGE OP_VERIFY <delegate_pubkey hex> OP_EQUALVERIFY
@@ -61,8 +61,8 @@ well below arkd's batch expiry, or the coin is renewable in every round.
 
 Input 0 of an intent proof is the BIP-322 message input, hence the `i−1`.
 
-The zero-fee script is kept byte-identical to the first release so existing
-addresses don't move; [covenant_test.go](../internal/core/application/covenant_test.go)
+The rc.1 covenant changes addresses from rc.0; owners must move funds to newly
+registered addresses. [covenant_test.go](../internal/core/application/covenant_test.go)
 pins both variants.
 
 ## Renewal flow

@@ -75,13 +75,9 @@ func renewalOutput(v types.Vtxo, pkScript []byte, p domain.Params, fee int64) (*
 // delegate only, within RenewalWindow seconds of expiry, output i-1
 // preserving script and assets of input i and its value minus at most MaxFee.
 //
-// TODO(emulator-rc1): Add a versioned covenant using OP_CHECKTIME OP_VERIFY.
-// Emulator v0.0.8-rc.1 repurposes 0xdc from CHECKTIMEVERIFY to CHECKTIME, so
-// this legacy covenant leaves an extra boolean and fails ErrCleanStack there.
-// Coordinate the new variant with the SDK/API and migrate existing addresses;
-// never change the bytes this function produces for already-registered params.
+// Requires emulator v0.0.8-rc.1: CHECKTIME pushes a boolean consumed by VERIFY.
 //
-//	OP_PUSHEXPIRY <window> OP_SUB OP_CHECKTIMEVERIFY
+//	OP_PUSHEXPIRY <window> OP_SUB OP_CHECKTIME OP_VERIFY
 //	"type" OP_INSPECTINTENTMESSAGE OP_VERIFY "register" OP_EQUALVERIFY
 //	"onchain_output_indexes" OP_INSPECTINTENTMESSAGE OP_VERIFY "[]" OP_EQUALVERIFY
 //	"cosigners_public_keys.0" OP_INSPECTINTENTMESSAGE OP_VERIFY <delegate> OP_EQUALVERIFY
@@ -101,7 +97,8 @@ func buildArkadeScript(delegatePubKeyHex string, p domain.Params) ([]byte, error
 		AddOp(arkade.OP_PUSHEXPIRY).
 		AddInt64(p.RenewalWindow).
 		AddOp(arkade.OP_SUB).
-		AddOp(arkade.OP_CHECKTIMEVERIFY).
+		AddOp(arkade.OP_CHECKTIME).
+		AddOp(txscript.OP_VERIFY).
 		AddData([]byte("type")).
 		AddOp(arkade.OP_INSPECTINTENTMESSAGE).
 		AddOp(txscript.OP_VERIFY).

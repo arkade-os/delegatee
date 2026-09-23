@@ -10,7 +10,7 @@ require (
 	github.com/arkade-os/arkd/pkg/ark-lib v0.8.1-0.20260720133940-f444de6c336c
 	github.com/arkade-os/arkd/pkg/client-lib v0.0.0-20260707112601-db93f3d63dab
 	github.com/arkade-os/delegatee/api-spec v0.0.0-00010101000000-000000000000
-	github.com/arkade-os/emulator/pkg/arkade v0.0.0-20260903164234-4feb9eaa81b4
+	github.com/arkade-os/emulator/pkg/arkade v0.0.0-20260922104224-640b3b5ebd3a
 	github.com/arkade-os/emulator/pkg/client v0.0.0-20260903164234-4feb9eaa81b4
 	github.com/arkade-os/go-sdk v0.11.0
 	github.com/btcsuite/btcd v0.24.3-0.20240921052913-67b8efd3ba53

@@ -28,6 +28,8 @@ github.com/arkade-os/emulator/api-spec v0.0.0-20260903164234-4feb9eaa81b4 h1:27d
 github.com/arkade-os/emulator/api-spec v0.0.0-20260903164234-4feb9eaa81b4/go.mod h1:tEIk3jkGMkN3zo4oc9Pyds2bQVKL83rZ6aUX5KVeYLU=
 github.com/arkade-os/emulator/pkg/arkade v0.0.0-20260903164234-4feb9eaa81b4 h1:IXRc+QllOu513qH5NeGjuXVHoZD79Qb8WC/8ShC9E28=
 github.com/arkade-os/emulator/pkg/arkade v0.0.0-20260903164234-4feb9eaa81b4/go.mod h1:GRTwZJ0eBLovxhWh57z8x83Y/ygdU7gz6wHlo2Ob8VY=
+github.com/arkade-os/emulator/pkg/arkade v0.0.0-20260922104224-640b3b5ebd3a h1:7ewVzpWUNrAaGeiLMVoN65nJSoriG2r+pB3K7Xirfqo=
+github.com/arkade-os/emulator/pkg/arkade v0.0.0-20260922104224-640b3b5ebd3a/go.mod h1:GRTwZJ0eBLovxhWh57z8x83Y/ygdU7gz6wHlo2Ob8VY=
 github.com/arkade-os/emulator/pkg/client v0.0.0-20260903164234-4feb9eaa81b4 h1:ABjfYi2C04kMM8O5rvakCH7GzLTOwe3uFsOOESXU9UY=
 github.com/arkade-os/emulator/pkg/client v0.0.0-20260903164234-4feb9eaa81b4/go.mod h1:0uQ+FggJsZ94TCUUGjWNtRkeuVGmollfrAKR3+LvvaM=
 github.com/arkade-os/go-sdk v0.11.0 h1:xE/MfapmbQ6xTqRu/bT+okdDQN4qCDTKLPUAKVyaJdA=

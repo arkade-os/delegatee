@@ -22,12 +22,8 @@ How the covenant works, byte by byte, is in [docs/protocol.md](docs/protocol.md)
 
 ## Quick start
 
-You need an arkd, an emulator v0.0.8-rc.0 connected to it, and a postgres
+You need an arkd, an emulator v0.0.8-rc.1 connected to it, and a postgres
 database.
-
-Emulator v0.0.8-rc.1 changes `CHECKTIMEVERIFY` into `CHECKTIME` and rejects the
-current covenant with an extra stack item. Support requires a new covenant
-variant and address migration; see `TODO(emulator-rc1)` in `covenant.go`.
 
 ```sh
 docker run -d --restart unless-stopped \
@@ -352,7 +348,7 @@ make build
 
 Everything needed for regtest is in [docker-compose.regtest.yml](docker-compose.regtest.yml):
 bitcoin and the explorer come from [nigiri](https://github.com/vulpemventures/nigiri),
-the rest (nbxplorer, arkd-wallet, arkd v0.9.13, emulator v0.0.8-rc.0, postgres)
+the rest (nbxplorer, arkd-wallet, arkd v0.9.13, emulator v0.0.8-rc.1, postgres)
 from the compose file. `make regtest-up` also runs
 [scripts/regtest-init.sh](scripts/regtest-init.sh), which creates, unlocks and
 funds the arkd wallet through its admin API (port 7071).
