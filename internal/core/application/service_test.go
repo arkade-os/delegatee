@@ -27,14 +27,14 @@ func TestNewService(t *testing.T) {
 			env := newTestEnv(t)
 			tweak(env)
 			_, err := NewService(t.Context(), env.repo, env.ark, env.indexer, env.emulator,
-				env.userKey, time.Hour, time.Minute, 16, 100)
+				env.userKey, time.Hour, time.Minute, 0, 16, 100)
 			require.Error(t, err)
 		})
 	}
 	env := newTestEnv(t)
-	_, err := NewService(t.Context(), env.repo, env.ark, env.indexer, env.emulator, env.userKey, time.Hour, time.Minute, 0, 100)
+	_, err := NewService(t.Context(), env.repo, env.ark, env.indexer, env.emulator, env.userKey, time.Hour, time.Minute, 0, 0, 100)
 	require.Error(t, err, "zero vtxos per intent")
-	_, err = NewService(t.Context(), env.repo, env.ark, env.indexer, env.emulator, env.userKey, time.Hour, time.Minute, 16, 0)
+	_, err = NewService(t.Context(), env.repo, env.ark, env.indexer, env.emulator, env.userKey, time.Hour, time.Minute, 0, 16, 0)
 	require.Error(t, err, "zero max delegations")
 }
 
@@ -116,7 +116,7 @@ func TestKeyRotationWatchesPreviousDelegations(t *testing.T) {
 	require.NoError(t, err)
 	rotated, err := NewServiceWithKeys(
 		t.Context(), env.repo, env.ark, env.indexer, env.emulator,
-		[]*btcec.PrivateKey{newKey, oldKey}, time.Hour, time.Minute, 16, 100,
+		[]*btcec.PrivateKey{newKey, oldKey}, time.Hour, time.Minute, 0, 16, 100,
 	)
 	require.NoError(t, err)
 	rotatedSvc := rotated.(*service)

@@ -245,6 +245,7 @@ Environment variables only.
 | `DELEGATEE_PORT` | public gRPC + REST port | `7080` |
 | `DELEGATEE_ADMIN_PORT` | admin gRPC + REST + UI port | `7081` |
 | `DELEGATEE_POLL_INTERVAL` | how often addresses are scanned | `1m` |
+| `DELEGATEE_COLLECTION_WINDOW` | maximum deliberate wait from renewal eligibility to collect more VTXOs; urgent or full intents submit sooner; `0s` disables | `30s` |
 | `DELEGATEE_RENEWAL_TIMEOUT` | max time from intent registration to batch finalization; must cover the gap between two arkd sessions | `2h` |
 | `DELEGATEE_ADMIN_AUTH` | `file` enables per-operator auth; `disabled` delegates auth to a trusted proxy/network boundary | required |
 | `DELEGATEE_ADMIN_USERS_FILE` | newline-separated `username:bcrypt-hash` records when admin auth is `file` | required with `file` |
@@ -288,6 +289,15 @@ testnet4, signet, mutinynet, mainnet.
     addresses, four at a time. What is derived from a delegation (covenant,
     tweaked key, merkle proof) is computed once and kept: a scan over 5,000
     addresses takes about a millisecond of CPU, 1.4 s before that cache;
+  - `DELEGATEE_COLLECTION_WINDOW` (default `30s`, `0s` disables) collects
+    eligible VTXOs until the oldest eligibility time plus that window. New
+    arrivals and restarts do not extend the deadline. Submission starts sooner
+    when one cosigner has `MAX_VTXOS_PER_INTENT` inputs, or waiting would leave
+    less than half a VTXO's effective renewal window or two minutes before
+    expiry. The scheduler wakes at the deadline even if `POLL_INTERVAL` is
+    longer, refreshes the eligible inputs, and prioritizes earliest expiries.
+    Scans and arkd round completion can still add latency; this bounds the
+    deliberate collection delay, not the time to confirmation;
   - due VTXOs go in intents of `MAX_VTXOS_PER_INTENT`, built and finalized
     four at a time, with one previous-transaction lookup per intent. All
     intents are registered up front and batch sessions are followed until

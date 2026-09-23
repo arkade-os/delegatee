@@ -32,16 +32,17 @@ type AdminUser struct {
 }
 
 type Config struct {
-	ArkURL         string
-	EmulatorURL    string // https:// enables TLS
-	DatabaseURL    string
-	Port           uint32
-	AdminPort      uint32
-	LogLevel       int
-	SecretKey      *btcec.PrivateKey   // active tree cosigner key, pinned in new covenants
-	SecretKeys     []*btcec.PrivateKey // active key followed by previous keys
-	PollInterval   time.Duration
-	RenewalTimeout time.Duration // must cover the gap between two arkd sessions
+	ArkURL           string
+	EmulatorURL      string // https:// enables TLS
+	DatabaseURL      string
+	Port             uint32
+	AdminPort        uint32
+	LogLevel         int
+	SecretKey        *btcec.PrivateKey   // active tree cosigner key, pinned in new covenants
+	SecretKeys       []*btcec.PrivateKey // active key followed by previous keys
+	PollInterval     time.Duration
+	CollectionWindow time.Duration // maximum extra wait from renewal eligibility; zero disables
+	RenewalTimeout   time.Duration // must cover the gap between two arkd sessions
 	// MaxVtxosPerIntent: the covenant runs 4 OP_INSPECTINTENTMESSAGE per input
 	// and the emulator allows 64 per request, so 16 is the ceiling.
 	MaxVtxosPerIntent int
@@ -99,6 +100,12 @@ func LoadConfig() (*Config, error) {
 	}
 	if cfg.RenewalTimeout <= 0 {
 		return nil, fmt.Errorf("%sRENEWAL_TIMEOUT must be positive", envPrefix)
+	}
+	if cfg.CollectionWindow, err = envDuration("COLLECTION_WINDOW", 30*time.Second); err != nil {
+		return nil, err
+	}
+	if cfg.CollectionWindow < 0 {
+		return nil, fmt.Errorf("%sCOLLECTION_WINDOW must not be negative", envPrefix)
 	}
 	if cfg.MaxVtxosPerIntent, err = envInt("MAX_VTXOS_PER_INTENT", 16); err != nil {
 		return nil, err
@@ -173,7 +180,7 @@ func (c *Config) AppService(ctx context.Context) (application.Service, error) {
 	}
 	svc, err := application.NewServiceWithKeys(
 		ctx, repo, ark, indexerSvc, emulatorclient.NewGRPCClient(emuConn),
-		keys, c.PollInterval, c.RenewalTimeout, c.MaxVtxosPerIntent, c.MaxDelegations,
+		keys, c.PollInterval, c.RenewalTimeout, c.CollectionWindow, c.MaxVtxosPerIntent, c.MaxDelegations,
 	)
 	if err != nil {
 		// main retries until arkd and the emulator are up: don't leak a pool per attempt

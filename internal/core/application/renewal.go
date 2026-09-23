@@ -46,6 +46,7 @@ type renewalResult struct {
 // cosigned by the emulator and registered, then follows batch sessions until
 // every registered intent has been included.
 func (s *service) renew(ctx context.Context, inputs []renewalInput) []renewalResult {
+	sortRenewalInputs(inputs)
 	groups := make([][]renewalInput, len(s.cosigners))
 	indices := make(map[*cosigner]int, len(s.cosigners))
 	for i, cosigner := range s.cosigners {
@@ -58,11 +59,18 @@ func (s *service) renew(ctx context.Context, inputs []renewalInput) []renewalRes
 		}
 		groups[indices[cosigner]] = append(groups[indices[cosigner]], in)
 	}
-	var results []renewalResult
-	for i, inputs := range groups {
-		if len(inputs) > 0 {
-			results = append(results, s.renewForCosigner(ctx, s.cosigners[i], inputs)...)
+	order := make([]int, 0, len(groups))
+	for i, group := range groups {
+		if len(group) > 0 {
+			order = append(order, i)
 		}
+	}
+	slices.SortStableFunc(order, func(a, b int) int {
+		return groups[a][0].vtxo.ExpiresAt.Compare(groups[b][0].vtxo.ExpiresAt)
+	})
+	var results []renewalResult
+	for _, i := range order {
+		results = append(results, s.renewForCosigner(ctx, s.cosigners[i], groups[i])...)
 	}
 	return results
 }

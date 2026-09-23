@@ -67,12 +67,19 @@ pins both variants.
 
 ## Renewal flow
 
-Every `POLL_INTERVAL`:
+Every `POLL_INTERVAL` (or sooner at a pending collection deadline):
 
 1. list active delegations, query the arkd indexer for their spendable VTXOs;
 2. keep the VTXOs that are due: inside `renewal_window`, and, when
    `max_fee` > 0, past half of their life, so that a window longer than the
-   VTXO lifetime does not pay a fee in every round;
+   VTXO lifetime does not pay a fee in every round. Collect due inputs for up
+   to `COLLECTION_WINDOW` (default `30s`, `0s` disables), anchored to the
+   oldest eligibility time. Submit sooner when one cosigner can fill an
+   intent, or waiting would leave less than half the effective renewal
+   window or two minutes before expiry. Rescan before submission to discard
+   spent VTXOs and cancelled delegations and include newly eligible inputs.
+   Process earliest expiries first within each cosigner group and order
+   groups by their earliest expiry;
 3. read arkd's intent fee programs (`GetInfo`) and price each VTXO: input fee
    plus output fee at the actual output amount, each rounded up. The service
    solves that fee/output dependency and rejects non-convergent or invalid

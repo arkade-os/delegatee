@@ -346,7 +346,7 @@ func newTestEnv(t testing.TB, tweak ...func(*testEnv)) *testEnv {
 	}
 	key, _ := hexKey(t)
 	svc, err := NewService(t.Context(), env.repo, env.ark, env.indexer, env.emulator,
-		key, time.Hour, time.Minute, 16, 100)
+		key, time.Hour, time.Minute, 0, 16, 100)
 	require.NoError(t, err)
 	env.svc = svc.(*service)
 	return env

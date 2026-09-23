@@ -30,6 +30,13 @@ func TestLoad(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint32(7080), cfg.Port)
 	require.Equal(t, 5*time.Second, cfg.PollInterval)
+	require.Equal(t, 30*time.Second, cfg.CollectionWindow)
+	for _, window := range []time.Duration{0, 10 * time.Second} {
+		t.Setenv("DELEGATEE_COLLECTION_WINDOW", window.String())
+		configured, err := LoadConfig()
+		require.NoError(t, err)
+		require.Equal(t, window, configured.CollectionWindow)
+	}
 	require.NotNil(t, cfg.SecretKey)
 	require.Len(t, cfg.SecretKeys, 1)
 	require.Len(t, cfg.AdminUsers, 1)
@@ -54,7 +61,8 @@ func TestLoadRejectsBadValues(t *testing.T) {
 	}
 	for name, bad := range map[string]string{
 		"DELEGATEE_PORT": "http", "DELEGATEE_ADMIN_PORT": "x", "DELEGATEE_LOG_LEVEL": "debug",
-		"DELEGATEE_POLL_INTERVAL": "10", "DELEGATEE_RENEWAL_TIMEOUT": "soon",
+		"DELEGATEE_COLLECTION_WINDOW": "soon",
+		"DELEGATEE_POLL_INTERVAL":     "10", "DELEGATEE_RENEWAL_TIMEOUT": "soon",
 		"DELEGATEE_MAX_VTXOS_PER_INTENT": "many", "DELEGATEE_MAX_DELEGATIONS": "1e3",
 		"DELEGATEE_SECRET_KEY": "0000000000000000000000000000000000000000000000000000000000000000",
 		"DELEGATEE_ARK_URL":    "", "DELEGATEE_EMULATOR_URL": "", "DELEGATEE_DATABASE_URL": "",
@@ -70,7 +78,8 @@ func TestLoadRejectsBadValues(t *testing.T) {
 	}
 	for name, bad := range map[string]string{
 		"DELEGATEE_PORT": "0", "DELEGATEE_ADMIN_PORT": "65536",
-		"DELEGATEE_POLL_INTERVAL": "0s", "DELEGATEE_RENEWAL_TIMEOUT": "-1s",
+		"DELEGATEE_COLLECTION_WINDOW": "-1s",
+		"DELEGATEE_POLL_INTERVAL":     "0s", "DELEGATEE_RENEWAL_TIMEOUT": "-1s",
 		"DELEGATEE_MAX_VTXOS_PER_INTENT": "17", "DELEGATEE_MAX_DELEGATIONS": "0",
 		"DELEGATEE_PUBLIC_RATE_LIMIT": "NaN",
 		"DELEGATEE_ADMIN_AUTH":        "maybe",

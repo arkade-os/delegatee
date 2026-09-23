@@ -119,6 +119,8 @@ type service struct {
 	cosigners         []*cosigner
 	pollInterval      time.Duration
 	renewalTimeout    time.Duration
+	collectionWindow  time.Duration
+	collectUntil      time.Time // next collection deadline; only touched by scan
 	maxVtxosPerIntent int
 	maxDelegations    int
 	registerMu        sync.Mutex
@@ -191,10 +193,10 @@ func NewService(
 	indexerSvc indexer.Indexer,
 	emulator emulatorclient.TransportClient,
 	key *btcec.PrivateKey,
-	pollInterval, renewalTimeout time.Duration,
+	pollInterval, renewalTimeout, collectionWindow time.Duration,
 	maxVtxosPerIntent, maxDelegations int,
 ) (Service, error) {
-	return NewServiceWithKeys(ctx, repo, ark, indexerSvc, emulator, []*btcec.PrivateKey{key}, pollInterval, renewalTimeout, maxVtxosPerIntent, maxDelegations)
+	return NewServiceWithKeys(ctx, repo, ark, indexerSvc, emulator, []*btcec.PrivateKey{key}, pollInterval, renewalTimeout, collectionWindow, maxVtxosPerIntent, maxDelegations)
 }
 
 func NewServiceWithKeys(
@@ -204,7 +206,7 @@ func NewServiceWithKeys(
 	indexerSvc indexer.Indexer,
 	emulator emulatorclient.TransportClient,
 	keys []*btcec.PrivateKey,
-	pollInterval, renewalTimeout time.Duration,
+	pollInterval, renewalTimeout, collectionWindow time.Duration,
 	maxVtxosPerIntent, maxDelegations int,
 ) (Service, error) {
 	if len(keys) == 0 {
@@ -225,6 +227,9 @@ func NewServiceWithKeys(
 		}
 		seen[pubKey] = struct{}{}
 		cosigners[i] = &cosigner{key: key, pubKey: pubKey}
+	}
+	if collectionWindow < 0 {
+		return nil, fmt.Errorf("collection window must not be negative")
 	}
 	if pollInterval <= 0 || renewalTimeout <= 0 {
 		return nil, fmt.Errorf("poll interval and renewal timeout must be positive")
@@ -277,6 +282,7 @@ func NewServiceWithKeys(
 		cosigners:         cosigners,
 		pollInterval:      pollInterval,
 		renewalTimeout:    renewalTimeout,
+		collectionWindow:  collectionWindow,
 		maxVtxosPerIntent: maxVtxosPerIntent,
 		maxDelegations:    maxDelegations,
 		network:           network,
@@ -364,15 +370,16 @@ func (s *service) Start() {
 	s.stopped = make(chan struct{})
 	go func() {
 		defer close(s.stopped)
-		ticker := time.NewTicker(s.pollInterval)
-		defer ticker.Stop()
+		timer := time.NewTimer(s.pollInterval)
+		defer timer.Stop()
 		for {
 			s.scan(ctx)
+			timer.Reset(s.nextScanDelay(time.Now()))
 			select {
 			case <-ctx.Done():
 				s.wg.Wait()
 				return
-			case <-ticker.C:
+			case <-timer.C:
 			}
 		}
 	}()
@@ -609,6 +616,7 @@ func (s *service) scriptOf(d *domain.Delegation) ([]byte, script.VtxoScript, err
 }
 
 func (s *service) scan(ctx context.Context) {
+	s.collectUntil = time.Time{}
 	if s.renewing.Load() > 0 {
 		return
 	}
@@ -688,6 +696,10 @@ func (s *service) scan(ctx context.Context) {
 	s.lastScan, s.holdings = now, holdings
 	s.mu.Unlock()
 	if len(inputs) == 0 {
+		return
+	}
+	s.collectUntil = s.collectionDeadline(inputs, time.Now())
+	if !s.collectUntil.IsZero() {
 		return
 	}
 	// one cosigner key means one batch session at a time: renew everything together.
