@@ -33,6 +33,9 @@ import (
 
 const maxRequestBodySize = 1 << 20
 
+// ReadTimeout is what makes Go disarm the header deadline on h2c connections.
+var readHeaderTimeout, readTimeout = 10 * time.Second, 30 * time.Second
+
 // the operator web UI, served at / on the admin port
 //
 //go:embed web/index.html
@@ -198,11 +201,11 @@ func (s *service) newServer(
 		handler = newRateLimiter(s.cfg.PublicRateLimit).middleware(handler)
 	}
 	srv := &http.Server{
-		Addr:      address(port),
-		Handler:   handler,
-		Protocols: protocols,
-		// no body timeouts: they would cut grpc streams. Headers are enough against slow clients.
-		ReadHeaderTimeout: 10 * time.Second,
+		Addr:              address(port),
+		Handler:           handler,
+		Protocols:         protocols,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
 		IdleTimeout:       2 * time.Minute,
 	}
 	s.grpcs = append(s.grpcs, grpcServer)

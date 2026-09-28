@@ -213,6 +213,7 @@ type fakeApp struct {
 	started, stopped bool
 	cancelled        string
 	arkDown          bool
+	delay            time.Duration
 }
 
 func (f *fakeApp) Start() { f.started = true }
@@ -230,7 +231,11 @@ func (f *fakeApp) Status() application.Status {
 }
 func (f *fakeApp) CountActive(context.Context) (int64, error)        { return 5, nil }
 func (f *fakeApp) IntentFees(context.Context) (arkfee.Config, error) { return arkfee.Config{}, nil }
-func (f *fakeApp) Health(context.Context) map[string]error {
+func (f *fakeApp) Health(ctx context.Context) map[string]error {
+	select {
+	case <-time.After(f.delay):
+	case <-ctx.Done():
+	}
 	h := map[string]error{"database": nil, "ark": nil}
 	if f.arkDown {
 		h["ark"] = errors.New("down")
@@ -299,4 +304,16 @@ func do(t *testing.T, method, url string, tweak ...func(*http.Request)) (*http.R
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	return resp, string(body)
+}
+
+func TestGatewayOutlivesHeaderTimeout(t *testing.T) {
+	prev := readHeaderTimeout
+	readHeaderTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { readHeaderTimeout = prev })
+	_, admin, app := serveFake(t, "")
+	resp, _ := do(t, http.MethodGet, "http://"+admin+"/v1/info")
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	app.delay = 2 * readHeaderTimeout
+	resp, body := do(t, http.MethodGet, "http://"+admin+"/healthz")
+	require.Equal(t, http.StatusOK, resp.StatusCode, body)
 }
