@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -18,14 +19,15 @@ import (
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 	singlekeywallet "github.com/arkade-os/arkd/pkg/client-lib/identity/singlekey"
 	inmemorystore "github.com/arkade-os/arkd/pkg/client-lib/identity/singlekey/store/inmemory"
 	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
+	"github.com/arkade-os/arkd/pkg/client-lib/store"
 	"github.com/arkade-os/arkd/pkg/client-lib/types"
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/config"
 	"github.com/arkade-os/delegatee/internal/core/application"
-	arksdk "github.com/arkade-os/go-sdk"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	log "github.com/sirupsen/logrus"
@@ -129,10 +131,10 @@ func TestDelegateRenewal(t *testing.T) {
 	t.Logf("second renewal: %s", second.Outpoint.String())
 
 	// --- a vtxo carrying an asset is renewed with its asset intact
-	_, assetIDs, err := alice.IssueAsset(ctx, assetAmount, nil, nil)
+	issued, err := alice.IssueAsset(ctx, assetAmount, nil, nil)
 	require.NoError(t, err)
-	require.Len(t, assetIDs, 1)
-	assetID := assetIDs[0].String()
+	require.Len(t, issued.IssuedAssets, 1)
+	assetID := issued.IssuedAssets[0].String()
 	assetFundingTxid, err := alice.SendOffChain(ctx, []types.Receiver{{
 		To: address, Amount: delegateAmount, Assets: []types.Asset{{AssetId: assetID, Amount: assetAmount}},
 	}})
@@ -406,37 +408,77 @@ func waitForRenewedVtxo(
 	return found
 }
 
-func setupAlice(t *testing.T) (arksdk.Wallet, *btcec.PublicKey) {
+// testWallet returns txids the way the tests read them.
+type testWallet struct{ clientlib.Wallet }
+
+func (w testWallet) SendOffChain(ctx context.Context, receivers []types.Receiver) (string, error) {
+	// client-lib has no local view of its change and asks the indexer each time:
+	// right after a send the indexer may not show the change yet
+	var need uint64
+	for _, r := range receivers {
+		need += r.Amount
+	}
+	for deadline := time.Now().Add(15 * time.Second); ; time.Sleep(200 * time.Millisecond) {
+		spendable, _, err := w.ListVtxos(ctx)
+		if err != nil {
+			return "", err
+		}
+		var have uint64
+		for _, v := range spendable {
+			have += v.Amount
+		}
+		if have >= need || time.Now().After(deadline) {
+			break
+		}
+	}
+	// client-lib appends its change output to the slice it is given: a sub-slice
+	// with spare capacity would see its next element overwritten
+	res, err := w.Wallet.SendOffChain(ctx, slices.Clone(receivers))
+	if err != nil {
+		return "", err
+	}
+	return res.Txid, nil
+}
+
+func setupAlice(t *testing.T) (testWallet, *btcec.PublicKey) {
 	t.Helper()
 	ctx := t.Context()
 
-	store, err := inmemorystore.NewStore()
+	idStore, err := inmemorystore.NewStore()
 	require.NoError(t, err)
-	identity, err := singlekeywallet.NewIdentity(store)
+	identity, err := singlekeywallet.NewIdentity(idStore)
 	require.NoError(t, err)
 	privKey, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
 
-	wallet, err := arksdk.NewWallet(t.TempDir(), arksdk.WithIdentity(identity))
+	configStore, err := store.NewStore(store.Config{ConfigStoreType: types.InMemoryStore})
 	require.NoError(t, err)
-	t.Cleanup(wallet.Stop)
-	require.NoError(t, wallet.Init(
-		ctx, arkURL, hex.EncodeToString(privKey.Serialize()), password,
-		arksdk.WithExplorerURL(explorerURL),
-	))
+	wallet, err := clientlib.NewWallet(configStore, clientlib.WithIdentity(identity))
+	require.NoError(t, err)
+	require.NoError(t, wallet.Init(ctx, clientlib.InitArgs{
+		ServerUrl: arkURL, Seed: hex.EncodeToString(privKey.Serialize()), Password: password, ExplorerURL: explorerURL,
+	}))
 	require.NoError(t, wallet.Unlock(ctx, password))
-	synced := <-wallet.IsSynced(ctx)
-	require.NoError(t, synced.Err)
-	require.True(t, synced.Synced)
+	t.Cleanup(wallet.Stop)      // Stop panics on a wallet that never initialised
 	log.SetLevel(log.InfoLevel) // the sdk lowers the global level
-	return wallet, privKey.PubKey()
+	return testWallet{wallet}, privKey.PubKey()
 }
 
-func fundAndSettle(t *testing.T, wallet arksdk.Wallet, amount int64) {
+// onchainTotal counts boarding funds still inside their exit delay, like the old sdk did.
+func onchainTotal(b *clientlib.Balance) uint64 {
+	total := b.OnchainBalance.SpendableAmount
+	for _, l := range b.OnchainBalance.LockedAmount {
+		total += l.Amount
+	}
+	return total
+}
+
+func fundAndSettle(t *testing.T, wallet testWallet, amount int64) {
 	t.Helper()
 	ctx := t.Context()
-	boardingAddr, err := wallet.NewBoardingAddress(ctx)
+	_, _, boarding, err := wallet.Receive(ctx)
 	require.NoError(t, err)
+	boardingAddr := boarding.Address
 
 	amountBtc := strings.TrimSuffix(btcutil.Amount(amount).Format(btcutil.AmountBTC), " BTC")
 	out, err := exec.Command("nigiri", "faucet", boardingAddr, amountBtc).CombinedOutput()
@@ -444,7 +486,7 @@ func fundAndSettle(t *testing.T, wallet arksdk.Wallet, amount int64) {
 
 	require.Eventually(t, func() bool {
 		balance, err := wallet.Balance(ctx)
-		return err == nil && balance.OnchainBalance.Total > 0
+		return err == nil && onchainTotal(balance) > 0
 	}, 30*time.Second, 500*time.Millisecond, "boarding utxo not detected")
 
 	_, err = wallet.Settle(ctx)

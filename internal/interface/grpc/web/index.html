@@ -7,90 +7,132 @@
 <style>
 :root {
   color-scheme: light dark;
-  --paper: #f6f7f9; --surface: #ffffff; --ink: #14213d; --muted: #5f6b7e; --line: #dde1e8; --hover: #eef1f6; --current: #e3e9f6;
-  --ok: #1f7a55; --window: #a56a00; --window-a: #fff3d1; --window-b: #f7dc93; --bad: #b3261e; --track: #e6eaf2; --elapsed: rgba(20, 33, 61, .3);
-  --accent: #2346a0; --bar: #14213d; --bar-ink: #ffffff; --bar-muted: #c3cbe0;
-  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --paper: #f3f4f6; --surface: #ffffff; --ink: #1c2130; --muted: #667085; --faint: #98a2b3; --line: #e3e6eb; --hover: #f5f6f8; --current: #e9eefb;
+  --ok: #1e7a4e; --ok-soft: #e4f4ec; --window: #a86a00; --window-a: #fbf0d3; --window-b: #f3dc99; --bad: #b42318; --bad-soft: #fbe9e7;
+  --track: #e6e8ee; --elapsed: rgba(28, 33, 48, .28); --accent: #2c56c9; --accent-ink: #ffffff; --shadow: 0 12px 32px rgba(16, 24, 40, .18);
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 6px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #0e1524; --surface: #141d30; --ink: #e6eaf3; --muted: #94a0b8; --line: #27324a; --hover: #1a2439; --current: #22304f;
-    --ok: #5fd0a0; --window: #f0b94a; --window-a: #4a3a12; --window-b: #6b5318; --bad: #ff8a80; --track: #222c42; --elapsed: rgba(230, 234, 243, .28);
-    --accent: #8fb0ff; --bar: #0a101c; --bar-ink: #e6eaf3; --bar-muted: #94a0b8;
+    --paper: #0f141f; --surface: #161c2a; --ink: #e8ebf2; --muted: #98a2b8; --faint: #6b7590; --line: #27304a; --hover: #1c2436; --current: #24304f;
+    --ok: #5ccf9c; --ok-soft: #14301f; --window: #f0b94a; --window-a: #3e3213; --window-b: #5b4818; --bad: #ff8a80; --bad-soft: #3b1c1a;
+    --track: #232b3f; --elapsed: rgba(232, 235, 242, .26); --accent: #8fb0ff; --accent-ink: #0f141f; --shadow: 0 12px 32px rgba(0, 0, 0, .5);
   }
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--sans); }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.5 var(--sans); }
 button, input { font: inherit; color: inherit; }
-button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: .35rem .75rem; }
-button:hover { border-color: var(--ink); }
-button.danger { color: var(--bad); }
-button.danger:hover { border-color: var(--bad); }
-button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-button.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
+h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.25; }
+p { margin: 0; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.hash { font-family: var(--mono); font-size: .85em; word-break: break-all; }
+.hash { font-family: var(--mono); font-size: .86em; word-break: break-all; }
 .n { font-variant-numeric: tabular-nums; }
-kbd { font: .8em var(--mono); border: 1px solid var(--line); border-radius: 4px; padding: 0 .3rem; }
+kbd { font: .8em var(--mono); border: 1px solid var(--line); border-radius: 4px; padding: 0 .3rem; background: var(--surface); }
+[hidden] { display: none !important; }
 
-header { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center; padding: .7rem 1.25rem; background: var(--bar); color: var(--bar-ink); }
-header h1 { font-size: 1rem; margin: 0; font-weight: 650; }
-header h1 button { all: unset; cursor: pointer; }
-header .meta { color: var(--bar-muted); font-size: .85rem; display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; }
-header .meta button { background: none; border: 0; padding: 0; color: var(--bar-ink); text-decoration: underline dotted; }
-#health { margin-left: auto; font-size: .85rem; display: flex; align-items: center; gap: .4rem; }
-#health i, .pulse { width: .6rem; height: .6rem; border-radius: 50%; background: #8b94a8; display: inline-block; flex: none; }
-#health.ok i { background: #4cd49a; } #health.down i { background: #ff7a70; }
+/* buttons: one shape, three roles */
+button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: var(--r); padding: 0 .8rem; min-height: 2.25rem; font-weight: 500; transition: background .12s, border-color .12s, color .12s; }
+button:hover { background: var(--hover); border-color: var(--faint); }
+button:active { background: var(--current); }
+button:disabled { cursor: default; opacity: .55; }
+button:disabled:hover { background: var(--surface); border-color: var(--line); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+button.danger { color: var(--bad); }
+button.danger:hover { background: var(--bad-soft); border-color: var(--bad); }
+button.danger.solid { background: var(--bad); color: #fff; border-color: var(--bad); }
+button.danger.solid:hover { filter: brightness(1.08); background: var(--bad); }
+button.link { border: 0; background: none; padding: 0; min-height: 0; font-weight: inherit; color: var(--accent); text-decoration: underline; text-underline-offset: .15em; border-radius: 2px; }
+button.link:hover { background: none; color: var(--ink); }
+button[aria-busy=true] { pointer-events: none; opacity: .7; }
+button[aria-busy=true]::after { content: "…"; }
 
-/* what the scanner is doing, always visible */
-#status { display: flex; flex-wrap: wrap; gap: .25rem 2rem; padding: .55rem 1.25rem; background: var(--surface); border-bottom: 1px solid var(--line); font-size: .88rem; color: var(--muted); }
+/* header: identity and health, nothing else */
+header { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center; padding: .6rem clamp(1rem, 3vw, 2rem); background: var(--surface); border-bottom: 1px solid var(--line); }
+header h1 { font-size: 1rem; letter-spacing: -.01em; }
+header h1 button { all: unset; cursor: pointer; border-radius: 2px; }
+header h1 button:hover { color: var(--accent); }
+header .meta { color: var(--muted); font-size: .86rem; display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; }
+header .meta button { all: unset; cursor: pointer; color: var(--ink); font: .82rem var(--mono); text-decoration: underline dotted; text-underline-offset: .2em; border-radius: 2px; }
+header .meta button:hover { color: var(--accent); }
+#health { margin-left: auto; font-size: .86rem; color: var(--muted); display: flex; align-items: center; gap: .45rem; }
+#health i { width: .55rem; height: .55rem; border-radius: 50%; background: var(--faint); flex: none; }
+#health.ok i { background: var(--ok); } #health.down i { background: var(--bad); }
+#health.down { color: var(--bad); }
+
+/* status: three facts about the scanner, always visible */
+#status { display: flex; flex-wrap: wrap; padding: .35rem clamp(1rem, 3vw, 2rem); background: var(--surface); border-bottom: 1px solid var(--line); font-size: .86rem; color: var(--muted); min-height: 2.5rem; }
+#status > span { padding: .3rem 1.5rem .3rem 0; margin-right: 1.5rem; border-right: 1px solid var(--line); }
+#status > span:last-child { border-right: 0; margin-right: 0; }
 #status b { color: var(--ink); font-weight: 600; }
 #status .warn, #status .warn b { color: var(--bad); }
 #status .busy, #status .busy b { color: var(--window); }
-.pulse { background: var(--window); margin-right: .35rem; animation: pulse 1.4s ease-in-out infinite; }
+.pulse { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: var(--window); margin-right: .4rem; vertical-align: middle; animation: pulse 1.4s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .25; } }
-@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
 
-main { display: grid; grid-template-columns: minmax(20rem, 27rem) minmax(0, 1fr); min-height: calc(100vh - 6rem); }
+main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr); min-height: calc(100vh - 6rem); }
 #list { border-right: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-width: 0; max-height: calc(100vh - 6rem); position: sticky; top: 0; }
-.filters { display: flex; border-bottom: 1px solid var(--line); }
-.filters button { flex: 1; border: 0; border-radius: 0; border-bottom: 2px solid transparent; padding: .6rem .25rem; color: var(--muted); font-size: .85rem; background: none; }
-.filters button[aria-pressed=true] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
-.filters .alert .n { color: var(--bad); }
-#search { margin: .6rem; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
+.filters { display: flex; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.filters button { flex: 1; border: 0; border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: .65rem .5rem; min-height: 0; color: var(--muted); font-size: .86rem; font-weight: 500; background: none; white-space: nowrap; }
+.filters button:hover { background: var(--hover); color: var(--ink); }
+.filters button[aria-pressed=true] { color: var(--ink); border-bottom-color: var(--ink); }
+.filters .n { color: var(--faint); margin-left: .15rem; }
+.filters .alert .n { color: var(--bad); font-weight: 600; }
+.filters button[aria-pressed=true] .n { color: var(--muted); }
+#search { margin: .6rem .75rem; padding: .5rem .7rem; min-height: 2.25rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
+#search:focus { background: var(--surface); border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 #rows { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
-#rows li button { display: grid; grid-template-columns: .6rem minmax(0, 1fr) auto; gap: .1rem .6rem; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: .55rem .8rem; background: none; }
+#rows li button { display: grid; grid-template-columns: .6rem minmax(0, 1fr) auto; gap: .1rem .6rem; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: .6rem .75rem .6rem .9rem; min-height: 0; font-weight: 400; background: none; box-shadow: inset 3px 0 0 transparent; }
 #rows li button:hover { background: var(--hover); }
-#rows li button[aria-current=true] { background: var(--current); }
+#rows li button[aria-current=true] { background: var(--current); box-shadow: inset 3px 0 0 var(--accent); }
+#rows li button:focus-visible { outline-offset: -2px; }
 .dot { width: .55rem; height: .55rem; border-radius: 50%; align-self: center; background: var(--line); }
-.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); } .dot.late { background: var(--window); } .dot.off { background: none; border: 1px solid var(--muted); }
+.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); } .dot.late { background: var(--window); } .dot.off { background: none; border: 1px solid var(--faint); }
 #rows .when, #rows .sub { color: var(--muted); font-size: .8rem; white-space: nowrap; }
 #rows .sub { grid-column: 2 / 4; overflow: hidden; text-overflow: ellipsis; }
 #rows .sub.bad { color: var(--bad); } #rows .sub.late { color: var(--window); }
-.empty { padding: 1.5rem 1.25rem; color: var(--muted); max-width: 36rem; }
-#hint { padding: .4rem .8rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .78rem; }
+.empty { padding: 1.25rem 1rem; color: var(--muted); max-width: 36rem; line-height: 1.55; }
+#hint { padding: .45rem .9rem; border-top: 1px solid var(--line); color: var(--faint); font-size: .78rem; }
 
+/* skeletons: shown until data lands, and again while an address loads */
+.sk { display: block; height: .8em; border-radius: 3px; background: var(--track); animation: sk 1.2s ease-in-out infinite; }
+@keyframes sk { 50% { opacity: .45; } }
+#rows li.sk-row { display: grid; grid-template-columns: .6rem 1fr auto; gap: .35rem .6rem; align-items: center; padding: .8rem .75rem .8rem .9rem; border-bottom: 1px solid var(--line); }
+#rows li.sk-row .sk:first-child { width: .55rem; height: .55rem; border-radius: 50%; }
+#rows li.sk-row .sk:last-child { width: 4rem; }
+#rows li.sk-row .sk:nth-child(4) { grid-column: 2 / 4; width: 60%; }
+#detail[aria-busy=true] { opacity: .85; }
+.sk-detail .sk { margin: .6rem 0; }
+@media (prefers-reduced-motion: reduce) { .pulse, .sk { animation: none; } button { transition: none; } }
+
+/* detail */
 #detail { padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 3rem; min-width: 0; }
-#detail h2 { font-size: 1.05rem; margin: 0 0 .25rem; font-weight: 600; }
-#detail h3 { font-size: .95rem; margin: 2rem 0 .5rem; font-weight: 600; }
-#detail h3 + p { margin: 0 0 .75rem; color: var(--muted); font-size: .9rem; max-width: 44rem; }
-.title { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-start; justify-content: space-between; }
-.title .hash { font-size: .95rem; max-width: 46rem; }
+#detail h2 { font-size: 1.2rem; letter-spacing: -.01em; display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+#detail h3 { font-size: .95rem; margin: 2.25rem 0 .6rem; }
+#detail h3 + p { margin: 0 0 .9rem; color: var(--muted); max-width: 44rem; }
+.title { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; align-items: flex-start; justify-content: space-between; }
+.title .hash { margin-top: .3rem; font-size: .9rem; max-width: 46rem; color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.facts { display: flex; flex-wrap: wrap; gap: .4rem 2rem; margin: .75rem 0 0; color: var(--muted); font-size: .9rem; }
-.facts b { color: var(--ink); font-weight: 600; }
-.badge { border-radius: 99px; padding: .05rem .55rem; font-size: .8rem; border: 1px solid currentColor; font-weight: 400; }
-.badge.ok { color: var(--ok); } .badge.off { color: var(--muted); } .badge.bad { color: var(--bad); }
-.note { border-left: 3px solid var(--bad); padding: .5rem .9rem; margin: 1rem 0 0; background: var(--surface); max-width: 46rem; font-size: .9rem; }
-.note.info { border-left-color: var(--line); color: var(--muted); }
-details { margin-top: 1.5rem; font-size: .88rem; } details summary { cursor: pointer; color: var(--muted); } details .hash { display: block; margin: .4rem 0; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, max-content)); gap: .75rem 2.5rem; margin: 1.25rem 0 0; padding: .9rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.facts div { display: flex; flex-direction: column; gap: .1rem; }
+.facts dt { color: var(--muted); font-size: .8rem; }
+.facts dd { margin: 0; font-weight: 600; }
+.badge { display: inline-flex; align-items: center; gap: .4rem; border-radius: 99px; padding: .1rem .65rem .1rem .5rem; font-size: .78rem; font-weight: 500; border: 1px solid var(--line); color: var(--muted); }
+.badge::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--faint); }
+.badge.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; } .badge.ok::before { background: var(--ok); }
+.badge.bad { color: var(--bad); background: var(--bad-soft); border-color: transparent; } .badge.bad::before { background: var(--bad); }
+.note { border-left: 3px solid var(--bad); padding: .6rem .9rem; margin: 1rem 0 0; background: var(--bad-soft); border-radius: 0 var(--r) var(--r) 0; max-width: 46rem; }
+.note.info { border-left-color: var(--faint); background: var(--surface); color: var(--muted); }
+details { margin-top: 2rem; font-size: .88rem; } details summary { cursor: pointer; color: var(--muted); } details summary:hover { color: var(--ink); } details .hash { display: block; margin: .4rem 0; }
 
 /* the lifetime bar: birth to expiry, renewal window hatched at the end, a marker for now */
-.vtxo { padding: .75rem 0; border-bottom: 1px solid var(--line); }
+.vtxo { padding: .8rem 0; border-bottom: 1px solid var(--line); }
 .vtxo .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; }
 .vtxo .amount { font-weight: 600; }
-.life { position: relative; height: .7rem; margin: .5rem 0 .3rem; background: var(--track); border-radius: 3px; overflow: hidden; }
+.life { position: relative; height: .7rem; margin: .55rem 0 .35rem; background: var(--track); border-radius: 3px; overflow: hidden; }
 .life .elapsed { position: absolute; inset: 0 auto 0 0; background: var(--elapsed); z-index: 1; }
 .life .window { position: absolute; inset: 0 0 0 auto; background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
 .life .now { position: absolute; z-index: 2; top: 0; bottom: 0; width: 2px; background: var(--ink); }
@@ -98,34 +140,42 @@ details { margin-top: 1.5rem; font-size: .88rem; } details summary { cursor: poi
 .state.in { color: var(--window); font-weight: 600; } .state.late { color: var(--bad); font-weight: 600; }
 
 /* overview: every address on one time axis, from now to the furthest expiry */
-.horizon { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto; gap: .35rem 1rem; align-items: center; font-size: .85rem; }
-.horizon button { all: unset; font: .85em var(--mono); cursor: pointer; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.horizon { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto; gap: .5rem 1rem; align-items: center; font-size: .86rem; }
+.horizon button { all: unset; font: .86em var(--mono); cursor: pointer; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 2px; }
+.horizon button:hover { color: var(--ink); text-decoration: underline; }
 .horizon button:focus-visible { outline: 2px solid var(--accent); }
-.horizon .lane { display: flex; height: .6rem; background: var(--track); border-radius: 3px; overflow: hidden; }
+.horizon .lane { display: flex; height: .7rem; background: var(--track); border-radius: 3px; overflow: hidden; }
 .horizon .lane .left { background: var(--elapsed); }
 .horizon .lane .window { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
 .horizon .t { color: var(--muted); white-space: nowrap; text-align: right; }
 .horizon .t.in { color: var(--window); font-weight: 600; } .horizon .t.late { color: var(--bad); font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: .3rem 1.25rem; margin: .75rem 0 0; color: var(--muted); font-size: .8rem; }
+.legend i { display: inline-block; width: 1.1rem; height: .55rem; border-radius: 2px; vertical-align: middle; margin-right: .35rem; background: var(--elapsed); }
+.legend i.w { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
 
 table { border-collapse: collapse; width: 100%; font-size: .88rem; }
-th { text-align: left; font-weight: 600; color: var(--muted); padding: .35rem .75rem .35rem 0; border-bottom: 1px solid var(--line); }
-td { padding: .45rem .75rem .45rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
-td.res { white-space: nowrap; } td.res.ok { color: var(--ok); } td.res.bad { color: var(--bad); }
+th { text-align: left; font-weight: 500; color: var(--muted); font-size: .8rem; padding: .35rem .75rem .45rem 0; border-bottom: 1px solid var(--line); }
+td { padding: .5rem .75rem .5rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td:first-child, td.hash { white-space: nowrap; word-break: normal; }
+td.res { white-space: nowrap; font-weight: 500; } td.res.ok { color: var(--ok); } td.res.bad { color: var(--bad); }
 .scroll { overflow-x: auto; }
 
-dialog { border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem 1.5rem; max-width: 30rem; color: var(--ink); background: var(--surface); }
-dialog::backdrop { background: rgba(10, 16, 28, .55); }
-dialog h2 { font-size: 1.05rem; margin: 0; }
-dialog p { margin: .5rem 0 1.25rem; color: var(--muted); }
+dialog { border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem 1.5rem 1.5rem; width: min(30rem, calc(100vw - 2rem)); color: var(--ink); background: var(--surface); box-shadow: var(--shadow); }
+dialog::backdrop { background: rgba(10, 16, 28, .5); }
+dialog h2 { font-size: 1.05rem; }
+dialog p { margin: .6rem 0 1.5rem; color: var(--muted); }
 dialog .actions { justify-content: flex-end; }
-#toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: .5rem 1rem; border-radius: 6px; font-size: .9rem; z-index: 10; }
+#toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: .55rem 1rem; border-radius: var(--r); font-size: .88rem; z-index: 10; box-shadow: var(--shadow); max-width: calc(100vw - 2rem); }
 #toast.bad { background: var(--bad); color: #fff; }
 
 @media (max-width: 800px) {
-  main { grid-template-columns: minmax(0, 1fr); }
+  main { grid-template-columns: minmax(0, 1fr); min-height: 0; }
   #health { margin-left: 0; }
-  #list { border-right: 0; position: static; max-height: 45vh; }
+  #status > span { border-right: 0; margin-right: 0; padding-right: 0; width: 100%; }
+  #list { border-right: 0; border-bottom: 1px solid var(--line); position: static; max-height: 45vh; }
+  #rows li button { padding-top: .75rem; padding-bottom: .75rem; }
   #hint { display: none; }
+  .facts { grid-template-columns: 1fr 1fr; }
 }
 </style>
 </head>
@@ -135,22 +185,22 @@ dialog .actions { justify-content: flex-end; }
   <div class="meta" id="meta"></div>
   <div id="health" role="status"><i></i><span>checking…</span></div>
 </header>
-<div id="status" role="status"></div>
+<div id="status" role="status"><span><i class="sk" style="width:12rem"></i></span></div>
 <main>
   <section id="list" aria-label="Delegations">
     <div class="filters" id="filters"></div>
     <input id="search" type="search" placeholder="Find an address" aria-label="Find an address">
-    <ul id="rows"></ul>
+    <ul id="rows"><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li></ul>
     <div id="hint"><kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>/</kbd> find, <kbd>Esc</kbd> overview</div>
   </section>
-  <section id="detail" aria-live="polite"></section>
+  <section id="detail" aria-live="polite" aria-busy="true"></section>
 </main>
-<dialog id="confirm">
-  <h2>Stop renewing this address?</h2>
+<dialog id="confirm" aria-labelledby="confirm-title">
+  <h2 id="confirm-title">Stop renewing this address?</h2>
   <p id="confirm-text"></p>
-  <div class="actions"><button value="no">Keep renewing</button><button class="danger" id="confirm-yes">Stop renewing</button></div>
+  <div class="actions"><button value="no">Keep renewing</button><button class="danger solid" id="confirm-yes">Stop renewing</button></div>
 </dialog>
-<div id="toast" hidden></div>
+<div id="toast" role="status" hidden></div>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -158,6 +208,8 @@ const short = (s, n = 10) => (s.length > 2 * n + 1 ? s.slice(0, n) + "…" + s.s
 const num = (v) => Number(v || 0); // the gateway encodes int64 as strings
 const sats = (v) => num(v).toLocaleString() + " sats";
 const nowSecs = () => Date.now() / 1000;
+const charges = (program) => Boolean(program) && Number(program) !== 0; // "0.0" is a fee program too
+const skeleton = (n) => `<div class="sk-detail" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<i class="sk" style="width:${[55, 90, 40, 70, 30][i % 5]}%"></i>`).join("")}</div>`;
 
 let delegations = [], status = null, filter = null, selected = location.hash.slice(1), detail = null;
 
@@ -243,7 +295,7 @@ function renderStatus() {
   const stale = !busy && last > 0 && nowSecs() - last > Math.max(3 * poll, 30);
   const active = delegations.filter((d) => d.status === "active" && d.managed);
   const total = active.reduce((a, d) => a + num(d.totalAmount), 0), vtxos = active.reduce((a, d) => a + num(d.vtxoCount), 0);
-  const fees = status.intentFees, charged = fees && Object.values(fees).some(Boolean);
+  const fees = status.intentFees, charged = fees && Object.values(fees).some(charges);
   $("status").innerHTML = [
     busy ? `<span class="busy"><i class="pulse"></i>Renewing <b>${status.renewingVtxos}</b> VTXO${status.renewingVtxos > 1 ? "s" : ""} in a batch now, scans resume after</span>`
       : !last ? `<span>First scan pending</span>`
@@ -302,14 +354,15 @@ function renderOverview() {
       <span class="t n ${cls}">${left <= 0 ? "expired" : st.key === "bad" ? "not renewing, " + span(left) + " left" : left <= win ? "renewable now, " + span(left) + " left" : "renewable " + ago(d.nextRenewalAt)}</span>`;
   }).join("");
 
-  const f = status?.intentFees, rows = f && [["each VTXO renewed", f.offchainInput], ["each output created", f.offchainOutput]].filter((r) => r[1]);
+  const f = status?.intentFees, rows = f && [["each VTXO renewed", f.offchainInput], ["each output created", f.offchainOutput]].filter((r) => charges(r[1]));
   const strangers = delegations.filter(foreign).length;
+  $("detail").removeAttribute("aria-busy");
   $("detail").innerHTML = `
     <h2>Overview</h2>
     ${strangers ? `<p class="note"><b>${strangers}</b> active delegation${strangers > 1 ? "s were" : " was"} registered under another secret key and cannot be renewed by this instance. If the key was rotated by mistake, restore the previous key in the configured keyring.</p>` : ""}
     <h3>Next to expire</h3>
-    <p>Each bar runs from now to the address's earliest expiry; the hatched end is when it can be renewed. A bar that is all hatch is renewable now.</p>
-    ${shown.length ? `<div class="horizon">${lanes}</div>${held.length > shown.length ? `<p class="state">and ${held.length - shown.length} more, later</p>` : ""}`
+    <p>Each bar runs from now to the address's earliest expiry. The hatched end is when it can be renewed; a bar that is all hatch is renewable now.</p>
+    ${shown.length ? `<div class="horizon">${lanes}</div><p class="legend"><span><i></i>waiting</span><span><i class="w"></i>renewal window</span></p>${held.length > shown.length ? `<p class="state">and ${held.length - shown.length} more, later</p>` : ""}`
       : `<p class="empty">No VTXO is being watched yet. They show up here after the next scan once coins sit at a registered address.</p>`}
     <h3>What arkd charges</h3>
     ${!f ? `<p>Unknown: arkd is unreachable.</p>`
@@ -320,13 +373,21 @@ function renderOverview() {
 }
 
 async function loadDetail() {
-  if (!selected) { detail = null; return status && renderOverview(); }
+  if (!selected) { detail = null; $("detail").removeAttribute("aria-busy"); return status && renderOverview(); }
+  const address = selected;
+  if (detail?.delegation.address !== address) {
+    $("detail").setAttribute("aria-busy", "true");
+    $("detail").innerHTML = `<h2 class="hash" style="font-size:.95rem;color:var(--muted)">${esc(short(address, 12))}</h2>${skeleton(5)}`;
+  }
   try {
-    detail = await api("/v1/delegate/" + encodeURIComponent(selected));
+    detail = await api("/v1/delegate/" + encodeURIComponent(address));
   } catch (e) {
-    $("detail").innerHTML = `<p class="empty">Could not load ${esc(short(selected, 12))}: ${esc(e.message)}. <button class="link" id="home2">Back to the overview</button></p>`;
+    $("detail").removeAttribute("aria-busy");
+    $("detail").innerHTML = `<p class="empty">Could not load ${esc(short(address, 12))}: ${esc(e.message)}. <button class="link" id="home2">Back to the overview</button></p>`;
     return;
   }
+  if (address !== selected) return; // the operator moved on while this was loading
+  $("detail").removeAttribute("aria-busy");
   renderDetail();
 }
 
@@ -355,9 +416,9 @@ function renderDetail() {
       <div class="actions"><button data-copy="${esc(d.address)}">Copy address</button>
         ${active ? `<button class="danger" id="stop">Stop renewing</button>` : `<button class="primary" id="resume">Resume renewing</button>`}</div>
     </div>
-    <div class="facts"><span>renewable <b>${span(windowSecs)}</b> before expiry</span>
-      <span>pays up to <b class="n">${sats(d.maxFee)}</b> of arkd fee per renewal</span>
-      <span>registered <b>${ago(d.createdAt)}</b></span></div>
+    <dl class="facts"><div><dt>Renewable</dt><dd>${span(windowSecs)} before expiry</dd></div>
+      <div><dt>Pays per renewal</dt><dd class="n">${num(d.maxFee) ? "up to " + sats(d.maxFee) : "nothing"}</dd></div>
+      <div><dt>Registered</dt><dd>${ago(d.createdAt)}</dd></div></dl>
     ${st?.why && active ? `<p class="note">${esc(st.why)}</p>` : ""}
     ${active && num(d.maxFee) > 0 && life && windowSecs > life / 2 ? `<p class="note info">The renewal window (${span(windowSecs)}) is more than half the VTXO lifetime (${span(life)}). Because this delegation can pay fees, it is only renewed in the second half of a VTXO's life, so it doesn't pay in every round.</p>` : ""}
     <h3>VTXOs at this address</h3>
@@ -379,6 +440,7 @@ function renderDetail() {
 
 async function setRenewing(on) {
   const d = detail.delegation;
+  $("detail").querySelector("#stop, #resume")?.setAttribute("aria-busy", "true");
   try {
     if (on) {
       await api("/v1/delegate", { method: "POST", headers: { "Content-Type": "application/json" },

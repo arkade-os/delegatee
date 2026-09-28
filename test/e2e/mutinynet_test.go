@@ -14,14 +14,15 @@ import (
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 	singlekeywallet "github.com/arkade-os/arkd/pkg/client-lib/identity/singlekey"
 	inmemorystore "github.com/arkade-os/arkd/pkg/client-lib/identity/singlekey/store/inmemory"
 	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
 	grpcindexer "github.com/arkade-os/arkd/pkg/client-lib/indexer/grpc"
+	"github.com/arkade-os/arkd/pkg/client-lib/store"
 	"github.com/arkade-os/arkd/pkg/client-lib/types"
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/core/application"
-	arksdk "github.com/arkade-os/go-sdk"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -106,32 +107,34 @@ func TestLiveDelegatee(t *testing.T) {
 		privKey, _ = btcec.PrivKeyFromBytes(raw)
 	}
 	t.Logf("WALLET_KEY=%x", privKey.Serialize())
-	store, err := inmemorystore.NewStore()
+	idStore, err := inmemorystore.NewStore()
 	require.NoError(t, err)
-	identity, err := singlekeywallet.NewIdentity(store)
+	identity, err := singlekeywallet.NewIdentity(idStore)
 	require.NoError(t, err)
-	wallet, err := arksdk.NewWallet(t.TempDir(), arksdk.WithIdentity(identity))
+	configStore, err := store.NewStore(store.Config{ConfigStoreType: types.InMemoryStore})
 	require.NoError(t, err)
-	t.Cleanup(wallet.Stop)
-	require.NoError(t, wallet.Init(ctx, arkURL, hex.EncodeToString(privKey.Serialize()), password))
-	require.NoError(t, wallet.Unlock(ctx, password))
-	synced := <-wallet.IsSynced(ctx)
-	require.NoError(t, synced.Err)
+	w, err := clientlib.NewWallet(configStore, clientlib.WithIdentity(identity))
+	require.NoError(t, err)
+	require.NoError(t, w.Init(ctx, clientlib.InitArgs{
+		ServerUrl: arkURL, Seed: hex.EncodeToString(privKey.Serialize()), Password: password,
+		ExplorerURL: "https://mempool.mutinynet.arkade.sh/api",
+	}))
+	require.NoError(t, w.Unlock(ctx, password))
+	t.Cleanup(w.Stop) // Stop panics on a wallet that never initialised
+	wallet := testWallet{w}
 
 	balance, err := wallet.Balance(ctx)
 	require.NoError(t, err)
 	if balance.OffchainBalance.Total == 0 {
-		if balance.OnchainBalance.Total == 0 {
-			offchain, err := wallet.NewOffchainAddress(ctx)
-			require.NoError(t, err)
-			boarding, err := wallet.NewBoardingAddress(ctx)
+		if onchainTotal(balance) == 0 {
+			_, offchain, boarding, err := wallet.Receive(ctx)
 			require.NoError(t, err)
 			fmt.Printf("\n>>> fund the wallet, checking every 10s:\n"+
 				"    offchain: %s  (e.g. curl -X POST https://faucet.mutinynet.arkade.sh/faucet -d '{\"address\":\"%s\",\"amount\":50000}')\n"+
-				"    onchain:  %s  (e.g. https://faucet.mutinynet.com)\n\n", offchain, offchain, boarding)
+				"    onchain:  %s  (e.g. https://faucet.mutinynet.com)\n\n", offchain.Address, offchain.Address, boarding.Address)
 			require.Eventually(t, func() bool {
 				b, err := wallet.Balance(ctx)
-				return err == nil && (b.OnchainBalance.Total > 0 || b.OffchainBalance.Total > 0)
+				return err == nil && (onchainTotal(b) > 0 || b.OffchainBalance.Total > 0)
 			}, 20*time.Minute, 10*time.Second, "funds never arrived")
 			balance, err = wallet.Balance(ctx)
 			require.NoError(t, err)

@@ -67,9 +67,9 @@ func TestIntentFees(t *testing.T) {
 	// a second delegation that pays fees holds an asset: the fee covenant
 	// tunnels script and assets but not the value, unlike the zero-fee one
 	withAsset := register(200)
-	_, assetIDs, err := alice.IssueAsset(ctx, assetAmount, nil, nil)
+	issued, err := alice.IssueAsset(ctx, assetAmount, nil, nil)
 	require.NoError(t, err)
-	assetID := assetIDs[0].String()
+	assetID := issued.IssuedAssets[0].String()
 	_, err = alice.SendOffChain(ctx, []types.Receiver{{
 		To: withAsset.address, Amount: delegateAmount, Assets: []types.Asset{{AssetId: assetID, Amount: assetAmount}},
 	}})

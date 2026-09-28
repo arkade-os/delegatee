@@ -38,7 +38,7 @@ func TestCollectionDeadline(t *testing.T) {
 	paid.vtxo.CreatedAt = now.Add(-10 * time.Minute)
 	paid.vtxo.ExpiresAt = now.Add(10 * time.Minute)
 	// The fee-paying VTXO is only eligible halfway through its lifetime.
-	paid.delegation.Params.RenewalWindow = 3600
+	paid.delegation.RenewalWindow = 3600
 	require.Equal(t, now.Add(5*time.Minute), s.collectionDeadline([]renewalInput{paid}, now))
 
 	s.maxVtxosPerIntent = 2
