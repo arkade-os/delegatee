@@ -23,7 +23,7 @@
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.5 var(--sans); }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
 button, input { font: inherit; color: inherit; }
 h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.25; }
 p { margin: 0; }
@@ -52,7 +52,7 @@ button[aria-busy=true]::after { content: "…"; }
 
 /* header: identity and health, nothing else */
 header { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center; padding: .6rem clamp(1rem, 3vw, 2rem); background: var(--surface); border-bottom: 1px solid var(--line); }
-header h1 { font-size: 1rem; letter-spacing: -.01em; }
+header h1 { font-size: 1.05rem; letter-spacing: -.02em; }
 header h1 button { all: unset; cursor: pointer; border-radius: 2px; }
 header h1 button:hover { color: var(--accent); }
 header .meta { color: var(--muted); font-size: .86rem; display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; }
@@ -85,7 +85,7 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 #search { margin: .6rem .75rem; padding: .5rem .7rem; min-height: 2.25rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
 #search:focus { background: var(--surface); border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 #rows { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
-#rows li button { display: grid; grid-template-columns: .6rem minmax(0, 1fr) auto; gap: .1rem .6rem; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: .6rem .75rem .6rem .9rem; min-height: 0; font-weight: 400; background: none; box-shadow: inset 3px 0 0 transparent; }
+#rows li button { display: grid; grid-template-columns: .6rem minmax(0, 1fr) auto; gap: .15rem .65rem; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: .7rem .85rem .7rem .95rem; min-height: 0; font-weight: 400; background: none; box-shadow: inset 3px 0 0 transparent; }
 #rows li button:hover { background: var(--hover); }
 #rows li button[aria-current=true] { background: var(--current); box-shadow: inset 3px 0 0 var(--accent); }
 #rows li button:focus-visible { outline-offset: -2px; }
@@ -109,33 +109,38 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 @media (prefers-reduced-motion: reduce) { .pulse, .sk { animation: none; } button { transition: none; } }
 
 /* detail */
-#detail { padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 3rem; min-width: 0; }
-#detail h2 { font-size: 1.2rem; letter-spacing: -.01em; display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
-#detail h3 { font-size: .95rem; margin: 2.25rem 0 .6rem; }
-#detail h3 + p { margin: 0 0 .9rem; color: var(--muted); max-width: 44rem; }
+#detail { padding: 1.75rem clamp(1rem, 3vw, 2.5rem) 4rem; min-width: 0; max-width: 78rem; }
+#detail h2 { font-size: 1.35rem; letter-spacing: -.02em; display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; }
+#detail h3 { font-size: 1rem; margin: 2.75rem 0 .5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+#detail h3:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+#detail h3 + p { margin: 0 0 1rem; color: var(--muted); max-width: 44rem; }
+#detail .empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 1.25rem; }
 .title { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; align-items: flex-start; justify-content: space-between; }
 .title .hash { margin-top: .3rem; font-size: .9rem; max-width: 46rem; color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, max-content)); gap: .75rem 2.5rem; margin: 1.25rem 0 0; padding: .9rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, max-content)); gap: .75rem 3rem; margin: 1.5rem 0 0; padding: 1rem 0; border-top: 1px solid var(--line); }
 .facts div { display: flex; flex-direction: column; gap: .1rem; }
 .facts dt { color: var(--muted); font-size: .8rem; }
-.facts dd { margin: 0; font-weight: 600; }
+.facts dd { margin: 0; font-weight: 600; font-size: 1.02rem; }
 .badge { display: inline-flex; align-items: center; gap: .4rem; border-radius: 99px; padding: .1rem .65rem .1rem .5rem; font-size: .78rem; font-weight: 500; border: 1px solid var(--line); color: var(--muted); }
 .badge::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--faint); }
 .badge.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; } .badge.ok::before { background: var(--ok); }
 .badge.bad { color: var(--bad); background: var(--bad-soft); border-color: transparent; } .badge.bad::before { background: var(--bad); }
+.badge.late { color: var(--window); background: var(--window-a); border-color: transparent; } .badge.late::before { background: var(--window); }
 .note { border-left: 3px solid var(--bad); padding: .6rem .9rem; margin: 1rem 0 0; background: var(--bad-soft); border-radius: 0 var(--r) var(--r) 0; max-width: 46rem; }
 .note.info { border-left-color: var(--faint); background: var(--surface); color: var(--muted); }
-details { margin-top: 2rem; font-size: .88rem; } details summary { cursor: pointer; color: var(--muted); } details summary:hover { color: var(--ink); } details .hash { display: block; margin: .4rem 0; }
+.paths { list-style: none; margin: 0; padding: 0; max-width: 46rem; }
+.paths li { display: flex; justify-content: space-between; gap: 1rem; padding: .5rem 0; border-bottom: 1px solid var(--line); } .paths li:last-child { border-bottom: 0; }
+.paths .words { font-family: var(--mono); font-size: .86em; }
 
 /* the lifetime bar: birth to expiry, renewal window hatched at the end, a marker for now */
-.vtxo { padding: .8rem 0; border-bottom: 1px solid var(--line); }
+.vtxo { padding: .9rem 0; border-bottom: 1px solid var(--line); } .vtxo:last-of-type { border-bottom: 0; }
 .vtxo .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; }
 .vtxo .amount { font-weight: 600; }
-.life { position: relative; height: .7rem; margin: .55rem 0 .35rem; background: var(--track); border-radius: 3px; overflow: hidden; }
-.life .elapsed { position: absolute; inset: 0 auto 0 0; background: var(--elapsed); z-index: 1; }
-.life .window { position: absolute; inset: 0 0 0 auto; background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
-.life .now { position: absolute; z-index: 2; top: 0; bottom: 0; width: 2px; background: var(--ink); }
+.life { position: relative; height: .8rem; margin: .6rem 0 .4rem; background: var(--track); border-radius: 4px; }
+.life .elapsed { position: absolute; inset: 0 auto 0 0; background: var(--elapsed); z-index: 1; border-radius: 4px 0 0 4px; }
+.life .window { position: absolute; inset: 0 0 0 auto; background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); border-radius: 0 4px 4px 0; }
+.life .now { position: absolute; z-index: 2; top: -3px; bottom: -3px; width: 2px; background: var(--ink); border-radius: 1px; }
 .state { font-size: .82rem; color: var(--muted); }
 .state.in { color: var(--window); font-weight: 600; } .state.late { color: var(--bad); font-weight: 600; }
 
@@ -144,9 +149,13 @@ details { margin-top: 2rem; font-size: .88rem; } details summary { cursor: point
 .horizon button { all: unset; font: .86em var(--mono); cursor: pointer; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 2px; }
 .horizon button:hover { color: var(--ink); text-decoration: underline; }
 .horizon button:focus-visible { outline: 2px solid var(--accent); }
-.horizon .lane { display: flex; height: .7rem; background: var(--track); border-radius: 3px; overflow: hidden; }
+.horizon .lane { display: flex; height: .8rem; background: var(--track); border-radius: 4px; overflow: hidden; }
 .horizon .lane .left { background: var(--elapsed); }
 .horizon .lane .window { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
+.horizon .lane.late { background: var(--bad-soft); box-shadow: inset 3px 0 0 var(--bad); }
+.horizon .lane .window, .life .window { min-width: 3px; }
+.horizon .axis { position: relative; height: 1.4rem; border-top: 1px solid var(--line); margin-top: .1rem; font-size: .74rem; color: var(--faint); }
+.horizon .axis i { position: absolute; top: 0; padding: .2rem 0 0 .3rem; border-left: 1px solid var(--line); font-style: normal; white-space: nowrap; }
 .horizon .t { color: var(--muted); white-space: nowrap; text-align: right; }
 .horizon .t.in { color: var(--window); font-weight: 600; } .horizon .t.late { color: var(--bad); font-weight: 600; }
 .legend { display: flex; flex-wrap: wrap; gap: .3rem 1.25rem; margin: .75rem 0 0; color: var(--muted); font-size: .8rem; }
@@ -155,7 +164,8 @@ details { margin-top: 2rem; font-size: .88rem; } details summary { cursor: point
 
 table { border-collapse: collapse; width: 100%; font-size: .88rem; }
 th { text-align: left; font-weight: 500; color: var(--muted); font-size: .8rem; padding: .35rem .75rem .45rem 0; border-bottom: 1px solid var(--line); }
-td { padding: .5rem .75rem .5rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td { padding: .55rem .75rem .55rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:hover td { background: var(--hover); }
 td:first-child, td.hash { white-space: nowrap; word-break: normal; }
 td.res { white-space: nowrap; font-weight: 500; } td.res.ok { color: var(--ok); } td.res.bad { color: var(--bad); }
 .scroll { overflow-x: auto; }
@@ -211,7 +221,31 @@ const nowSecs = () => Date.now() / 1000;
 const charges = (program) => Boolean(program) && Number(program) !== 0; // "0.0" is a fee program too
 const skeleton = (n) => `<div class="sk-detail" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<i class="sk" style="width:${[55, 90, 40, 70, 30][i % 5]}%"></i>`).join("")}</div>`;
 
-let delegations = [], status = null, filter = null, selected = location.hash.slice(1), detail = null;
+let delegations = [], status = null, filter = null, selected = location.hash.slice(1), detail = null, allVtxos = false, info = null;
+
+// --- tapscripts as words: who signs, and after what time
+const OPS = { 0x75: "DROP", 0x87: "EQUAL", 0x88: "EQUALVERIFY", 0xa8: "SHA256", 0xa9: "HASH160", 0xac: "CHECKSIG", 0xad: "CHECKSIGVERIFY",
+  0xae: "CHECKMULTISIG", 0xb1: "CHECKLOCKTIMEVERIFY", 0xb2: "CHECKSEQUENCEVERIFY", 0xba: "CHECKSIGADD" };
+function keyName(x) { // x-only key against the keys arkd told us about
+  const known = info ? [["server", info.serverPubkey], ["emulator", info.emulatorTweakedPubkey], ["emulator key", info.emulatorPubkey], ["delegatee", info.delegatePubkey]] : [];
+  return known.find(([, k]) => k && k.slice(-64) === x)?.[0] ?? (detail?.delegation ? "owner" : short(x, 6));
+}
+function scriptWords(hex) {
+  const b = Uint8Array.from(hex.match(/../g) ?? [], (h) => parseInt(h, 16)), out = [];
+  for (let i = 0; i < b.length;) {
+    const op = b[i++];
+    let n = op > 0 && op <= 0x4b ? op : op === 0x4c ? b[i++] : op === 0x4d ? b[i] | (b[i + 1] << 8) : -1;
+    if (op === 0x4d) i += 2;
+    if (n < 0) { out.push(op === 0 ? "0" : op >= 0x51 && op <= 0x60 ? String(op - 0x50) : OPS[op] ?? "OP_" + op.toString(16)); continue; }
+    const data = Array.from(b.slice(i, i + n), (x) => x.toString(16).padStart(2, "0")).join(""); i += n;
+    if (n === 32) { out.push(keyName(data)); continue; }
+    const next = b[i], v = b.slice(i - n, i).reduceRight((a, x) => a * 256 + x, 0); // little-endian script number
+    if (next === 0xb2) out.push(v & (1 << 22) ? "after " + span((v & 0xffff) * 512) : "after " + v + " blocks");
+    else if (next === 0xb1) out.push(v < 500_000_000 ? "from block " + v.toLocaleString() : "from " + new Date(v * 1000).toLocaleDateString());
+    else out.push(n <= 8 ? String(v) : short(data, 6));
+  }
+  return out.join(" ");
+}
 
 // --- what state is a delegation in? one place, used by the list, the filters and the overview
 function stateOf(d) {
@@ -231,6 +265,7 @@ function stateOf(d) {
 // not seen by a scan that ran after it was (re)registered: it is under another key
 const foreign = (d) => d.status === "active" && !d.managed && num(status?.lastScanAt) > num(d.updatedAt);
 const MAX_ROWS = 300; // the list is sorted by urgency, so what matters is always in it
+const MAX_LANES = 20, MAX_VTXOS = 40, AXIS_UNIT = 600; // ten minutes: the horizon's finest step
 const URGENCY = { bad: 0, late: 1, ok: 2, off: 3 };
 const FILTERS = [
   ["attention", "Needs attention", (d) => ["bad", "late"].includes(stateOf(d).key)],
@@ -265,6 +300,7 @@ function ago(ts) {
 async function loadMeta() {
   try {
     const i = await api("/v1/info");
+    info = i;
     $("meta").innerHTML = `<span>${esc(i.network)}</span><span>${esc(i.version)}</span>
       <span>delegate key <button class="hash" title="Copy delegate public key" data-copy="${esc(i.delegatePubkey)}">${esc(short(i.delegatePubkey, 8))}</button></span>`;
   } catch { /* the health badge says why */ }
@@ -342,17 +378,20 @@ function renderList() {
 function renderOverview() {
   const held = delegations.filter((d) => d.status === "active" && d.managed && num(d.nextExpiry))
     .sort((a, b) => num(a.nextExpiry) - num(b.nextExpiry));
-  const now = nowSecs(), shown = held.slice(0, 12);
-  const far = Math.max(...shown.map((d) => num(d.nextExpiry) - now), 1);
-  const pct = (x) => Math.min(100, Math.max(0, (x / far) * 100));
+  const now = nowSecs(), shown = held.slice(0, MAX_LANES);
+  // log axis: ten minutes and a month both get room, a linear one would hide the near end
+  const far = Math.max(...shown.map((d) => num(d.nextExpiry) - now), 2 * AXIS_UNIT);
+  const pct = (x) => Math.log1p(Math.max(0, x) / AXIS_UNIT) / Math.log1p(far / AXIS_UNIT) * 100;
   const lanes = shown.map((d) => {
     const left = num(d.nextExpiry) - now, win = num(d.nextExpiry) - num(d.nextRenewalAt), st = stateOf(d);
     const cls = left <= 0 || st.key !== "ok" ? "late" : left <= win ? "in" : "";
     return `<button data-address="${esc(d.address)}" class="hash" title="${esc(d.address)}">${esc(short(d.address, 8))}</button>
-      <div class="lane" role="img" aria-label="expires ${ago(d.nextExpiry)}">
-        <div class="left" style="width:${pct(left - win)}%"></div><div class="window" style="width:${pct(Math.min(win, left))}%"></div></div>
-      <span class="t n ${cls}">${left <= 0 ? "expired" : st.key === "bad" ? "not renewing, " + span(left) + " left" : left <= win ? "renewable now, " + span(left) + " left" : "renewable " + ago(d.nextRenewalAt)}</span>`;
+      <div class="lane ${left <= 0 ? "late" : ""}" role="img" aria-label="expires ${ago(d.nextExpiry)}">
+        <div class="left" style="width:${pct(left - win)}%"></div><div class="window" style="width:${pct(left) - pct(left - win)}%"></div></div>
+      <span class="t n ${cls}">${left <= 0 ? "expired " + ago(d.nextExpiry) : st.key === "bad" ? "not renewing, " + span(left) + " left" : left <= win ? "renewable now, " + span(left) + " left" : "renewable " + ago(d.nextRenewalAt)}</span>`;
   }).join("");
+  const ticks = [3600, 6 * 3600, 86400, 3 * 86400, 7 * 86400, 14 * 86400, 30 * 86400, 90 * 86400].filter((t) => t < far * 0.85);
+  const axis = `<span></span><div class="axis"><i style="left:0">now</i>${ticks.map((t) => `<i style="left:${pct(t)}%">${span(t)}</i>`).join("")}</div><span></span>`;
 
   const f = status?.intentFees, rows = f && [["each VTXO renewed", f.offchainInput], ["each output created", f.offchainOutput]].filter((r) => charges(r[1]));
   const strangers = delegations.filter(foreign).length;
@@ -362,7 +401,7 @@ function renderOverview() {
     ${strangers ? `<p class="note"><b>${strangers}</b> active delegation${strangers > 1 ? "s were" : " was"} registered under another secret key and cannot be renewed by this instance. If the key was rotated by mistake, restore the previous key in the configured keyring.</p>` : ""}
     <h3>Next to expire</h3>
     <p>Each bar runs from now to the address's earliest expiry. The hatched end is when it can be renewed; a bar that is all hatch is renewable now.</p>
-    ${shown.length ? `<div class="horizon">${lanes}</div><p class="legend"><span><i></i>waiting</span><span><i class="w"></i>renewal window</span></p>${held.length > shown.length ? `<p class="state">and ${held.length - shown.length} more, later</p>` : ""}`
+    ${shown.length ? `<div class="horizon">${lanes}${axis}</div><p class="legend"><span><i></i>waiting</span><span><i class="w"></i>renewal window</span></p>${held.length > shown.length ? `<p class="state">and ${held.length - shown.length} more, later</p>` : ""}`
       : `<p class="empty">No VTXO is being watched yet. They show up here after the next scan once coins sit at a registered address.</p>`}
     <h3>What arkd charges</h3>
     ${!f ? `<p>Unknown: arkd is unreachable.</p>`
@@ -376,6 +415,7 @@ async function loadDetail() {
   if (!selected) { detail = null; $("detail").removeAttribute("aria-busy"); return status && renderOverview(); }
   const address = selected;
   if (detail?.delegation.address !== address) {
+    allVtxos = false;
     $("detail").setAttribute("aria-busy", "true");
     $("detail").innerHTML = `<h2 class="hash" style="font-size:.95rem;color:var(--muted)">${esc(short(address, 12))}</h2>${skeleton(5)}`;
   }
@@ -405,13 +445,15 @@ function lifeBar(v) {
 }
 
 function renderDetail() {
-  const d = detail.delegation, vtxos = detail.vtxos || [], renewals = detail.renewals || [];
+  const d = detail.delegation, renewals = detail.renewals || [];
+  const vtxos = (detail.vtxos || []).slice().sort((a, b) => num(a.renewableAt) - num(b.renewableAt));
+  const held = vtxos.reduce((a, v) => a + num(v.amount), 0), shownVtxos = allVtxos ? vtxos : vtxos.slice(0, MAX_VTXOS);
   const active = d.status === "active", windowSecs = num(d.renewalWindow);
   const inList = delegations.find((x) => x.address === d.address), st = inList && stateOf(inList);
   const life = vtxos.length ? Math.max(...vtxos.map((v) => num(v.expiresAt) - num(v.createdAt))) : 0;
   $("detail").innerHTML = `
     <div class="title">
-      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : "ok"}">${!active ? (d.status === "revoked" ? "stopped by its owner" : "stopped by an operator") : st?.text === "different key" ? "different key" : st?.key === "bad" ? "not renewing" : "renewing"}</span></h2>
+      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : "ok"}">${!active ? (d.status === "revoked" ? "stopped by its owner" : "stopped by an operator") : st?.text === "different key" ? "different key" : st?.key === "bad" ? "not renewing" : st?.key === "late" ? "late" : "renewing"}</span></h2>
         <div class="hash">${esc(d.address)}</div></div>
       <div class="actions"><button data-copy="${esc(d.address)}">Copy address</button>
         ${active ? `<button class="danger" id="stop">Stop renewing</button>` : `<button class="primary" id="resume">Resume renewing</button>`}</div>
@@ -422,9 +464,10 @@ function renderDetail() {
     ${st?.why && active ? `<p class="note">${esc(st.why)}</p>` : ""}
     ${active && num(d.maxFee) > 0 && life && windowSecs > life / 2 ? `<p class="note info">The renewal window (${span(windowSecs)}) is more than half the VTXO lifetime (${span(life)}). Because this delegation can pay fees, it is only renewed in the second half of a VTXO's life, so it doesn't pay in every round.</p>` : ""}
     <h3>VTXOs at this address</h3>
-    ${vtxos.length ? vtxos.map((v) => `<div class="vtxo"><div class="top"><span class="hash">${esc(v.outpoint)}</span>
+    ${vtxos.length > 1 ? `<p><b class="n">${vtxos.length}</b> VTXOs holding <b class="n">${sats(held)}</b>, soonest to renew first.</p>` : ""}
+    ${vtxos.length ? shownVtxos.map((v) => `<div class="vtxo"><div class="top"><span class="hash">${esc(v.outpoint)}</span>
         <span class="amount n">${sats(v.amount)}${(v.assets || []).map((a) => ` + ${num(a.amount).toLocaleString()} of ${esc(short(a.assetId, 6))}`).join("")}</span></div>
-        ${lifeBar(v)}</div>`).join("")
+        ${lifeBar(v)}</div>`).join("") + (vtxos.length > shownVtxos.length ? `<p class="state"><button class="link" id="all-vtxos">Show all ${vtxos.length}</button>, the ${shownVtxos.length} soonest are above.</p>` : "")
       : `<p class="empty">Nothing to renew: no spendable VTXO sits at this address right now.</p>`}
     <h3>Renewal attempts</h3>
     ${renewals.length ? `<div class="scroll"><table><thead><tr><th>When</th><th>Result</th><th>VTXOs</th><th>Batch or reason</th></tr></thead><tbody>
@@ -435,7 +478,9 @@ function renderDetail() {
       </tbody></table></div>
       <p class="state">A failure that repeats is listed once, at the time it first happened.</p>`
       : `<p class="empty">No attempt yet. A VTXO is first renewed when it enters its renewal window.</p>`}
-    <details><summary>Tapscripts</summary>${(d.tapscripts || []).map((t) => `<span class="hash">${esc(t)}</span>`).join("")}</details>`;
+    <h3>Spending paths</h3>
+    <p>Who can spend a VTXO at this address, one tapscript each.</p>
+    <ul class="paths">${(d.tapscripts || []).map((t) => `<li><span class="words">${esc(scriptWords(t))}</span><button class="link" data-copy="${esc(t)}" title="Copy the script hex">hex</button></li>`).join("")}</ul>`;
 }
 
 async function setRenewing(on) {
@@ -469,6 +514,7 @@ document.addEventListener("click", (e) => {
   else if (b.dataset.address) go(b.dataset.address);
   else if (b.dataset.copy) navigator.clipboard.writeText(b.dataset.copy).then(() => toast("Copied"), () => toast("Copy failed, select the text instead", true));
   else if (b.id === "home" || b.id === "home2" || b.id === "see-fees") go("");
+  else if (b.id === "all-vtxos") { allVtxos = true; renderDetail(); }
   else if (b.id === "stop") askStop();
   else if (b.id === "confirm-yes") { $("confirm").close(); setRenewing(false); }
   else if (b.value === "no") $("confirm").close();
@@ -491,7 +537,7 @@ addEventListener("hashchange", () => { selected = location.hash.slice(1); render
 
 function refresh() { loadHealth(); loadList().then(loadDetail); }
 loadMeta(); refresh();
-setInterval(() => { if (!document.hidden && !$("confirm").open && !$("detail").querySelector("details[open]")) refresh(); }, 15000);
+setInterval(() => { if (!document.hidden && !$("confirm").open) refresh(); }, 15000);
 </script>
 </body>
 </html>
