@@ -13,21 +13,20 @@ import (
 	"sync/atomic"
 	"time"
 
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
 	"github.com/arkade-os/arkd/pkg/ark-lib/tree"
-	"github.com/arkade-os/arkd/pkg/client-lib/client"
-	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	"github.com/arkade-os/emulator/pkg/arkade"
 	emulatorclient "github.com/arkade-os/emulator/pkg/client"
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/btcutil/psbt"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/psbt/v2"
+	"github.com/btcsuite/btcd/txscript/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -105,15 +104,15 @@ type Service interface {
 	Status() Status
 	CountActive(ctx context.Context) (int64, error)
 	IntentFees(ctx context.Context) (arkfee.Config, error)
-	Vtxos(ctx context.Context, d *domain.Delegation) ([]types.Vtxo, error)
-	DueAt(d *domain.Delegation, v types.Vtxo) time.Time
+	Vtxos(ctx context.Context, d *domain.Delegation) ([]clientlib.Vtxo, error)
+	DueAt(d *domain.Delegation, v clientlib.Vtxo) time.Time
 	Health(ctx context.Context) map[string]error
 }
 
 type service struct {
 	repo              domain.DelegationRepository
-	ark               client.Client
-	indexer           indexer.Indexer
+	ark               clientlib.Client
+	indexer           clientlib.Indexer
 	emulator          emulatorclient.TransportClient
 	key               *btcec.PrivateKey
 	cosigners         []*cosigner
@@ -171,7 +170,7 @@ type watched struct {
 }
 
 type renewalInput struct {
-	vtxo         types.Vtxo
+	vtxo         clientlib.Vtxo
 	delegation   *domain.Delegation
 	cosigner     *cosigner
 	pkScript     []byte
@@ -189,8 +188,8 @@ type covenant struct {
 func NewService(
 	ctx context.Context,
 	repo domain.DelegationRepository,
-	ark client.Client,
-	indexerSvc indexer.Indexer,
+	ark clientlib.Client,
+	indexerSvc clientlib.Indexer,
 	emulator emulatorclient.TransportClient,
 	key *btcec.PrivateKey,
 	pollInterval, renewalTimeout, collectionWindow time.Duration,
@@ -202,8 +201,8 @@ func NewService(
 func NewServiceWithKeys(
 	ctx context.Context,
 	repo domain.DelegationRepository,
-	ark client.Client,
-	indexerSvc indexer.Indexer,
+	ark clientlib.Client,
+	indexerSvc clientlib.Indexer,
 	emulator emulatorclient.TransportClient,
 	keys []*btcec.PrivateKey,
 	pollInterval, renewalTimeout, collectionWindow time.Duration,
@@ -264,7 +263,7 @@ func NewServiceWithKeys(
 	if err != nil {
 		return nil, err
 	}
-	forfeitAddr, err := btcutil.DecodeAddress(arkInfo.ForfeitAddress, nil)
+	forfeitAddr, err := address.DecodeAddress(arkInfo.ForfeitAddress, nil)
 	if err != nil {
 		return nil, fmt.Errorf("arkd forfeit address: %w", err)
 	}
@@ -477,7 +476,7 @@ func (s *service) IntentFees(ctx context.Context) (arkfee.Config, error) {
 	return info.Fees.IntentFees, nil
 }
 
-func (s *service) DueAt(d *domain.Delegation, v types.Vtxo) time.Time {
+func (s *service) DueAt(d *domain.Delegation, v clientlib.Vtxo) time.Time {
 	return dueAt(v, d.Params)
 }
 
@@ -489,7 +488,7 @@ func (s *service) ListRenewals(ctx context.Context, d *domain.Delegation) ([]dom
 	return s.repo.ListRenewals(ctx, d.ID, 50)
 }
 
-func (s *service) Vtxos(ctx context.Context, d *domain.Delegation) ([]types.Vtxo, error) {
+func (s *service) Vtxos(ctx context.Context, d *domain.Delegation) ([]clientlib.Vtxo, error) {
 	pkScript, _, err := s.scriptOf(d)
 	if err != nil {
 		return nil, err
@@ -508,10 +507,10 @@ const concurrency = 4
 
 // spendableVtxos queries the indexer for many scripts, a few chunks of 100
 // at a time, and groups the result by script.
-func (s *service) spendableVtxos(ctx context.Context, scripts []string) (map[string][]types.Vtxo, error) {
+func (s *service) spendableVtxos(ctx context.Context, scripts []string) (map[string][]clientlib.Vtxo, error) {
 	const chunk = 100
 	var mu sync.Mutex
-	out := make(map[string][]types.Vtxo)
+	out := make(map[string][]clientlib.Vtxo)
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(concurrency)
 	for start := 0; start < len(scripts); start += chunk {
@@ -519,9 +518,9 @@ func (s *service) spendableVtxos(ctx context.Context, scripts []string) (map[str
 		g.Go(func() error {
 			// arkd answers an unpaged request in full; should that change, follow the pages
 			for page := int32(0); ; {
-				opts := []indexer.GetVtxosOption{indexer.WithScripts(batch), indexer.WithSpendableOnly()}
+				opts := []clientlib.GetVtxosOption{clientlib.WithScripts(batch), clientlib.WithSpendableOnly()}
 				if page > 0 {
-					opts = append(opts, indexer.WithVtxosPage(&indexer.PageRequest{Index: page}))
+					opts = append(opts, clientlib.WithVtxosPage(&clientlib.PageRequest{Index: page}))
 				}
 				resp, err := s.indexer.GetVtxos(ctx, opts...)
 				if err != nil {
@@ -574,7 +573,7 @@ func (s *service) scannerHealth(now time.Time) error {
 
 // late reports a vtxo renewable for a while and still there: less than a
 // quarter of the time between renewable and expiry is left.
-func late(v types.Vtxo, due, now time.Time) bool {
+func late(v clientlib.Vtxo, due, now time.Time) bool {
 	room := v.ExpiresAt.Sub(due)
 	return room > 0 && v.ExpiresAt.Sub(now) < room/4
 }

@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/core/application"
 	"github.com/arkade-os/delegatee/internal/core/domain"
@@ -190,13 +191,13 @@ func (f *fakeService) CancelDelegation(_ context.Context, address string) error 
 	f.cancelled = address
 	return f.err
 }
-func (f *fakeService) Vtxos(context.Context, *domain.Delegation) ([]types.Vtxo, error) {
-	return []types.Vtxo{{
-		Outpoint: types.Outpoint{Txid: "ab", VOut: 1}, Amount: 5000, CreatedAt: t0, ExpiresAt: t0.Add(time.Hour),
-		Preconfirmed: true, Assets: []types.Asset{{AssetId: "gold", Amount: 3}},
+func (f *fakeService) Vtxos(context.Context, *domain.Delegation) ([]clientlib.Vtxo, error) {
+	return []clientlib.Vtxo{{
+		Outpoint: clientlib.Outpoint{Txid: "ab", VOut: 1}, Amount: 5000, CreatedAt: t0, ExpiresAt: t0.Add(time.Hour),
+		Preconfirmed: true, Assets: []clientlib.Asset{{AssetId: "gold", Amount: 3}},
 	}}, nil
 }
-func (f *fakeService) DueAt(_ *domain.Delegation, v types.Vtxo) time.Time {
+func (f *fakeService) DueAt(_ *domain.Delegation, v clientlib.Vtxo) time.Time {
 	return v.ExpiresAt.Add(-10 * time.Minute)
 }
 func (f *fakeService) ListRenewals(context.Context, *domain.Delegation) ([]domain.Renewal, error) {

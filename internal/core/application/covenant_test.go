@@ -5,7 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	"github.com/stretchr/testify/require"
 )
@@ -29,13 +30,13 @@ func TestRenewalCovenant(t *testing.T) {
 
 	now := time.Unix(1_000_000, 0)
 	params := domain.Params{RenewalWindow: 100, MaxFee: 150}
-	require.Equal(t, now, dueAt(types.Vtxo{ExpiresAt: now.Add(100 * time.Second)}, params))
+	require.Equal(t, now, dueAt(clientlib.Vtxo{ExpiresAt: now.Add(100 * time.Second)}, params))
 	// may pay fees and the window covers the whole life: wait for half of it
-	short := types.Vtxo{CreatedAt: now, ExpiresAt: now.Add(60 * time.Second)}
+	short := clientlib.Vtxo{CreatedAt: now, ExpiresAt: now.Add(60 * time.Second)}
 	require.Equal(t, now.Add(30*time.Second), dueAt(short, params))
 	require.Equal(t, now.Add(-40*time.Second), dueAt(short, domain.Params{RenewalWindow: 100}))
 
-	v := types.Vtxo{Amount: 1000}
+	v := clientlib.Vtxo{Amount: 1000}
 	out, err := renewalOutput(v, []byte{0x51}, params, 150)
 	require.NoError(t, err)
 	require.Equal(t, int64(850), out.Value)
@@ -43,9 +44,9 @@ func TestRenewalCovenant(t *testing.T) {
 	require.ErrorContains(t, err, "exceeds the delegation max fee")
 	_, err = renewalOutput(v, nil, params, -1)
 	require.ErrorContains(t, err, "negative intent fee")
-	_, err = renewalOutput(types.Vtxo{Amount: 1 << 63}, nil, params, 0)
+	_, err = renewalOutput(clientlib.Vtxo{Amount: 1 << 63}, nil, params, 0)
 	require.ErrorContains(t, err, "not a valid amount")
-	_, err = renewalOutput(types.Vtxo{Amount: 100}, nil, params, 100)
+	_, err = renewalOutput(clientlib.Vtxo{Amount: 100}, nil, params, 100)
 	require.ErrorContains(t, err, "not covered")
 }
 

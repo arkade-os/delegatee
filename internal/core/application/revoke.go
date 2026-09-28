@@ -12,7 +12,7 @@ import (
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	log "github.com/sirupsen/logrus"
 )
 

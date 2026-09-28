@@ -4,7 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/core/application"
 	"github.com/arkade-os/delegatee/internal/core/domain"
@@ -128,7 +129,7 @@ func toDelegation(d *domain.Delegation) *delegateev1.Delegation {
 	}
 }
 
-func (h *handler) toVtxos(d *domain.Delegation, vtxos []types.Vtxo) []*delegateev1.Vtxo {
+func (h *handler) toVtxos(d *domain.Delegation, vtxos []clientlib.Vtxo) []*delegateev1.Vtxo {
 	out := make([]*delegateev1.Vtxo, len(vtxos))
 	for i, v := range vtxos {
 		assets := make([]*delegateev1.Asset, len(v.Assets))

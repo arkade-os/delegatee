@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
 	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
-	grpcindexer "github.com/arkade-os/arkd/pkg/client-lib/indexer/grpc"
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/config"
 	"github.com/arkade-os/delegatee/internal/core/application"
@@ -28,7 +28,7 @@ import (
 type delegatee struct {
 	client    delegateev1.DelegateeServiceClient
 	admin     delegateev1.AdminServiceClient
-	indexer   indexer.Indexer
+	indexer   clientlib.Indexer
 	addr      string // public host:port
 	adminAddr string
 	stop      func() // also runs at cleanup; blocks until the in-flight batch is done
@@ -69,7 +69,7 @@ func startDelegatee(t *testing.T, tweak ...func(*config.Config)) delegatee {
 	}
 	d.client = delegateev1.NewDelegateeServiceClient(dial(d.addr))
 	d.admin = delegateev1.NewAdminServiceClient(dial(d.adminAddr))
-	indexerSvc, err := grpcindexer.NewClient(arkURL)
+	indexerSvc, err := indexer.NewClient(arkURL)
 	require.NoError(t, err)
 	t.Cleanup(indexerSvc.Close)
 	d.indexer = indexerSvc
@@ -104,10 +104,10 @@ func delegateScript(
 }
 
 // spendable lists the unspent vtxos at pkScript.
-func spendable(t *testing.T, d delegatee, pkScript []byte) []types.Vtxo {
+func spendable(t *testing.T, d delegatee, pkScript []byte) []clientlib.Vtxo {
 	t.Helper()
 	resp, err := d.indexer.GetVtxos(t.Context(),
-		indexer.WithScripts([]string{hex.EncodeToString(pkScript)}), indexer.WithSpendableOnly())
+		clientlib.WithScripts([]string{hex.EncodeToString(pkScript)}), clientlib.WithSpendableOnly())
 	require.NoError(t, err)
 	return resp.Vtxos
 }

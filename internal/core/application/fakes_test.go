@@ -8,20 +8,19 @@ import (
 	"testing"
 	"time"
 
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
 	"github.com/arkade-os/arkd/pkg/ark-lib/tree"
-	"github.com/arkade-os/arkd/pkg/client-lib/client"
-	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	emulatorclient "github.com/arkade-os/emulator/pkg/client"
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/btcutil/psbt"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/psbt/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -172,9 +171,9 @@ func (r *fakeRepo) Close() error {
 // fakeArk answers what the delegatee calls on arkd; any other method panics
 // on the nil embedded interface.
 type fakeArk struct {
-	client.Client
+	clientlib.Client
 	mu          sync.Mutex
-	info        *client.Info
+	info        *clientlib.Info
 	infoErr     error
 	registerErr error
 	streamErr   error
@@ -200,7 +199,7 @@ func (a *fakeArk) SubmitSignedForfeitTxs(_ context.Context, forfeits []string, _
 	return nil
 }
 
-func (a *fakeArk) GetInfo(context.Context) (*client.Info, error) { return a.info, a.infoErr }
+func (a *fakeArk) GetInfo(context.Context) (*clientlib.Info, error) { return a.info, a.infoErr }
 func (a *fakeArk) RegisterIntent(_ context.Context, proof, _ string) (string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -216,19 +215,19 @@ func (a *fakeArk) ConfirmRegistration(_ context.Context, id string) error {
 }
 
 // GetEventStream serves a stream arkd closes at once: enough to reach the batch session.
-func (a *fakeArk) GetEventStream(context.Context, []string) (<-chan client.BatchEventChannel, func(), error) {
+func (a *fakeArk) GetEventStream(context.Context, []string) (<-chan clientlib.BatchEventChannel, func(), error) {
 	if a.streamErr != nil {
 		return nil, nil, a.streamErr
 	}
-	ch := make(chan client.BatchEventChannel)
+	ch := make(chan clientlib.BatchEventChannel)
 	close(ch)
 	return ch, func() {}, nil
 }
 
 type fakeIndexer struct {
-	indexer.Indexer
+	clientlib.Indexer
 	mu        sync.Mutex
-	vtxos     []types.Vtxo
+	vtxos     []clientlib.Vtxo
 	err       error
 	calls     int
 	served    bool
@@ -239,7 +238,7 @@ type fakeIndexer struct {
 
 // GetVtxos cannot see which scripts are asked for (the options are opaque),
 // so it serves everything to the first request of a scan and nothing after.
-func (i *fakeIndexer) GetVtxos(context.Context, ...indexer.GetVtxosOption) (*indexer.VtxosResponse, error) {
+func (i *fakeIndexer) GetVtxos(context.Context, ...clientlib.GetVtxosOption) (*clientlib.VtxosResponse, error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.calls++
@@ -247,24 +246,24 @@ func (i *fakeIndexer) GetVtxos(context.Context, ...indexer.GetVtxosOption) (*ind
 		return nil, i.err
 	}
 	if i.served {
-		return &indexer.VtxosResponse{}, nil
+		return &clientlib.VtxosResponse{}, nil
 	}
 	i.served = true
-	return &indexer.VtxosResponse{Vtxos: i.vtxos}, nil
+	return &clientlib.VtxosResponse{Vtxos: i.vtxos}, nil
 }
 
 // serve makes the next scan see vtxos.
-func (i *fakeIndexer) serve(vtxos ...types.Vtxo) {
+func (i *fakeIndexer) serve(vtxos ...clientlib.Vtxo) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.vtxos, i.served, i.calls = vtxos, false, 0
 }
 
-func (i *fakeIndexer) GetVirtualTxs(_ context.Context, txids []string, _ ...indexer.PageOption) (*indexer.VirtualTxsResponse, error) {
+func (i *fakeIndexer) GetVirtualTxs(_ context.Context, txids []string, _ ...clientlib.PageOption) (*clientlib.VirtualTxsResponse, error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.txLookups++
-	resp := &indexer.VirtualTxsResponse{}
+	resp := &clientlib.VirtualTxsResponse{}
 	for k := len(txids) - 1; k >= 0 && !i.prevMiss; k-- { // in another order than asked
 		if tx, ok := i.txs[txids[k]]; ok {
 			resp.Txs = append(resp.Txs, tx)
@@ -327,13 +326,13 @@ func newTestEnv(t testing.TB, tweak ...func(*testEnv)) *testEnv {
 	_, signer := hexKey(t)
 	forfeitKey, forfeit := hexKey(t)
 	_, emu := hexKey(t)
-	forfeitAddr, err := btcutil.NewAddressWitnessPubKeyHash(
-		btcutil.Hash160(forfeitKey.PubKey().SerializeCompressed()), &chaincfg.RegressionNetParams)
+	forfeitAddr, err := address.NewAddressWitnessPubKeyHash(
+		address.Hash160(forfeitKey.PubKey().SerializeCompressed()), &chaincfg.RegressionNetParams)
 	require.NoError(t, err)
 
 	env := &testEnv{
 		repo: &fakeRepo{},
-		ark: &fakeArk{info: &client.Info{
+		ark: &fakeArk{info: &clientlib.Info{
 			SignerPubKey: signer, ForfeitPubKey: forfeit, Network: arklib.BitcoinRegTest.Name,
 			ForfeitAddress: forfeitAddr.EncodeAddress(),
 		}},
@@ -353,7 +352,7 @@ func newTestEnv(t testing.TB, tweak ...func(*testEnv)) *testEnv {
 }
 
 func (e *testEnv) setFees(offchainInput string) {
-	e.ark.info.Fees = types.FeeInfo{IntentFees: arkfee.Config{IntentOffchainInputProgram: offchainInput}}
+	e.ark.info.Fees = clientlib.FeeInfo{IntentFees: arkfee.Config{IntentOffchainInputProgram: offchainInput}}
 }
 
 // tapscripts builds what a wallet registers: the delegate leaf from Info plus an exit leaf.
@@ -386,7 +385,7 @@ func (e *testEnv) register(t testing.TB, p domain.Params) *domain.Delegation {
 
 // vtxo sits at the delegation's script and expires in expiresIn. n makes the
 // tx that created it, which the indexer can serve, unique.
-func (e *testEnv) vtxo(t testing.TB, d *domain.Delegation, n int, amount uint64, expiresIn time.Duration) types.Vtxo {
+func (e *testEnv) vtxo(t testing.TB, d *domain.Delegation, n int, amount uint64, expiresIn time.Duration) clientlib.Vtxo {
 	t.Helper()
 	pkScript, _, err := e.svc.scriptOf(d)
 	require.NoError(t, err)
@@ -401,8 +400,8 @@ func (e *testEnv) vtxo(t testing.TB, d *domain.Delegation, n int, amount uint64,
 	e.indexer.mu.Lock()
 	e.indexer.txs[txid] = b64
 	e.indexer.mu.Unlock()
-	return types.Vtxo{
-		Outpoint: types.Outpoint{Txid: txid, VOut: 0}, Script: hex.EncodeToString(pkScript), Amount: amount,
+	return clientlib.Vtxo{
+		Outpoint: clientlib.Outpoint{Txid: txid, VOut: 0}, Script: hex.EncodeToString(pkScript), Amount: amount,
 		CreatedAt: time.Now().Add(-time.Hour), ExpiresAt: time.Now().Add(expiresIn),
 	}
 }

@@ -15,12 +15,11 @@ import (
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
-	singlekeywallet "github.com/arkade-os/arkd/pkg/client-lib/identity/singlekey"
-	inmemorystore "github.com/arkade-os/arkd/pkg/client-lib/identity/singlekey/store/inmemory"
 	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
-	grpcindexer "github.com/arkade-os/arkd/pkg/client-lib/indexer/grpc"
-	"github.com/arkade-os/arkd/pkg/client-lib/store"
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
+	clientwallet "github.com/arkade-os/arkd/pkg/client-wallet"
+	walletidentity "github.com/arkade-os/arkd/pkg/client-wallet/identity"
+	inmemorystore "github.com/arkade-os/arkd/pkg/client-wallet/identity/store/inmemory"
+	walletstore "github.com/arkade-os/arkd/pkg/client-wallet/store/inmemory"
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/core/application"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -94,7 +93,7 @@ func TestLiveDelegatee(t *testing.T) {
 	// the public endpoint only exposes the JSON gateway
 	client := restClient{base: strings.TrimSuffix(delegateeURL, "/")}
 
-	indexerSvc, err := grpcindexer.NewClient(arkURL)
+	indexerSvc, err := indexer.NewClient(arkURL)
 	require.NoError(t, err)
 	t.Cleanup(indexerSvc.Close)
 
@@ -109,13 +108,13 @@ func TestLiveDelegatee(t *testing.T) {
 	t.Logf("WALLET_KEY=%x", privKey.Serialize())
 	idStore, err := inmemorystore.NewStore()
 	require.NoError(t, err)
-	identity, err := singlekeywallet.NewIdentity(idStore)
+	identity, err := walletidentity.NewIdentity(idStore)
 	require.NoError(t, err)
-	configStore, err := store.NewStore(store.Config{ConfigStoreType: types.InMemoryStore})
+	configStore, err := walletstore.NewStore()
 	require.NoError(t, err)
-	w, err := clientlib.NewWallet(configStore, clientlib.WithIdentity(identity))
+	w, err := clientwallet.NewWallet(configStore, clientwallet.WithIdentity(identity))
 	require.NoError(t, err)
-	require.NoError(t, w.Init(ctx, clientlib.InitArgs{
+	require.NoError(t, w.Init(ctx, clientwallet.InitArgs{
 		ServerUrl: arkURL, Seed: hex.EncodeToString(privKey.Serialize()), Password: password,
 		ExplorerURL: "https://mempool.mutinynet.arkade.sh/api",
 	}))
@@ -189,9 +188,9 @@ func TestLiveDelegatee(t *testing.T) {
 	t.Logf("delegation at %s", address)
 
 	// reuse a vtxo funded by an earlier run, else fund one now
-	listVtxos := func() []types.Vtxo {
+	listVtxos := func() []clientlib.Vtxo {
 		resp, err := indexerSvc.GetVtxos(ctx,
-			indexer.WithScripts([]string{hex.EncodeToString(pkScript)}), indexer.WithSpendableOnly())
+			clientlib.WithScripts([]string{hex.EncodeToString(pkScript)}), clientlib.WithSpendableOnly())
 		if err != nil {
 			return nil
 		}
@@ -200,7 +199,7 @@ func TestLiveDelegatee(t *testing.T) {
 	vtxos := listVtxos()
 	if len(vtxos) == 0 {
 		amount := min(balance.OffchainBalance.Total/2, 20_000)
-		fundingTxid, err := wallet.SendOffChain(ctx, []types.Receiver{{To: address, Amount: amount}})
+		fundingTxid, err := wallet.SendOffChain(ctx, []clientlib.Receiver{{To: address, Amount: amount}})
 		require.NoError(t, err)
 		t.Logf("funded %d sats in %s", amount, fundingTxid)
 		require.Eventually(t, func() bool { vtxos = listVtxos(); return len(vtxos) > 0 }, time.Minute, 5*time.Second)
@@ -214,7 +213,7 @@ func TestLiveDelegatee(t *testing.T) {
 	}
 
 	t.Log("waiting for the delegatee to renew it...")
-	var renewed types.Vtxo
+	var renewed clientlib.Vtxo
 	require.Eventually(t, func() bool {
 		for _, v := range listVtxos() {
 			if v.Txid != current.Txid && !v.Preconfirmed && !v.Spent && v.Amount == current.Amount {

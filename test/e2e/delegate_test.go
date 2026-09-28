@@ -20,16 +20,16 @@ import (
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
-	singlekeywallet "github.com/arkade-os/arkd/pkg/client-lib/identity/singlekey"
-	inmemorystore "github.com/arkade-os/arkd/pkg/client-lib/identity/singlekey/store/inmemory"
-	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
-	"github.com/arkade-os/arkd/pkg/client-lib/store"
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
+	clientwallet "github.com/arkade-os/arkd/pkg/client-wallet"
+	walletidentity "github.com/arkade-os/arkd/pkg/client-wallet/identity"
+	inmemorystore "github.com/arkade-os/arkd/pkg/client-wallet/identity/store/inmemory"
+	walletstore "github.com/arkade-os/arkd/pkg/client-wallet/store/inmemory"
+	wallettypes "github.com/arkade-os/arkd/pkg/client-wallet/types"
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/config"
 	"github.com/arkade-os/delegatee/internal/core/application"
 	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/btcutil/v2"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -117,12 +117,12 @@ func TestDelegateRenewal(t *testing.T) {
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 
 	// --- alice locks funds at the delegate address
-	fundingTxid, err := alice.SendOffChain(ctx, []types.Receiver{{To: address, Amount: delegateAmount}})
+	fundingTxid, err := alice.SendOffChain(ctx, []clientlib.Receiver{{To: address, Amount: delegateAmount}})
 	require.NoError(t, err)
 	t.Logf("funded delegate vtxo in %s", fundingTxid)
 
 	// --- the delegatee renews it through a batch, without alice
-	noAssets := func(v types.Vtxo) bool { return len(v.Assets) == 0 }
+	noAssets := func(v clientlib.Vtxo) bool { return len(v.Assets) == 0 }
 	first := waitForRenewedVtxo(t, indexerSvc, pkScript, fundingTxid, noAssets)
 	t.Logf("first renewal: %s", first.Outpoint.String())
 
@@ -135,12 +135,12 @@ func TestDelegateRenewal(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, issued.IssuedAssets, 1)
 	assetID := issued.IssuedAssets[0].String()
-	assetFundingTxid, err := alice.SendOffChain(ctx, []types.Receiver{{
-		To: address, Amount: delegateAmount, Assets: []types.Asset{{AssetId: assetID, Amount: assetAmount}},
+	assetFundingTxid, err := alice.SendOffChain(ctx, []clientlib.Receiver{{
+		To: address, Amount: delegateAmount, Assets: []clientlib.Asset{{AssetId: assetID, Amount: assetAmount}},
 	}})
 	require.NoError(t, err)
 	t.Logf("funded asset delegate vtxo in %s", assetFundingTxid)
-	renewedAsset := waitForRenewedVtxo(t, indexerSvc, pkScript, assetFundingTxid, func(v types.Vtxo) bool {
+	renewedAsset := waitForRenewedVtxo(t, indexerSvc, pkScript, assetFundingTxid, func(v clientlib.Vtxo) bool {
 		return len(v.Assets) == 1 && v.Assets[0].AssetId == assetID && v.Assets[0].Amount == assetAmount
 	})
 	t.Logf("asset renewal: %s", renewedAsset.Outpoint.String())
@@ -215,7 +215,7 @@ func TestConcurrentDelegations(t *testing.T) {
 
 	// one delegate address per user, all funded by a single tx
 	pkScripts := make([][]byte, n)
-	receivers := make([]types.Receiver, n)
+	receivers := make([]clientlib.Receiver, n)
 	for i := range n {
 		userKey, err := btcec.NewPrivateKey()
 		require.NoError(t, err)
@@ -225,7 +225,7 @@ func TestConcurrentDelegations(t *testing.T) {
 		reg, err := client.RegisterDelegation(ctx, &delegateev1.RegisterDelegationRequest{Tapscripts: tapscripts, RenewalWindow: renewalWindow})
 		require.NoError(t, err)
 		address := reg.GetDelegation().GetAddress()
-		receivers[i] = types.Receiver{To: address, Amount: delegateAmount}
+		receivers[i] = clientlib.Receiver{To: address, Amount: delegateAmount}
 		t.Cleanup(func() {
 			_, _ = admin.CancelDelegation(context.WithoutCancel(ctx), &delegateev1.CancelDelegationRequest{Address: address})
 		})
@@ -234,9 +234,9 @@ func TestConcurrentDelegations(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("funded %d delegate vtxos in %s", n, fundingTxid)
 
-	renewed := make([]types.Vtxo, n)
+	renewed := make([]clientlib.Vtxo, n)
 	for i := range n {
-		renewed[i] = waitForRenewedVtxo(t, indexerSvc, pkScripts[i], fundingTxid, func(types.Vtxo) bool { return true })
+		renewed[i] = waitForRenewedVtxo(t, indexerSvc, pkScripts[i], fundingTxid, func(clientlib.Vtxo) bool { return true })
 	}
 	commitments := map[string]int{}
 	for _, v := range renewed {
@@ -278,7 +278,7 @@ func TestRenewalWindows(t *testing.T) {
 		pkScript []byte
 	}
 	var ds []delegation
-	var receivers []types.Receiver
+	var receivers []clientlib.Receiver
 	for _, window := range []int64{600, 3000, 0, 60} {
 		info, err := client.GetInfo(ctx, &delegateev1.GetInfoRequest{RenewalWindow: window})
 		require.NoError(t, err)
@@ -302,7 +302,7 @@ func TestRenewalWindows(t *testing.T) {
 
 		address := reg.GetDelegation().GetAddress()
 		ds = append(ds, delegation{window: want, address: address, pkScript: pkScript})
-		receivers = append(receivers, types.Receiver{To: address, Amount: delegateAmount})
+		receivers = append(receivers, clientlib.Receiver{To: address, Amount: delegateAmount})
 		t.Cleanup(func() {
 			_, _ = admin.CancelDelegation(context.WithoutCancel(ctx), &delegateev1.CancelDelegationRequest{Address: address})
 		})
@@ -312,14 +312,14 @@ func TestRenewalWindows(t *testing.T) {
 
 	// windows wider than the 512s regtest expiry renew in the next batch
 	for _, d := range ds[:3] {
-		v := waitForRenewedVtxo(t, indexerSvc, d.pkScript, fundingTxid, func(types.Vtxo) bool { return true })
+		v := waitForRenewedVtxo(t, indexerSvc, d.pkScript, fundingTxid, func(clientlib.Vtxo) bool { return true })
 		t.Logf("window %d renewed: %s", d.window, v.Outpoint.String())
 	}
 
 	// the 60s window is still far from expiry: untouched, no renewal attempted
 	small := ds[3]
 	resp, err := indexerSvc.GetVtxos(ctx,
-		indexer.WithScripts([]string{hex.EncodeToString(small.pkScript)}), indexer.WithSpendableOnly())
+		clientlib.WithScripts([]string{hex.EncodeToString(small.pkScript)}), clientlib.WithSpendableOnly())
 	require.NoError(t, err)
 	require.Len(t, resp.Vtxos, 1)
 	require.Equal(t, fundingTxid, resp.Vtxos[0].Txid)
@@ -352,7 +352,7 @@ func TestManyDelegations(t *testing.T) {
 	require.NoError(t, err)
 
 	pkScripts := make([][]byte, n)
-	receivers := make([]types.Receiver, n)
+	receivers := make([]clientlib.Receiver, n)
 	for i := range n {
 		userKey, err := btcec.NewPrivateKey()
 		require.NoError(t, err)
@@ -361,7 +361,7 @@ func TestManyDelegations(t *testing.T) {
 		reg, err := client.RegisterDelegation(ctx, &delegateev1.RegisterDelegationRequest{Tapscripts: tapscripts})
 		require.NoError(t, err)
 		address := reg.GetDelegation().GetAddress()
-		receivers[i] = types.Receiver{To: address, Amount: delegateAmount}
+		receivers[i] = clientlib.Receiver{To: address, Amount: delegateAmount}
 		t.Cleanup(func() {
 			_, _ = admin.CancelDelegation(context.WithoutCancel(ctx), &delegateev1.CancelDelegationRequest{Address: address})
 		})
@@ -374,7 +374,7 @@ func TestManyDelegations(t *testing.T) {
 
 	commitments := map[string]int{}
 	for i := range n {
-		v := waitForRenewedVtxo(t, indexerSvc, pkScripts[i], "", func(v types.Vtxo) bool { return !v.Preconfirmed })
+		v := waitForRenewedVtxo(t, indexerSvc, pkScripts[i], "", func(v clientlib.Vtxo) bool { return !v.Preconfirmed })
 		require.Len(t, v.CommitmentTxids, 1)
 		commitments[v.CommitmentTxids[0]]++
 	}
@@ -385,14 +385,14 @@ func TestManyDelegations(t *testing.T) {
 // waitForRenewedVtxo polls the indexer until a settled (non-preconfirmed),
 // unspent vtxo of delegateAmount other than prevTxid matching match sits at pkScript.
 func waitForRenewedVtxo(
-	t *testing.T, indexerSvc indexer.Indexer, pkScript []byte, prevTxid string, match func(types.Vtxo) bool,
-) types.Vtxo {
+	t *testing.T, indexerSvc clientlib.Indexer, pkScript []byte, prevTxid string, match func(clientlib.Vtxo) bool,
+) clientlib.Vtxo {
 	t.Helper()
-	var found types.Vtxo
+	var found clientlib.Vtxo
 	require.Eventually(t, func() bool {
 		resp, err := indexerSvc.GetVtxos(t.Context(),
-			indexer.WithScripts([]string{hex.EncodeToString(pkScript)}),
-			indexer.WithSpendableOnly(),
+			clientlib.WithScripts([]string{hex.EncodeToString(pkScript)}),
+			clientlib.WithSpendableOnly(),
 		)
 		if err != nil {
 			return false
@@ -409,9 +409,9 @@ func waitForRenewedVtxo(
 }
 
 // testWallet returns txids the way the tests read them.
-type testWallet struct{ clientlib.Wallet }
+type testWallet struct{ clientwallet.Wallet }
 
-func (w testWallet) SendOffChain(ctx context.Context, receivers []types.Receiver) (string, error) {
+func (w testWallet) SendOffChain(ctx context.Context, receivers []clientlib.Receiver) (string, error) {
 	// client-lib has no local view of its change and asks the indexer each time:
 	// right after a send the indexer may not show the change yet
 	var need uint64
@@ -446,16 +446,16 @@ func setupAlice(t *testing.T) (testWallet, *btcec.PublicKey) {
 
 	idStore, err := inmemorystore.NewStore()
 	require.NoError(t, err)
-	identity, err := singlekeywallet.NewIdentity(idStore)
+	identity, err := walletidentity.NewIdentity(idStore)
 	require.NoError(t, err)
 	privKey, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
 
-	configStore, err := store.NewStore(store.Config{ConfigStoreType: types.InMemoryStore})
+	configStore, err := walletstore.NewStore()
 	require.NoError(t, err)
-	wallet, err := clientlib.NewWallet(configStore, clientlib.WithIdentity(identity))
+	wallet, err := clientwallet.NewWallet(configStore, clientwallet.WithIdentity(identity))
 	require.NoError(t, err)
-	require.NoError(t, wallet.Init(ctx, clientlib.InitArgs{
+	require.NoError(t, wallet.Init(ctx, clientwallet.InitArgs{
 		ServerUrl: arkURL, Seed: hex.EncodeToString(privKey.Serialize()), Password: password, ExplorerURL: explorerURL,
 	}))
 	require.NoError(t, wallet.Unlock(ctx, password))
@@ -465,7 +465,7 @@ func setupAlice(t *testing.T) (testWallet, *btcec.PublicKey) {
 }
 
 // onchainTotal counts boarding funds still inside their exit delay, like the old sdk did.
-func onchainTotal(b *clientlib.Balance) uint64 {
+func onchainTotal(b *wallettypes.Balance) uint64 {
 	total := b.OnchainBalance.SpendableAmount
 	for _, l := range b.OnchainBalance.LockedAmount {
 		total += l.Amount

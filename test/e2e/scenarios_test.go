@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	"encoding/hex"
 
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/config"
 	"github.com/arkade-os/delegatee/internal/core/application"
@@ -37,7 +38,7 @@ func TestRestartAndKeys(t *testing.T) {
 	reg := registerDelegation(t, first, alicePubKey, renewalWindow, 0)
 	first.stop()
 
-	fundingTxid, err := alice.SendOffChain(ctx, []types.Receiver{{To: reg.address, Amount: delegateAmount}})
+	fundingTxid, err := alice.SendOffChain(ctx, []clientlib.Receiver{{To: reg.address, Amount: delegateAmount}})
 	require.NoError(t, err)
 
 	stranger := startDelegatee(t)
@@ -66,7 +67,7 @@ func TestRestartAndKeys(t *testing.T) {
 		c.SecretKeys = []*btcec.PrivateKey{rotatedKey, key}
 	}
 	second := startDelegatee(t, withRotatedKeys)
-	renewed := waitForRenewedVtxo(t, second.indexer, reg.pkScript, fundingTxid, func(types.Vtxo) bool { return true })
+	renewed := waitForRenewedVtxo(t, second.indexer, reg.pkScript, fundingTxid, func(clientlib.Vtxo) bool { return true })
 	t.Logf("renewed after restart: %s", renewed.Outpoint.String())
 	// new addresses use the rotated key; the old address keeps its old leaf.
 	again, err := second.client.GetInfo(ctx, &delegateev1.GetInfoRequest{RenewalWindow: renewalWindow})
@@ -88,7 +89,7 @@ func TestCancelStopsRenewals(t *testing.T) {
 	reg := registerDelegation(t, d, alicePubKey, renewalWindow, 0)
 	_, err := d.admin.CancelDelegation(ctx, &delegateev1.CancelDelegationRequest{Address: reg.address})
 	require.NoError(t, err)
-	fundingTxid, err := alice.SendOffChain(ctx, []types.Receiver{{To: reg.address, Amount: delegateAmount}})
+	fundingTxid, err := alice.SendOffChain(ctx, []clientlib.Receiver{{To: reg.address, Amount: delegateAmount}})
 	require.NoError(t, err)
 	neverRenewed(t, d, reg.pkScript, fundingTxid)
 	detail, err := d.client.GetDelegation(ctx, &delegateev1.GetDelegationRequest{Address: reg.address})
@@ -100,7 +101,7 @@ func TestCancelStopsRenewals(t *testing.T) {
 		Tapscripts: reg.tapscripts, RenewalWindow: renewalWindow,
 	})
 	require.NoError(t, err)
-	waitForRenewedVtxo(t, d.indexer, reg.pkScript, fundingTxid, func(types.Vtxo) bool { return true })
+	waitForRenewedVtxo(t, d.indexer, reg.pkScript, fundingTxid, func(clientlib.Vtxo) bool { return true })
 }
 
 // TestSeveralCoinsAtOneAddress: all the coins of an address go in one batch,
@@ -117,9 +118,9 @@ func TestSeveralCoinsAtOneAddress(t *testing.T) {
 
 	reg := registerDelegation(t, d, alicePubKey, renewalWindow, 0)
 	amounts := []uint64{10_000, 10_000, 25_000, 1_000}
-	receivers := make([]types.Receiver, len(amounts))
+	receivers := make([]clientlib.Receiver, len(amounts))
 	for i, a := range amounts {
-		receivers[i] = types.Receiver{To: reg.address, Amount: a}
+		receivers[i] = clientlib.Receiver{To: reg.address, Amount: a}
 	}
 	fundingTxid, err := alice.SendOffChain(ctx, receivers)
 	require.NoError(t, err)
@@ -167,7 +168,7 @@ func TestFeeDropUnblocksRenewal(t *testing.T) {
 	require.Equal(t, "100.0", st.GetIntentFees().GetOffchainInput(), "the operator sees what arkd charges")
 
 	// alice pays the fee for her own send; the delegation cannot
-	fundingTxid, err := alice.SendOffChain(ctx, []types.Receiver{{To: reg.address, Amount: delegateAmount}})
+	fundingTxid, err := alice.SendOffChain(ctx, []clientlib.Receiver{{To: reg.address, Amount: delegateAmount}})
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
 		list, err := d.admin.ListDelegations(ctx, &delegateev1.ListDelegationsRequest{})
@@ -188,7 +189,7 @@ func TestFeeDropUnblocksRenewal(t *testing.T) {
 	require.Len(t, detail.GetRenewals(), 1, "refused every poll, recorded once")
 
 	clearFees()
-	renewed := waitForRenewedVtxo(t, d.indexer, reg.pkScript, fundingTxid, func(types.Vtxo) bool { return true })
+	renewed := waitForRenewedVtxo(t, d.indexer, reg.pkScript, fundingTxid, func(clientlib.Vtxo) bool { return true })
 	require.Equal(t, delegateAmount, renewed.Amount, "nothing was deducted")
 }
 
@@ -297,7 +298,7 @@ func TestStopWaitsForTheBatch(t *testing.T) {
 	alice, alicePubKey := setupAlice(t)
 	fundAndSettle(t, alice, 100_000)
 	reg := registerDelegation(t, d, alicePubKey, renewalWindow, 0)
-	fundingTxid, err := alice.SendOffChain(ctx, []types.Receiver{{To: reg.address, Amount: delegateAmount}})
+	fundingTxid, err := alice.SendOffChain(ctx, []clientlib.Receiver{{To: reg.address, Amount: delegateAmount}})
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {

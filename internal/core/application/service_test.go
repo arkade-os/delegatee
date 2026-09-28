@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	emulatorclient "github.com/arkade-os/emulator/pkg/client"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -314,9 +315,9 @@ func TestLateAndScannerHealth(t *testing.T) {
 	env := newTestEnv(t)
 	now := time.Now()
 	due := now.Add(-time.Hour)
-	require.False(t, late(types.Vtxo{ExpiresAt: now.Add(time.Hour)}, due, now), "half the room left")
-	require.True(t, late(types.Vtxo{ExpiresAt: now.Add(10 * time.Minute)}, due, now), "last quarter")
-	require.False(t, late(types.Vtxo{ExpiresAt: due}, due, now), "no room at all is not late, it is a zero window")
+	require.False(t, late(clientlib.Vtxo{ExpiresAt: now.Add(time.Hour)}, due, now), "half the room left")
+	require.True(t, late(clientlib.Vtxo{ExpiresAt: now.Add(10 * time.Minute)}, due, now), "last quarter")
+	require.False(t, late(clientlib.Vtxo{ExpiresAt: due}, due, now), "no room at all is not late, it is a zero window")
 
 	d := env.register(t, domain.Params{RenewalWindow: 3600})
 	stuck := env.vtxo(t, d, 1, 5000, 5*time.Minute) // renewable since 55 min, expires in 5

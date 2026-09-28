@@ -5,12 +5,13 @@ import (
 	"strings"
 	"testing"
 
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/tree"
-	"github.com/arkade-os/arkd/pkg/client-lib/client"
 	"github.com/arkade-os/delegatee/internal/core/domain"
-	"github.com/btcsuite/btcd/btcutil/psbt"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/psbt/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,11 +93,11 @@ func TestBatchHandlerSignsAndForfeits(t *testing.T) {
 	}
 	ctx := t.Context()
 
-	skip, err := h.OnTreeSigningStarted(ctx, client.TreeSigningStartedEvent{CosignersPubkeys: []string{"02aa"}}, batch.vtxoTree)
+	skip, err := h.OnTreeSigningStarted(ctx, clientlib.TreeSigningStartedEvent{CosignersPubkeys: []string{"02aa"}}, batch.vtxoTree)
 	require.NoError(t, err)
 	require.True(t, skip, "a tree we do not cosign")
 
-	started := client.TreeSigningStartedEvent{
+	started := clientlib.TreeSigningStartedEvent{
 		Id: "b1", UnsignedCommitmentTx: batch.commitment, CosignersPubkeys: []string{env.svc.delegatePubKeyHex},
 	}
 	skip, err = h.OnTreeSigningStarted(ctx, started, batch.vtxoTree)
@@ -112,7 +113,7 @@ func TestBatchHandlerSignsAndForfeits(t *testing.T) {
 	aggregated, err := coordinator.AggregateNonces()
 	require.NoError(t, err)
 
-	done, err := h.OnTreeNoncesAggregated(ctx, client.TreeNoncesAggregatedEvent{Id: "b1", Nonces: aggregated})
+	done, err := h.OnTreeNoncesAggregated(ctx, clientlib.TreeNoncesAggregatedEvent{Id: "b1", Nonces: aggregated})
 	require.NoError(t, err)
 	require.True(t, done)
 	ban, err := coordinator.AddSignatures(env.svc.key.PubKey(), env.ark.sigs)
@@ -127,16 +128,16 @@ func TestBatchHandlerSignsAndForfeits(t *testing.T) {
 
 	// finalization: a batch missing one of our coins gets no forfeit at all
 	stingy := buildBatch(t, env, []*wire.TxOut{first.output}, 2)
-	_, err = h.OnBatchFinalization(ctx, client.BatchFinalizationEvent{Tx: stingy.commitment}, stingy.vtxoTree, stingy.connectors)
+	_, err = h.OnBatchFinalization(ctx, clientlib.BatchFinalizationEvent{Tx: stingy.commitment}, stingy.vtxoTree, stingy.connectors)
 	require.ErrorContains(t, err, "refusing to forfeit")
 	require.Empty(t, env.ark.forfeits)
 
 	few := buildBatch(t, env, []*wire.TxOut{first.output, second.output}, 1)
-	_, err = h.OnBatchFinalization(ctx, client.BatchFinalizationEvent{Tx: few.commitment}, few.vtxoTree, few.connectors)
+	_, err = h.OnBatchFinalization(ctx, clientlib.BatchFinalizationEvent{Tx: few.commitment}, few.vtxoTree, few.connectors)
 	require.ErrorContains(t, err, "got 0 connectors for 1 vtxos")
 
 	env.ark.forfeits = nil
-	signed, err := h.OnBatchFinalization(ctx, client.BatchFinalizationEvent{Tx: batch.commitment}, batch.vtxoTree, batch.connectors)
+	signed, err := h.OnBatchFinalization(ctx, clientlib.BatchFinalizationEvent{Tx: batch.commitment}, batch.vtxoTree, batch.connectors)
 	require.NoError(t, err)
 	require.Len(t, signed, 2)
 	require.ElementsMatch(t, signed, env.ark.forfeits, "submitted per intent, in any order")
@@ -149,7 +150,7 @@ func TestBatchHandlerSignsAndForfeits(t *testing.T) {
 	require.Len(t, connectorsUsed, 2, "each forfeit spends its own connector")
 
 	env.emulator.infoErr = errBoom
-	_, err = h.OnBatchFinalization(ctx, client.BatchFinalizationEvent{Tx: batch.commitment}, batch.vtxoTree, batch.connectors)
+	_, err = h.OnBatchFinalization(ctx, clientlib.BatchFinalizationEvent{Tx: batch.commitment}, batch.vtxoTree, batch.connectors)
 	require.ErrorContains(t, err, "emulator finalization")
 }
 

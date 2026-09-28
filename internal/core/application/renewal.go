@@ -21,15 +21,14 @@ import (
 	"github.com/arkade-os/arkd/pkg/ark-lib/tree"
 	"github.com/arkade-os/arkd/pkg/ark-lib/txutils"
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
-	"github.com/arkade-os/arkd/pkg/client-lib/client"
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
+	batchsessionhandler "github.com/arkade-os/arkd/pkg/client-lib/batch-session/handler"
 	"github.com/arkade-os/emulator/pkg/arkade"
 	emulatorclient "github.com/arkade-os/emulator/pkg/client"
 	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil/psbt"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/psbt/v2"
+	"github.com/btcsuite/btcd/txscript/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -141,16 +140,18 @@ func (s *service) renewForCosigner(ctx context.Context, cosigner *cosigner, inpu
 		return results
 	}
 
-	var outpoints []types.Outpoint
+	var outpoints []clientlib.Outpoint
 	for _, p := range pending {
 		for _, in := range p.inputs {
 			outpoints = append(outpoints, in.vtxo.Outpoint)
 		}
 	}
 	signerSession := tree.NewTreeSignerSession(cosigner.key)
-	eventsCh, stop, err := s.ark.GetEventStream(ctx, clientlib.GetEventStreamTopics(
-		outpoints, []tree.SignerSession{signerSession},
-	))
+	topics := make([]string, 0, len(outpoints)+1)
+	for _, outpoint := range outpoints {
+		topics = append(topics, outpoint.String())
+	}
+	eventsCh, stop, err := s.ark.GetEventStream(ctx, append(topics, signerSession.GetPublicKey()))
 	if err != nil {
 		for _, p := range pending {
 			results = append(results, renewalResult{inputs: p.inputs, err: fmt.Errorf("event stream: %w", err)})
@@ -174,7 +175,7 @@ func (s *service) renewForCosigner(ctx context.Context, cosigner *cosigner, inpu
 	h := &batchHandler{svc: s, pending: registered}
 	for len(h.pending) > 0 {
 		h.signerSession = tree.NewTreeSignerSession(cosigner.key)
-		commitmentTxid, _, _, _, _, err := clientlib.JoinBatchSession(ctx, eventsCh, h)
+		commitmentTxid, _, _, _, _, err := batchsessionhandler.JoinBatchSession(ctx, eventsCh, h)
 		if err != nil {
 			for _, p := range append(h.inBatch, h.pending...) {
 				results = append(results, renewalResult{inputs: p.inputs, err: fmt.Errorf("batch session: %w", err)})
@@ -209,7 +210,7 @@ func (s *service) buildIntent(ctx context.Context, cosigner *cosigner, inputs []
 
 	proofInputs := make([]intent.Input, len(inputs))
 	outputs := make([]*wire.TxOut, len(inputs))
-	vtxos := make([]types.Vtxo, len(inputs))
+	vtxos := make([]clientlib.Vtxo, len(inputs))
 	for i, in := range inputs {
 		hash, err := chainhash.NewHashFromStr(in.vtxo.Txid)
 		if err != nil {
@@ -298,7 +299,7 @@ func (s *service) feeEstimator(ctx context.Context) (*feeEstimator, error) {
 }
 
 func (f *feeEstimator) of(in renewalInput) (int64, error) {
-	inFee, err := f.EvalOffchainInput(types.VtxoWithTapTree{Vtxo: in.vtxo}.ToArkFeeInput())
+	inFee, err := f.EvalOffchainInput(in.vtxo.ToArkFeeInput())
 	if err != nil {
 		return 0, fmt.Errorf("intent input fee: %w", err)
 	}
@@ -353,7 +354,7 @@ func feeSatoshis(fee arkfee.FeeAmount) (int64, error) {
 }
 
 // assetPacketFor moves the assets of proof input i to output i-1.
-func assetPacketFor(vtxos []types.Vtxo) (asset.Packet, error) {
+func assetPacketFor(vtxos []clientlib.Vtxo) (asset.Packet, error) {
 	type transfer struct {
 		inputs  []asset.AssetInput
 		outputs []asset.AssetOutput
@@ -439,19 +440,21 @@ type batchHandler struct {
 	batchExpiry arklib.RelativeLocktime
 }
 
-func (h *batchHandler) OnStreamStarted(context.Context, client.StreamStartedEvent) error { return nil }
-func (h *batchHandler) OnBatchFinalized(context.Context, client.BatchFinalizedEvent) error {
+func (h *batchHandler) OnStreamStarted(context.Context, clientlib.StreamStartedEvent) error {
 	return nil
 }
-func (h *batchHandler) OnTreeTxEvent(context.Context, client.TreeTxEvent) error { return nil }
-func (h *batchHandler) OnTreeSignatureEvent(context.Context, client.TreeSignatureEvent) error {
+func (h *batchHandler) OnBatchFinalized(context.Context, clientlib.BatchFinalizedEvent) error {
 	return nil
 }
-func (h *batchHandler) OnTreeNonces(context.Context, client.TreeNoncesEvent) (bool, error) {
+func (h *batchHandler) OnTreeTxEvent(context.Context, clientlib.TreeTxEvent) error { return nil }
+func (h *batchHandler) OnTreeSignatureEvent(context.Context, clientlib.TreeSignatureEvent) error {
+	return nil
+}
+func (h *batchHandler) OnTreeNonces(context.Context, clientlib.TreeNoncesEvent) (bool, error) {
 	return false, nil
 }
 
-func (h *batchHandler) OnBatchStarted(ctx context.Context, event client.BatchStartedEvent) (bool, time.Duration, error) {
+func (h *batchHandler) OnBatchStarted(ctx context.Context, event clientlib.BatchStartedEvent) (bool, time.Duration, error) {
 	var inBatch, pending []*pendingIntent
 	for _, p := range h.pending {
 		sum := sha256.Sum256([]byte(p.id))
@@ -478,7 +481,7 @@ func (h *batchHandler) OnBatchStarted(ctx context.Context, event client.BatchSta
 	return false, time.Duration(event.BatchExpiry) * time.Second, nil
 }
 
-func (h *batchHandler) OnBatchFailed(_ context.Context, event client.BatchFailedEvent) error {
+func (h *batchHandler) OnBatchFailed(_ context.Context, event clientlib.BatchFailedEvent) error {
 	if event.Id == h.batchID {
 		return fmt.Errorf("batch %s failed: %s", event.Id, event.Reason)
 	}
@@ -486,7 +489,7 @@ func (h *batchHandler) OnBatchFailed(_ context.Context, event client.BatchFailed
 }
 
 func (h *batchHandler) OnTreeSigningStarted(
-	ctx context.Context, event client.TreeSigningStartedEvent, vtxoTree *tree.TxTree,
+	ctx context.Context, event clientlib.TreeSigningStartedEvent, vtxoTree *tree.TxTree,
 ) (bool, error) {
 	if !slices.Contains(event.CosignersPubkeys, h.signerSession.GetPublicKey()) {
 		return true, nil
@@ -513,7 +516,7 @@ func (h *batchHandler) OnTreeSigningStarted(
 	return false, h.svc.ark.SubmitTreeNonces(ctx, event.Id, h.signerSession.GetPublicKey(), nonces)
 }
 
-func (h *batchHandler) OnTreeNoncesAggregated(ctx context.Context, event client.TreeNoncesAggregatedEvent) (bool, error) {
+func (h *batchHandler) OnTreeNoncesAggregated(ctx context.Context, event clientlib.TreeNoncesAggregatedEvent) (bool, error) {
 	h.signerSession.SetAggregatedNonces(event.Nonces)
 	sigs, err := h.signerSession.Sign()
 	if err != nil {
@@ -524,12 +527,12 @@ func (h *batchHandler) OnTreeNoncesAggregated(ctx context.Context, event client.
 }
 
 func (h *batchHandler) OnBatchFinalization(
-	ctx context.Context, event client.BatchFinalizationEvent, vtxoTree, connectorTree *tree.TxTree,
+	ctx context.Context, event clientlib.BatchFinalizationEvent, vtxoTree, connectorTree *tree.TxTree,
 ) ([]string, error) {
 	// the point of no return: a forfeit hands the old vtxo to arkd, so the
 	// batch must verifiably contain the new one. The users are not here to check.
 	var outputs []*wire.TxOut
-	var assets [][]types.Asset
+	var assets [][]clientlib.Asset
 	for _, p := range h.inBatch {
 		for _, in := range p.inputs {
 			outputs = append(outputs, in.output)
@@ -608,7 +611,7 @@ func validateBatch(
 func validateBatchWithAssets(
 	commitmentTx string, vtxoTree, connectorTree *tree.TxTree,
 	forfeitPubKey *btcec.PublicKey, batchExpiry arklib.RelativeLocktime, outputs []*wire.TxOut,
-	assets [][]types.Asset,
+	assets [][]clientlib.Asset,
 ) (err error) {
 	// Remote trees can be malformed; turn validator panics into errors.
 	defer func() {
@@ -686,7 +689,7 @@ func leavesPay(leaves []*psbt.Packet, outputs []*wire.TxOut) error {
 	return leavesPayWithAssets(leaves, outputs, nil)
 }
 
-func leavesPayWithAssets(leaves []*psbt.Packet, outputs []*wire.TxOut, expectedAssets [][]types.Asset) error {
+func leavesPayWithAssets(leaves []*psbt.Packet, outputs []*wire.TxOut, expectedAssets [][]clientlib.Asset) error {
 	if expectedAssets != nil && len(expectedAssets) != len(outputs) {
 		return fmt.Errorf("expected asset count %d does not match output count %d", len(expectedAssets), len(outputs))
 	}
@@ -741,7 +744,7 @@ func leavesPayWithAssets(leaves []*psbt.Packet, outputs []*wire.TxOut, expectedA
 	return nil
 }
 
-func assetsAt(packet asset.Packet, index int, expected []types.Asset) bool {
+func assetsAt(packet asset.Packet, index int, expected []clientlib.Asset) bool {
 	actual := make(map[string]uint64)
 	for _, group := range packet {
 		if group.IsIssuance() {

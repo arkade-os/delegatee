@@ -7,16 +7,16 @@ import (
 	"testing"
 	"time"
 
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
 	"github.com/arkade-os/arkd/pkg/ark-lib/extension"
 	"github.com/arkade-os/arkd/pkg/ark-lib/txutils"
-	"github.com/arkade-os/arkd/pkg/client-lib/client"
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	emulatorclient "github.com/arkade-os/emulator/pkg/client"
-	"github.com/btcsuite/btcd/btcutil/psbt"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/psbt/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,7 +46,7 @@ func TestLeavesPay(t *testing.T) {
 func TestLeavesPayChecksAssets(t *testing.T) {
 	const assetID = "abababababababababababababababababababababababababababababababab0000"
 	script := []byte{0x51, 0x02}
-	packet, err := assetPacketFor([]types.Vtxo{{Assets: []types.Asset{{AssetId: assetID, Amount: 5}}}})
+	packet, err := assetPacketFor([]clientlib.Vtxo{{Assets: []clientlib.Asset{{AssetId: assetID, Amount: 5}}}})
 	require.NoError(t, err)
 	ext, err := (extension.Extension{packet}).TxOut()
 	require.NoError(t, err)
@@ -57,12 +57,12 @@ func TestLeavesPayChecksAssets(t *testing.T) {
 	require.NoError(t, leavesPayWithAssets(
 		[]*psbt.Packet{leaf},
 		[]*wire.TxOut{wire.NewTxOut(1_000, script)},
-		[][]types.Asset{{{AssetId: assetID, Amount: 5}}},
+		[][]clientlib.Asset{{{AssetId: assetID, Amount: 5}}},
 	))
 	require.Error(t, leavesPayWithAssets(
 		[]*psbt.Packet{leaf},
 		[]*wire.TxOut{wire.NewTxOut(1_000, script)},
-		[][]types.Asset{{{AssetId: assetID, Amount: 6}}},
+		[][]clientlib.Asset{{{AssetId: assetID, Amount: 6}}},
 	))
 }
 
@@ -97,7 +97,7 @@ func TestRenewPaysTheFeeOrRefuses(t *testing.T) {
 
 func TestRenewPricesOutputFeeAtTheActualOutputAmount(t *testing.T) {
 	env := newTestEnv(t)
-	env.ark.info.Fees = types.FeeInfo{IntentFees: arkfee.Config{
+	env.ark.info.Fees = clientlib.FeeInfo{IntentFees: arkfee.Config{
 		IntentOffchainOutputProgram: "amount < 10000.0 ? 200.0 : 100.0",
 	}}
 	env.ark.streamErr = errBoom
@@ -185,16 +185,16 @@ func TestBuildIntentNeedsThePreviousTx(t *testing.T) {
 }
 
 func TestAssetPacket(t *testing.T) {
-	packet, err := assetPacketFor([]types.Vtxo{{Amount: 1}, {Amount: 2}})
+	packet, err := assetPacketFor([]clientlib.Vtxo{{Amount: 1}, {Amount: 2}})
 	require.NoError(t, err)
 	require.Nil(t, packet, "no assets, no packet")
 
 	gold := strings.Repeat("ab", 32) + "0000"
 	silver := strings.Repeat("cd", 32) + "0100"
-	packet, err = assetPacketFor([]types.Vtxo{
-		{Assets: []types.Asset{{AssetId: gold, Amount: 5}}},
+	packet, err = assetPacketFor([]clientlib.Vtxo{
+		{Assets: []clientlib.Asset{{AssetId: gold, Amount: 5}}},
 		{},
-		{Assets: []types.Asset{{AssetId: silver, Amount: 7}, {AssetId: gold, Amount: 1}}},
+		{Assets: []clientlib.Asset{{AssetId: silver, Amount: 7}, {AssetId: gold, Amount: 1}}},
 	})
 	require.NoError(t, err)
 	require.Len(t, packet, 2, "one group per asset")
@@ -205,7 +205,7 @@ func TestAssetPacket(t *testing.T) {
 	require.Equal(t, uint16(2), packet[0].Outputs[1].Vout)
 	require.Equal(t, uint64(7), packet[1].Outputs[0].Amount)
 
-	_, err = assetPacketFor([]types.Vtxo{{Assets: []types.Asset{{AssetId: "zz", Amount: 1}}}})
+	_, err = assetPacketFor([]clientlib.Vtxo{{Assets: []clientlib.Asset{{AssetId: "zz", Amount: 1}}}})
 	require.Error(t, err)
 }
 
@@ -218,12 +218,12 @@ func TestBatchHandlerSelection(t *testing.T) {
 	mine, other := &pendingIntent{id: "mine"}, &pendingIntent{id: "later"}
 	h := &batchHandler{svc: env.svc, pending: []*pendingIntent{mine, other}}
 
-	skip, _, err := h.OnBatchStarted(t.Context(), client.BatchStartedEvent{Id: "b0", HashedIntentIds: []string{hashed("someone")}})
+	skip, _, err := h.OnBatchStarted(t.Context(), clientlib.BatchStartedEvent{Id: "b0", HashedIntentIds: []string{hashed("someone")}})
 	require.NoError(t, err)
 	require.True(t, skip, "not our batch")
 	require.Empty(t, env.ark.confirmed)
 
-	skip, timeout, err := h.OnBatchStarted(t.Context(), client.BatchStartedEvent{
+	skip, timeout, err := h.OnBatchStarted(t.Context(), clientlib.BatchStartedEvent{
 		Id: "b1", HashedIntentIds: []string{hashed("mine")}, BatchExpiry: 1024,
 	})
 	require.NoError(t, err)
@@ -234,19 +234,19 @@ func TestBatchHandlerSelection(t *testing.T) {
 	require.Equal(t, []*pendingIntent{other}, h.pending)
 	require.Equal(t, arklib.LocktimeTypeSecond, h.batchExpiry.Type)
 
-	_, _, err = h.OnBatchStarted(t.Context(), client.BatchStartedEvent{Id: "b2", HashedIntentIds: []string{hashed("later")}, BatchExpiry: 144})
+	_, _, err = h.OnBatchStarted(t.Context(), clientlib.BatchStartedEvent{Id: "b2", HashedIntentIds: []string{hashed("later")}, BatchExpiry: 144})
 	require.NoError(t, err)
 	require.Equal(t, arklib.LocktimeTypeBlock, h.batchExpiry.Type)
 
-	require.NoError(t, h.OnBatchFailed(t.Context(), client.BatchFailedEvent{Id: "another", Reason: "x"}))
-	require.ErrorContains(t, h.OnBatchFailed(t.Context(), client.BatchFailedEvent{Id: "b2", Reason: "timeout"}), "batch b2 failed: timeout")
+	require.NoError(t, h.OnBatchFailed(t.Context(), clientlib.BatchFailedEvent{Id: "another", Reason: "x"}))
+	require.ErrorContains(t, h.OnBatchFailed(t.Context(), clientlib.BatchFailedEvent{Id: "b2", Reason: "timeout"}), "batch b2 failed: timeout")
 
 	// the no-op callbacks stay no-ops
-	require.NoError(t, h.OnStreamStarted(t.Context(), client.StreamStartedEvent{}))
-	require.NoError(t, h.OnBatchFinalized(t.Context(), client.BatchFinalizedEvent{}))
-	require.NoError(t, h.OnTreeTxEvent(t.Context(), client.TreeTxEvent{}))
-	require.NoError(t, h.OnTreeSignatureEvent(t.Context(), client.TreeSignatureEvent{}))
-	done, err := h.OnTreeNonces(t.Context(), client.TreeNoncesEvent{})
+	require.NoError(t, h.OnStreamStarted(t.Context(), clientlib.StreamStartedEvent{}))
+	require.NoError(t, h.OnBatchFinalized(t.Context(), clientlib.BatchFinalizedEvent{}))
+	require.NoError(t, h.OnTreeTxEvent(t.Context(), clientlib.TreeTxEvent{}))
+	require.NoError(t, h.OnTreeSignatureEvent(t.Context(), clientlib.TreeSignatureEvent{}))
+	done, err := h.OnTreeNonces(t.Context(), clientlib.TreeNoncesEvent{})
 	require.NoError(t, err)
 	require.False(t, done)
 }
@@ -279,7 +279,7 @@ func TestForfeits(t *testing.T) {
 	require.ErrorContains(t, err, "connector not found")
 
 	// nothing is forfeited for a batch that cannot be verified
-	_, err = h.OnBatchFinalization(t.Context(), client.BatchFinalizationEvent{}, nil, nil)
+	_, err = h.OnBatchFinalization(t.Context(), clientlib.BatchFinalizationEvent{}, nil, nil)
 	require.ErrorContains(t, err, "refusing to forfeit")
 }
 

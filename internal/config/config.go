@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	grpcclient "github.com/arkade-os/arkd/pkg/client-lib/client/grpc"
-	grpcindexer "github.com/arkade-os/arkd/pkg/client-lib/indexer/grpc"
+	"github.com/arkade-os/arkd/pkg/client-lib/client"
+	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
 	"github.com/arkade-os/delegatee/internal/core/application"
 	"github.com/arkade-os/delegatee/internal/infrastructure/db/postgres"
 	emulatorclient "github.com/arkade-os/emulator/pkg/client"
@@ -155,12 +155,12 @@ func (c *Config) AppService(ctx context.Context) (application.Service, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 	arkURL := strings.TrimSuffix(c.ArkURL, "/")
-	ark, err := grpcclient.NewClient(arkURL, "delegateed")
+	ark, err := client.NewClient(arkURL, "delegateed")
 	if err != nil {
 		_ = repo.Close()
 		return nil, fmt.Errorf("connect to arkd: %w", err)
 	}
-	indexerSvc, err := grpcindexer.NewClient(arkURL)
+	indexerSvc, err := indexer.NewClient(arkURL)
 	if err != nil {
 		_ = repo.Close()
 		ark.Close()

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -60,7 +60,7 @@ func TestIntentFees(t *testing.T) {
 	paying, free := register(150), register(0)
 	require.NotEqual(t, paying.address, free.address)
 
-	_, err := alice.SendOffChain(ctx, []types.Receiver{
+	_, err := alice.SendOffChain(ctx, []clientlib.Receiver{
 		{To: paying.address, Amount: delegateAmount}, {To: free.address, Amount: delegateAmount},
 	})
 	require.NoError(t, err)
@@ -70,8 +70,8 @@ func TestIntentFees(t *testing.T) {
 	issued, err := alice.IssueAsset(ctx, assetAmount, nil, nil)
 	require.NoError(t, err)
 	assetID := issued.IssuedAssets[0].String()
-	_, err = alice.SendOffChain(ctx, []types.Receiver{{
-		To: withAsset.address, Amount: delegateAmount, Assets: []types.Asset{{AssetId: assetID, Amount: assetAmount}},
+	_, err = alice.SendOffChain(ctx, []clientlib.Receiver{{
+		To: withAsset.address, Amount: delegateAmount, Assets: []clientlib.Asset{{AssetId: assetID, Amount: assetAmount}},
 	}})
 	require.NoError(t, err)
 
@@ -81,7 +81,7 @@ func TestIntentFees(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		resp, err := indexerSvc.GetVtxos(ctx,
-			indexer.WithScripts([]string{hex.EncodeToString(paying.pkScript)}), indexer.WithSpendableOnly())
+			clientlib.WithScripts([]string{hex.EncodeToString(paying.pkScript)}), clientlib.WithSpendableOnly())
 		if err != nil {
 			return false
 		}
@@ -104,7 +104,7 @@ func TestIntentFees(t *testing.T) {
 	// renewed once, not in every round: the amount lost is exactly one fee
 	time.Sleep(15 * time.Second)
 	resp, err := indexerSvc.GetVtxos(ctx,
-		indexer.WithScripts([]string{hex.EncodeToString(paying.pkScript)}), indexer.WithSpendableOnly())
+		clientlib.WithScripts([]string{hex.EncodeToString(paying.pkScript)}), clientlib.WithSpendableOnly())
 	require.NoError(t, err)
 	require.Len(t, resp.Vtxos, 1)
 	require.Equal(t, uint64(delegateAmount-fee), resp.Vtxos[0].Amount)
@@ -118,7 +118,7 @@ func TestIntentFees(t *testing.T) {
 		return !ren.GetSuccess() && strings.Contains(ren.GetError(), "exceeds the delegation max fee")
 	}, time.Minute, 500*time.Millisecond, "fee refusal not recorded")
 	resp, err = indexerSvc.GetVtxos(ctx,
-		indexer.WithScripts([]string{hex.EncodeToString(free.pkScript)}), indexer.WithSpendableOnly())
+		clientlib.WithScripts([]string{hex.EncodeToString(free.pkScript)}), clientlib.WithSpendableOnly())
 	require.NoError(t, err)
 	require.Len(t, resp.Vtxos, 1)
 	require.True(t, resp.Vtxos[0].Preconfirmed, "zero max fee vtxo must not be renewed")

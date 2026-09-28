@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"time"
 
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	"github.com/arkade-os/arkd/pkg/ark-lib/intent"
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	"github.com/arkade-os/emulator/pkg/arkade"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/txscript/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 // DefaultRenewalWindow applies when a request leaves the window unset.
@@ -44,7 +45,7 @@ func validateParams(p domain.Params) error {
 // dueAt is when a vtxo must be renewed: the start of its renewal window. A delegation that may pay fees
 // waits at least half the vtxo's life: a window longer than the life would
 // otherwise renew, and pay, in every round.
-func dueAt(v types.Vtxo, p domain.Params) time.Time {
+func dueAt(v clientlib.Vtxo, p domain.Params) time.Time {
 	window := time.Duration(p.RenewalWindow) * time.Second
 	if life := v.ExpiresAt.Sub(v.CreatedAt); p.MaxFee > 0 && life > 0 {
 		window = min(window, life/2)
@@ -54,7 +55,7 @@ func dueAt(v types.Vtxo, p domain.Params) time.Time {
 
 // renewalOutput is what the intent creates for the vtxo once arkd's fee for
 // it is paid, or an error when the covenant would not allow it.
-func renewalOutput(v types.Vtxo, pkScript []byte, p domain.Params, fee int64) (*wire.TxOut, error) {
+func renewalOutput(v clientlib.Vtxo, pkScript []byte, p domain.Params, fee int64) (*wire.TxOut, error) {
 	// the amount comes from the indexer: keep it a valid bitcoin amount
 	if v.Amount > btcutil.MaxSatoshi {
 		return nil, fmt.Errorf("vtxo amount %d is not a valid amount", v.Amount)

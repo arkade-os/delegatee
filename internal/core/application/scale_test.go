@@ -4,7 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +28,7 @@ func TestScale(t *testing.T) {
 	total, due := scaleSize() // BenchmarkScan5000 is the big one
 	env := newTestEnv(t)
 	env.svc.maxDelegations = total + 1
-	vtxos := make([]types.Vtxo, 0, total)
+	vtxos := make([]clientlib.Vtxo, 0, total)
 	var last *domain.Delegation
 	for i := range total {
 		last = env.register(t, domain.Params{RenewalWindow: int64(i + 1)})
@@ -67,7 +68,7 @@ func TestScale(t *testing.T) {
 // each) and puts one vtxo, not yet due, at every one of them.
 func manyDelegations(t testing.TB, env *testEnv, n int) {
 	env.svc.maxDelegations = n + 1
-	vtxos := make([]types.Vtxo, 0, n)
+	vtxos := make([]clientlib.Vtxo, 0, n)
 	for i := range n {
 		d := env.register(t, domain.Params{RenewalWindow: int64(i + 1)})
 		vtxos = append(vtxos, env.vtxo(t, d, i, 1000, 400*24*time.Hour))

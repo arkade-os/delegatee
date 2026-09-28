@@ -5,7 +5,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/arkade-os/arkd/pkg/client-lib/types"
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +17,7 @@ func TestCollectionDeadline(t *testing.T) {
 	s := &service{collectionWindow: 30 * time.Second, maxVtxosPerIntent: 16, cosigners: []*cosigner{key}}
 	input := func(due time.Time, window time.Duration) renewalInput {
 		return renewalInput{
-			vtxo:       types.Vtxo{ExpiresAt: due.Add(window)},
+			vtxo:       clientlib.Vtxo{ExpiresAt: due.Add(window)},
 			delegation: &domain.Delegation{Params: domain.Params{RenewalWindow: int64(window / time.Second)}},
 		}
 	}
