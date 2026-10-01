@@ -3,6 +3,7 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 	"github.com/stretchr/testify/require"
@@ -38,12 +39,22 @@ func TestManyDelegations(t *testing.T) {
 func TestAssetRenewal(t *testing.T) {
 	d := startDelegatee(t)
 	alice := fundedWallet(t)
-	issued, err := alice.IssueAsset(t.Context(), assetAmount, nil, nil)
-	require.NoError(t, err)
-	asset := clientlib.Asset{AssetId: issued.IssuedAssets[0].String(), Amount: assetAmount}
+	var assets []clientlib.Asset
+	for _, amount := range []uint64{assetAmount, 2 * assetAmount} {
+		var id string
+		// the previous issuance's change is spendable once the indexer lists it
+		require.Eventually(t, func() bool {
+			issued, err := alice.IssueAsset(t.Context(), amount, nil, nil)
+			if err == nil {
+				id = issued.IssuedAssets[0].String()
+			}
+			return err == nil
+		}, time.Minute, 2*time.Second)
+		assets = append(assets, clientlib.Asset{AssetId: id, Amount: amount})
+	}
 
 	w := renewalWatch(t, d, newOwner(t, d), 0)
-	pay(t, alice, w.Address, asset)
+	pay(t, alice, w.Address, assets...)
 	renewed := landed(t, d, w, w, 1)
-	require.Equal(t, []clientlib.Asset{asset}, renewed[0].Assets)
+	require.ElementsMatch(t, assets, renewed[0].Assets)
 }

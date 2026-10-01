@@ -280,6 +280,14 @@ func TestErrorsMapToStatusCodes(t *testing.T) {
 	}
 }
 
+func TestOnchainCoinHasNoExpiry(t *testing.T) {
+	created := time.Unix(1_790_000_000, 0)
+	out := toVtxos([]clientlib.Vtxo{{CreatedAt: created}}, []time.Time{{}})
+	require.Zero(t, out[0].ExpiresAt)
+	require.Zero(t, out[0].RenewableAt)
+	require.Equal(t, created.Unix(), out[0].CreatedAt)
+}
+
 func TestHealth(t *testing.T) {
 	svc := newFake()
 	svc.health = map[string]error{"database": nil, "ark": nil}

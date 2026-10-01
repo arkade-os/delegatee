@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -31,7 +32,9 @@ import (
 //	ARK_URL=https://mutinynet.arkade.sh \
 //	go test -v -count=1 -timeout 40m -run TestLiveDelegatee ./test/e2e/
 //
-// OWNER_KEY (hex) reuses an earlier owner; the coin renews only in its last 1024 s, so rerun when told.
+// OWNER_KEY (hex) reuses an earlier owner; the coin renews only in its last RENEWAL_WINDOW seconds (default 1024), so rerun when told.
+// On mutinynet VTXOs live 7 days (604800 s): RENEWAL_WINDOW=604500 makes a coin renewable 5 minutes after it is created,
+// and every renewed coin again ~5 minutes later, so cancel the delegation afterwards.
 func TestLiveDelegatee(t *testing.T) {
 	delegateeURL, arkURL := os.Getenv("DELEGATEE_URL"), os.Getenv("ARK_URL")
 	if delegateeURL == "" || arkURL == "" {
@@ -51,6 +54,12 @@ func TestLiveDelegatee(t *testing.T) {
 	require.NoError(t, err)
 	o := owner{liveOwnerKey(t), keysOf(t, info)}
 	vars := o.variables(0)
+	window := int64(1024)
+	if w := os.Getenv("RENEWAL_WINDOW"); w != "" {
+		window, err = strconv.ParseInt(w, 10, 64)
+		require.NoError(t, err)
+	}
+	vars["renewal_window"] = scriptNum(window)
 	vars["exit_delay"] = scriptNum(sequence(t, arkInfo.UnilateralExitDelay))
 	boardingVars := maps.Clone(vars)
 	boardingVars["boarding_exit_delay"] = scriptNum(sequence(t, arkInfo.BoardingExitDelay))
@@ -71,7 +80,7 @@ func TestLiveDelegatee(t *testing.T) {
 		}
 		return len(vtxos) > 0
 	}, 30*time.Minute, 10*time.Second, "nothing boarded")
-	opensAt := boarded.ExpiresAt.Add(-1024 * time.Second)
+	opensAt := boarded.ExpiresAt.Add(-time.Duration(window) * time.Second)
 	if time.Until(opensAt) > 10*time.Minute {
 		t.Logf("%s expires %s: rerun after %s with OWNER_KEY", boarded.Outpoint.String(), boarded.ExpiresAt, opensAt.Format(time.RFC3339))
 		return

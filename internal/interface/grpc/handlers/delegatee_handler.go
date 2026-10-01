@@ -224,16 +224,24 @@ func toVtxos(vtxos []clientlib.Vtxo, due []time.Time) []*delegateev1.Vtxo {
 		out[i] = &delegateev1.Vtxo{
 			Outpoint:     v.Outpoint.String(),
 			Amount:       v.Amount,
-			ExpiresAt:    v.ExpiresAt.Unix(),
-			CreatedAt:    v.CreatedAt.Unix(),
+			ExpiresAt:    unix(v.ExpiresAt),
+			CreatedAt:    unix(v.CreatedAt),
 			Preconfirmed: v.Preconfirmed,
 			Assets:       assets,
 		}
 		if due != nil {
-			out[i].RenewableAt = due[i].Unix()
+			out[i].RenewableAt = unix(due[i])
 		}
 	}
 	return out
+}
+
+// unix is 0 for the zero time: an onchain coin has no expiry.
+func unix(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.Unix()
 }
 
 func toRenewals(renewals []domain.Renewal) []*delegateev1.Renewal {
