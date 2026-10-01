@@ -3,6 +3,7 @@ ENV CGO_ENABLED=0
 WORKDIR /app
 COPY go.mod go.sum ./
 COPY api-spec/go.mod api-spec/go.sum ./api-spec/
+COPY pkg/template/go.mod pkg/template/go.sum ./pkg/template/
 RUN go mod download
 COPY . .
 ARG VERSION=docker
