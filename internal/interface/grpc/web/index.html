@@ -47,6 +47,8 @@ button.danger.solid { background: var(--bad); color: #fff; border-color: var(--b
 button.danger.solid:hover { filter: brightness(1.08); background: var(--bad); }
 button.link { border: 0; background: none; padding: 0; min-height: 0; font-weight: inherit; color: var(--accent); text-decoration: underline; text-underline-offset: .15em; border-radius: 2px; }
 button.link:hover { background: none; color: var(--ink); }
+button.mini { min-height: 0; padding: 0 .45rem; margin-left: .5rem; font: 500 .74rem/1.6 var(--sans); color: var(--muted); border-radius: 4px; vertical-align: .1em; }
+button.mini:hover { color: var(--ink); }
 button[aria-busy=true] { pointer-events: none; opacity: .7; }
 button[aria-busy=true]::after { content: "…"; }
 
@@ -74,7 +76,8 @@ header .meta button:hover { color: var(--accent); }
 @keyframes pulse { 50% { opacity: .25; } }
 
 main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr); min-height: calc(100vh - 6rem); }
-#list { border-right: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-width: 0; max-height: calc(100vh - 6rem); position: sticky; top: 0; }
+#list { border-right: 1px solid var(--line); background: var(--surface); min-width: 0; }
+#list .pane { display: flex; flex-direction: column; height: calc(100vh - 5.25rem); position: sticky; top: 0; }
 .filters { display: flex; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .filters button { flex: 1; border: 0; border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: .65rem .5rem; min-height: 0; color: var(--muted); font-size: .86rem; font-weight: 500; background: none; white-space: nowrap; }
 .filters button:hover { background: var(--hover); color: var(--ink); }
@@ -83,7 +86,7 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 .filters .alert .n { color: var(--bad); font-weight: 600; }
 .filters button[aria-pressed=true] .n { color: var(--muted); }
 #search { margin: .6rem .75rem; padding: .5rem .7rem; min-height: 2.25rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
-#search:focus { background: var(--surface); border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+#search:focus, #register textarea:focus { background: var(--surface); border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 #rows { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
 #rows li button { display: grid; grid-template-columns: .6rem minmax(0, 1fr) auto; gap: .15rem .65rem; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: .7rem .85rem .7rem .95rem; min-height: 0; font-weight: 400; background: none; box-shadow: inset 3px 0 0 transparent; }
 #rows li button:hover { background: var(--hover); }
@@ -119,9 +122,9 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 .title .hash { margin-top: .3rem; font-size: .9rem; max-width: 46rem; color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, max-content)); gap: .75rem 3rem; margin: 1.5rem 0 0; padding: 1rem 0; border-top: 1px solid var(--line); }
-.facts div { display: flex; flex-direction: column; gap: .1rem; }
+.facts div { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
 .facts dt { color: var(--muted); font-size: .8rem; }
-.facts dd { margin: 0; font-weight: 600; font-size: 1.02rem; }
+.facts dd { margin: 0; font-weight: 600; font-size: 1.02rem; overflow-wrap: anywhere; }
 .badge { display: inline-flex; align-items: center; gap: .4rem; border-radius: 99px; padding: .1rem .65rem .1rem .5rem; font-size: .78rem; font-weight: 500; border: 1px solid var(--line); color: var(--muted); }
 .badge::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--faint); }
 .badge.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; } .badge.ok::before { background: var(--ok); }
@@ -161,9 +164,11 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 .legend i { display: inline-block; width: 1.1rem; height: .55rem; border-radius: 2px; vertical-align: middle; margin-right: .35rem; background: var(--elapsed); }
 .legend i.w { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
 
-#template-doc, #artifact-doc { white-space: pre-wrap; word-break: break-all; max-width: 46rem; margin-top: .75rem; }
-#register textarea { width: 100%; max-width: 46rem; min-height: 8rem; font-family: var(--mono); font-size: .86em; }
-#delegate label { display: block; margin: .4rem 0; } #delegate input { width: 100%; max-width: 46rem; font-family: var(--mono); font-size: .86em; }
+.doc { max-width: 60rem; margin-top: .75rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
+.doc .bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .35rem .5rem .35rem .75rem; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .8rem; }
+.doc pre { margin: 0; padding: .75rem; overflow: auto; max-height: 36rem; font: .82rem/1.55 var(--mono); tab-size: 2; }
+.j-k { color: var(--accent); } .j-s { color: var(--ok); } .j-n { color: var(--window); } .j-b { color: var(--bad); } .j-p { color: var(--faint); }
+#register textarea { display: block; width: 100%; max-width: 46rem; min-height: 10rem; margin-bottom: .75rem; padding: .6rem .75rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); color: var(--ink); font: .84rem/1.5 var(--mono); resize: vertical; }
 table { border-collapse: collapse; width: 100%; font-size: .88rem; }
 th { text-align: left; font-weight: 500; color: var(--muted); font-size: .8rem; padding: .35rem .75rem .45rem 0; border-bottom: 1px solid var(--line); }
 td { padding: .55rem .75rem .55rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -184,7 +189,8 @@ dialog .actions { justify-content: flex-end; }
   main { grid-template-columns: minmax(0, 1fr); min-height: 0; }
   #health { margin-left: 0; }
   #status > span { border-right: 0; margin-right: 0; padding-right: 0; width: 100%; }
-  #list { border-right: 0; border-bottom: 1px solid var(--line); position: static; max-height: 45vh; }
+  #list { border-right: 0; border-bottom: 1px solid var(--line); }
+  #list .pane { position: static; height: auto; max-height: 45vh; }
   #rows li button { padding-top: .75rem; padding-bottom: .75rem; }
   #hint { display: none; }
   .facts { grid-template-columns: 1fr 1fr; }
@@ -199,12 +205,12 @@ dialog .actions { justify-content: flex-end; }
 </header>
 <div id="status" role="status"><span><i class="sk" style="width:12rem"></i></span></div>
 <main>
-  <section id="list" aria-label="Delegations">
+  <section id="list" aria-label="Delegations"><div class="pane">
     <div class="filters" id="filters"></div>
     <input id="search" type="search" placeholder="Find an address" aria-label="Find an address">
     <ul id="rows"><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li></ul>
     <div id="hint"><kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>/</kbd> find, <kbd>Esc</kbd> overview</div>
-  </section>
+  </div></section>
   <section id="detail" aria-live="polite" aria-busy="true"></section>
 </main>
 <dialog id="confirm" aria-labelledby="confirm-title">
@@ -229,12 +235,28 @@ let loadLimit = 5000, moreRows = false; // newest first, a page of 1000 at a tim
 
 const OPS = { 0x75: "DROP", 0x87: "EQUAL", 0x88: "EQUALVERIFY", 0xa8: "SHA256", 0xa9: "HASH160", 0xac: "CHECKSIG", 0xad: "CHECKSIGVERIFY",
   0xae: "CHECKMULTISIG", 0xb1: "CHECKLOCKTIMEVERIFY", 0xb2: "CHECKSEQUENCEVERIFY", 0xba: "CHECKSIGADD" };
+// a key that is none of these is a tweaked covenant key, named by its own bytes
 function keyName(x) {
-  const known = info ? [["server", info.serverPubkey], ["emulator key", info.emulatorPubkey], ["delegatee", info.delegatePubkey]] : [];
-  return known.find(([, k]) => k && k.slice(-64) === x)?.[0] ?? (detail?.delegation ? "owner" : short(x, 6));
+  const known = [...(info ? [["server", info.serverPubkey], ["emulator", info.emulatorPubkey], ["delegatee", info.delegatePubkey]] : []),
+    ...Object.entries(detail?.delegation.variables || {})];
+  return known.find(([, k]) => k && (k.length === 64 || k.length === 66) && k.slice(-64) === x)?.[0] ?? "covenant·" + x.slice(0, 6);
+}
+const bytes = (hex) => Uint8Array.from(hex.match(/../g) ?? [], (h) => parseInt(h, 16));
+// minimal little-endian, the top bit of the last byte is the sign
+function scriptNum(b) {
+  if (!b.length) return 0;
+  const v = b.reduceRight((a, x, i) => a * 256 + (i === b.length - 1 ? x & 0x7f : x), 0);
+  return b[b.length - 1] & 0x80 ? -v : v;
+}
+const bip68 = (v) => (v & (1 << 22) ? span((v & 0xffff) * 512) : (v & 0xffff) + " blocks");
+function variable(name, type, hex) {
+  if (type !== "int") return `<span class="hash" title="${esc(hex)}">${esc(short(hex, 10))}</span>${hex.length > 21 ? `<button class="mini" data-copy="${esc(hex)}" title="Copy ${esc(name)}">copy</button>` : ""}`;
+  const n = scriptNum(bytes(hex));
+  const text = /delay/.test(name) ? bip68(n) : /window/.test(name) ? span(n) : /fee/.test(name) ? sats(n) : n.toLocaleString();
+  return `<span class="n" title="script number 0x${esc(hex) || "(empty)"}">${esc(text)}</span>`;
 }
 function scriptWords(hex) {
-  const b = Uint8Array.from(hex.match(/../g) ?? [], (h) => parseInt(h, 16)), out = [];
+  const b = bytes(hex), out = [];
   for (let i = 0; i < b.length;) {
     const op = b[i++];
     let n = op > 0 && op <= 0x4b ? op : op === 0x4c ? b[i++] : op === 0x4d ? b[i] | (b[i + 1] << 8) : -1;
@@ -242,16 +264,18 @@ function scriptWords(hex) {
     if (n < 0) { out.push(op === 0 ? "0" : op >= 0x51 && op <= 0x60 ? String(op - 0x50) : OPS[op] ?? "OP_" + op.toString(16)); continue; }
     const data = Array.from(b.slice(i, i + n), (x) => x.toString(16).padStart(2, "0")).join(""); i += n;
     if (n === 32) { out.push(keyName(data)); continue; }
-    const next = b[i], v = b.slice(i - n, i).reduceRight((a, x) => a * 256 + x, 0); // little-endian script number
-    if (next === 0xb2) out.push(v & (1 << 22) ? "after " + span((v & 0xffff) * 512) : "after " + v + " blocks");
+    const next = b[i], v = scriptNum(b.slice(i - n, i));
+    if (next === 0xb2) out.push("after " + bip68(v));
     else if (next === 0xb1) out.push(v < 500_000_000 ? "from block " + v.toLocaleString() : "from " + new Date(v * 1000).toLocaleDateString());
     else out.push(n <= 8 ? String(v) : short(data, 6));
   }
   return out.join(" ");
 }
 
+// a watch boards an onchain coin, the rest renew VTXOs
+const boards = (delegation) => (delegation.slots || []).some((s) => s.onchain);
 function stateOf(d) {
-  const r = d.lastRenewal;
+  const r = d.lastRenewal, done = boards(d.delegation) ? "boarded" : "renewed";
   if (d.delegation.status !== "active") return { key: "off", dot: "off", text: d.delegation.status === "cancelled" ? "stopped" : d.delegation.status };
   if (d.unmanagedReason)
     return { key: "bad", dot: "bad", skipped: true, text: d.unmanagedReason, why: "The scanner skips it: " + d.unmanagedReason + "." };
@@ -261,8 +285,8 @@ function stateOf(d) {
   if (num(d.nextExpiry) && left < room / 4)
     return { key: "late", dot: "late", text: left <= 0 ? "expired" : "expires " + ago(d.nextExpiry),
       why: left <= 0 ? "A VTXO expired without being renewed." : "Renewable for a while and not renewed yet. Check that arkd rounds are running." };
-  if (!r) return { key: "ok", dot: "", text: "not renewed yet" };
-  return { key: "ok", dot: "ok", text: "renewed " + ago(r.attemptedAt) };
+  if (!r) return { key: "ok", dot: "", text: "not " + done + " yet" };
+  return { key: "ok", dot: "ok", text: done + " " + ago(r.attemptedAt) };
 }
 const MAX_ROWS = 300; // the list is sorted by urgency
 const MAX_LANES = 20, MAX_VTXOS = 40, AXIS_UNIT = 600; // ten minutes: the horizon's finest step
@@ -282,8 +306,30 @@ async function api(path, opts) {
 }
 const send = (method, path, body) => api(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 const act = (request, done, failed) => request.then(() => { toast(done); refresh(); }, (e) => toast(failed + e.message, true));
+const shown = {}; // kind: { id, document }, kept across refreshes
 const showDocument = (kind, id) => api(`/v1/${kind}/` + encodeURIComponent(id))
-  .then((r) => { const pre = $(kind + "-doc"); pre.hidden = false; pre.textContent = r[kind].document; }, (e) => toast(`Could not load the ${kind}: ` + e.message, true));
+  .then((r) => { shown[kind] = { id, document: r[kind].document }; renderOverview(); $(kind + "-doc")?.scrollIntoView({ block: "nearest" }); },
+    (e) => toast(`Could not load the ${kind}: ` + e.message, true));
+
+// ponytail: JSON.parse rounds numbers past 2^53, copy gives the exact document
+function jsonHtml(v, pad = "") {
+  const p = (c) => `<span class="j-p">${c}</span>`, inner = pad + "  ";
+  if (v === null || typeof v !== "object") return `<span class="${typeof v === "string" ? "j-s" : typeof v === "number" ? "j-n" : "j-b"}">${esc(JSON.stringify(v))}</span>`;
+  const entries = Object.entries(v), [open, close] = Array.isArray(v) ? "[]" : "{}";
+  if (!entries.length) return p(open + close);
+  const item = ([k, x]) => (Array.isArray(v) ? "" : `<span class="j-k">${esc(JSON.stringify(k))}</span>${p(":")} `) + jsonHtml(x, inner);
+  if (Array.isArray(v) && v.every((x) => x === null || typeof x !== "object") && JSON.stringify(v).length < 100)
+    return p("[") + entries.map(item).join(p(",") + " ") + p("]");
+  return p(open) + "\n" + entries.map((e) => inner + item(e)).join(p(",") + "\n") + "\n" + pad + p(close);
+}
+function documentView(kind) {
+  const d = shown[kind];
+  if (!d) return "";
+  let body;
+  try { body = jsonHtml(JSON.parse(d.document)); } catch { body = esc(d.document); }
+  return `<div class="doc" id="${kind}-doc"><div class="bar"><span class="hash">${esc(short(d.id, 10))}</span>
+    <span><button class="mini" data-copy="${esc(d.document)}">copy</button><button class="mini" data-hide="${kind}">close</button></span></div><pre>${body}</pre></div>`;
+}
 
 function toast(msg, bad) {
   const t = $("toast");
@@ -385,7 +431,8 @@ function renderList() {
   $("rows").innerHTML = rows.slice(0, MAX_ROWS).map((d) => {
     const st = stateOf(d), address = d.delegation.address;
     const selection = "id/" + d.delegation.id;
-    const label = address ? short(address, 12) : `#${d.delegation.id}, successor of #${num(d.delegation.parentId)}`;
+    const parent = num(d.delegation.parentId);
+    const label = address ? short(address, 12) : parent ? `#${d.delegation.id}, successor of #${parent}` : `#${d.delegation.id}`;
     const holds = d.delegation.status !== "active" || !d.managed ? ""
       : num(d.vtxoCount) ? `${sats(d.totalAmount)} in ${d.vtxoCount} VTXO${d.vtxoCount > 1 ? "s" : ""}, next expiry ${ago(d.nextExpiry)}` : "no VTXO at this address";
     return `<li><button data-address="${esc(selection)}" aria-current="${selection === selected}">
@@ -398,8 +445,7 @@ function renderList() {
 
 function renderOverview() {
   // don't wipe a half-typed form on refresh
-  if ($("register")?.document.value || [...document.querySelectorAll("#delegate [data-var]")].some((i) => i.value)) return;
-  const chosen = $("delegate-template")?.value;
+  if ($("register")?.document.value) return;
   const held = delegations.filter((d) => d.delegation.status === "active" && d.managed && num(d.nextExpiry))
     .sort((a, b) => num(a.nextExpiry) - num(b.nextExpiry));
   const now = nowSecs(), shown = held.slice(0, MAX_LANES);
@@ -419,7 +465,7 @@ function renderOverview() {
   const axis = `<span></span><div class="axis"><i style="left:0">now</i>${ticks.map((t) => `<i style="left:${pct(t)}%">${span(t)}</i>`).join("")}</div><span></span>`;
 
   const f = status?.intentFees, rows = f && [["each VTXO renewed", f.offchainInput], ["each output created", f.offchainOutput]].filter((r) => charges(r[1]));
-  const strangers = delegations.filter((d) => d.unmanagedReason === "registered under another key").length, usable = templates.filter((t) => t.status === "active");
+  const strangers = delegations.filter((d) => d.unmanagedReason === "registered under another key").length;
   $("detail").removeAttribute("aria-busy");
   $("detail").innerHTML = `
     <h2>Overview</h2>
@@ -444,29 +490,19 @@ function renderOverview() {
         <td class="n">${num(t.delegations)}</td><td class="n">${num(t.failures)}</td>
         <td><button class="link" data-template-status="${t.status === "active" ? "disabled" : "active"}" data-id="${esc(t.id)}">${t.status === "active" ? "Disable" : "Enable"}</button>
         ${num(t.delegations) ? "" : `<button class="link danger" data-template-delete="${esc(t.id)}">Delete</button>`}</td></tr>`).join("")}
-      </tbody></table></div><pre id="template-doc" class="hash" hidden></pre>`
+      </tbody></table></div>${documentView("template")}`
       : `<p class="empty">No template registered. Developers register one with POST /v1/template on the public port.</p>`}
     <h3>Artifacts</h3>
     <p>Compiler artifacts templates may reference by id. An artifact still referenced by a template cannot be deleted.</p>
     ${artifacts.length ? `<div class="scroll"><table><thead><tr><th>Artifact</th><th>Registered</th><th></th></tr></thead><tbody>
       ${artifacts.map((a) => `<tr><td class="hash"><button class="link hash" data-artifact="${esc(a.id)}" title="Show the document">${esc(short(a.id, 10))}</button></td>
         <td>${ago(a.createdAt)}</td><td><button class="link danger" data-artifact-delete="${esc(a.id)}">Delete</button></td></tr>`).join("")}
-      </tbody></table></div><pre id="artifact-doc" class="hash" hidden></pre>`
+      </tbody></table></div>${documentView("artifact")}`
       : `<p class="empty">No artifact registered.</p>`}
     <h3>Register</h3>
     <p>Paste a document and register it. The same public endpoints developers use, served on this port.</p>
     <form id="register"><textarea name="document" placeholder='{"format": "..."}' aria-label="Document"></textarea>
-      <div class="actions"><button class="primary" value="template">Register template</button><button value="artifact">Register artifact</button></div></form>
-    ${usable.length ? `<h3>Register a delegation</h3>
-    <p>Pick a template and give each of its variables, in canonical hex.</p>
-    <form id="delegate"><select id="delegate-template" aria-label="Template">${usable.map((t) => `<option value="${esc(t.id)}" ${t.id === chosen ? "selected" : ""}>${esc(short(t.id, 10))}</option>`).join("")}</select>
-      <div id="delegate-vars">${variableInputs(usable.find((t) => t.id === chosen) || usable[0])}</div>
-      <div class="actions"><button class="primary">Register delegation</button></div></form>` : ""}`;
-}
-
-function variableInputs(t) {
-  return (t?.params || []).map((p) => `<label>${esc(p.name)} <span class="state">${esc(p.type)}</span>
-    <input data-var="${esc(p.name)}" placeholder="hex" pattern="([0-9a-f]{2})*" required autocomplete="off"></label>`).join("");
+      <div class="actions"><button class="primary" value="template">Register template</button><button value="artifact">Register artifact</button></div></form>`;
 }
 
 async function loadDetail() {
@@ -508,17 +544,18 @@ function renderDetail() {
   const held = vtxos.reduce((a, v) => a + num(v.amount), 0), shownVtxos = allVtxos ? vtxos : vtxos.slice(0, MAX_VTXOS);
   const active = d.status === "active";
   const inList = delegations.find((x) => x.delegation.id === d.id), st = inList && stateOf(inList);
-  const slots = d.slots || [];
+  const slots = d.slots || [], watch = boards(d), done = watch ? "boarded" : "renewed";
+  const types = Object.fromEntries((templates.find((t) => t.id === d.templateId)?.params || []).map((p) => [p.name, p.type]));
   $("detail").innerHTML = `
     <div class="title">
-      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : "ok"}">${!active ? (d.status === "cancelled" ? "stopped by an operator" : esc(d.status)) : st?.skipped ? esc(st.text) : st?.key === "bad" ? "not renewing" : st?.key === "late" ? "late" : "renewing"}</span></h2>
+      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : "ok"}">${!active ? (d.status === "cancelled" ? "stopped by an operator" : esc(d.status)) : st?.skipped ? esc(st.text) : st?.key === "bad" ? "not renewing" : st?.key === "late" ? "late" : watch ? "active" : "renewing"}</span></h2>
         <div class="hash">${esc(d.address)}</div></div>
       <div class="actions"><button data-copy="${esc(d.address)}">Copy address</button>
-        ${active ? `<button class="danger" id="stop">Stop renewing</button>` : d.address ? `<button class="primary" id="resume">Resume renewing</button>` : ""}</div>
+        ${active ? `<button class="danger" id="stop">Stop renewing</button>` : d.status === "cancelled" ? `<button class="primary" id="resume">Resume renewing</button>` : ""}</div>
     </div>
-    <dl class="facts"><div><dt>Template</dt><dd class="hash">${esc(short(d.templateId, 10))}<button class="link" data-copy="${esc(d.templateId)}" title="Copy the template id">copy</button></dd></div>
+    <dl class="facts"><div><dt>Template</dt><dd class="hash" title="${esc(d.templateId)}">${esc(short(d.templateId, 8))}<button class="mini" data-copy="${esc(d.templateId)}" title="Copy the template id">copy</button></dd></div>
       ${num(d.parentId) ? `<div><dt>Successor of</dt><dd><a href="#id/${num(d.parentId)}">#${num(d.parentId)}</a></dd></div>` : ""}
-      ${Object.entries(d.variables || {}).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}
+      ${Object.entries(d.variables || {}).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${variable(k, types[k], v)}</dd></div>`).join("")}
       <div><dt>Registered</dt><dd>${ago(d.createdAt)}</dd></div>
       <div><dt>Expires</dt><dd>${num(d.expiresAt) ? `<span title="${new Date(num(d.expiresAt) * 1000).toLocaleString()}">${ago(d.expiresAt)}</span>` : "never"}</dd></div></dl>
     ${st?.why && active ? `<p class="note">${esc(st.why)}</p>` : ""}
@@ -528,10 +565,10 @@ function renderDetail() {
         <span class="amount n">${sats(v.amount)}${(v.assets || []).map((a) => ` + ${num(a.amount).toLocaleString()} of ${esc(short(a.assetId, 6))}`).join("")}</span></div>
         ${lifeBar(v)}</div>`).join("") + (vtxos.length > shownVtxos.length ? `<p class="state"><button class="link" id="all-vtxos">Show all ${vtxos.length}</button>, the ${shownVtxos.length} soonest are above.</p>` : "")
       : `<p class="empty">Nothing to renew: no spendable VTXO sits at this address right now.</p>`}
-    <h3>Renewal attempts</h3>
+    <h3>${watch ? "Boarding" : "Renewal"} attempts</h3>
     ${renewals.length ? `<div class="scroll"><table><thead><tr><th>When</th><th>Result</th><th>VTXOs</th><th>Batch or reason</th></tr></thead><tbody>
       ${renewals.map((r) => `<tr><td title="${new Date(num(r.attemptedAt) * 1000).toLocaleString()}">${ago(r.attemptedAt)}</td>
-        <td class="res ${r.success ? "ok" : "bad"}">${r.success ? "renewed" : "failed"}</td>
+        <td class="res ${r.success ? "ok" : "bad"}">${r.success ? done : "failed"}</td>
         <td class="hash">${(r.outpoints || []).map((o) => esc(short(o, 8))).join("<br>")}</td>
         <td class="${r.success ? "hash" : ""}">${r.success ? `<button class="link hash" data-copy="${esc(r.commitmentTxid)}" title="Copy commitment txid">${esc(short(r.commitmentTxid, 12))}</button>` : esc(r.error)}</td></tr>`).join("")}
       </tbody></table></div>
@@ -540,23 +577,16 @@ function renderDetail() {
     <h3>Inputs</h3>
     <p>Each input of the template: what it watches or the output bound to it, and who can spend it, one tapscript each.</p>
     ${slots.map((sl) => `<h4>${esc(sl.name)} <span class="badge">${sl.onchain ? "onchain" : "offchain"}</span></h4>
-      ${sl.outpoint ? `<p class="hash">${esc(sl.outpoint)} <button class="link" data-copy="${esc(sl.outpoint)}" title="Copy the outpoint">copy</button></p>` : ""}
-      <ul class="paths">${(sl.tapscripts || []).map((t) => `<li><span class="words">${esc(scriptWords(t))}</span><button class="link" data-copy="${esc(t)}" title="Copy the script hex">hex</button></li>`).join("")}</ul>`).join("")}`;
+      ${sl.outpoint ? `<p class="hash">${esc(sl.outpoint)} <button class="mini" data-copy="${esc(sl.outpoint)}" title="Copy the outpoint">copy</button></p>` : ""}
+      <ul class="paths">${(sl.tapscripts || []).map((t) => `<li><span class="words">${esc(scriptWords(t))}</span><button class="mini" data-copy="${esc(t)}" title="Copy the script hex">hex</button></li>`).join("")}</ul>`).join("")}`;
 }
 
 async function setRenewing(on) {
   const d = detail.delegation;
   $("detail").querySelector("#stop, #resume")?.setAttribute("aria-busy", "true");
   try {
-    if (on && d.status === "cancelled") {
-      await send("POST", "/v1/admin/delegation/" + encodeURIComponent(d.id) + "/resume", {});
-    } else if (on) {
-      // an expired watch is registered again, keeping its expiry while it is still ahead
-      await send("POST", "/v1/delegate", { templateId: d.templateId, variables: d.variables,
-        ...(num(d.expiresAt) > nowSecs() ? { expiresAt: d.expiresAt } : {}) });
-    } else {
-      await api("/v1/admin/delegation/" + encodeURIComponent(d.id), { method: "DELETE" });
-    }
+    if (on) await send("POST", "/v1/admin/delegation/" + encodeURIComponent(d.id) + "/resume", {});
+    else await api("/v1/admin/delegation/" + encodeURIComponent(d.id), { method: "DELETE" });
     toast(on ? "Renewing resumed" : "Renewing stopped");
   } catch (e) { toast(`Could not ${on ? "resume" : "stop"} renewing: ${e.message}`, true); }
   refresh();
@@ -584,6 +614,7 @@ document.addEventListener("click", (e) => {
   else if (b.value === "no") $("confirm").close();
   else if (b.id === "resume") setRenewing(true);
   else if (b.id === "load-more") { loadLimit += 5000; refresh(); }
+  else if (b.dataset.hide) { delete shown[b.dataset.hide]; renderOverview(); }
   else if (b.dataset.template) showDocument("template", b.dataset.template);
   else if (b.dataset.artifact) showDocument("artifact", b.dataset.artifact);
   else if (b.dataset.templateStatus) act(send("PUT", "/v1/admin/template/" + encodeURIComponent(b.dataset.id) + "/status", { status: b.dataset.templateStatus }),
@@ -593,19 +624,7 @@ document.addEventListener("click", (e) => {
   else if (b.dataset.templateDelete) act(api("/v1/admin/template/" + encodeURIComponent(b.dataset.templateDelete), { method: "DELETE" }), "Template deleted", "Could not delete the template: ");
   else if (b.dataset.artifactDelete) act(api("/v1/admin/artifact/" + encodeURIComponent(b.dataset.artifactDelete), { method: "DELETE" }), "Artifact deleted", "Could not delete the artifact: ");
 });
-document.addEventListener("change", (e) => {
-  if (e.target === $("delegate-template")) $("delegate-vars").innerHTML = variableInputs(templates.find((t) => t.id === e.target.value));
-});
 document.addEventListener("submit", (e) => {
-  const form = $("delegate");
-  if (e.target === form) {
-    e.preventDefault();
-    const inputs = [...form.querySelectorAll("[data-var]")], variables = Object.fromEntries(inputs.map((i) => [i.dataset.var, i.value.trim()]));
-    form.setAttribute("aria-busy", "true");
-    return send("POST", "/v1/delegate", { templateId: $("delegate-template").value, variables })
-      .then((r) => { toast(`Registered ${short(r.delegation.address || "#" + r.delegation.id, 8)}`); inputs.forEach((i) => { i.value = ""; }); refresh(); }, (err) => toast(`Could not register the delegation: ${err.message}`, true))
-      .finally(() => form.removeAttribute("aria-busy"));
-  }
   if (e.target.id !== "register") return;
   e.preventDefault();
   const kind = e.submitter?.value === "artifact" ? "artifact" : "template", document_ = e.target.document.value.trim();
@@ -617,7 +636,7 @@ document.addEventListener("submit", (e) => {
 });
 document.addEventListener("keydown", (e) => {
   if ($("confirm").open || e.metaKey || e.ctrlKey || e.altKey) return;
-  const typing = e.target.matches("input, textarea, select");
+  const typing = e.target.matches("input, textarea");
   if (e.key === "/" && !typing) { e.preventDefault(); $("search").focus(); }
   else if (e.key === "Escape") { typing ? e.target.blur() : go(""); }
   else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !typing) {
