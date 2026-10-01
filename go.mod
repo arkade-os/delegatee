@@ -4,13 +4,17 @@ go 1.26.6
 
 replace github.com/arkade-os/delegatee/api-spec => ./api-spec
 
+replace github.com/arkade-os/delegatee/pkg/template => ./pkg/template
+
 require (
 	github.com/arkade-os/arkd/pkg/ark-lib v0.8.1-0.20260901090427-f863e4847193
 	github.com/arkade-os/arkd/pkg/client-lib v0.0.0-20260901090427-f863e4847193
 	github.com/arkade-os/arkd/pkg/client-wallet v0.0.0-20260901090427-f863e4847193
 	github.com/arkade-os/delegatee/api-spec v0.0.0-00010101000000-000000000000
+	github.com/arkade-os/delegatee/pkg/template v0.0.0
 	github.com/arkade-os/emulator/pkg/arkade v0.0.0-20260925153657-d928b6ed57ee
 	github.com/arkade-os/emulator/pkg/client v0.0.0-20260925153657-d928b6ed57ee
+	github.com/btcsuite/btcd/address/v2 v2.0.0
 	github.com/btcsuite/btcd/btcec/v2 v2.5.0
 	github.com/btcsuite/btcd/btcutil/v2 v2.0.1
 	github.com/btcsuite/btcd/chaincfg/v2 v2.0.0
@@ -18,6 +22,7 @@ require (
 	github.com/btcsuite/btcd/psbt/v2 v2.0.0
 	github.com/btcsuite/btcd/txscript/v2 v2.0.0
 	github.com/btcsuite/btcd/wire/v2 v2.0.1
+	github.com/btcsuite/btcwallet v0.18.0
 	github.com/golang-migrate/migrate/v4 v4.18.1
 	github.com/lib/pq v1.10.9
 	github.com/meshapi/grpc-api-gateway v0.1.0
@@ -41,11 +46,9 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/btcsuite/btcd v0.26.2 // indirect
-	github.com/btcsuite/btcd/address/v2 v2.0.0 // indirect
 	github.com/btcsuite/btcd/v2transport v1.1.0 // indirect
 	github.com/btcsuite/btclog v1.0.0 // indirect
 	github.com/btcsuite/btclog/v2 v2.0.1-0.20250728225537-6090e87c6c5b // indirect
-	github.com/btcsuite/btcwallet v0.18.0 // indirect
 	github.com/btcsuite/btcwallet/wallet/txauthor v1.4.0 // indirect
 	github.com/btcsuite/btcwallet/wallet/txrules v1.3.0 // indirect
 	github.com/btcsuite/btcwallet/wallet/txsizes v1.3.0 // indirect

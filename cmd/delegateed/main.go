@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/arkade-os/delegatee/internal/config"
+	"github.com/arkade-os/delegatee/internal/infrastructure/db/postgres"
 	grpcservice "github.com/arkade-os/delegatee/internal/interface/grpc"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,7 +34,7 @@ func main() {
 		if err = svc.Start(); err == nil {
 			break
 		}
-		if attempt >= 30 {
+		if attempt >= 30 || errors.Is(err, postgres.ErrKeyInUse) {
 			log.WithError(err).Fatal("start service")
 		}
 		log.WithError(err).WithField("attempt", attempt).Warn("dependencies not ready, retrying in 5s")
@@ -41,7 +43,7 @@ func main() {
 	log.RegisterExitHandler(svc.Stop)
 
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, os.Interrupt)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
 	<-sigChan
 
 	log.Info("shutting down delegateed")

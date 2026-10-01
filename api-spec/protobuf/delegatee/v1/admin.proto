@@ -6,9 +6,17 @@ import "meshapi/gateway/annotations.proto";
 import "delegatee/v1/service.proto";
 
 service AdminService {
+  // ListDelegations lists one page, newest first.
   rpc ListDelegations(ListDelegationsRequest) returns (ListDelegationsResponse) {
     option (meshapi.gateway.http) = {
       get: "/v1/admin/delegate"
+    };
+  }
+
+  // GetDelegationById returns any delegation, with its coins and history.
+  rpc GetDelegationById(GetDelegationByIdRequest) returns (GetDelegationByIdResponse) {
+    option (meshapi.gateway.http) = {
+      get: "/v1/admin/delegation/{id}"
     };
   }
 
@@ -18,16 +26,76 @@ service AdminService {
     };
   }
 
+  // CancelDelegation stops the active watches of an address, or one
+  // delegation by id: advertisements have no address. Registering a
+  // cancelled delegation again is refused until ResumeDelegation.
   rpc CancelDelegation(CancelDelegationRequest) returns (CancelDelegationResponse) {
     option (meshapi.gateway.http) = {
       delete: "/v1/admin/delegate/{address}"
+      additional_bindings { delete: "/v1/admin/delegation/{id}" }
     };
+  }
+
+  // ResumeDelegation sets a cancelled delegation active again.
+  rpc ResumeDelegation(ResumeDelegationRequest) returns (ResumeDelegationResponse) {
+    option (meshapi.gateway.http) = { post: "/v1/admin/delegation/{id}/resume" body: "*" };
+  }
+
+  rpc ListAllTemplates(ListAllTemplatesRequest) returns (ListAllTemplatesResponse) {
+    option (meshapi.gateway.http) = { get: "/v1/admin/template" };
+  }
+  rpc SetTemplateStatus(SetTemplateStatusRequest) returns (SetTemplateStatusResponse) {
+    option (meshapi.gateway.http) = { put: "/v1/admin/template/{id}/status" body: "*" };
+  }
+  // SetTemplateTrusted marks a template the operator vouches for.
+  rpc SetTemplateTrusted(SetTemplateTrustedRequest) returns (SetTemplateTrustedResponse) {
+    option (meshapi.gateway.http) = { put: "/v1/admin/template/{id}/trusted" body: "*" };
+  }
+  rpc DeleteTemplate(DeleteTemplateRequest) returns (DeleteTemplateResponse) {
+    option (meshapi.gateway.http) = { delete: "/v1/admin/template/{id}" };
+  }
+  rpc DeleteArtifact(DeleteArtifactRequest) returns (DeleteArtifactResponse) {
+    option (meshapi.gateway.http) = { delete: "/v1/admin/artifact/{id}" };
+  }
+  // ListArtifacts lists every artifact, newest first, without documents.
+  rpc ListArtifacts(ListArtifactsRequest) returns (ListArtifactsResponse) {
+    option (meshapi.gateway.http) = { get: "/v1/admin/artifact" };
   }
 }
 
-message ListDelegationsRequest {}
+message ListDelegationsRequest {
+  // page_size defaults to 100, at most 1000.
+  int32 page_size = 1;
+  // cursor is the next_cursor of the previous page, 0 for the first.
+  int64 cursor = 2;
+  // status filters when set: active, cancelled, expired or done.
+  string status = 3;
+}
 message ListDelegationsResponse {
-  repeated Delegation delegations = 1;
+  repeated DelegationSummary delegations = 1;
+  // next_cursor is 0 on the last page.
+  int64 next_cursor = 2;
+}
+
+message DelegationSummary {
+  Delegation delegation = 1;
+  // managed is false when this instance cannot renew the delegation; unmanaged_reason says why.
+  bool managed = 2;
+  string unmanaged_reason = 3;
+  int32 vtxo_count = 4;
+  uint64 total_amount = 5;
+  int64 next_expiry = 6;
+  int64 next_renewal_at = 7;
+  Renewal last_renewal = 8;
+}
+
+message GetDelegationByIdRequest {
+  int64 id = 1;
+}
+message GetDelegationByIdResponse {
+  Delegation delegation = 1;
+  repeated Vtxo vtxos = 2;
+  repeated Renewal renewals = 3;
 }
 
 message GetStatusRequest {}
@@ -47,5 +115,41 @@ message IntentFees {
 
 message CancelDelegationRequest {
   string address = 1;
+  // id, when set, takes precedence over address.
+  int64 id = 2;
 }
 message CancelDelegationResponse {}
+
+message ResumeDelegationRequest { int64 id = 1; }
+message ResumeDelegationResponse {}
+
+// TemplateSummary is a template with what only the operator sees.
+message TemplateSummary {
+  Template template = 1; // without its document in list responses
+  // failures is the count of consecutive renewal cycles the failure valve saw rejected.
+  int32 failures = 2;
+  // delegations is how many delegations reference the template.
+  int64 delegations = 3;
+  // trusted templates get the daemon's own signature on delegate-key leaves
+  // and are exempt from the failure valve; seeded ones are trusted.
+  bool trusted = 4;
+}
+
+message ListAllTemplatesRequest { string status = 1; }
+message ListAllTemplatesResponse { repeated TemplateSummary templates = 1; }
+message SetTemplateStatusRequest {
+  string id = 1;
+  string status = 2; // active | disabled
+}
+message SetTemplateStatusResponse { TemplateSummary template = 1; }
+message SetTemplateTrustedRequest {
+  string id = 1;
+  bool trusted = 2;
+}
+message SetTemplateTrustedResponse { TemplateSummary template = 1; }
+message DeleteTemplateRequest { string id = 1; }
+message DeleteTemplateResponse {}
+message DeleteArtifactRequest { string id = 1; }
+message DeleteArtifactResponse {}
+message ListArtifactsRequest {}
+message ListArtifactsResponse { repeated Artifact artifacts = 1; }

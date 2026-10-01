@@ -5,19 +5,17 @@ package delegatee.v1;
 import "meshapi/gateway/annotations.proto";
 
 service DelegateeService {
-  // GetInfo returns everything a wallet needs to build a delegate address
-  // it also returns the address itself would derive from the given params, so the wallet can verify it.
-  // params are optional, and default to the values the server is configured with.
+  // GetInfo returns the keys a wallet instantiates a template with.
   rpc GetInfo(GetInfoRequest) returns (GetInfoResponse) {
     option (meshapi.gateway.http) = {
       get: "/v1/info"
     };
   }
 
-  // RegisterDelegation starts renewing the VTXOs locked at the address
-  // derived from the given tapscripts. The tapscripts must contain the
-  // delegate tapscript GetInfo returns for the same params, and
-  // an exit leaf.
+  // RegisterDelegation registers a watch: the daemon acts on coins sent to
+  // the address the template derives for variables, until expires_at. The
+  // template must have exactly one input; the wallet compares the address
+  // with its own. Registering an active watch again returns it unchanged.
   rpc RegisterDelegation(RegisterDelegationRequest) returns (RegisterDelegationResponse) {
     option (meshapi.gateway.http) = {
       post: "/v1/delegate"
@@ -25,45 +23,51 @@ service DelegateeService {
     };
   }
 
-  // GetDelegation returns a delegation with its spendable VTXOs (live from
-  // the arkd indexer) and its renewal history.
+  // GetDelegation returns the watch of an address (an active one first, else
+  // the newest) with its spendable VTXOs (live from the arkd indexer) and its
+  // renewal history.
   rpc GetDelegation(GetDelegationRequest) returns (GetDelegationResponse) {
     option (meshapi.gateway.http) = {
       get: "/v1/delegate/{address}"
     };
   }
 
-  // RevokeDelegation stops renewing the address on its owner's request,
-  // proven with a key of the exit leaf. Register again to resume.
-  rpc RevokeDelegation(RevokeDelegationRequest) returns (RevokeDelegationResponse) {
-    option (meshapi.gateway.http) = {
-      post: "/v1/delegate/{address}/revoke"
-      body: "*"
-    };
+  // RegisterArtifact stores a compiler artifact templates may reference. Idempotent on its id.
+  rpc RegisterArtifact(RegisterArtifactRequest) returns (RegisterArtifactResponse) {
+    option (meshapi.gateway.http) = { post: "/v1/artifact" body: "*" };
+  }
+  rpc GetArtifact(GetArtifactRequest) returns (GetArtifactResponse) {
+    option (meshapi.gateway.http) = { get: "/v1/artifact/{id}" };
+  }
+  // RegisterTemplate stores a template the engine accepts. It is active at once. Idempotent on its id.
+  rpc RegisterTemplate(RegisterTemplateRequest) returns (RegisterTemplateResponse) {
+    option (meshapi.gateway.http) = { post: "/v1/template" body: "*" };
+  }
+  rpc GetTemplate(GetTemplateRequest) returns (GetTemplateResponse) {
+    option (meshapi.gateway.http) = { get: "/v1/template/{id}" };
+  }
+  // ListTemplates lists the active templates, without their documents.
+  rpc ListTemplates(ListTemplatesRequest) returns (ListTemplatesResponse) {
+    option (meshapi.gateway.http) = { get: "/v1/template" };
   }
 }
 
-message GetInfoRequest {
-  int64 renewal_window = 1;
-  int64 max_fee = 2;
-}
+message GetInfoRequest {}
 message GetInfoResponse {
   string version = 1;
   string network = 2;
   string delegate_pubkey = 3;
   string server_pubkey = 4;
   string emulator_pubkey = 5;
-  string emulator_tweaked_pubkey = 6;
-  string arkade_script = 7;
-  string delegate_tapscript = 8;
-  int64 renewal_window = 9;
-  int64 max_fee = 10;
+  // encryption_pubkey seals template secrets for this daemon; empty without an encryption key.
+  string encryption_pubkey = 6;
 }
 
 message RegisterDelegationRequest {
-  repeated string tapscripts = 1;
-  int64 renewal_window = 2;
-  int64 max_fee = 3;
+  string template_id = 1;
+  map<string, string> variables = 2;
+  // expires_at is a unix time after which the watch stops; 0 never expires.
+  int64 expires_at = 3;
 }
 message RegisterDelegationResponse {
   Delegation delegation = 1;
@@ -78,30 +82,31 @@ message GetDelegationResponse {
   repeated Renewal renewals = 3;
 }
 
-message RevokeDelegationRequest {
-  string address = 1;
-  string pubkey = 2;
-  // TODO simplify ?
-  string signature = 3;
-  int64 timestamp = 4;
-}
-message RevokeDelegationResponse {}
-
+// Delegation is an instance of a template.
 message Delegation {
   int64 id = 1;
+  // address is slot 0's address for a watch, empty otherwise.
   string address = 2;
+  // status is active, cancelled, expired or done.
   string status = 3;
-  repeated string tapscripts = 4;
-  int64 created_at = 5;
-  int64 updated_at = 6;
-  int64 renewal_window = 7;
-  int64 max_fee = 8;
-  Renewal last_renewal = 9;
-  bool managed = 10;
-  int32 vtxo_count = 11;
-  uint64 total_amount = 12;
-  int64 next_expiry = 13;
-  int64 next_renewal_at = 14;
+  string template_id = 4;
+  map<string, string> variables = 5;
+  // expires_at is 0 when the delegation never expires.
+  int64 expires_at = 6;
+  repeated Slot slots = 7;
+  int64 created_at = 8;
+  int64 updated_at = 9;
+  // parent_id is the delegation whose settled transaction advertised this one, 0 for a watch.
+  int64 parent_id = 10;
+}
+
+// Slot is one template input of a delegation.
+message Slot {
+  string name = 1;
+  bool onchain = 2;
+  repeated string tapscripts = 3;
+  // outpoint is "txid:vout" when bound, empty for a watch.
+  string outpoint = 4;
 }
 
 message Vtxo {
@@ -112,6 +117,7 @@ message Vtxo {
   repeated Asset assets = 5;
   int64 created_at = 6;
   int64 renewable_at = 7;
+  bool onchain = 8;
 }
 
 message Asset {
@@ -125,4 +131,34 @@ message Renewal {
   bool success = 3;
   string error = 4;
   int64 attempted_at = 5;
+}
+
+message RegisterArtifactRequest { string document = 1; }
+message RegisterArtifactResponse { Artifact artifact = 1; }
+message GetArtifactRequest { string id = 1; }
+message GetArtifactResponse { Artifact artifact = 1; }
+message Artifact {
+  string id = 1;
+  string document = 2;
+  int64 created_at = 3;
+}
+
+message RegisterTemplateRequest { string document = 1; }
+message RegisterTemplateResponse { Template template = 1; }
+message GetTemplateRequest { string id = 1; }
+message GetTemplateResponse { Template template = 1; }
+// ListTemplatesRequest has no fields: the public list is always the active one.
+message ListTemplatesRequest {}
+message ListTemplatesResponse { repeated Template templates = 1; }
+message Param {
+  string name = 1;
+  string type = 2;
+}
+message Template {
+  string id = 1;
+  string document = 2; // empty in list responses
+  repeated string artifact_ids = 3;
+  repeated Param params = 4;
+  string status = 5;
+  int64 created_at = 6;
 }

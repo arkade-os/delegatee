@@ -1,7 +1,5 @@
-# Full regtest stack for delegateed on the nigiri network: run `nigiri start`
-# first (bitcoin, electrs, chopsticks on :3000). The arkd + emulator services
-# mirror the emulator repo's docker-compose.regtest.yml; stop that one before
-# starting this, they share container names and ports.
+# Regtest stack on the nigiri network (`nigiri start` first). arkd and the
+# emulator share container names and ports with the emulator repo's stack.
 services:
   pgnbxplorer:
     restart: unless-stopped
@@ -93,7 +91,7 @@ services:
         target: /app/data
 
   emulator:
-    image: ghcr.io/arkade-os/emulator:${EMULATOR_VERSION:-v0.0.8-rc.1}
+    image: ghcr.io/arkade-os/emulator:${EMULATOR_VERSION:-v0.0.9-rc.0}
     container_name: emulator
     restart: unless-stopped
     ports:
@@ -142,11 +140,11 @@ services:
       - DELEGATEE_DATABASE_URL=postgres://postgres@pg:5432/delegatee?sslmode=disable
       - DELEGATEE_ARK_URL=arkd:7070
       - DELEGATEE_EMULATOR_URL=emulator:7073
-      - DELEGATEE_SECRET_KEY=${DELEGATEE_SECRET_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
-      - DELEGATEE_PORT=7080
-      - DELEGATEE_ADMIN_PORT=7081
+      - DELEGATEE_DELEGATE_KEY=${DELEGATEE_DELEGATE_KEY:-0000000000000000000000000000000000000000000000000000000000000001}
+      - DELEGATEE_EXPLORER_URL=http://chopsticks:3000
       - DELEGATEE_ADMIN_AUTH=disabled
       - DELEGATEE_POLL_INTERVAL=10s
+      - DELEGATEE_MIN_WATCH_EXPIRY=0
 
 networks:
   default:

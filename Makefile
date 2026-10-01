@@ -18,7 +18,8 @@ clean:
 
 ## unit tests (no infrastructure), with coverage per package
 test:
-	go test -short -race -cover ./...
+	go test -race -cover $$(go list ./... | grep -v -e /test/e2e -e /infrastructure/db)
+	cd pkg/template && go test -race -cover ./...
 
 ## repository tests against postgres, then end-to-end against the regtest stack (make regtest-up first)
 test-e2e:
@@ -27,14 +28,13 @@ test-e2e:
 
 lint:
 	golangci-lint run ./...
+	cd pkg/template && golangci-lint run ./...
 
 ## proto: regenerates api-spec/protobuf/gen and the openapi spec with buf (docker)
 proto: proto-lint
-	@echo "Compiling stubs..."
 	@docker run --rm --volume "$(shell pwd):/workspace" --workdir /workspace buf generate
 
 proto-lint:
-	@echo "Linting protos..."
 	@docker build -q -t buf -f buf.Dockerfile . &> /dev/null
 	@docker run --rm --volume "$(shell pwd):/workspace" --workdir /workspace buf lint
 
@@ -78,6 +78,7 @@ regtest-down:
 run: build
 	DELEGATEE_ARK_URL=localhost:7070 DELEGATEE_EMULATOR_URL=localhost:7073 \
 	DELEGATEE_DATABASE_URL=postgres://postgres@localhost:5432/delegatee?sslmode=disable \
-	DELEGATEE_SECRET_KEY=$${DELEGATEE_SECRET_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef} \
+	DELEGATEE_DELEGATE_KEY=$${DELEGATEE_DELEGATE_KEY:-0000000000000000000000000000000000000000000000000000000000000001} \
+	DELEGATEE_EXPLORER_URL=http://localhost:3000 \
 	DELEGATEE_ADMIN_AUTH=disabled \
-	DELEGATEE_LOG_LEVEL=5 DELEGATEE_POLL_INTERVAL=10s ./bin/$(BINARY)
+	DELEGATEE_LOG_LEVEL=5 DELEGATEE_POLL_INTERVAL=10s DELEGATEE_MIN_WATCH_EXPIRY=0 ./bin/$(BINARY)

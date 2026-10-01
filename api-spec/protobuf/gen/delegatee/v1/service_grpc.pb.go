@@ -22,28 +22,36 @@ const (
 	DelegateeService_GetInfo_FullMethodName            = "/delegatee.v1.DelegateeService/GetInfo"
 	DelegateeService_RegisterDelegation_FullMethodName = "/delegatee.v1.DelegateeService/RegisterDelegation"
 	DelegateeService_GetDelegation_FullMethodName      = "/delegatee.v1.DelegateeService/GetDelegation"
-	DelegateeService_RevokeDelegation_FullMethodName   = "/delegatee.v1.DelegateeService/RevokeDelegation"
+	DelegateeService_RegisterArtifact_FullMethodName   = "/delegatee.v1.DelegateeService/RegisterArtifact"
+	DelegateeService_GetArtifact_FullMethodName        = "/delegatee.v1.DelegateeService/GetArtifact"
+	DelegateeService_RegisterTemplate_FullMethodName   = "/delegatee.v1.DelegateeService/RegisterTemplate"
+	DelegateeService_GetTemplate_FullMethodName        = "/delegatee.v1.DelegateeService/GetTemplate"
+	DelegateeService_ListTemplates_FullMethodName      = "/delegatee.v1.DelegateeService/ListTemplates"
 )
 
 // DelegateeServiceClient is the client API for DelegateeService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DelegateeServiceClient interface {
-	// GetInfo returns everything a wallet needs to build a delegate address
-	// it also returns the address itself would derive from the given params, so the wallet can verify it.
-	// params are optional, and default to the values the server is configured with.
+	// GetInfo returns the keys a wallet instantiates a template with.
 	GetInfo(ctx context.Context, in *GetInfoRequest, opts ...grpc.CallOption) (*GetInfoResponse, error)
-	// RegisterDelegation starts renewing the VTXOs locked at the address
-	// derived from the given tapscripts. The tapscripts must contain the
-	// delegate tapscript GetInfo returns for the same params, and
-	// an exit leaf.
+	// RegisterDelegation registers a watch: the daemon acts on coins sent to
+	// the address the template derives for variables, until expires_at. The
+	// template must have exactly one input; the wallet compares the address
+	// with its own. Registering an active watch again returns it unchanged.
 	RegisterDelegation(ctx context.Context, in *RegisterDelegationRequest, opts ...grpc.CallOption) (*RegisterDelegationResponse, error)
-	// GetDelegation returns a delegation with its spendable VTXOs (live from
-	// the arkd indexer) and its renewal history.
+	// GetDelegation returns the watch of an address (an active one first, else
+	// the newest) with its spendable VTXOs (live from the arkd indexer) and its
+	// renewal history.
 	GetDelegation(ctx context.Context, in *GetDelegationRequest, opts ...grpc.CallOption) (*GetDelegationResponse, error)
-	// RevokeDelegation stops renewing the address on its owner's request,
-	// proven with a key of the exit leaf. Register again to resume.
-	RevokeDelegation(ctx context.Context, in *RevokeDelegationRequest, opts ...grpc.CallOption) (*RevokeDelegationResponse, error)
+	// RegisterArtifact stores a compiler artifact templates may reference. Idempotent on its id.
+	RegisterArtifact(ctx context.Context, in *RegisterArtifactRequest, opts ...grpc.CallOption) (*RegisterArtifactResponse, error)
+	GetArtifact(ctx context.Context, in *GetArtifactRequest, opts ...grpc.CallOption) (*GetArtifactResponse, error)
+	// RegisterTemplate stores a template the engine accepts. It is active at once. Idempotent on its id.
+	RegisterTemplate(ctx context.Context, in *RegisterTemplateRequest, opts ...grpc.CallOption) (*RegisterTemplateResponse, error)
+	GetTemplate(ctx context.Context, in *GetTemplateRequest, opts ...grpc.CallOption) (*GetTemplateResponse, error)
+	// ListTemplates lists the active templates, without their documents.
+	ListTemplates(ctx context.Context, in *ListTemplatesRequest, opts ...grpc.CallOption) (*ListTemplatesResponse, error)
 }
 
 type delegateeServiceClient struct {
@@ -84,10 +92,50 @@ func (c *delegateeServiceClient) GetDelegation(ctx context.Context, in *GetDeleg
 	return out, nil
 }
 
-func (c *delegateeServiceClient) RevokeDelegation(ctx context.Context, in *RevokeDelegationRequest, opts ...grpc.CallOption) (*RevokeDelegationResponse, error) {
+func (c *delegateeServiceClient) RegisterArtifact(ctx context.Context, in *RegisterArtifactRequest, opts ...grpc.CallOption) (*RegisterArtifactResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RevokeDelegationResponse)
-	err := c.cc.Invoke(ctx, DelegateeService_RevokeDelegation_FullMethodName, in, out, cOpts...)
+	out := new(RegisterArtifactResponse)
+	err := c.cc.Invoke(ctx, DelegateeService_RegisterArtifact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *delegateeServiceClient) GetArtifact(ctx context.Context, in *GetArtifactRequest, opts ...grpc.CallOption) (*GetArtifactResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetArtifactResponse)
+	err := c.cc.Invoke(ctx, DelegateeService_GetArtifact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *delegateeServiceClient) RegisterTemplate(ctx context.Context, in *RegisterTemplateRequest, opts ...grpc.CallOption) (*RegisterTemplateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegisterTemplateResponse)
+	err := c.cc.Invoke(ctx, DelegateeService_RegisterTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *delegateeServiceClient) GetTemplate(ctx context.Context, in *GetTemplateRequest, opts ...grpc.CallOption) (*GetTemplateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTemplateResponse)
+	err := c.cc.Invoke(ctx, DelegateeService_GetTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *delegateeServiceClient) ListTemplates(ctx context.Context, in *ListTemplatesRequest, opts ...grpc.CallOption) (*ListTemplatesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTemplatesResponse)
+	err := c.cc.Invoke(ctx, DelegateeService_ListTemplates_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -98,21 +146,25 @@ func (c *delegateeServiceClient) RevokeDelegation(ctx context.Context, in *Revok
 // All implementations should embed UnimplementedDelegateeServiceServer
 // for forward compatibility.
 type DelegateeServiceServer interface {
-	// GetInfo returns everything a wallet needs to build a delegate address
-	// it also returns the address itself would derive from the given params, so the wallet can verify it.
-	// params are optional, and default to the values the server is configured with.
+	// GetInfo returns the keys a wallet instantiates a template with.
 	GetInfo(context.Context, *GetInfoRequest) (*GetInfoResponse, error)
-	// RegisterDelegation starts renewing the VTXOs locked at the address
-	// derived from the given tapscripts. The tapscripts must contain the
-	// delegate tapscript GetInfo returns for the same params, and
-	// an exit leaf.
+	// RegisterDelegation registers a watch: the daemon acts on coins sent to
+	// the address the template derives for variables, until expires_at. The
+	// template must have exactly one input; the wallet compares the address
+	// with its own. Registering an active watch again returns it unchanged.
 	RegisterDelegation(context.Context, *RegisterDelegationRequest) (*RegisterDelegationResponse, error)
-	// GetDelegation returns a delegation with its spendable VTXOs (live from
-	// the arkd indexer) and its renewal history.
+	// GetDelegation returns the watch of an address (an active one first, else
+	// the newest) with its spendable VTXOs (live from the arkd indexer) and its
+	// renewal history.
 	GetDelegation(context.Context, *GetDelegationRequest) (*GetDelegationResponse, error)
-	// RevokeDelegation stops renewing the address on its owner's request,
-	// proven with a key of the exit leaf. Register again to resume.
-	RevokeDelegation(context.Context, *RevokeDelegationRequest) (*RevokeDelegationResponse, error)
+	// RegisterArtifact stores a compiler artifact templates may reference. Idempotent on its id.
+	RegisterArtifact(context.Context, *RegisterArtifactRequest) (*RegisterArtifactResponse, error)
+	GetArtifact(context.Context, *GetArtifactRequest) (*GetArtifactResponse, error)
+	// RegisterTemplate stores a template the engine accepts. It is active at once. Idempotent on its id.
+	RegisterTemplate(context.Context, *RegisterTemplateRequest) (*RegisterTemplateResponse, error)
+	GetTemplate(context.Context, *GetTemplateRequest) (*GetTemplateResponse, error)
+	// ListTemplates lists the active templates, without their documents.
+	ListTemplates(context.Context, *ListTemplatesRequest) (*ListTemplatesResponse, error)
 }
 
 // UnimplementedDelegateeServiceServer should be embedded to have
@@ -131,8 +183,20 @@ func (UnimplementedDelegateeServiceServer) RegisterDelegation(context.Context, *
 func (UnimplementedDelegateeServiceServer) GetDelegation(context.Context, *GetDelegationRequest) (*GetDelegationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetDelegation not implemented")
 }
-func (UnimplementedDelegateeServiceServer) RevokeDelegation(context.Context, *RevokeDelegationRequest) (*RevokeDelegationResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method RevokeDelegation not implemented")
+func (UnimplementedDelegateeServiceServer) RegisterArtifact(context.Context, *RegisterArtifactRequest) (*RegisterArtifactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterArtifact not implemented")
+}
+func (UnimplementedDelegateeServiceServer) GetArtifact(context.Context, *GetArtifactRequest) (*GetArtifactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetArtifact not implemented")
+}
+func (UnimplementedDelegateeServiceServer) RegisterTemplate(context.Context, *RegisterTemplateRequest) (*RegisterTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterTemplate not implemented")
+}
+func (UnimplementedDelegateeServiceServer) GetTemplate(context.Context, *GetTemplateRequest) (*GetTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTemplate not implemented")
+}
+func (UnimplementedDelegateeServiceServer) ListTemplates(context.Context, *ListTemplatesRequest) (*ListTemplatesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTemplates not implemented")
 }
 func (UnimplementedDelegateeServiceServer) testEmbeddedByValue() {}
 
@@ -208,20 +272,92 @@ func _DelegateeService_GetDelegation_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DelegateeService_RevokeDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RevokeDelegationRequest)
+func _DelegateeService_RegisterArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterArtifactRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DelegateeServiceServer).RevokeDelegation(ctx, in)
+		return srv.(DelegateeServiceServer).RegisterArtifact(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: DelegateeService_RevokeDelegation_FullMethodName,
+		FullMethod: DelegateeService_RegisterArtifact_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DelegateeServiceServer).RevokeDelegation(ctx, req.(*RevokeDelegationRequest))
+		return srv.(DelegateeServiceServer).RegisterArtifact(ctx, req.(*RegisterArtifactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DelegateeService_GetArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetArtifactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DelegateeServiceServer).GetArtifact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DelegateeService_GetArtifact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DelegateeServiceServer).GetArtifact(ctx, req.(*GetArtifactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DelegateeService_RegisterTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DelegateeServiceServer).RegisterTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DelegateeService_RegisterTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DelegateeServiceServer).RegisterTemplate(ctx, req.(*RegisterTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DelegateeService_GetTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DelegateeServiceServer).GetTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DelegateeService_GetTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DelegateeServiceServer).GetTemplate(ctx, req.(*GetTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DelegateeService_ListTemplates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTemplatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DelegateeServiceServer).ListTemplates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DelegateeService_ListTemplates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DelegateeServiceServer).ListTemplates(ctx, req.(*ListTemplatesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -246,8 +382,24 @@ var DelegateeService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DelegateeService_GetDelegation_Handler,
 		},
 		{
-			MethodName: "RevokeDelegation",
-			Handler:    _DelegateeService_RevokeDelegation_Handler,
+			MethodName: "RegisterArtifact",
+			Handler:    _DelegateeService_RegisterArtifact_Handler,
+		},
+		{
+			MethodName: "GetArtifact",
+			Handler:    _DelegateeService_GetArtifact_Handler,
+		},
+		{
+			MethodName: "RegisterTemplate",
+			Handler:    _DelegateeService_RegisterTemplate_Handler,
+		},
+		{
+			MethodName: "GetTemplate",
+			Handler:    _DelegateeService_GetTemplate_Handler,
+		},
+		{
+			MethodName: "ListTemplates",
+			Handler:    _DelegateeService_ListTemplates_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

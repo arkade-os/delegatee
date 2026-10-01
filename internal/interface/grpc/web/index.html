@@ -33,7 +33,7 @@ p { margin: 0; }
 kbd { font: .8em var(--mono); border: 1px solid var(--line); border-radius: 4px; padding: 0 .3rem; background: var(--surface); }
 [hidden] { display: none !important; }
 
-/* buttons: one shape, three roles */
+/* buttons */
 button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: var(--r); padding: 0 .8rem; min-height: 2.25rem; font-weight: 500; transition: background .12s, border-color .12s, color .12s; }
 button:hover { background: var(--hover); border-color: var(--faint); }
 button:active { background: var(--current); }
@@ -50,7 +50,7 @@ button.link:hover { background: none; color: var(--ink); }
 button[aria-busy=true] { pointer-events: none; opacity: .7; }
 button[aria-busy=true]::after { content: "…"; }
 
-/* header: identity and health, nothing else */
+/* header */
 header { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center; padding: .6rem clamp(1rem, 3vw, 2rem); background: var(--surface); border-bottom: 1px solid var(--line); }
 header h1 { font-size: 1.05rem; letter-spacing: -.02em; }
 header h1 button { all: unset; cursor: pointer; border-radius: 2px; }
@@ -63,7 +63,7 @@ header .meta button:hover { color: var(--accent); }
 #health.ok i { background: var(--ok); } #health.down i { background: var(--bad); }
 #health.down { color: var(--bad); }
 
-/* status: three facts about the scanner, always visible */
+/* status */
 #status { display: flex; flex-wrap: wrap; padding: .35rem clamp(1rem, 3vw, 2rem); background: var(--surface); border-bottom: 1px solid var(--line); font-size: .86rem; color: var(--muted); min-height: 2.5rem; }
 #status > span { padding: .3rem 1.5rem .3rem 0; margin-right: 1.5rem; border-right: 1px solid var(--line); }
 #status > span:last-child { border-right: 0; margin-right: 0; }
@@ -97,7 +97,7 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 .empty { padding: 1.25rem 1rem; color: var(--muted); max-width: 36rem; line-height: 1.55; }
 #hint { padding: .45rem .9rem; border-top: 1px solid var(--line); color: var(--faint); font-size: .78rem; }
 
-/* skeletons: shown until data lands, and again while an address loads */
+/* skeletons */
 .sk { display: block; height: .8em; border-radius: 3px; background: var(--track); animation: sk 1.2s ease-in-out infinite; }
 @keyframes sk { 50% { opacity: .45; } }
 #rows li.sk-row { display: grid; grid-template-columns: .6rem 1fr auto; gap: .35rem .6rem; align-items: center; padding: .8rem .75rem .8rem .9rem; border-bottom: 1px solid var(--line); }
@@ -128,12 +128,11 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 .badge.bad { color: var(--bad); background: var(--bad-soft); border-color: transparent; } .badge.bad::before { background: var(--bad); }
 .badge.late { color: var(--window); background: var(--window-a); border-color: transparent; } .badge.late::before { background: var(--window); }
 .note { border-left: 3px solid var(--bad); padding: .6rem .9rem; margin: 1rem 0 0; background: var(--bad-soft); border-radius: 0 var(--r) var(--r) 0; max-width: 46rem; }
-.note.info { border-left-color: var(--faint); background: var(--surface); color: var(--muted); }
 .paths { list-style: none; margin: 0; padding: 0; max-width: 46rem; }
 .paths li { display: flex; justify-content: space-between; gap: 1rem; padding: .5rem 0; border-bottom: 1px solid var(--line); } .paths li:last-child { border-bottom: 0; }
 .paths .words { font-family: var(--mono); font-size: .86em; }
 
-/* the lifetime bar: birth to expiry, renewal window hatched at the end, a marker for now */
+/* lifetime bar: birth to expiry, renewal window hatched */
 .vtxo { padding: .9rem 0; border-bottom: 1px solid var(--line); } .vtxo:last-of-type { border-bottom: 0; }
 .vtxo .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; }
 .vtxo .amount { font-weight: 600; }
@@ -144,7 +143,7 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 .state { font-size: .82rem; color: var(--muted); }
 .state.in { color: var(--window); font-weight: 600; } .state.late { color: var(--bad); font-weight: 600; }
 
-/* overview: every address on one time axis, from now to the furthest expiry */
+/* overview: every address on one time axis */
 .horizon { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto; gap: .5rem 1rem; align-items: center; font-size: .86rem; }
 .horizon button { all: unset; font: .86em var(--mono); cursor: pointer; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 2px; }
 .horizon button:hover { color: var(--ink); text-decoration: underline; }
@@ -162,6 +161,9 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 .legend i { display: inline-block; width: 1.1rem; height: .55rem; border-radius: 2px; vertical-align: middle; margin-right: .35rem; background: var(--elapsed); }
 .legend i.w { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
 
+#template-doc, #artifact-doc { white-space: pre-wrap; word-break: break-all; max-width: 46rem; margin-top: .75rem; }
+#register textarea { width: 100%; max-width: 46rem; min-height: 8rem; font-family: var(--mono); font-size: .86em; }
+#delegate label { display: block; margin: .4rem 0; } #delegate input { width: 100%; max-width: 46rem; font-family: var(--mono); font-size: .86em; }
 table { border-collapse: collapse; width: 100%; font-size: .88rem; }
 th { text-align: left; font-weight: 500; color: var(--muted); font-size: .8rem; padding: .35rem .75rem .45rem 0; border-bottom: 1px solid var(--line); }
 td { padding: .55rem .75rem .55rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -222,12 +224,13 @@ const charges = (program) => Boolean(program) && Number(program) !== 0; // "0.0"
 const skeleton = (n) => `<div class="sk-detail" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<i class="sk" style="width:${[55, 90, 40, 70, 30][i % 5]}%"></i>`).join("")}</div>`;
 
 let delegations = [], status = null, filter = null, selected = location.hash.slice(1), detail = null, allVtxos = false, info = null;
+let templates = [], artifacts = [];
+let loadLimit = 5000, moreRows = false; // newest first, a page of 1000 at a time
 
-// --- tapscripts as words: who signs, and after what time
 const OPS = { 0x75: "DROP", 0x87: "EQUAL", 0x88: "EQUALVERIFY", 0xa8: "SHA256", 0xa9: "HASH160", 0xac: "CHECKSIG", 0xad: "CHECKSIGVERIFY",
   0xae: "CHECKMULTISIG", 0xb1: "CHECKLOCKTIMEVERIFY", 0xb2: "CHECKSEQUENCEVERIFY", 0xba: "CHECKSIGADD" };
-function keyName(x) { // x-only key against the keys arkd told us about
-  const known = info ? [["server", info.serverPubkey], ["emulator", info.emulatorTweakedPubkey], ["emulator key", info.emulatorPubkey], ["delegatee", info.delegatePubkey]] : [];
+function keyName(x) {
+  const known = info ? [["server", info.serverPubkey], ["emulator key", info.emulatorPubkey], ["delegatee", info.delegatePubkey]] : [];
   return known.find(([, k]) => k && k.slice(-64) === x)?.[0] ?? (detail?.delegation ? "owner" : short(x, 6));
 }
 function scriptWords(hex) {
@@ -247,12 +250,11 @@ function scriptWords(hex) {
   return out.join(" ");
 }
 
-// --- what state is a delegation in? one place, used by the list, the filters and the overview
 function stateOf(d) {
   const r = d.lastRenewal;
-  if (d.status !== "active") return { key: "off", dot: "off", text: d.status === "revoked" ? "stopped by owner" : "stopped" };
-  if (foreign(d))
-    return { key: "bad", dot: "bad", text: "different key", why: "Registered under another secret key: this instance cannot renew it." };
+  if (d.delegation.status !== "active") return { key: "off", dot: "off", text: d.delegation.status === "cancelled" ? "stopped" : d.delegation.status };
+  if (d.unmanagedReason)
+    return { key: "bad", dot: "bad", skipped: true, text: d.unmanagedReason, why: "The scanner skips it: " + d.unmanagedReason + "." };
   if (r && !r.success) return { key: "bad", dot: "bad", text: "failed " + ago(r.attemptedAt), why: r.error };
   // late: three quarters of the way from "renewable" to "expired" and still there
   const left = num(d.nextExpiry) - nowSecs(), room = num(d.nextExpiry) - num(d.nextRenewalAt);
@@ -262,15 +264,13 @@ function stateOf(d) {
   if (!r) return { key: "ok", dot: "", text: "not renewed yet" };
   return { key: "ok", dot: "ok", text: "renewed " + ago(r.attemptedAt) };
 }
-// not seen by a scan that ran after it was (re)registered: it is under another key
-const foreign = (d) => d.status === "active" && !d.managed && num(status?.lastScanAt) > num(d.updatedAt);
-const MAX_ROWS = 300; // the list is sorted by urgency, so what matters is always in it
+const MAX_ROWS = 300; // the list is sorted by urgency
 const MAX_LANES = 20, MAX_VTXOS = 40, AXIS_UNIT = 600; // ten minutes: the horizon's finest step
 const URGENCY = { bad: 0, late: 1, ok: 2, off: 3 };
 const FILTERS = [
   ["attention", "Needs attention", (d) => ["bad", "late"].includes(stateOf(d).key)],
-  ["active", "Active", (d) => d.status === "active"],
-  ["cancelled", "Stopped", (d) => d.status !== "active"],
+  ["active", "Active", (d) => d.delegation.status === "active"],
+  ["cancelled", "Stopped", (d) => d.delegation.status !== "active"],
   ["all", "All", () => true],
 ];
 
@@ -280,6 +280,10 @@ async function api(path, opts) {
   if (!res.ok) throw new Error(body.message || res.statusText);
   return body;
 }
+const send = (method, path, body) => api(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const act = (request, done, failed) => request.then(() => { toast(done); refresh(); }, (e) => toast(failed + e.message, true));
+const showDocument = (kind, id) => api(`/v1/${kind}/` + encodeURIComponent(id))
+  .then((r) => { const pre = $(kind + "-doc"); pre.hidden = false; pre.textContent = r[kind].document; }, (e) => toast(`Could not load the ${kind}: ` + e.message, true));
 
 function toast(msg, bad) {
   const t = $("toast");
@@ -317,10 +321,25 @@ async function loadHealth() {
   }
 }
 
+async function loadDelegations() {
+  const rows = [];
+  let cursor = 0;
+  do {
+    const page = await api("/v1/admin/delegate?page_size=1000" + (cursor ? "&cursor=" + cursor : ""));
+    rows.push(...(page.delegations || []));
+    cursor = num(page.nextCursor);
+  } while (cursor && rows.length < loadLimit);
+  moreRows = Boolean(cursor);
+  return rows;
+}
+
 async function loadList() {
   try {
-    [status, { delegations = [] }] = await Promise.all([api("/v1/admin/status"), api("/v1/admin/delegate")]);
+    [status, delegations, { templates = [] }, { artifacts = [] }] = await Promise.all([
+      api("/v1/admin/status"), loadDelegations(), api("/v1/admin/template"), api("/v1/admin/artifact"),
+    ]);
   } catch (e) { return toast("Could not load delegations: " + e.message, true); }
+  templates = templates.map((t) => ({ ...t.template, ...t }));
   if (!filter) filter = delegations.some(FILTERS[0][2]) ? "attention" : "active";
   renderStatus(); renderList();
   if (!selected) renderOverview();
@@ -329,7 +348,7 @@ async function loadList() {
 function renderStatus() {
   const poll = num(status.pollInterval), last = num(status.lastScanAt), busy = status.renewingVtxos > 0;
   const stale = !busy && last > 0 && nowSecs() - last > Math.max(3 * poll, 30);
-  const active = delegations.filter((d) => d.status === "active" && d.managed);
+  const active = delegations.filter((d) => d.delegation.status === "active" && d.managed);
   const total = active.reduce((a, d) => a + num(d.totalAmount), 0), vtxos = active.reduce((a, d) => a + num(d.vtxoCount), 0);
   const fees = status.intentFees, charged = fees && Object.values(fees).some(charges);
   $("status").innerHTML = [
@@ -344,7 +363,7 @@ function renderStatus() {
 
 function visibleRows() {
   const q = $("search").value.trim().toLowerCase(), fn = FILTERS.find((f) => f[0] === filter)[2];
-  return delegations.filter((d) => fn(d) && d.address.toLowerCase().includes(q))
+  return delegations.filter((d) => fn(d) && d.delegation.address.toLowerCase().includes(q))
     .sort((a, b) => URGENCY[stateOf(a).key] - URGENCY[stateOf(b).key]
       || (num(a.nextExpiry) || Infinity) - (num(b.nextExpiry) || Infinity));
 }
@@ -364,28 +383,34 @@ function renderList() {
   }
   const more = rows.length - MAX_ROWS;
   $("rows").innerHTML = rows.slice(0, MAX_ROWS).map((d) => {
-    const st = stateOf(d);
-    const holds = d.status !== "active" || !d.managed ? ""
+    const st = stateOf(d), address = d.delegation.address;
+    const selection = "id/" + d.delegation.id;
+    const label = address ? short(address, 12) : `#${d.delegation.id}, successor of #${num(d.delegation.parentId)}`;
+    const holds = d.delegation.status !== "active" || !d.managed ? ""
       : num(d.vtxoCount) ? `${sats(d.totalAmount)} in ${d.vtxoCount} VTXO${d.vtxoCount > 1 ? "s" : ""}, next expiry ${ago(d.nextExpiry)}` : "no VTXO at this address";
-    return `<li><button data-address="${esc(d.address)}" aria-current="${d.address === selected}">
-      <span class="dot ${st.dot}"></span><span class="hash">${esc(short(d.address, 12))}</span><span class="when">${st.text}</span>
+    return `<li><button data-address="${esc(selection)}" aria-current="${selection === selected}">
+      <span class="dot ${st.dot}"></span><span class="hash">${esc(label)}</span><span class="when">${esc(st.text)}</span>
       ${st.why ? `<span class="sub ${st.key}" title="${esc(st.why)}">${esc(st.why)}</span>` : holds ? `<span class="sub n">${holds}</span>` : ""}</button></li>`;
-  }).join("") + (more > 0 ? `<li class="empty">${more.toLocaleString()} more, by urgency. Find an address to narrow down.</li>` : "");
+  }).join("") + (more > 0 ? `<li class="empty">${more.toLocaleString()} more, by urgency. Find an address to narrow down.</li>` : "")
+    + (moreRows ? `<li class="empty">Only the newest ${delegations.length.toLocaleString()} delegations are loaded. <button class="link" id="load-more">Load more</button></li>` : "");
   $("rows").querySelector("[aria-current=true]")?.scrollIntoView({ block: "nearest" });
 }
 
-// --- right pane, nothing selected: the horizon and arkd's fees
 function renderOverview() {
-  const held = delegations.filter((d) => d.status === "active" && d.managed && num(d.nextExpiry))
+  // don't wipe a half-typed form on refresh
+  if ($("register")?.document.value || [...document.querySelectorAll("#delegate [data-var]")].some((i) => i.value)) return;
+  const chosen = $("delegate-template")?.value;
+  const held = delegations.filter((d) => d.delegation.status === "active" && d.managed && num(d.nextExpiry))
     .sort((a, b) => num(a.nextExpiry) - num(b.nextExpiry));
   const now = nowSecs(), shown = held.slice(0, MAX_LANES);
-  // log axis: ten minutes and a month both get room, a linear one would hide the near end
+  // log axis: a linear one would hide the near end
   const far = Math.max(...shown.map((d) => num(d.nextExpiry) - now), 2 * AXIS_UNIT);
   const pct = (x) => Math.log1p(Math.max(0, x) / AXIS_UNIT) / Math.log1p(far / AXIS_UNIT) * 100;
   const lanes = shown.map((d) => {
+    const address = d.delegation.address;
     const left = num(d.nextExpiry) - now, win = num(d.nextExpiry) - num(d.nextRenewalAt), st = stateOf(d);
     const cls = left <= 0 || st.key !== "ok" ? "late" : left <= win ? "in" : "";
-    return `<button data-address="${esc(d.address)}" class="hash" title="${esc(d.address)}">${esc(short(d.address, 8))}</button>
+    return `<button data-address="${esc("id/" + d.delegation.id)}" class="hash" title="${esc(address)}">${esc(address ? short(address, 8) : "#" + d.delegation.id)}</button>
       <div class="lane ${left <= 0 ? "late" : ""}" role="img" aria-label="expires ${ago(d.nextExpiry)}">
         <div class="left" style="width:${pct(left - win)}%"></div><div class="window" style="width:${pct(left) - pct(left - win)}%"></div></div>
       <span class="t n ${cls}">${left <= 0 ? "expired " + ago(d.nextExpiry) : st.key === "bad" ? "not renewing, " + span(left) + " left" : left <= win ? "renewable now, " + span(left) + " left" : "renewable " + ago(d.nextRenewalAt)}</span>`;
@@ -394,33 +419,66 @@ function renderOverview() {
   const axis = `<span></span><div class="axis"><i style="left:0">now</i>${ticks.map((t) => `<i style="left:${pct(t)}%">${span(t)}</i>`).join("")}</div><span></span>`;
 
   const f = status?.intentFees, rows = f && [["each VTXO renewed", f.offchainInput], ["each output created", f.offchainOutput]].filter((r) => charges(r[1]));
-  const strangers = delegations.filter(foreign).length;
+  const strangers = delegations.filter((d) => d.unmanagedReason === "registered under another key").length, usable = templates.filter((t) => t.status === "active");
   $("detail").removeAttribute("aria-busy");
   $("detail").innerHTML = `
     <h2>Overview</h2>
-    ${strangers ? `<p class="note"><b>${strangers}</b> active delegation${strangers > 1 ? "s were" : " was"} registered under another secret key and cannot be renewed by this instance. If the key was rotated by mistake, restore the previous key in the configured keyring.</p>` : ""}
+    ${strangers ? `<p class="note"><b>${strangers}</b> active delegation${strangers > 1 ? "s were" : " was"} registered under another delegate key and cannot be renewed by this instance. If the key was rotated by mistake, restore the previous key in the configured keyring.</p>` : ""}
     <h3>Next to expire</h3>
     <p>Each bar runs from now to the address's earliest expiry. The hatched end is when it can be renewed; a bar that is all hatch is renewable now.</p>
     ${shown.length ? `<div class="horizon">${lanes}${axis}</div><p class="legend"><span><i></i>waiting</span><span><i class="w"></i>renewal window</span></p>${held.length > shown.length ? `<p class="state">and ${held.length - shown.length} more, later</p>` : ""}`
       : `<p class="empty">No VTXO is being watched yet. They show up here after the next scan once coins sit at a registered address.</p>`}
     <h3>What arkd charges</h3>
     ${!f ? `<p>Unknown: arkd is unreachable.</p>`
-      : !rows.length ? `<p>Nothing. Every delegation can be renewed, whatever its max fee.</p>`
-      : `<p>A renewal pays every line below. A delegation whose max fee is lower is skipped and shows up under Needs attention until the fee drops.</p>
+      : !rows.length ? `<p>Nothing.</p>`
+      : `<p>A renewal pays every line below. A delegation whose template caps its fee lower is skipped and shows up under Needs attention until the fee drops.</p>
         <div class="scroll"><table><thead><tr><th>For</th><th>Fee program, in sats</th></tr></thead><tbody>
-        ${rows.map(([k, v]) => `<tr><td>${k}</td><td class="hash">${esc(v)}</td></tr>`).join("")}</tbody></table></div>`}`;
+        ${rows.map(([k, v]) => `<tr><td>${k}</td><td class="hash">${esc(v)}</td></tr>`).join("")}</tbody></table></div>`}
+    <h3>Templates</h3>
+    <p>What a delegation may be registered with. A disabled template registers nothing and renews nothing. A template whose intents keep being rejected is disabled by the daemon, unless it is trusted.</p>
+    ${templates.length ? `<div class="scroll"><table><thead><tr><th>Template</th><th>Variables</th><th>Status</th><th>Trusted</th><th>Delegations</th><th>Failed cycles</th><th></th></tr></thead><tbody>
+      ${templates.map((t) => `<tr><td class="hash"><button class="link hash" data-template="${esc(t.id)}" title="Show the document">${esc(short(t.id, 10))}</button></td>
+        <td class="hash">${(t.params || []).map((p) => `${esc(p.name)}: ${esc(p.type)}`).join("<br>")}</td>
+        <td class="res ${t.status === "active" ? "ok" : "bad"}">${esc(t.status)}</td>
+        <td>${t.trusted ? "yes" : "no"} <button class="link" data-template-trusted="${t.trusted ? "false" : "true"}" data-id="${esc(t.id)}">${t.trusted ? "Distrust" : "Trust"}</button></td>
+        <td class="n">${num(t.delegations)}</td><td class="n">${num(t.failures)}</td>
+        <td><button class="link" data-template-status="${t.status === "active" ? "disabled" : "active"}" data-id="${esc(t.id)}">${t.status === "active" ? "Disable" : "Enable"}</button>
+        ${num(t.delegations) ? "" : `<button class="link danger" data-template-delete="${esc(t.id)}">Delete</button>`}</td></tr>`).join("")}
+      </tbody></table></div><pre id="template-doc" class="hash" hidden></pre>`
+      : `<p class="empty">No template registered. Developers register one with POST /v1/template on the public port.</p>`}
+    <h3>Artifacts</h3>
+    <p>Compiler artifacts templates may reference by id. An artifact still referenced by a template cannot be deleted.</p>
+    ${artifacts.length ? `<div class="scroll"><table><thead><tr><th>Artifact</th><th>Registered</th><th></th></tr></thead><tbody>
+      ${artifacts.map((a) => `<tr><td class="hash"><button class="link hash" data-artifact="${esc(a.id)}" title="Show the document">${esc(short(a.id, 10))}</button></td>
+        <td>${ago(a.createdAt)}</td><td><button class="link danger" data-artifact-delete="${esc(a.id)}">Delete</button></td></tr>`).join("")}
+      </tbody></table></div><pre id="artifact-doc" class="hash" hidden></pre>`
+      : `<p class="empty">No artifact registered.</p>`}
+    <h3>Register</h3>
+    <p>Paste a document and register it. The same public endpoints developers use, served on this port.</p>
+    <form id="register"><textarea name="document" placeholder='{"format": "..."}' aria-label="Document"></textarea>
+      <div class="actions"><button class="primary" value="template">Register template</button><button value="artifact">Register artifact</button></div></form>
+    ${usable.length ? `<h3>Register a delegation</h3>
+    <p>Pick a template and give each of its variables, in canonical hex.</p>
+    <form id="delegate"><select id="delegate-template" aria-label="Template">${usable.map((t) => `<option value="${esc(t.id)}" ${t.id === chosen ? "selected" : ""}>${esc(short(t.id, 10))}</option>`).join("")}</select>
+      <div id="delegate-vars">${variableInputs(usable.find((t) => t.id === chosen) || usable[0])}</div>
+      <div class="actions"><button class="primary">Register delegation</button></div></form>` : ""}`;
+}
+
+function variableInputs(t) {
+  return (t?.params || []).map((p) => `<label>${esc(p.name)} <span class="state">${esc(p.type)}</span>
+    <input data-var="${esc(p.name)}" placeholder="hex" pattern="([0-9a-f]{2})*" required autocomplete="off"></label>`).join("");
 }
 
 async function loadDetail() {
   if (!selected) { detail = null; $("detail").removeAttribute("aria-busy"); return status && renderOverview(); }
   const address = selected;
-  if (detail?.delegation.address !== address) {
+  if ("id/" + detail?.delegation.id !== address) {
     allVtxos = false;
     $("detail").setAttribute("aria-busy", "true");
     $("detail").innerHTML = `<h2 class="hash" style="font-size:.95rem;color:var(--muted)">${esc(short(address, 12))}</h2>${skeleton(5)}`;
   }
   try {
-    detail = await api("/v1/delegate/" + encodeURIComponent(address));
+    detail = await api(address.startsWith("id/") ? "/v1/admin/delegation/" + encodeURIComponent(address.slice(3)) : "/v1/delegate/" + encodeURIComponent(address));
   } catch (e) {
     $("detail").removeAttribute("aria-busy");
     $("detail").innerHTML = `<p class="empty">Could not load ${esc(short(address, 12))}: ${esc(e.message)}. <button class="link" id="home2">Back to the overview</button></p>`;
@@ -448,21 +506,22 @@ function renderDetail() {
   const d = detail.delegation, renewals = detail.renewals || [];
   const vtxos = (detail.vtxos || []).slice().sort((a, b) => num(a.renewableAt) - num(b.renewableAt));
   const held = vtxos.reduce((a, v) => a + num(v.amount), 0), shownVtxos = allVtxos ? vtxos : vtxos.slice(0, MAX_VTXOS);
-  const active = d.status === "active", windowSecs = num(d.renewalWindow);
-  const inList = delegations.find((x) => x.address === d.address), st = inList && stateOf(inList);
-  const life = vtxos.length ? Math.max(...vtxos.map((v) => num(v.expiresAt) - num(v.createdAt))) : 0;
+  const active = d.status === "active";
+  const inList = delegations.find((x) => x.delegation.id === d.id), st = inList && stateOf(inList);
+  const slots = d.slots || [];
   $("detail").innerHTML = `
     <div class="title">
-      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : "ok"}">${!active ? (d.status === "revoked" ? "stopped by its owner" : "stopped by an operator") : st?.text === "different key" ? "different key" : st?.key === "bad" ? "not renewing" : st?.key === "late" ? "late" : "renewing"}</span></h2>
+      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : "ok"}">${!active ? (d.status === "cancelled" ? "stopped by an operator" : esc(d.status)) : st?.skipped ? esc(st.text) : st?.key === "bad" ? "not renewing" : st?.key === "late" ? "late" : "renewing"}</span></h2>
         <div class="hash">${esc(d.address)}</div></div>
       <div class="actions"><button data-copy="${esc(d.address)}">Copy address</button>
-        ${active ? `<button class="danger" id="stop">Stop renewing</button>` : `<button class="primary" id="resume">Resume renewing</button>`}</div>
+        ${active ? `<button class="danger" id="stop">Stop renewing</button>` : d.address ? `<button class="primary" id="resume">Resume renewing</button>` : ""}</div>
     </div>
-    <dl class="facts"><div><dt>Renewable</dt><dd>${span(windowSecs)} before expiry</dd></div>
-      <div><dt>Pays per renewal</dt><dd class="n">${num(d.maxFee) ? "up to " + sats(d.maxFee) : "nothing"}</dd></div>
-      <div><dt>Registered</dt><dd>${ago(d.createdAt)}</dd></div></dl>
+    <dl class="facts"><div><dt>Template</dt><dd class="hash">${esc(short(d.templateId, 10))}<button class="link" data-copy="${esc(d.templateId)}" title="Copy the template id">copy</button></dd></div>
+      ${num(d.parentId) ? `<div><dt>Successor of</dt><dd><a href="#id/${num(d.parentId)}">#${num(d.parentId)}</a></dd></div>` : ""}
+      ${Object.entries(d.variables || {}).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}
+      <div><dt>Registered</dt><dd>${ago(d.createdAt)}</dd></div>
+      <div><dt>Expires</dt><dd>${num(d.expiresAt) ? `<span title="${new Date(num(d.expiresAt) * 1000).toLocaleString()}">${ago(d.expiresAt)}</span>` : "never"}</dd></div></dl>
     ${st?.why && active ? `<p class="note">${esc(st.why)}</p>` : ""}
-    ${active && num(d.maxFee) > 0 && life && windowSecs > life / 2 ? `<p class="note info">The renewal window (${span(windowSecs)}) is more than half the VTXO lifetime (${span(life)}). Because this delegation can pay fees, it is only renewed in the second half of a VTXO's life, so it doesn't pay in every round.</p>` : ""}
     <h3>VTXOs at this address</h3>
     ${vtxos.length > 1 ? `<p><b class="n">${vtxos.length}</b> VTXOs holding <b class="n">${sats(held)}</b>, soonest to renew first.</p>` : ""}
     ${vtxos.length ? shownVtxos.map((v) => `<div class="vtxo"><div class="top"><span class="hash">${esc(v.outpoint)}</span>
@@ -478,20 +537,25 @@ function renderDetail() {
       </tbody></table></div>
       <p class="state">A failure that repeats is listed once, at the time it first happened.</p>`
       : `<p class="empty">No attempt yet. A VTXO is first renewed when it enters its renewal window.</p>`}
-    <h3>Spending paths</h3>
-    <p>Who can spend a VTXO at this address, one tapscript each.</p>
-    <ul class="paths">${(d.tapscripts || []).map((t) => `<li><span class="words">${esc(scriptWords(t))}</span><button class="link" data-copy="${esc(t)}" title="Copy the script hex">hex</button></li>`).join("")}</ul>`;
+    <h3>Inputs</h3>
+    <p>Each input of the template: what it watches or the output bound to it, and who can spend it, one tapscript each.</p>
+    ${slots.map((sl) => `<h4>${esc(sl.name)} <span class="badge">${sl.onchain ? "onchain" : "offchain"}</span></h4>
+      ${sl.outpoint ? `<p class="hash">${esc(sl.outpoint)} <button class="link" data-copy="${esc(sl.outpoint)}" title="Copy the outpoint">copy</button></p>` : ""}
+      <ul class="paths">${(sl.tapscripts || []).map((t) => `<li><span class="words">${esc(scriptWords(t))}</span><button class="link" data-copy="${esc(t)}" title="Copy the script hex">hex</button></li>`).join("")}</ul>`).join("")}`;
 }
 
 async function setRenewing(on) {
   const d = detail.delegation;
   $("detail").querySelector("#stop, #resume")?.setAttribute("aria-busy", "true");
   try {
-    if (on) {
-      await api("/v1/delegate", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tapscripts: d.tapscripts, renewalWindow: d.renewalWindow, maxFee: d.maxFee }) });
+    if (on && d.status === "cancelled") {
+      await send("POST", "/v1/admin/delegation/" + encodeURIComponent(d.id) + "/resume", {});
+    } else if (on) {
+      // an expired watch is registered again, keeping its expiry while it is still ahead
+      await send("POST", "/v1/delegate", { templateId: d.templateId, variables: d.variables,
+        ...(num(d.expiresAt) > nowSecs() ? { expiresAt: d.expiresAt } : {}) });
     } else {
-      await api("/v1/admin/delegate/" + encodeURIComponent(d.address), { method: "DELETE" });
+      await api("/v1/admin/delegation/" + encodeURIComponent(d.id), { method: "DELETE" });
     }
     toast(on ? "Renewing resumed" : "Renewing stopped");
   } catch (e) { toast(`Could not ${on ? "resume" : "stop"} renewing: ${e.message}`, true); }
@@ -499,10 +563,10 @@ async function setRenewing(on) {
 }
 
 function askStop() {
-  const held = delegations.find((x) => x.address === detail.delegation.address);
+  const held = delegations.find((x) => x.delegation.id === detail.delegation.id);
   $("confirm-text").textContent = (num(held?.vtxoCount)
     ? `${sats(held.totalAmount)} in ${held.vtxoCount} VTXO${held.vtxoCount > 1 ? "s" : ""}, the first expiring ${ago(held.nextExpiry)}, will expire`
-    : "Coins sent to it later will expire") + " unless the owner exits or you resume. Nothing is deleted.";
+    : "Coins sent to it later will expire") + " unless the owner exits or you resume. The owner cannot register it again until you resume. Nothing is deleted.";
   $("confirm").showModal();
 }
 
@@ -519,17 +583,48 @@ document.addEventListener("click", (e) => {
   else if (b.id === "confirm-yes") { $("confirm").close(); setRenewing(false); }
   else if (b.value === "no") $("confirm").close();
   else if (b.id === "resume") setRenewing(true);
+  else if (b.id === "load-more") { loadLimit += 5000; refresh(); }
+  else if (b.dataset.template) showDocument("template", b.dataset.template);
+  else if (b.dataset.artifact) showDocument("artifact", b.dataset.artifact);
+  else if (b.dataset.templateStatus) act(send("PUT", "/v1/admin/template/" + encodeURIComponent(b.dataset.id) + "/status", { status: b.dataset.templateStatus }),
+    "Template " + b.dataset.templateStatus, "Could not change the template: ");
+  else if (b.dataset.templateTrusted) act(send("PUT", "/v1/admin/template/" + encodeURIComponent(b.dataset.id) + "/trusted", { trusted: b.dataset.templateTrusted === "true" }),
+    b.dataset.templateTrusted === "true" ? "Template trusted" : "Template no longer trusted", "Could not change the template: ");
+  else if (b.dataset.templateDelete) act(api("/v1/admin/template/" + encodeURIComponent(b.dataset.templateDelete), { method: "DELETE" }), "Template deleted", "Could not delete the template: ");
+  else if (b.dataset.artifactDelete) act(api("/v1/admin/artifact/" + encodeURIComponent(b.dataset.artifactDelete), { method: "DELETE" }), "Artifact deleted", "Could not delete the artifact: ");
+});
+document.addEventListener("change", (e) => {
+  if (e.target === $("delegate-template")) $("delegate-vars").innerHTML = variableInputs(templates.find((t) => t.id === e.target.value));
+});
+document.addEventListener("submit", (e) => {
+  const form = $("delegate");
+  if (e.target === form) {
+    e.preventDefault();
+    const inputs = [...form.querySelectorAll("[data-var]")], variables = Object.fromEntries(inputs.map((i) => [i.dataset.var, i.value.trim()]));
+    form.setAttribute("aria-busy", "true");
+    return send("POST", "/v1/delegate", { templateId: $("delegate-template").value, variables })
+      .then((r) => { toast(`Registered ${short(r.delegation.address || "#" + r.delegation.id, 8)}`); inputs.forEach((i) => { i.value = ""; }); refresh(); }, (err) => toast(`Could not register the delegation: ${err.message}`, true))
+      .finally(() => form.removeAttribute("aria-busy"));
+  }
+  if (e.target.id !== "register") return;
+  e.preventDefault();
+  const kind = e.submitter?.value === "artifact" ? "artifact" : "template", document_ = e.target.document.value.trim();
+  if (!document_) return toast("Paste a document first", true);
+  e.target.setAttribute("aria-busy", "true");
+  send("POST", "/v1/" + kind, { document: document_ })
+    .then((r) => { const id = (kind === "artifact" ? r.artifact : r.template).id; toast(`Registered ${kind} ${short(id, 8)}`); e.target.reset(); refresh(); }, (err) => toast(`Could not register the ${kind}: ${err.message}`, true))
+    .finally(() => e.target.removeAttribute("aria-busy"));
 });
 document.addEventListener("keydown", (e) => {
   if ($("confirm").open || e.metaKey || e.ctrlKey || e.altKey) return;
-  const typing = e.target === $("search");
+  const typing = e.target.matches("input, textarea, select");
   if (e.key === "/" && !typing) { e.preventDefault(); $("search").focus(); }
-  else if (e.key === "Escape") { typing ? $("search").blur() : go(""); }
+  else if (e.key === "Escape") { typing ? e.target.blur() : go(""); }
   else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !typing) {
     const rows = visibleRows().slice(0, MAX_ROWS); if (!rows.length) return;
     e.preventDefault();
-    const i = rows.findIndex((d) => d.address === selected), step = e.key === "ArrowDown" ? 1 : -1;
-    go(rows[Math.min(rows.length - 1, Math.max(0, i < 0 ? 0 : i + step))].address);
+    const i = rows.findIndex((d) => "id/" + d.delegation.id === selected), step = e.key === "ArrowDown" ? 1 : -1;
+    go("id/" + rows[Math.min(rows.length - 1, Math.max(0, i < 0 ? 0 : i + step))].delegation.id);
   }
 });
 $("search").addEventListener("input", renderList);

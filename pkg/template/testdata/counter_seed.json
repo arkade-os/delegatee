@@ -1,0 +1,198 @@
+{
+  "format": "delegateed-template/v1",
+  "type": "intent",
+  "variables": {"counter_program": "bytes32", "reserve_program": "bytes32"},
+  "inputs": [
+    {
+      "name": "deposit",
+      "type": "onchain",
+      "schedule": {"min_confirmations": 1},
+      "contract": {
+        "definition": {
+          "contractName": "Seed",
+          "constructorInputs": [
+            {"name": "exitKey", "type": "pubkey"},
+            {"name": "counterProgram", "type": "bytes32"},
+            {"name": "reserveProgram", "type": "bytes32"}
+          ],
+          "structs": [],
+          "functions": [
+            {
+              "name": "spend",
+              "leaves": [
+                {
+                  "name": "spend",
+                  "asm": ["<SERVER_KEY>", "OP_CHECKSIGVERIFY", "<exitKey>", "OP_CHECKSIG"],
+                  "witness": [
+                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
+                    {"name": "exitSig", "type": "signature", "encoding": "schnorr-64"}
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "exit",
+              "leaves": [
+                {
+                  "name": "exit",
+                  "asm": ["4194306", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<exitKey>", "OP_CHECKSIG"],
+                  "witness": [{"name": "exitSig", "type": "signature", "encoding": "schnorr-64"}]
+                }
+              ]
+            },
+            {
+              "name": "seed",
+              "arkade": {
+                "inputs": [],
+                "asm": [
+                  "0x74797065", "OP_INSPECTINTENTMESSAGE", "OP_VERIFY", "0x7265676973746572", "OP_EQUALVERIFY",
+                  "0x6f6e636861696e5f6f75747075745f696e6465786573", "OP_INSPECTINTENTMESSAGE", "OP_VERIFY", "0x5b5d", "OP_EQUALVERIFY",
+                  "0x636f7369676e6572735f7075626c69635f6b6579732e30", "OP_INSPECTINTENTMESSAGE", "OP_VERIFY", "<DELEGATE_KEY>", "OP_EQUALVERIFY",
+                  "0x636f7369676e6572735f7075626c69635f6b6579732e31", "OP_INSPECTINTENTMESSAGE", "OP_NOT", "OP_VERIFY", "OP_DROP",
+                  "2", "OP_INSPECTPACKET", "OP_VERIFY", "0x0500000000000000", "OP_EQUALVERIFY",
+                  "5", "OP_INSPECTPACKET", "OP_VERIFY", "0x012400b60f6a7cad731b6f283d76b57dd84046e3937105793acf10568b866cd8de3c4b00000100", "OP_EQUALVERIFY",
+                  "0", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "1", "OP_EQUALVERIFY", "<counterProgram>", "OP_EQUALVERIFY",
+                  "1", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "1", "OP_EQUALVERIFY", "<reserveProgram>", "OP_EQUALVERIFY",
+                  "0", "OP_INSPECTOUTPUTVALUE", "1", "OP_INSPECTOUTPUTVALUE", "OP_ADD", "OP_PUSHCURRENTINPUTINDEX", "OP_INSPECTINPUTVALUE", "OP_NUMEQUAL"
+                ]
+              },
+              "leaves": [
+                {
+                  "name": "seed",
+                  "asm": ["<SERVER_KEY>", "OP_CHECKSIGVERIFY", "<EMULATOR_KEY:seed>", "OP_CHECKSIG"],
+                  "witness": [
+                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
+                    {"name": "emulatorSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "arguments": {
+          "exitKey": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+          "counterProgram": "<counter_program>",
+          "reserveProgram": "<reserve_program>"
+        }
+      },
+      "spend": {"function": "seed", "leaf": "seed"}
+    }
+  ],
+  "outputs": [
+    {
+      "name": "counter",
+      "index": 0,
+      "value": {"from": "deposit", "amount": 10000},
+      "locking": {
+        "contract": {
+          "definition": {
+            "contractName": "Counter",
+            "constructorInputs": [],
+            "structs": [],
+            "functions": [
+              {
+                "name": "delayed_server_spend",
+                "leaves": [
+                  {
+                    "name": "delayed_server_spend",
+                    "asm": ["4194306", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<SERVER_KEY>", "OP_CHECKSIG"],
+                    "witness": [{"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true}]
+                  }
+                ]
+              },
+              {
+                "name": "renew",
+                "arkade": {
+                  "inputs": [],
+                  "asm": [
+                    "OP_PUSHEXPIRY", "1024", "OP_SUB", "OP_CHECKTIME", "OP_VERIFY",
+                    "0x74797065", "OP_INSPECTINTENTMESSAGE", "OP_VERIFY", "0x7265676973746572", "OP_EQUALVERIFY",
+                    "0x6f6e636861696e5f6f75747075745f696e6465786573", "OP_INSPECTINTENTMESSAGE", "OP_VERIFY", "0x5b5d", "OP_EQUALVERIFY",
+                    "0x636f7369676e6572735f7075626c69635f6b6579732e30", "OP_INSPECTINTENTMESSAGE", "OP_VERIFY", "<DELEGATE_KEY>", "OP_EQUALVERIFY",
+                    "0x636f7369676e6572735f7075626c69635f6b6579732e31", "OP_INSPECTINTENTMESSAGE", "OP_NOT", "OP_VERIFY", "OP_DROP",
+                    "2", "OP_INSPECTPACKET", "OP_VERIFY", "OP_SIZE", "8", "OP_EQUALVERIFY", "OP_BIN2NUM",
+                    "2", "OP_PUSHCURRENTINPUTINDEX", "OP_INSPECTINPUTPACKET", "OP_VERIFY", "OP_BIN2NUM", "OP_1ADD", "OP_EQUALVERIFY",
+                    "5", "OP_INSPECTPACKET", "OP_VERIFY", "5", "OP_PUSHCURRENTINPUTINDEX", "OP_INSPECTINPUTPACKET", "OP_VERIFY", "OP_EQUALVERIFY",
+                    "OP_PUSHCURRENTINPUTINDEX", "OP_1SUB", "7", "0", "OP_TUNNEL"
+                  ]
+                },
+                "leaves": [
+                  {
+                    "name": "renew",
+                    "asm": ["<SERVER_KEY>", "OP_CHECKSIGVERIFY", "<EMULATOR_KEY:renew>", "OP_CHECKSIG"],
+                    "witness": [
+                      {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
+                      {"name": "emulatorSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "reserve",
+      "index": 1,
+      "value": {"from": "deposit"},
+      "locking": {
+        "contract": {
+          "definition": {
+            "contractName": "Reserve",
+            "constructorInputs": [],
+            "structs": [],
+            "functions": [
+              {
+                "name": "delayed_server_spend",
+                "leaves": [
+                  {
+                    "name": "delayed_server_spend",
+                    "asm": ["4194306", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<SERVER_KEY>", "OP_CHECKSIG"],
+                    "witness": [{"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true}]
+                  }
+                ]
+              },
+              {
+                "name": "renew",
+                "arkade": {
+                  "inputs": [],
+                  "asm": [
+                    "1", "OP_DROP",
+                    "OP_PUSHEXPIRY", "1024", "OP_SUB", "OP_CHECKTIME", "OP_VERIFY",
+                    "0x74797065", "OP_INSPECTINTENTMESSAGE", "OP_VERIFY", "0x7265676973746572", "OP_EQUALVERIFY",
+                    "0x6f6e636861696e5f6f75747075745f696e6465786573", "OP_INSPECTINTENTMESSAGE", "OP_VERIFY", "0x5b5d", "OP_EQUALVERIFY",
+                    "0x636f7369676e6572735f7075626c69635f6b6579732e30", "OP_INSPECTINTENTMESSAGE", "OP_VERIFY", "<DELEGATE_KEY>", "OP_EQUALVERIFY",
+                    "0x636f7369676e6572735f7075626c69635f6b6579732e31", "OP_INSPECTINTENTMESSAGE", "OP_NOT", "OP_VERIFY", "OP_DROP",
+                    "5", "OP_INSPECTPACKET", "OP_VERIFY", "5", "OP_PUSHCURRENTINPUTINDEX", "OP_INSPECTINPUTPACKET", "OP_VERIFY", "OP_EQUALVERIFY",
+                    "OP_PUSHCURRENTINPUTINDEX", "OP_1SUB", "7", "0", "OP_TUNNEL"
+                  ]
+                },
+                "leaves": [
+                  {
+                    "name": "renew",
+                    "asm": ["<SERVER_KEY>", "OP_CHECKSIGVERIFY", "<EMULATOR_KEY:renew>", "OP_CHECKSIG"],
+                    "witness": [
+                      {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
+                      {"name": "emulatorSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "packets": {
+    "output_index": 2,
+    "rules": [{"type": 2, "action": "emit", "from": "deposit", "data": "0500000000000000"}],
+    "advertise": [
+      {
+        "template": "b60f6a7cad731b6f283d76b57dd84046e3937105793acf10568b866cd8de3c4b",
+        "outputs": ["counter", "reserve"]
+      }
+    ]
+  }
+}

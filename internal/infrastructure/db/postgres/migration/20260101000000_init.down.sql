@@ -1,5 +1,16 @@
+DROP INDEX IF EXISTS idx_settlements_delegation;
 DROP INDEX IF EXISTS idx_renewals_attempted_at;
 DROP INDEX IF EXISTS idx_renewals_delegation;
+DROP INDEX IF EXISTS idx_templates_status;
+DROP INDEX IF EXISTS idx_delegations_slots;
+DROP INDEX IF EXISTS idx_delegations_fingerprint;
+DROP INDEX IF EXISTS idx_delegations_active_fingerprint;
+DROP INDEX IF EXISTS idx_delegations_parent;
+DROP INDEX IF EXISTS idx_delegations_address;
+DROP INDEX IF EXISTS idx_delegations_template;
 DROP INDEX IF EXISTS idx_delegations_status;
+DROP TABLE IF EXISTS settlements;
 DROP TABLE IF EXISTS renewals;
 DROP TABLE IF EXISTS delegations;
+DROP TABLE IF EXISTS templates;
+DROP TABLE IF EXISTS artifacts;

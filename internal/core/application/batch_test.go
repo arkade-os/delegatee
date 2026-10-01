@@ -1,21 +1,21 @@
 package application
 
 import (
+	"bytes"
 	"encoding/hex"
+	"slices"
 	"strings"
 	"testing"
 
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
+	"github.com/arkade-os/arkd/pkg/ark-lib/extension"
 	"github.com/arkade-os/arkd/pkg/ark-lib/tree"
-	"github.com/arkade-os/delegatee/internal/core/domain"
 	"github.com/btcsuite/btcd/psbt/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
 )
-
-var testExpiry = arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: 1024}
 
 func TestValidateBatch(t *testing.T) {
 	env := newTestEnv(t)
@@ -25,7 +25,7 @@ func TestValidateBatch(t *testing.T) {
 	// the batch also serves someone else
 	batch := buildBatch(t, env, append([]*wire.TxOut{wire.NewTxOut(777, bob)}, ours...), 3)
 	validate := func(b testBatch, outputs []*wire.TxOut) error {
-		return validateBatch(b.commitment, b.vtxoTree, b.connectors, env.svc.forfeitPubKey, testExpiry, outputs)
+		return validateBatch(b.commitment, b.vtxoTree, b.connectors, env.svc.forfeitPubKey, testExpiry, outputs, nil, true)
 	}
 	require.NoError(t, validate(batch, ours))
 
@@ -54,11 +54,11 @@ func TestValidateBatch(t *testing.T) {
 	t.Run("sweepable by someone else, or sooner", func(t *testing.T) {
 		stranger := newTestEnv(t)
 		require.ErrorContains(t,
-			validateBatch(batch.commitment, batch.vtxoTree, batch.connectors, stranger.svc.forfeitPubKey, testExpiry, ours),
+			validateBatch(batch.commitment, batch.vtxoTree, batch.connectors, stranger.svc.forfeitPubKey, testExpiry, ours, nil, true),
 			"vtxo tree")
 		sooner := arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: 512}
 		require.ErrorContains(t,
-			validateBatch(batch.commitment, batch.vtxoTree, batch.connectors, env.svc.forfeitPubKey, sooner, ours),
+			validateBatch(batch.commitment, batch.vtxoTree, batch.connectors, env.svc.forfeitPubKey, sooner, ours, nil, true),
 			"vtxo tree")
 	})
 	t.Run("garbage", func(t *testing.T) {
@@ -68,7 +68,7 @@ func TestValidateBatch(t *testing.T) {
 	})
 	t.Run("malformed tree is rejected without a panic", func(t *testing.T) {
 		malformed := &tree.TxTree{Root: &psbt.Packet{UnsignedTx: &wire.MsgTx{}}}
-		require.ErrorContains(t, validateBatch(batch.commitment, malformed, batch.connectors, env.svc.forfeitPubKey, testExpiry, ours), "no input")
+		require.ErrorContains(t, validateBatch(batch.commitment, malformed, batch.connectors, env.svc.forfeitPubKey, testExpiry, ours, nil, true), "no input")
 	})
 	t.Run("connectors must spend commitment output one", func(t *testing.T) {
 		wrong := buildBatch(t, env, ours, 3)
@@ -77,19 +77,18 @@ func TestValidateBatch(t *testing.T) {
 	})
 }
 
-// The whole cosigner role against an honest coordinator: nonces, signatures,
-// then forfeits, which only leave once the batch checks out.
+// forfeits leave only once the batch checks out
 func TestBatchHandlerSignsAndForfeits(t *testing.T) {
 	env := newTestEnv(t)
-	first := dueInput(t, env, domain.Params{RenewalWindow: 600}, 1, 10_000)
-	second := dueInput(t, env, domain.Params{RenewalWindow: 700}, 2, 20_000)
-	for _, in := range []*renewalInput{&first, &second} {
-		in.output = wire.NewTxOut(int64(in.vtxo.Amount), in.pkScript)
-	}
-	batch := buildBatch(t, env, []*wire.TxOut{first.output, second.output}, 2)
+	first := builtIntent(t, env, dueInput(t, env, 0, 10_000))
+	second := builtIntent(t, env, dueInput(t, env, 0, 20_000))
+	firstOut, secondOut := first.outputs[0], second.outputs[0]
+	require.Equal(t, int64(10_000), firstOut.Value, "no fee: the template pays the vtxo back in full")
+	batch := buildBatch(t, env, []*wire.TxOut{firstOut, secondOut}, 2)
+	carry(batch.vtxoTree, first, second)
 	h := &batchHandler{
-		svc: env.svc, signerSession: tree.NewTreeSignerSession(env.svc.key), batchExpiry: testExpiry,
-		inBatch: []*pendingIntent{{inputs: []renewalInput{first}}, {inputs: []renewalInput{second}}},
+		svc: env.svc, signerSession: tree.NewTreeSignerSession(env.svc.cosigners[0].key), batchExpiry: testExpiry,
+		inBatch: []*pendingIntent{first, second},
 	}
 	ctx := t.Context()
 
@@ -98,7 +97,7 @@ func TestBatchHandlerSignsAndForfeits(t *testing.T) {
 	require.True(t, skip, "a tree we do not cosign")
 
 	started := clientlib.TreeSigningStartedEvent{
-		Id: "b1", UnsignedCommitmentTx: batch.commitment, CosignersPubkeys: []string{env.svc.delegatePubKeyHex},
+		Id: "b1", UnsignedCommitmentTx: batch.commitment, CosignersPubkeys: []string{env.svc.cosigners[0].pubKey},
 	}
 	skip, err = h.OnTreeSigningStarted(ctx, started, batch.vtxoTree)
 	require.NoError(t, err)
@@ -109,14 +108,14 @@ func TestBatchHandlerSignsAndForfeits(t *testing.T) {
 	require.NoError(t, err)
 	coordinator, err := tree.NewTreeCoordinatorSession(sweepRoot, batch.amount, batch.vtxoTree)
 	require.NoError(t, err)
-	coordinator.AddNonce(env.svc.key.PubKey(), env.ark.nonces)
+	coordinator.AddNonce(env.svc.cosigners[0].key.PubKey(), env.ark.nonces)
 	aggregated, err := coordinator.AggregateNonces()
 	require.NoError(t, err)
 
 	done, err := h.OnTreeNoncesAggregated(ctx, clientlib.TreeNoncesAggregatedEvent{Id: "b1", Nonces: aggregated})
 	require.NoError(t, err)
 	require.True(t, done)
-	ban, err := coordinator.AddSignatures(env.svc.key.PubKey(), env.ark.sigs)
+	ban, err := coordinator.AddSignatures(env.svc.cosigners[0].key.PubKey(), env.ark.sigs)
 	require.NoError(t, err)
 	require.False(t, ban, "our partial signatures verify")
 	_, err = coordinator.SignTree()
@@ -127,12 +126,13 @@ func TestBatchHandlerSignsAndForfeits(t *testing.T) {
 	require.Error(t, err)
 
 	// finalization: a batch missing one of our coins gets no forfeit at all
-	stingy := buildBatch(t, env, []*wire.TxOut{first.output}, 2)
+	stingy := buildBatch(t, env, []*wire.TxOut{firstOut}, 2)
 	_, err = h.OnBatchFinalization(ctx, clientlib.BatchFinalizationEvent{Tx: stingy.commitment}, stingy.vtxoTree, stingy.connectors)
 	require.ErrorContains(t, err, "refusing to forfeit")
 	require.Empty(t, env.ark.forfeits)
 
-	few := buildBatch(t, env, []*wire.TxOut{first.output, second.output}, 1)
+	few := buildBatch(t, env, []*wire.TxOut{firstOut, secondOut}, 1)
+	carry(few.vtxoTree, first, second)
 	_, err = h.OnBatchFinalization(ctx, clientlib.BatchFinalizationEvent{Tx: few.commitment}, few.vtxoTree, few.connectors)
 	require.ErrorContains(t, err, "got 0 connectors for 1 vtxos")
 
@@ -148,14 +148,55 @@ func TestBatchHandlerSignsAndForfeits(t *testing.T) {
 		connectorsUsed[forfeit.UnsignedTx.TxIn[1].PreviousOutPoint] = true
 	}
 	require.Len(t, connectorsUsed, 2, "each forfeit spends its own connector")
+	for _, p := range h.inBatch {
+		require.Contains(t, p.sources, p.settled[0].Hash.String(), "the output is found in the leaf carrying its packets")
+	}
 
 	env.emulator.infoErr = errBoom
 	_, err = h.OnBatchFinalization(ctx, clientlib.BatchFinalizationEvent{Tx: batch.commitment}, batch.vtxoTree, batch.connectors)
 	require.ErrorContains(t, err, "emulator finalization")
 }
 
-// testBatch is what an honest arkd proposes for the given outputs: a
-// commitment tx whose output 0 funds the vtxo tree and output 1 the connectors.
+func TestBatchWithoutVtxoOutputs(t *testing.T) {
+	env := newTestEnv(t)
+	batch := buildBatch(t, env, []*wire.TxOut{wire.NewTxOut(1000, append([]byte{0x51, 0x20}, make([]byte, 32)...))}, 1)
+	err := validateBatch(batch.commitment, nil, batch.connectors, env.svc.forfeitPubKey, testExpiry, nil, nil, true)
+	require.NoError(t, err, "vtxos leaving onchain need connectors, not a vtxo tree")
+	err = validateBatch(batch.commitment, nil, nil, env.svc.forfeitPubKey, testExpiry, nil, nil, true)
+	require.ErrorContains(t, err, "connector tree is missing")
+}
+
+func TestWithBoardingLeaves(t *testing.T) {
+	board := wire.OutPoint{Index: 1}
+	leaf := &psbt.TaprootTapLeafScript{Script: []byte{0x51}}
+	prev := wire.NewTxOut(20_000, []byte{0x51, 0x20})
+	other := &psbt.TaprootTapLeafScript{Script: []byte{0x52}}
+	p := &pendingIntent{inputs: []renewalInput{
+		{coin: coin{Outpoint: wire.OutPoint{Hash: board.Hash}}},
+		{onchain: true, coin: coin{Outpoint: board}, leaf: leaf, prevOut: prev},
+	}}
+	tx := wire.NewMsgTx(3)
+	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Index: 7}, nil, nil))
+	tx.AddTxIn(wire.NewTxIn(&board, nil, nil))
+	commitment, err := psbt.NewFromUnsignedTx(tx)
+	require.NoError(t, err)
+	commitment.Inputs[0].TaprootLeafScript = []*psbt.TaprootTapLeafScript{other}
+
+	boarding, err := p.withBoardingLeaves(commitment)
+	require.NoError(t, err)
+	require.True(t, boarding)
+	require.Empty(t, commitment.Inputs[0].TaprootLeafScript, "another input gets no leaf")
+	require.Equal(t, []*psbt.TaprootTapLeafScript{leaf}, commitment.Inputs[1].TaprootLeafScript)
+	require.Equal(t, prev, commitment.Inputs[1].WitnessUtxo)
+
+	commitment.UnsignedTx.TxIn = commitment.UnsignedTx.TxIn[:1]
+	_, err = p.withBoardingLeaves(commitment)
+	require.ErrorContains(t, err, "omits boarding input")
+}
+
+var testExpiry = arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: 1024}
+
+// testBatch's commitment output 0 funds the vtxo tree and output 1 the connectors.
 type testBatch struct {
 	commitment string
 	vtxoTree   *tree.TxTree
@@ -163,7 +204,8 @@ type testBatch struct {
 	amount     int64
 }
 
-func buildBatch(t *testing.T, env *testEnv, outputs []*wire.TxOut, connectors int) testBatch {
+// buildBatch also spends boarding in the commitment.
+func buildBatch(t *testing.T, env *testEnv, outputs []*wire.TxOut, connectors int, boarding ...wire.OutPoint) testBatch {
 	t.Helper()
 	sweepRoot, err := sweepTapTreeRoot(env.svc.forfeitPubKey, testExpiry)
 	require.NoError(t, err)
@@ -171,7 +213,7 @@ func buildBatch(t *testing.T, env *testEnv, outputs []*wire.TxOut, connectors in
 	for i, out := range outputs {
 		leaves[i] = tree.Leaf{
 			Outputs:             []tree.LeafOutput{{Amount: uint64(out.Value), Script: hex.EncodeToString(out.PkScript)}},
-			CosignersPublicKeys: []string{env.svc.delegatePubKeyHex},
+			CosignersPublicKeys: []string{env.svc.cosigners[0].pubKey},
 		}
 	}
 	forfeitKey := hex.EncodeToString(env.svc.forfeitPubKey.SerializeCompressed())
@@ -189,10 +231,14 @@ func buildBatch(t *testing.T, env *testEnv, outputs []*wire.TxOut, connectors in
 	require.NoError(t, err)
 	tx := wire.NewMsgTx(3)
 	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Index: 7}, nil, nil))
+	for _, op := range boarding {
+		tx.AddTxIn(wire.NewTxIn(&op, nil, nil))
+	}
 	tx.AddTxOut(wire.NewTxOut(batchAmount, batchScript))
 	tx.AddTxOut(wire.NewTxOut(connectorAmount, connectorScript))
 	commitment, err := psbt.NewFromUnsignedTx(tx)
 	require.NoError(t, err)
+	commitment.Inputs[0].WitnessUtxo = wire.NewTxOut(batchAmount+connectorAmount, env.svc.forfeitPkScript)
 	b64, err := commitment.B64Encode()
 	require.NoError(t, err)
 
@@ -202,4 +248,19 @@ func buildBatch(t *testing.T, env *testEnv, outputs []*wire.TxOut, connectors in
 	connectorTree, err := tree.BuildConnectorTree(&wire.OutPoint{Hash: txid, Index: 1}, connectorLeaves)
 	require.NoError(t, err)
 	return testBatch{b64, vtxoTree, connectorTree, batchAmount}
+}
+
+// carry copies each intent's packets onto the leaf paying it, as arkd does.
+func carry(vtxoTree *tree.TxTree, intents ...*pendingIntent) {
+	for _, leaf := range vtxoTree.Leaves() {
+		for _, p := range intents {
+			out := leaf.UnsignedTx.TxOut[0]
+			if out.Value != p.outputs[0].Value || !bytes.Equal(out.PkScript, p.outputs[0].PkScript) {
+				continue
+			}
+			ext := slices.IndexFunc(p.logical.TxOut, func(o *wire.TxOut) bool { return extension.IsExtension(o.PkScript) })
+			leaf.UnsignedTx.AddTxOut(p.logical.TxOut[ext])
+			leaf.Outputs = append(leaf.Outputs, psbt.POutput{})
+		}
+	}
 }

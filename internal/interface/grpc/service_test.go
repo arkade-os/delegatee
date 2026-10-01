@@ -2,6 +2,7 @@ package grpcservice
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,8 @@ import (
 	"github.com/arkade-os/delegatee/internal/config"
 	"github.com/arkade-os/delegatee/internal/core/application"
 	"github.com/arkade-os/delegatee/internal/core/domain"
+	interfaces "github.com/arkade-os/delegatee/internal/interface"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"
@@ -27,17 +30,17 @@ import (
 )
 
 func TestPortsAndRouting(t *testing.T) {
-	public, admin, app := serveFake(t, "")
+	logs := logtest.NewGlobal()
+	public, admin, app := serveFake(t)
 
 	// REST on the public port, with CORS for browser wallets
-	resp, body := do(t, http.MethodGet, "http://"+public+"/v1/info?renewalWindow=42&maxFee=7")
+	resp, body := do(t, http.MethodGet, "http://"+public+"/v1/info")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
-	var info struct{ Version, Network, RenewalWindow, MaxFee string }
+	var info struct{ Version, Network string }
 	require.NoError(t, json.Unmarshal([]byte(body), &info))
 	require.Equal(t, "test", info.Version)
-	require.Equal(t, "42", info.RenewalWindow)
-	require.Equal(t, "7", info.MaxFee)
+	require.Equal(t, "regtest", info.Network)
 	resp, _ = do(t, http.MethodOptions, "http://"+public+"/v1/delegate")
 	require.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
 
@@ -53,6 +56,9 @@ func TestPortsAndRouting(t *testing.T) {
 	require.Contains(t, resp.Header.Get("Content-Type"), "text/html")
 	require.Contains(t, resp.Header.Get("Content-Security-Policy"), "frame-ancestors 'none'")
 	require.Contains(t, body, "<title>delegateed operator</title>")
+	resp, _ = do(t, http.MethodGet, "http://"+admin+"/v1/admin/delegate?page_size=5&cursor=9&status=active")
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, [3]any{"active", int64(9), 6}, app.listed, "the UI's query parameters")
 	for _, path := range []string{"/v1/info", "/v1/admin/delegate", "/v1/admin/status", "/healthz"} {
 		resp, _ = do(t, http.MethodGet, "http://"+admin+path)
 		require.Equal(t, http.StatusOK, resp.StatusCode, path)
@@ -79,6 +85,7 @@ func TestPortsAndRouting(t *testing.T) {
 	resp, _ = do(t, http.MethodDelete, "http://"+admin+"/v1/admin/delegate/tark1x")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Equal(t, "tark1x", app.cancelled)
+	require.Equal(t, []string{"loopback"}, loggedAdmins(logs), "no user without authentication")
 
 	// grpc on the same ports
 	conn, err := grpc.NewClient(public, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -99,7 +106,11 @@ func TestPortsAndRouting(t *testing.T) {
 }
 
 func TestAdminPassword(t *testing.T) {
-	public, admin, _ := serveFakeUser(t, "operator", "s3cret")
+	hash, err := bcrypt.GenerateFromPassword([]byte("s3cret"), bcrypt.DefaultCost)
+	require.NoError(t, err)
+	public, admin, _ := serveFake(t, func(c *config.Config) {
+		c.AdminUsers = []config.AdminUser{{Username: "operator", PasswordHash: string(hash)}}
+	})
 	auth := func(user, pass string) func(*http.Request) {
 		return func(r *http.Request) { r.SetBasicAuth(user, pass) }
 	}
@@ -130,6 +141,24 @@ func TestAdminPassword(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestLogNamesTheAdmin(t *testing.T) {
+	logs := logtest.NewGlobal()
+	hash, err := bcrypt.GenerateFromPassword([]byte("s3cret"), bcrypt.DefaultCost)
+	require.NoError(t, err)
+	_, admin, _ := serveFake(t, func(c *config.Config) {
+		c.AdminUsers = []config.AdminUser{{Username: "operator", PasswordHash: string(hash)}}
+	})
+	resp, _ := do(t, http.MethodDelete, "http://"+admin+"/v1/admin/delegate/tark1x", func(r *http.Request) { r.SetBasicAuth("operator", "s3cret") })
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	authed, err := grpc.NewClient(admin, grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(basicAuthCredentials{Username: "operator", Password: "s3cret"}))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = authed.Close() })
+	_, err = delegateev1.NewAdminServiceClient(authed).CancelDelegation(t.Context(), &delegateev1.CancelDelegationRequest{Address: "tark1y"})
+	require.NoError(t, err)
+	require.Equal(t, []string{"operator", "operator"}, loggedAdmins(logs), "through the gateway, then over grpc")
+}
+
 func TestRateLimit(t *testing.T) {
 	l := newRateLimiter(2) // 2/s, burst 20
 	now := time.Now()
@@ -154,20 +183,7 @@ func TestRateLimit(t *testing.T) {
 	require.Equal(t, http.StatusTooManyRequests, last)
 
 	// the public port has it, the admin port does not
-	cfg := &config.Config{Port: freePort(t), AdminPort: freePort(t), PublicRateLimit: 1}
-	svc, err := NewService("test", cfg)
-	require.NoError(t, err)
-	require.NoError(t, svc.(*service).serve(t.Context(), &fakeApp{}))
-	t.Cleanup(svc.Stop)
-	public, admin := fmt.Sprintf("127.0.0.1:%d", cfg.Port), fmt.Sprintf("127.0.0.1:%d", cfg.AdminPort)
-	require.Eventually(t, func() bool {
-		resp, err := http.Get("http://" + public + "/v1/info")
-		if err != nil {
-			return false
-		}
-		_ = resp.Body.Close()
-		return true
-	}, 5*time.Second, 10*time.Millisecond)
+	public, admin, _ := serveFake(t, func(c *config.Config) { c.PublicRateLimit = 1 })
 	for range 15 {
 		resp, _ := do(t, http.MethodGet, "http://"+public+"/v1/info")
 		last = resp.StatusCode
@@ -179,16 +195,15 @@ func TestRateLimit(t *testing.T) {
 	}
 }
 
-func TestConfigValidate(t *testing.T) {
-	require.Error(t, Config{Port: 1234, AdminPort: 1234}.Validate(), "same port twice")
+func TestNewServicePorts(t *testing.T) {
+	_, err := NewService("v", &config.Config{Port: 1234, AdminPort: 1234})
+	require.Error(t, err, "same port twice")
 	busy, err := net.Listen("tcp", ":0")
 	require.NoError(t, err)
 	defer func() { _ = busy.Close() }()
 	taken := uint32(busy.Addr().(*net.TCPAddr).Port)
-	require.Error(t, Config{Port: taken, AdminPort: freePort(t)}.Validate(), "port in use")
-	require.NoError(t, Config{Port: freePort(t), AdminPort: freePort(t)}.Validate())
-	_, err = NewService("v", &config.Config{Port: 1, AdminPort: 1})
-	require.Error(t, err)
+	_, err = NewService("v", &config.Config{Port: taken, AdminPort: freePort(t)})
+	require.Error(t, err, "port in use")
 }
 
 func TestIsHttpRequest(t *testing.T) {
@@ -208,21 +223,38 @@ func TestIsHttpRequest(t *testing.T) {
 	}
 }
 
+func TestGatewayOutlivesHeaderTimeout(t *testing.T) {
+	prev := readHeaderTimeout
+	readHeaderTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { readHeaderTimeout = prev })
+	_, admin, app := serveFake(t)
+	resp, _ := do(t, http.MethodGet, "http://"+admin+"/v1/info")
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	app.delay = 2 * readHeaderTimeout
+	resp, body := do(t, http.MethodGet, "http://"+admin+"/healthz")
+	require.Equal(t, http.StatusOK, resp.StatusCode, body)
+}
+
 type fakeApp struct {
 	application.Service
 	started, stopped bool
 	cancelled        string
+	listed           [3]any
 	arkDown          bool
 	delay            time.Duration
 }
 
 func (f *fakeApp) Start() { f.started = true }
 func (f *fakeApp) Stop()  { f.stopped = true }
-func (f *fakeApp) Info(p domain.Params) (application.Info, error) {
-	return application.Info{Network: "regtest", Params: p}, nil
+func (f *fakeApp) Info() application.Info {
+	return application.Info{Network: "regtest"}
 }
-func (f *fakeApp) ListDelegations(context.Context) ([]domain.Delegation, error) {
+func (f *fakeApp) ListDelegations(_ context.Context, status string, cursor int64, limit int) ([]domain.Delegation, error) {
+	f.listed = [3]any{status, cursor, limit}
 	return []domain.Delegation{{ID: 1, Address: "tark1x", Status: "active"}}, nil
+}
+func (f *fakeApp) ListTemplates(_ context.Context, status string) ([]domain.Template, error) {
+	return []domain.Template{{ID: "a", Status: status}, {ID: "b", Status: status}}, nil
 }
 func (f *fakeApp) LastRenewals(context.Context) (map[int64]domain.Renewal, error) { return nil, nil }
 func (f *fakeApp) Status() application.Status {
@@ -256,20 +288,19 @@ func freePort(t *testing.T) uint32 {
 }
 
 // serveFake runs the real servers (grpc, gateway, UI) over a fake application.
-func serveFake(t *testing.T, password string) (public, admin string, app *fakeApp) {
-	return serveFakeUser(t, "admin", password)
-}
-
-func serveFakeUser(t *testing.T, username, password string) (public, admin string, app *fakeApp) {
+func serveFake(t *testing.T, tweak ...func(*config.Config)) (public, admin string, app *fakeApp) {
 	t.Helper()
 	cfg := &config.Config{Port: freePort(t), AdminPort: freePort(t)}
-	if password != "" {
-		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-		require.NoError(t, err)
-		cfg.AdminUsers = []config.AdminUser{{Username: username, PasswordHash: string(hash)}}
+	for _, f := range tweak {
+		f(cfg)
 	}
 	svc, err := NewService("test", cfg)
 	require.NoError(t, err)
+	return serveWith(t, svc)
+}
+
+func serveWith(t *testing.T, svc interfaces.Service) (public, admin string, app *fakeApp) {
+	t.Helper()
 	app = &fakeApp{}
 	require.NoError(t, svc.(*service).serve(t.Context(), app))
 	t.Cleanup(func() {
@@ -277,6 +308,7 @@ func serveFakeUser(t *testing.T, username, password string) (public, admin strin
 		require.True(t, app.stopped)
 	})
 	require.True(t, app.started)
+	cfg := svc.(*service).cfg
 	public, admin = fmt.Sprintf("127.0.0.1:%d", cfg.Port), fmt.Sprintf("127.0.0.1:%d", cfg.AdminPort)
 	require.Eventually(t, func() bool {
 		for _, addr := range []string{public, admin} {
@@ -306,14 +338,24 @@ func do(t *testing.T, method, url string, tweak ...func(*http.Request)) (*http.R
 	return resp, string(body)
 }
 
-func TestGatewayOutlivesHeaderTimeout(t *testing.T) {
-	prev := readHeaderTimeout
-	readHeaderTimeout = 300 * time.Millisecond
-	t.Cleanup(func() { readHeaderTimeout = prev })
-	_, admin, app := serveFake(t, "")
-	resp, _ := do(t, http.MethodGet, "http://"+admin+"/v1/info")
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	app.delay = 2 * readHeaderTimeout
-	resp, body := do(t, http.MethodGet, "http://"+admin+"/healthz")
-	require.Equal(t, http.StatusOK, resp.StatusCode, body)
+type basicAuthCredentials struct {
+	Username string
+	Password string
+}
+
+func (c basicAuthCredentials) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
+	return map[string]string{
+		"authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte(c.Username+":"+c.Password)),
+	}, nil
+}
+func (basicAuthCredentials) RequireTransportSecurity() bool { return false }
+
+func loggedAdmins(logs *logtest.Hook) []string {
+	var admins []string
+	for _, e := range logs.AllEntries() {
+		if admin, ok := e.Data["admin"].(string); ok {
+			admins = append(admins, admin)
+		}
+	}
+	return admins
 }

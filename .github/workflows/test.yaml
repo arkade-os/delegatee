@@ -8,44 +8,78 @@ on:
     branches:
       - '*'
 
+env:
+  EMULATOR_VERSION: v0.0.9-rc.0
+
 jobs:
   unit:
     name: unit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
           go-version: '1.26.6'
 
       - name: Run unit tests
         run: make test
 
-  integration:
-    name: integration
+  lint:
+    name: lint
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ['.', pkg/template]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        with:
+          go-version: '1.26.6'
+
+      - name: Run linter
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.10.1
+          working-directory: ${{ matrix.module }}
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
           go-version: '1.26.6'
 
       - name: Run Nigiri
-        uses: vulpemventures/nigiri-github-action@v1
+        uses: vulpemventures/nigiri-github-action@7fc63cec40cbfc113589a9ade24ab21c9107ad39 # v1
 
       - name: Run regtest environment
         run: make regtest-up
 
-      - name: Run integration tests
-        run: make test-e2e
+      - name: Run e2e tests
+        timeout-minutes: 30
+        shell: bash
+        run: make test-e2e 2>&1 | tee e2e.log
 
       - name: Capture logs
         if: failure()
         run: |
-          for c in emulator arkd arkd-wallet delegatee-pg; do
-            echo "=== $c ==="
-            docker logs --tail 300 "$c" 2>&1 || true
+          mkdir -p logs
+          mv e2e.log logs/delegateed.log || true
+          for c in arkd arkd-wallet emulator nbxplorer delegatee-pg; do
+            docker logs "$c" > "logs/$c.log" 2>&1 || true
           done
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-logs
+          path: logs/
+          retention-days: 14
 
       - name: Tear down
         if: always()

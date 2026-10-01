@@ -22,56 +22,61 @@ func BenchmarkScan5000(b *testing.B) {
 	require.Len(b, env.svc.Status().Holdings, 5000)
 }
 
-// TestScale pins how the work grows with thousands of delegations: by
-// requests made, not by wall time.
+// TestScale pins requests made, not wall time.
 func TestScale(t *testing.T) {
-	total, due := scaleSize() // BenchmarkScan5000 is the big one
+	total, due := scaleSize()
 	env := newTestEnv(t)
-	env.svc.maxDelegations = total + 1
+	env.svc.limits.MaxDelegations = total + 1
 	vtxos := make([]clientlib.Vtxo, 0, total)
-	var last *domain.Delegation
+	var first, last *domain.Delegation
 	for i := range total {
-		last = env.register(t, domain.Params{RenewalWindow: int64(i + 1)})
 		expiresIn := 400 * 24 * time.Hour
 		if i < due {
-			expiresIn = 0
+			expiresIn = time.Minute
 		}
-		vtxos = append(vtxos, env.vtxo(t, last, i, 1000, expiresIn))
+		owner, _ := hexKey(t)
+		v := env.coin(t, owner.PubKey(), 1000, expiresIn)
+		last = env.advertised(t, v)
+		if i == 0 {
+			first = last
+		}
+		vtxos = append(vtxos, v)
 	}
 
+	env.indexer.txLookups = 0
 	env.indexer.serve(vtxos...)
-	env.svc.scan(t.Context())
-	env.svc.wg.Wait()
+	env.scan(t)
 
 	require.Equal(t, total/100, env.indexer.calls, "100 scripts per indexer request")
 	require.Len(t, env.svc.Status().Holdings, total)
-	intents := (due + 15) / 16
-	require.Len(t, env.emulator.submitted, intents, "16 coins per intent")
-	require.Equal(t, intents, env.indexer.txLookups, "one previous-tx lookup per intent, not per coin")
-	require.Len(t, env.ark.registered, intents)
-	require.Len(t, env.repo.recorded(), due, "one row per delegation (the fake stream closes before any batch)")
+	require.Len(t, env.emulator.submitted, due, "one intent per coin")
+	require.Equal(t, due, env.indexer.txLookups, "watches derive nothing from sources: one lookup per intent")
+	require.Len(t, env.ark.registered, due)
+	require.Len(t, env.repo.recorded(), due, "one row per delegation and outcome (the fake stream closes before any batch)")
 
 	// the next scan derives nothing again, and forgets a cancelled delegation
-	first := env.svc.watched[1]
-	require.NotNil(t, first)
-	require.NoError(t, env.svc.CancelDelegation(t.Context(), last.Address))
+	cached := env.svc.watched[first.ID]
+	require.NotNil(t, cached)
+	require.NoError(t, env.svc.CancelDelegationByID(t.Context(), last.ID))
+	lookups := env.indexer.txLookups
 	env.indexer.serve(vtxos[due:]...)
-	env.svc.scan(t.Context())
-	env.svc.wg.Wait()
+	env.scan(t)
 	require.Len(t, env.svc.watched, total-1)
 	require.NotContains(t, env.svc.watched, last.ID)
-	require.Same(t, first, env.svc.watched[1], "kept, not rebuilt")
+	require.Same(t, cached, env.svc.watched[first.ID], "kept, not rebuilt")
+	require.Equal(t, lookups, env.indexer.txLookups, "no source fetched again")
 	require.Len(t, env.repo.recorded(), due, "nothing due, nothing new")
 }
 
-// manyDelegations registers n delegations with distinct scripts (one window
-// each) and puts one vtxo, not yet due, at every one of them.
+// manyDelegations binds n renewals, each to its own coin, not yet due.
 func manyDelegations(t testing.TB, env *testEnv, n int) {
-	env.svc.maxDelegations = n + 1
+	env.svc.limits.MaxDelegations = n + 1
 	vtxos := make([]clientlib.Vtxo, 0, n)
-	for i := range n {
-		d := env.register(t, domain.Params{RenewalWindow: int64(i + 1)})
-		vtxos = append(vtxos, env.vtxo(t, d, i, 1000, 400*24*time.Hour))
+	for range n {
+		owner, _ := hexKey(t)
+		v := env.coin(t, owner.PubKey(), 1000, 400*24*time.Hour)
+		env.advertised(t, v)
+		vtxos = append(vtxos, v)
 	}
 	env.indexer.serve(vtxos...)
 }

@@ -5,12 +5,112 @@
     "version": "version not set"
   },
   "paths": {
+    "/v1/admin/artifact": {
+      "get": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "ListArtifacts lists every artifact, newest first, without documents.",
+        "operationId": "AdminService_ListArtifacts",
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListArtifactsResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/artifact/{id}": {
+      "delete": {
+        "tags": [
+          "AdminService"
+        ],
+        "operationId": "AdminService_DeleteArtifact",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteArtifactResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/delegate": {
       "get": {
         "tags": [
           "AdminService"
         ],
+        "description": "ListDelegations lists one page, newest first.",
         "operationId": "AdminService_ListDelegations",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "page_size defaults to 100, at most 1000.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "cursor is the next_cursor of the previous page, 0 for the first.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "status filters when set: active, cancelled, expired or done.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "a successful response.",
@@ -40,12 +140,112 @@
         "tags": [
           "AdminService"
         ],
+        "description": "CancelDelegation stops the active watches of an address, or one\ndelegation by id: advertisements have no address. Registering a\ncancelled delegation again is refused until ResumeDelegation.",
         "operationId": "AdminService_CancelDelegation",
         "parameters": [
           {
             "name": "address",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "description": "id, when set, takes precedence over address.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelDelegationResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/delegation/{id}": {
+      "get": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "GetDelegationById returns any delegation, with its coins and history.",
+        "operationId": "AdminService_GetDelegationById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetDelegationByIdResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "CancelDelegation stops the active watches of an address, or one\ndelegation by id: advertisements have no address. Registering a\ncancelled delegation again is refused until ResumeDelegation.",
+        "operationId": "AdminService_CancelDelegation2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "id, when set, takes precedence over address.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "address",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -58,6 +258,59 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CancelDelegationResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/delegation/{id}/resume": {
+      "post": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "ResumeDelegation sets a cancelled delegation active again.",
+        "operationId": "AdminService_ResumeDelegation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "ResumeDelegationRequest",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeDelegationResponse"
                 }
               }
             }
@@ -104,6 +357,199 @@
           }
         }
       }
+    },
+    "/v1/admin/template": {
+      "get": {
+        "tags": [
+          "AdminService"
+        ],
+        "operationId": "AdminService_ListAllTemplates",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAllTemplatesResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/template/{id}": {
+      "delete": {
+        "tags": [
+          "AdminService"
+        ],
+        "operationId": "AdminService_DeleteTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteTemplateResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/template/{id}/status": {
+      "put": {
+        "tags": [
+          "AdminService"
+        ],
+        "operationId": "AdminService_SetTemplateStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "SetTemplateStatusRequest",
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "description": "active | disabled"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetTemplateStatusResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/template/{id}/trusted": {
+      "put": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "SetTemplateTrusted marks a template the operator vouches for.",
+        "operationId": "AdminService_SetTemplateTrusted",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "SetTemplateTrustedRequest",
+                "type": "object",
+                "properties": {
+                  "trusted": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetTemplateTrustedResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -118,12 +564,46 @@
           }
         }
       },
+      "Artifact": {
+        "title": "Artifact",
+        "type": "object",
+        "properties": {
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "document": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "Asset": {
+        "title": "Asset",
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "assetId": {
+            "type": "string"
+          }
+        }
+      },
       "CancelDelegationRequest": {
         "title": "CancelDelegationRequest",
         "type": "object",
         "properties": {
           "address": {
             "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "description": "id, when set, takes precedence over address.",
+            "format": "int64"
           }
         }
       },
@@ -134,27 +614,68 @@
       "Delegation": {
         "title": "Delegation",
         "type": "object",
+        "description": "Delegation is an instance of a template.",
         "properties": {
           "address": {
-            "type": "string"
+            "type": "string",
+            "description": "address is slot 0's address for a watch, empty otherwise."
           },
           "createdAt": {
             "type": "integer",
+            "format": "int64"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "expires_at is 0 when the delegation never expires.",
             "format": "int64"
           },
           "id": {
             "type": "integer",
             "format": "int64"
           },
+          "parentId": {
+            "type": "integer",
+            "description": "parent_id is the delegation whose settled transaction advertised this one, 0 for a watch.",
+            "format": "int64"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Slot"
+            }
+          },
+          "status": {
+            "type": "string",
+            "description": "status is active, cancelled, expired or done."
+          },
+          "templateId": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "DelegationSummary": {
+        "title": "DelegationSummary",
+        "type": "object",
+        "properties": {
+          "delegation": {
+            "$ref": "#/components/schemas/Delegation"
+          },
           "lastRenewal": {
             "$ref": "#/components/schemas/Renewal"
           },
           "managed": {
-            "type": "boolean"
-          },
-          "maxFee": {
-            "type": "integer",
-            "format": "int64"
+            "type": "boolean",
+            "description": "managed is false when this instance cannot renew the delegation; unmanaged_reason says why."
           },
           "nextExpiry": {
             "type": "integer",
@@ -164,30 +685,73 @@
             "type": "integer",
             "format": "int64"
           },
-          "renewalWindow": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "status": {
-            "type": "string"
-          },
-          "tapscripts": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
           "totalAmount": {
             "type": "integer",
             "format": "uint64"
           },
-          "updatedAt": {
-            "type": "integer",
-            "format": "int64"
+          "unmanagedReason": {
+            "type": "string"
           },
           "vtxoCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "DeleteArtifactRequest": {
+        "title": "DeleteArtifactRequest",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "DeleteArtifactResponse": {
+        "title": "DeleteArtifactResponse",
+        "type": "object"
+      },
+      "DeleteTemplateRequest": {
+        "title": "DeleteTemplateRequest",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "DeleteTemplateResponse": {
+        "title": "DeleteTemplateResponse",
+        "type": "object"
+      },
+      "GetDelegationByIdRequest": {
+        "title": "GetDelegationByIdRequest",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "GetDelegationByIdResponse": {
+        "title": "GetDelegationByIdResponse",
+        "type": "object",
+        "properties": {
+          "delegation": {
+            "$ref": "#/components/schemas/Delegation"
+          },
+          "renewals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Renewal"
+            }
+          },
+          "vtxos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Vtxo"
+            }
           }
         }
       },
@@ -234,9 +798,62 @@
           }
         }
       },
+      "ListAllTemplatesRequest": {
+        "title": "ListAllTemplatesRequest",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "ListAllTemplatesResponse": {
+        "title": "ListAllTemplatesResponse",
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateSummary"
+            }
+          }
+        }
+      },
+      "ListArtifactsRequest": {
+        "title": "ListArtifactsRequest",
+        "type": "object"
+      },
+      "ListArtifactsResponse": {
+        "title": "ListArtifactsResponse",
+        "type": "object",
+        "properties": {
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            }
+          }
+        }
+      },
       "ListDelegationsRequest": {
         "title": "ListDelegationsRequest",
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "integer",
+            "description": "cursor is the next_cursor of the previous page, 0 for the first.",
+            "format": "int64"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "page_size defaults to 100, at most 1000.",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string",
+            "description": "status filters when set: active, cancelled, expired or done."
+          }
+        }
       },
       "ListDelegationsResponse": {
         "title": "ListDelegationsResponse",
@@ -245,8 +862,25 @@
           "delegations": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Delegation"
+              "$ref": "#/components/schemas/DelegationSummary"
             }
+          },
+          "nextCursor": {
+            "type": "integer",
+            "description": "next_cursor is 0 on the last page.",
+            "format": "int64"
+          }
+        }
+      },
+      "Param": {
+        "title": "Param",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -275,6 +909,86 @@
           }
         }
       },
+      "ResumeDelegationRequest": {
+        "title": "ResumeDelegationRequest",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ResumeDelegationResponse": {
+        "title": "ResumeDelegationResponse",
+        "type": "object"
+      },
+      "SetTemplateStatusRequest": {
+        "title": "SetTemplateStatusRequest",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "active | disabled"
+          }
+        }
+      },
+      "SetTemplateStatusResponse": {
+        "title": "SetTemplateStatusResponse",
+        "type": "object",
+        "properties": {
+          "template": {
+            "$ref": "#/components/schemas/TemplateSummary"
+          }
+        }
+      },
+      "SetTemplateTrustedRequest": {
+        "title": "SetTemplateTrustedRequest",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "trusted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SetTemplateTrustedResponse": {
+        "title": "SetTemplateTrustedResponse",
+        "type": "object",
+        "properties": {
+          "template": {
+            "$ref": "#/components/schemas/TemplateSummary"
+          }
+        }
+      },
+      "Slot": {
+        "title": "Slot",
+        "type": "object",
+        "description": "Slot is one template input of a delegation.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "onchain": {
+            "type": "boolean"
+          },
+          "outpoint": {
+            "type": "string",
+            "description": "outpoint is \"txid:vout\" when bound, empty for a watch."
+          },
+          "tapscripts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "Status": {
         "title": "Status",
         "type": "object",
@@ -291,6 +1005,100 @@
           },
           "message": {
             "type": "string"
+          }
+        }
+      },
+      "Template": {
+        "title": "Template",
+        "type": "object",
+        "properties": {
+          "artifactIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "document": {
+            "type": "string",
+            "description": "empty in list responses"
+          },
+          "id": {
+            "type": "string"
+          },
+          "params": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Param"
+            }
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "TemplateSummary": {
+        "title": "TemplateSummary",
+        "type": "object",
+        "description": "TemplateSummary is a template with what only the operator sees.",
+        "properties": {
+          "delegations": {
+            "type": "integer",
+            "description": "delegations is how many delegations reference the template.",
+            "format": "int64"
+          },
+          "failures": {
+            "type": "integer",
+            "description": "failures is the count of consecutive renewal cycles the failure valve saw rejected.",
+            "format": "int32"
+          },
+          "template": {
+            "$ref": "#/components/schemas/Template",
+            "description": "without its document in list responses"
+          },
+          "trusted": {
+            "type": "boolean",
+            "description": "trusted templates get the daemon's own signature on delegate-key leaves\nand are exempt from the failure valve; seeded ones are trusted."
+          }
+        }
+      },
+      "Vtxo": {
+        "title": "Vtxo",
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Asset"
+            }
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "onchain": {
+            "type": "boolean"
+          },
+          "outpoint": {
+            "type": "string"
+          },
+          "preconfirmed": {
+            "type": "boolean"
+          },
+          "renewableAt": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       }

@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	_ "embed"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -36,14 +35,11 @@ const maxRequestBodySize = 1 << 20
 // ReadTimeout is what makes Go disarm the header deadline on h2c connections.
 var readHeaderTimeout, readTimeout = 10 * time.Second, 30 * time.Second
 
-// the operator web UI, served at / on the admin port
-//
 //go:embed web/index.html
 var adminUI []byte
 
 type service struct {
 	version       string
-	config        Config
 	cfg           *config.Config
 	appSvc        application.Service
 	servers       []*http.Server
@@ -55,19 +51,22 @@ type service struct {
 }
 
 func NewService(version string, cfg *config.Config) (interfaces.Service, error) {
-	if cfg == nil {
-		return nil, fmt.Errorf("config is required")
+	if cfg.Port == cfg.AdminPort {
+		return nil, fmt.Errorf("admin port must differ from port")
 	}
-	svcConfig := Config{Port: cfg.Port, AdminPort: cfg.AdminPort}
-	if err := svcConfig.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid service config: %s", err)
+	for _, port := range []uint32{cfg.Port, cfg.AdminPort} {
+		lis, err := net.Listen("tcp", address(port))
+		if err != nil {
+			return nil, err
+		}
+		_ = lis.Close()
 	}
 	token := make([]byte, 32)
 	if _, err := rand.Read(token); err != nil {
-		return nil, fmt.Errorf("create loopback credential: %w", err)
+		return nil, err
 	}
 	return &service{
-		version: version, config: svcConfig, cfg: cfg,
+		version: version, cfg: cfg,
 		loopbackToken: hex.EncodeToString(token), authLimiter: newRateLimiter(5),
 	}, nil
 }
@@ -81,7 +80,6 @@ func (s *service) Start() error {
 	return s.serve(ctx, appSvc)
 }
 
-// serve exposes appSvc on both ports and starts it.
 func (s *service) serve(ctx context.Context, appSvc application.Service) (err error) {
 	s.appSvc = appSvc
 	defer func() {
@@ -92,7 +90,7 @@ func (s *service) serve(ctx context.Context, appSvc application.Service) (err er
 		}
 	}()
 
-	public, err := s.newServer(ctx, s.config.Port, nil, func(srv *grpc.Server, gw *gateway.ServeMux, conn *grpc.ClientConn) {
+	public, err := s.newServer(s.cfg.Port, nil, func(srv *grpc.Server, gw *gateway.ServeMux, conn *grpc.ClientConn) {
 		delegateev1.RegisterDelegateeServiceServer(srv, handlers.New(s.version, appSvc))
 		delegateev1.RegisterDelegateeServiceHandler(ctx, gw, conn)
 	})
@@ -100,7 +98,7 @@ func (s *service) serve(ctx context.Context, appSvc application.Service) (err er
 		return err
 	}
 	// the admin port is a superset of the public one, so the UI needs a single origin
-	admin, err := s.newServer(ctx, s.config.AdminPort, adminUI, func(srv *grpc.Server, gw *gateway.ServeMux, conn *grpc.ClientConn) {
+	admin, err := s.newServer(s.cfg.AdminPort, adminUI, func(srv *grpc.Server, gw *gateway.ServeMux, conn *grpc.ClientConn) {
 		delegateev1.RegisterDelegateeServiceServer(srv, handlers.New(s.version, appSvc))
 		delegateev1.RegisterDelegateeServiceHandler(ctx, gw, conn)
 		delegateev1.RegisterAdminServiceServer(srv, handlers.NewAdmin(appSvc))
@@ -120,8 +118,7 @@ func (s *service) serve(ctx context.Context, appSvc application.Service) (err er
 		log.Warn("admin port has no authentication: keep it on a private network")
 	}
 	appSvc.Start()
-	log.Infof("started listening at %s", address(s.config.Port))
-	log.Infof("started admin listening at %s", address(s.config.AdminPort))
+	log.Infof("listening on %s, admin on %s", address(s.cfg.Port), address(s.cfg.AdminPort))
 	return nil
 }
 
@@ -156,10 +153,9 @@ func (s *service) closeServers() {
 	s.conns = nil
 }
 
-// newServer builds a grpc server plus its JSON gateway on one port; register
-// wires the services on both. index, when set, is the page served at /.
+// newServer serves grpc and its JSON gateway on one port; index, when set, is served at /.
 func (s *service) newServer(
-	ctx context.Context, port uint32, index []byte,
+	port uint32, index []byte,
 	register func(*grpc.Server, *gateway.ServeMux, *grpc.ClientConn),
 ) (*http.Server, error) {
 	grpcServer := grpc.NewServer(
@@ -174,7 +170,7 @@ func (s *service) newServer(
 		// the gateway reaches grpc through this same guarded port
 		dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(loopbackAuth(s.loopbackToken)))
 	}
-	conn, err := grpc.NewClient(gatewayAddress(port), dialOpts...)
+	conn, err := grpc.NewClient(fmt.Sprintf("127.0.0.1:%d", port), dialOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -196,6 +192,8 @@ func (s *service) newServer(
 	handler := router(grpcServer, gwmux, index, metrics)
 	if index != nil && len(s.cfg.AdminUsers) > 0 {
 		handler = basicAuth(s.cfg.AdminUsers, s.loopbackToken, s.authLimiter, handler)
+	} else if index != nil {
+		handler = asAdmin("", handler)
 	}
 	if index == nil && s.cfg.PublicRateLimit > 0 {
 		handler = newRateLimiter(s.cfg.PublicRateLimit).middleware(handler)
@@ -221,50 +219,31 @@ func (p loopbackAuth) GetRequestMetadata(context.Context, ...string) (map[string
 }
 func (loopbackAuth) RequireTransportSecurity() bool { return false }
 
-type basicAuthCredentials struct {
-	Username string
-	Password string
-}
-
-func (c basicAuthCredentials) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
-	return map[string]string{
-		"authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte(c.Username+":"+c.Password)),
-	}, nil
-}
-func (basicAuthCredentials) RequireTransportSecurity() bool { return false }
-
 var dummyAdminPasswordHash = func() []byte {
-	hash, err := bcrypt.GenerateFromPassword([]byte("delegateed-invalid-password"), bcrypt.MinCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte("delegateed-invalid-password"), bcrypt.DefaultCost)
 	if err != nil {
 		panic(err)
 	}
 	return hash
 }()
 
+// basicAuth names the user to the handlers; the gateway forwards the credentials it checked.
 func basicAuth(users []config.AdminUser, loopbackToken string, limiter *rateLimiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
 		if loopbackToken != "" && isLoopback(r.RemoteAddr) && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Delegatee-Loopback")), []byte(loopbackToken)) == 1 {
-			next.ServeHTTP(w, r)
+			asAdmin(user, next).ServeHTTP(w, r)
 			return
 		}
-		user, pass, ok := r.BasicAuth()
-		valid := false
-		passwordHash := dummyAdminPasswordHash
+		// an unknown user still pays for a bcrypt comparison
+		known, passwordHash := false, dummyAdminPasswordHash
 		for _, candidate := range users {
 			if user == candidate.Username {
-				passwordHash = []byte(candidate.PasswordHash)
+				known, passwordHash = true, []byte(candidate.PasswordHash)
 			}
 		}
-		if ok && bcrypt.CompareHashAndPassword(passwordHash, []byte(pass)) == nil {
-			for _, candidate := range users {
-				if user == candidate.Username {
-					valid = true
-					break
-				}
-			}
-		}
-		if !valid {
-			if limiter != nil && !limiter.allow(clientIP(r), time.Now()) {
+		if !ok || bcrypt.CompareHashAndPassword(passwordHash, []byte(pass)) != nil || !known {
+			if !limiter.allow(clientIP(r), time.Now()) {
 				w.Header().Set("Retry-After", "1")
 				http.Error(w, "too many requests", http.StatusTooManyRequests)
 				return
@@ -273,8 +252,18 @@ func basicAuth(users []config.AdminUser, loopbackToken string, limiter *rateLimi
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		next.ServeHTTP(w, r)
+		asAdmin(user, next).ServeHTTP(w, r)
 	})
+}
+
+func asAdmin(user string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(handlers.WithAdmin(r.Context(), user)))
+	})
+}
+
+func address(port uint32) string {
+	return fmt.Sprintf(":%d", port)
 }
 
 func clientIP(r *http.Request) string {

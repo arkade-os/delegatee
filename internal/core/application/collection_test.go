@@ -5,21 +5,14 @@ import (
 	"testing/synctest"
 	"time"
 
-	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
-
-	"github.com/arkade-os/delegatee/internal/core/domain"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCollectionDeadline(t *testing.T) {
 	now := time.Now()
-	key := &cosigner{}
-	s := &service{collectionWindow: 30 * time.Second, maxVtxosPerIntent: 16, cosigners: []*cosigner{key}}
+	s := &service{collectionWindow: 30 * time.Second}
 	input := func(due time.Time, window time.Duration) renewalInput {
-		return renewalInput{
-			vtxo:       clientlib.Vtxo{ExpiresAt: due.Add(window)},
-			delegation: &domain.Delegation{Params: domain.Params{RenewalWindow: int64(window / time.Second)}},
-		}
+		return renewalInput{coin: coin{Expiry: due.Add(window)}, due: due}
 	}
 	first := input(now.Add(-10*time.Second), 10*time.Minute)
 	second := input(now, 10*time.Minute)
@@ -34,18 +27,7 @@ func TestCollectionDeadline(t *testing.T) {
 	}
 	s.collectionWindow = time.Hour
 	require.Equal(t, now.Add(5*time.Minute), s.collectionDeadline([]renewalInput{second}, now), "keep half the renewal window")
-	paid := second
-	paid.delegation = &domain.Delegation{Params: domain.Params{RenewalWindow: 600, MaxFee: 100}}
-	paid.vtxo.CreatedAt = now.Add(-10 * time.Minute)
-	paid.vtxo.ExpiresAt = now.Add(10 * time.Minute)
-	// The fee-paying VTXO is only eligible halfway through its lifetime.
-	paid.delegation.RenewalWindow = 3600
-	require.Equal(t, now.Add(5*time.Minute), s.collectionDeadline([]renewalInput{paid}, now))
 
-	s.maxVtxosPerIntent = 2
-	require.True(t, s.collectionDeadline([]renewalInput{first, second}, now).IsZero(), "full intent submits early")
-	second.cosigner = &cosigner{}
-	require.False(t, s.collectionDeadline([]renewalInput{first, second}, now).IsZero(), "different keys do not fill one intent")
 	s.collectionWindow = 0
 	require.True(t, s.collectionDeadline([]renewalInput{first}, now).IsZero())
 }
@@ -54,10 +36,12 @@ func TestCollectionTimerBundlesFreshInputs(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		env := newTestEnv(t)
 		env.svc.collectionWindow = 30 * time.Second
-		// The ordinary poll is an hour: submission must use the collection timer.
-		d := env.register(t, domain.Params{RenewalWindow: 600})
-		first := env.vtxo(t, d, 1, 1000, 599*time.Second)
-		second := env.vtxo(t, d, 2, 1000, 610*time.Second)
+		// renewable 1024s before expiry: the first since a second, the second in ten
+		first := env.coin(t, env.userKey.PubKey(), 1000, 1023*time.Second)
+		second := env.coin(t, env.userKey.PubKey(), 1000, 1034*time.Second)
+		env.advertised(t, first)
+		env.advertised(t, second)
+		// the poll is an hour: the collection timer submits
 		env.indexer.serve(first, second)
 		env.svc.Start()
 		synctest.Wait()
@@ -66,9 +50,9 @@ func TestCollectionTimerBundlesFreshInputs(t *testing.T) {
 		time.Sleep(30 * time.Second)
 		synctest.Wait()
 		env.svc.Stop()
-		require.Len(t, env.emulator.submitted, 1, "both inputs collected into one intent")
+		require.Len(t, env.emulator.submitted, 2, "both coins collected into one cycle, one intent each")
 		records := env.repo.recorded()
-		require.Len(t, records, 1)
+		require.Len(t, records, 1, "one watch")
 		require.Equal(t, []string{first.Outpoint.String(), second.Outpoint.String()}, records[0].Outpoints)
 	})
 }
@@ -76,11 +60,12 @@ func TestCollectionTimerBundlesFreshInputs(t *testing.T) {
 func TestCollectionRefreshDropsSpentInputs(t *testing.T) {
 	env := newTestEnv(t)
 	env.svc.collectionWindow = 30 * time.Second
-	d := env.register(t, domain.Params{RenewalWindow: 600})
-	env.indexer.serve(env.vtxo(t, d, 1, 1000, 599*time.Second))
+	v := env.coin(t, env.userKey.PubKey(), 1000, 1023*time.Second)
+	env.advertised(t, v)
+	env.indexer.serve(v)
 	env.svc.scan(t.Context())
 	require.False(t, env.svc.collectUntil.IsZero())
-	// The fake now returns no VTXOs, as if the user spent it during collection.
+	// the coin is gone, as if its owner spent it while it was collected
 	env.svc.scan(t.Context())
 	require.True(t, env.svc.collectUntil.IsZero())
 	require.Empty(t, env.emulator.submitted)
@@ -90,20 +75,20 @@ func TestCollectionRefreshDropsSpentInputs(t *testing.T) {
 func TestCollectionUrgentInputFlushesWaitingInputs(t *testing.T) {
 	env := newTestEnv(t)
 	env.svc.collectionWindow = 30 * time.Second
-	d := env.register(t, domain.Params{RenewalWindow: 600})
-	waiting := env.vtxo(t, d, 1, 1000, 599*time.Second)
-	urgent := env.vtxo(t, d, 2, 1000, time.Minute)
+	waiting := env.coin(t, env.userKey.PubKey(), 1000, 1023*time.Second)
+	urgent := env.coin(t, env.userKey.PubKey(), 1000, time.Minute)
+	env.advertised(t, waiting)
+	env.advertised(t, urgent)
 	env.indexer.serve(waiting)
 	env.svc.scan(t.Context())
 	require.Empty(t, env.emulator.submitted)
 	env.indexer.serve(waiting, urgent)
-	env.svc.scan(t.Context())
-	env.svc.wg.Wait()
+	env.scan(t)
 	require.True(t, env.svc.collectUntil.IsZero())
-	require.Len(t, env.emulator.submitted, 1)
+	require.Len(t, env.emulator.submitted, 2)
 	records := env.repo.recorded()
-	require.Len(t, records, 1)
-	require.Equal(t, []string{urgent.Outpoint.String(), waiting.Outpoint.String()}, records[0].Outpoints)
+	require.Len(t, records, 1, "one watch")
+	require.Equal(t, []string{urgent.Outpoint.String(), waiting.Outpoint.String()}, records[0].Outpoints, "the soonest expiry first")
 }
 
 func TestCollectionFailedScanRetriesAtNormalInterval(t *testing.T) {

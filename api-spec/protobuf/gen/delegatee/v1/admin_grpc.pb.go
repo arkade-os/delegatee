@@ -19,18 +19,42 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AdminService_ListDelegations_FullMethodName  = "/delegatee.v1.AdminService/ListDelegations"
-	AdminService_GetStatus_FullMethodName        = "/delegatee.v1.AdminService/GetStatus"
-	AdminService_CancelDelegation_FullMethodName = "/delegatee.v1.AdminService/CancelDelegation"
+	AdminService_ListDelegations_FullMethodName    = "/delegatee.v1.AdminService/ListDelegations"
+	AdminService_GetDelegationById_FullMethodName  = "/delegatee.v1.AdminService/GetDelegationById"
+	AdminService_GetStatus_FullMethodName          = "/delegatee.v1.AdminService/GetStatus"
+	AdminService_CancelDelegation_FullMethodName   = "/delegatee.v1.AdminService/CancelDelegation"
+	AdminService_ResumeDelegation_FullMethodName   = "/delegatee.v1.AdminService/ResumeDelegation"
+	AdminService_ListAllTemplates_FullMethodName   = "/delegatee.v1.AdminService/ListAllTemplates"
+	AdminService_SetTemplateStatus_FullMethodName  = "/delegatee.v1.AdminService/SetTemplateStatus"
+	AdminService_SetTemplateTrusted_FullMethodName = "/delegatee.v1.AdminService/SetTemplateTrusted"
+	AdminService_DeleteTemplate_FullMethodName     = "/delegatee.v1.AdminService/DeleteTemplate"
+	AdminService_DeleteArtifact_FullMethodName     = "/delegatee.v1.AdminService/DeleteArtifact"
+	AdminService_ListArtifacts_FullMethodName      = "/delegatee.v1.AdminService/ListArtifacts"
 )
 
 // AdminServiceClient is the client API for AdminService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AdminServiceClient interface {
+	// ListDelegations lists one page, newest first.
 	ListDelegations(ctx context.Context, in *ListDelegationsRequest, opts ...grpc.CallOption) (*ListDelegationsResponse, error)
+	// GetDelegationById returns any delegation, with its coins and history.
+	GetDelegationById(ctx context.Context, in *GetDelegationByIdRequest, opts ...grpc.CallOption) (*GetDelegationByIdResponse, error)
 	GetStatus(ctx context.Context, in *GetStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error)
+	// CancelDelegation stops the active watches of an address, or one
+	// delegation by id: advertisements have no address. Registering a
+	// cancelled delegation again is refused until ResumeDelegation.
 	CancelDelegation(ctx context.Context, in *CancelDelegationRequest, opts ...grpc.CallOption) (*CancelDelegationResponse, error)
+	// ResumeDelegation sets a cancelled delegation active again.
+	ResumeDelegation(ctx context.Context, in *ResumeDelegationRequest, opts ...grpc.CallOption) (*ResumeDelegationResponse, error)
+	ListAllTemplates(ctx context.Context, in *ListAllTemplatesRequest, opts ...grpc.CallOption) (*ListAllTemplatesResponse, error)
+	SetTemplateStatus(ctx context.Context, in *SetTemplateStatusRequest, opts ...grpc.CallOption) (*SetTemplateStatusResponse, error)
+	// SetTemplateTrusted marks a template the operator vouches for.
+	SetTemplateTrusted(ctx context.Context, in *SetTemplateTrustedRequest, opts ...grpc.CallOption) (*SetTemplateTrustedResponse, error)
+	DeleteTemplate(ctx context.Context, in *DeleteTemplateRequest, opts ...grpc.CallOption) (*DeleteTemplateResponse, error)
+	DeleteArtifact(ctx context.Context, in *DeleteArtifactRequest, opts ...grpc.CallOption) (*DeleteArtifactResponse, error)
+	// ListArtifacts lists every artifact, newest first, without documents.
+	ListArtifacts(ctx context.Context, in *ListArtifactsRequest, opts ...grpc.CallOption) (*ListArtifactsResponse, error)
 }
 
 type adminServiceClient struct {
@@ -45,6 +69,16 @@ func (c *adminServiceClient) ListDelegations(ctx context.Context, in *ListDelega
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListDelegationsResponse)
 	err := c.cc.Invoke(ctx, AdminService_ListDelegations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) GetDelegationById(ctx context.Context, in *GetDelegationByIdRequest, opts ...grpc.CallOption) (*GetDelegationByIdResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetDelegationByIdResponse)
+	err := c.cc.Invoke(ctx, AdminService_GetDelegationById_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -71,13 +105,99 @@ func (c *adminServiceClient) CancelDelegation(ctx context.Context, in *CancelDel
 	return out, nil
 }
 
+func (c *adminServiceClient) ResumeDelegation(ctx context.Context, in *ResumeDelegationRequest, opts ...grpc.CallOption) (*ResumeDelegationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResumeDelegationResponse)
+	err := c.cc.Invoke(ctx, AdminService_ResumeDelegation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) ListAllTemplates(ctx context.Context, in *ListAllTemplatesRequest, opts ...grpc.CallOption) (*ListAllTemplatesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAllTemplatesResponse)
+	err := c.cc.Invoke(ctx, AdminService_ListAllTemplates_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) SetTemplateStatus(ctx context.Context, in *SetTemplateStatusRequest, opts ...grpc.CallOption) (*SetTemplateStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetTemplateStatusResponse)
+	err := c.cc.Invoke(ctx, AdminService_SetTemplateStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) SetTemplateTrusted(ctx context.Context, in *SetTemplateTrustedRequest, opts ...grpc.CallOption) (*SetTemplateTrustedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetTemplateTrustedResponse)
+	err := c.cc.Invoke(ctx, AdminService_SetTemplateTrusted_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) DeleteTemplate(ctx context.Context, in *DeleteTemplateRequest, opts ...grpc.CallOption) (*DeleteTemplateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteTemplateResponse)
+	err := c.cc.Invoke(ctx, AdminService_DeleteTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) DeleteArtifact(ctx context.Context, in *DeleteArtifactRequest, opts ...grpc.CallOption) (*DeleteArtifactResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteArtifactResponse)
+	err := c.cc.Invoke(ctx, AdminService_DeleteArtifact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) ListArtifacts(ctx context.Context, in *ListArtifactsRequest, opts ...grpc.CallOption) (*ListArtifactsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListArtifactsResponse)
+	err := c.cc.Invoke(ctx, AdminService_ListArtifacts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AdminServiceServer is the server API for AdminService service.
 // All implementations should embed UnimplementedAdminServiceServer
 // for forward compatibility.
 type AdminServiceServer interface {
+	// ListDelegations lists one page, newest first.
 	ListDelegations(context.Context, *ListDelegationsRequest) (*ListDelegationsResponse, error)
+	// GetDelegationById returns any delegation, with its coins and history.
+	GetDelegationById(context.Context, *GetDelegationByIdRequest) (*GetDelegationByIdResponse, error)
 	GetStatus(context.Context, *GetStatusRequest) (*GetStatusResponse, error)
+	// CancelDelegation stops the active watches of an address, or one
+	// delegation by id: advertisements have no address. Registering a
+	// cancelled delegation again is refused until ResumeDelegation.
 	CancelDelegation(context.Context, *CancelDelegationRequest) (*CancelDelegationResponse, error)
+	// ResumeDelegation sets a cancelled delegation active again.
+	ResumeDelegation(context.Context, *ResumeDelegationRequest) (*ResumeDelegationResponse, error)
+	ListAllTemplates(context.Context, *ListAllTemplatesRequest) (*ListAllTemplatesResponse, error)
+	SetTemplateStatus(context.Context, *SetTemplateStatusRequest) (*SetTemplateStatusResponse, error)
+	// SetTemplateTrusted marks a template the operator vouches for.
+	SetTemplateTrusted(context.Context, *SetTemplateTrustedRequest) (*SetTemplateTrustedResponse, error)
+	DeleteTemplate(context.Context, *DeleteTemplateRequest) (*DeleteTemplateResponse, error)
+	DeleteArtifact(context.Context, *DeleteArtifactRequest) (*DeleteArtifactResponse, error)
+	// ListArtifacts lists every artifact, newest first, without documents.
+	ListArtifacts(context.Context, *ListArtifactsRequest) (*ListArtifactsResponse, error)
 }
 
 // UnimplementedAdminServiceServer should be embedded to have
@@ -90,11 +210,35 @@ type UnimplementedAdminServiceServer struct{}
 func (UnimplementedAdminServiceServer) ListDelegations(context.Context, *ListDelegationsRequest) (*ListDelegationsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListDelegations not implemented")
 }
+func (UnimplementedAdminServiceServer) GetDelegationById(context.Context, *GetDelegationByIdRequest) (*GetDelegationByIdResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetDelegationById not implemented")
+}
 func (UnimplementedAdminServiceServer) GetStatus(context.Context, *GetStatusRequest) (*GetStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetStatus not implemented")
 }
 func (UnimplementedAdminServiceServer) CancelDelegation(context.Context, *CancelDelegationRequest) (*CancelDelegationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelDelegation not implemented")
+}
+func (UnimplementedAdminServiceServer) ResumeDelegation(context.Context, *ResumeDelegationRequest) (*ResumeDelegationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResumeDelegation not implemented")
+}
+func (UnimplementedAdminServiceServer) ListAllTemplates(context.Context, *ListAllTemplatesRequest) (*ListAllTemplatesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAllTemplates not implemented")
+}
+func (UnimplementedAdminServiceServer) SetTemplateStatus(context.Context, *SetTemplateStatusRequest) (*SetTemplateStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetTemplateStatus not implemented")
+}
+func (UnimplementedAdminServiceServer) SetTemplateTrusted(context.Context, *SetTemplateTrustedRequest) (*SetTemplateTrustedResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetTemplateTrusted not implemented")
+}
+func (UnimplementedAdminServiceServer) DeleteTemplate(context.Context, *DeleteTemplateRequest) (*DeleteTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteTemplate not implemented")
+}
+func (UnimplementedAdminServiceServer) DeleteArtifact(context.Context, *DeleteArtifactRequest) (*DeleteArtifactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteArtifact not implemented")
+}
+func (UnimplementedAdminServiceServer) ListArtifacts(context.Context, *ListArtifactsRequest) (*ListArtifactsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListArtifacts not implemented")
 }
 func (UnimplementedAdminServiceServer) testEmbeddedByValue() {}
 
@@ -130,6 +274,24 @@ func _AdminService_ListDelegations_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AdminServiceServer).ListDelegations(ctx, req.(*ListDelegationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_GetDelegationById_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDelegationByIdRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).GetDelegationById(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_GetDelegationById_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).GetDelegationById(ctx, req.(*GetDelegationByIdRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -170,6 +332,132 @@ func _AdminService_CancelDelegation_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AdminService_ResumeDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResumeDelegationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).ResumeDelegation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_ResumeDelegation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).ResumeDelegation(ctx, req.(*ResumeDelegationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_ListAllTemplates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAllTemplatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).ListAllTemplates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_ListAllTemplates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).ListAllTemplates(ctx, req.(*ListAllTemplatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_SetTemplateStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetTemplateStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).SetTemplateStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_SetTemplateStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).SetTemplateStatus(ctx, req.(*SetTemplateStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_SetTemplateTrusted_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetTemplateTrustedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).SetTemplateTrusted(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_SetTemplateTrusted_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).SetTemplateTrusted(ctx, req.(*SetTemplateTrustedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_DeleteTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).DeleteTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_DeleteTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).DeleteTemplate(ctx, req.(*DeleteTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_DeleteArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteArtifactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).DeleteArtifact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_DeleteArtifact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).DeleteArtifact(ctx, req.(*DeleteArtifactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_ListArtifacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListArtifactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).ListArtifacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_ListArtifacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).ListArtifacts(ctx, req.(*ListArtifactsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AdminService_ServiceDesc is the grpc.ServiceDesc for AdminService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -182,12 +470,44 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AdminService_ListDelegations_Handler,
 		},
 		{
+			MethodName: "GetDelegationById",
+			Handler:    _AdminService_GetDelegationById_Handler,
+		},
+		{
 			MethodName: "GetStatus",
 			Handler:    _AdminService_GetStatus_Handler,
 		},
 		{
 			MethodName: "CancelDelegation",
 			Handler:    _AdminService_CancelDelegation_Handler,
+		},
+		{
+			MethodName: "ResumeDelegation",
+			Handler:    _AdminService_ResumeDelegation_Handler,
+		},
+		{
+			MethodName: "ListAllTemplates",
+			Handler:    _AdminService_ListAllTemplates_Handler,
+		},
+		{
+			MethodName: "SetTemplateStatus",
+			Handler:    _AdminService_SetTemplateStatus_Handler,
+		},
+		{
+			MethodName: "SetTemplateTrusted",
+			Handler:    _AdminService_SetTemplateTrusted_Handler,
+		},
+		{
+			MethodName: "DeleteTemplate",
+			Handler:    _AdminService_DeleteTemplate_Handler,
+		},
+		{
+			MethodName: "DeleteArtifact",
+			Handler:    _AdminService_DeleteArtifact_Handler,
+		},
+		{
+			MethodName: "ListArtifacts",
+			Handler:    _AdminService_ListArtifacts_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -5,12 +5,93 @@
     "version": "version not set"
   },
   "paths": {
+    "/v1/artifact": {
+      "post": {
+        "tags": [
+          "DelegateeService"
+        ],
+        "description": "RegisterArtifact stores a compiler artifact templates may reference. Idempotent on its id.",
+        "operationId": "DelegateeService_RegisterArtifact",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterArtifactRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterArtifactResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/artifact/{id}": {
+      "get": {
+        "tags": [
+          "DelegateeService"
+        ],
+        "operationId": "DelegateeService_GetArtifact",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetArtifactResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/delegate": {
       "post": {
         "tags": [
           "DelegateeService"
         ],
-        "description": "RegisterDelegation starts renewing the VTXOs locked at the address\nderived from the given tapscripts. The tapscripts must contain the\ndelegate tapscript GetInfo returns for the same params, and\nan exit leaf.",
+        "description": "RegisterDelegation registers a watch: the daemon acts on coins sent to\nthe address the template derives for variables, until expires_at. The\ntemplate must have exactly one input; the wallet compares the address\nwith its own. Registering an active watch again returns it unchanged.",
         "operationId": "DelegateeService_RegisterDelegation",
         "requestBody": {
           "content": {
@@ -51,7 +132,7 @@
         "tags": [
           "DelegateeService"
         ],
-        "description": "GetDelegation returns a delegation with its spendable VTXOs (live from\nthe arkd indexer) and its renewal history.",
+        "description": "GetDelegation returns the watch of an address (an active one first, else\nthe newest) with its spendable VTXOs (live from the arkd indexer) and its\nrenewal history.",
         "operationId": "DelegateeService_GetDelegation",
         "parameters": [
           {
@@ -87,54 +168,20 @@
         }
       }
     },
-    "/v1/delegate/{address}/revoke": {
-      "post": {
+    "/v1/info": {
+      "get": {
         "tags": [
           "DelegateeService"
         ],
-        "description": "RevokeDelegation stops renewing the address on its owner's request,\nproven with a key of the exit leaf. Register again to resume.",
-        "operationId": "DelegateeService_RevokeDelegation",
-        "parameters": [
-          {
-            "name": "address",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "title": "RevokeDelegationRequest",
-                "type": "object",
-                "properties": {
-                  "pubkey": {
-                    "type": "string"
-                  },
-                  "signature": {
-                    "type": "string",
-                    "description": "TODO simplify ?"
-                  },
-                  "timestamp": {
-                    "type": "integer",
-                    "format": "int64"
-                  }
-                }
-              }
-            }
-          },
-          "required": true
-        },
+        "description": "GetInfo returns the keys a wallet instantiates a template with.",
+        "operationId": "DelegateeService_GetInfo",
         "responses": {
           "200": {
             "description": "a successful response.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RevokeDelegationResponse"
+                  "$ref": "#/components/schemas/GetInfoResponse"
                 }
               }
             }
@@ -152,28 +199,89 @@
         }
       }
     },
-    "/v1/info": {
+    "/v1/template": {
       "get": {
         "tags": [
           "DelegateeService"
         ],
-        "description": "GetInfo returns everything a wallet needs to build a delegate address\nit also returns the address itself would derive from the given params, so the wallet can verify it.\nparams are optional, and default to the values the server is configured with.",
-        "operationId": "DelegateeService_GetInfo",
-        "parameters": [
-          {
-            "name": "renewalWindow",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int64"
+        "description": "ListTemplates lists the active templates, without their documents.",
+        "operationId": "DelegateeService_ListTemplates",
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTemplatesResponse"
+                }
+              }
             }
           },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "DelegateeService"
+        ],
+        "description": "RegisterTemplate stores a template the engine accepts. It is active at once. Idempotent on its id.",
+        "operationId": "DelegateeService_RegisterTemplate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterTemplateResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/template/{id}": {
+      "get": {
+        "tags": [
+          "DelegateeService"
+        ],
+        "operationId": "DelegateeService_GetTemplate",
+        "parameters": [
           {
-            "name": "maxFee",
-            "in": "query",
+            "name": "id",
+            "in": "path",
+            "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
             }
           }
         ],
@@ -183,7 +291,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GetInfoResponse"
+                  "$ref": "#/components/schemas/GetTemplateResponse"
                 }
               }
             }
@@ -214,6 +322,22 @@
           }
         }
       },
+      "Artifact": {
+        "title": "Artifact",
+        "type": "object",
+        "properties": {
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "document": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
       "Asset": {
         "title": "Asset",
         "type": "object",
@@ -230,60 +354,70 @@
       "Delegation": {
         "title": "Delegation",
         "type": "object",
+        "description": "Delegation is an instance of a template.",
         "properties": {
           "address": {
-            "type": "string"
+            "type": "string",
+            "description": "address is slot 0's address for a watch, empty otherwise."
           },
           "createdAt": {
             "type": "integer",
+            "format": "int64"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "expires_at is 0 when the delegation never expires.",
             "format": "int64"
           },
           "id": {
             "type": "integer",
             "format": "int64"
           },
-          "lastRenewal": {
-            "$ref": "#/components/schemas/Renewal"
-          },
-          "managed": {
-            "type": "boolean"
-          },
-          "maxFee": {
+          "parentId": {
             "type": "integer",
+            "description": "parent_id is the delegation whose settled transaction advertised this one, 0 for a watch.",
             "format": "int64"
           },
-          "nextExpiry": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "nextRenewalAt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "renewalWindow": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "status": {
-            "type": "string"
-          },
-          "tapscripts": {
+          "slots": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Slot"
             }
           },
-          "totalAmount": {
-            "type": "integer",
-            "format": "uint64"
+          "status": {
+            "type": "string",
+            "description": "status is active, cancelled, expired or done."
+          },
+          "templateId": {
+            "type": "string"
           },
           "updatedAt": {
             "type": "integer",
             "format": "int64"
           },
-          "vtxoCount": {
-            "type": "integer",
-            "format": "int32"
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "GetArtifactRequest": {
+        "title": "GetArtifactRequest",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "GetArtifactResponse": {
+        "title": "GetArtifactResponse",
+        "type": "object",
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/Artifact"
           }
         }
       },
@@ -319,47 +453,24 @@
       },
       "GetInfoRequest": {
         "title": "GetInfoRequest",
-        "type": "object",
-        "properties": {
-          "maxFee": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "renewalWindow": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
+        "type": "object"
       },
       "GetInfoResponse": {
         "title": "GetInfoResponse",
         "type": "object",
         "properties": {
-          "arkadeScript": {
-            "type": "string"
-          },
           "delegatePubkey": {
-            "type": "string"
-          },
-          "delegateTapscript": {
             "type": "string"
           },
           "emulatorPubkey": {
             "type": "string"
           },
-          "emulatorTweakedPubkey": {
-            "type": "string"
-          },
-          "maxFee": {
-            "type": "integer",
-            "format": "int64"
+          "encryptionPubkey": {
+            "type": "string",
+            "description": "encryption_pubkey seals template secrets for this daemon; empty without an encryption key."
           },
           "network": {
             "type": "string"
-          },
-          "renewalWindow": {
-            "type": "integer",
-            "format": "int64"
           },
           "serverPubkey": {
             "type": "string"
@@ -369,21 +480,86 @@
           }
         }
       },
+      "GetTemplateRequest": {
+        "title": "GetTemplateRequest",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "GetTemplateResponse": {
+        "title": "GetTemplateResponse",
+        "type": "object",
+        "properties": {
+          "template": {
+            "$ref": "#/components/schemas/Template"
+          }
+        }
+      },
+      "ListTemplatesRequest": {
+        "title": "ListTemplatesRequest",
+        "type": "object",
+        "description": "ListTemplatesRequest has no fields: the public list is always the active one."
+      },
+      "ListTemplatesResponse": {
+        "title": "ListTemplatesResponse",
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Template"
+            }
+          }
+        }
+      },
+      "Param": {
+        "title": "Param",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "RegisterArtifactRequest": {
+        "title": "RegisterArtifactRequest",
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string"
+          }
+        }
+      },
+      "RegisterArtifactResponse": {
+        "title": "RegisterArtifactResponse",
+        "type": "object",
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/Artifact"
+          }
+        }
+      },
       "RegisterDelegationRequest": {
         "title": "RegisterDelegationRequest",
         "type": "object",
         "properties": {
-          "maxFee": {
+          "expiresAt": {
             "type": "integer",
+            "description": "expires_at is a unix time after which the watch stops; 0 never expires.",
             "format": "int64"
           },
-          "renewalWindow": {
-            "type": "integer",
-            "format": "int64"
+          "templateId": {
+            "type": "string"
           },
-          "tapscripts": {
-            "type": "array",
-            "items": {
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
               "type": "string"
             }
           }
@@ -395,6 +571,24 @@
         "properties": {
           "delegation": {
             "$ref": "#/components/schemas/Delegation"
+          }
+        }
+      },
+      "RegisterTemplateRequest": {
+        "title": "RegisterTemplateRequest",
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string"
+          }
+        }
+      },
+      "RegisterTemplateResponse": {
+        "title": "RegisterTemplateResponse",
+        "type": "object",
+        "properties": {
+          "template": {
+            "$ref": "#/components/schemas/Template"
           }
         }
       },
@@ -423,29 +617,28 @@
           }
         }
       },
-      "RevokeDelegationRequest": {
-        "title": "RevokeDelegationRequest",
+      "Slot": {
+        "title": "Slot",
         "type": "object",
+        "description": "Slot is one template input of a delegation.",
         "properties": {
-          "address": {
+          "name": {
             "type": "string"
           },
-          "pubkey": {
-            "type": "string"
+          "onchain": {
+            "type": "boolean"
           },
-          "signature": {
+          "outpoint": {
             "type": "string",
-            "description": "TODO simplify ?"
+            "description": "outpoint is \"txid:vout\" when bound, empty for a watch."
           },
-          "timestamp": {
-            "type": "integer",
-            "format": "int64"
+          "tapscripts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
-      },
-      "RevokeDelegationResponse": {
-        "title": "RevokeDelegationResponse",
-        "type": "object"
       },
       "Status": {
         "title": "Status",
@@ -462,6 +655,38 @@
             }
           },
           "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Template": {
+        "title": "Template",
+        "type": "object",
+        "properties": {
+          "artifactIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "document": {
+            "type": "string",
+            "description": "empty in list responses"
+          },
+          "id": {
+            "type": "string"
+          },
+          "params": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Param"
+            }
+          },
+          "status": {
             "type": "string"
           }
         }
@@ -487,6 +712,9 @@
           "expiresAt": {
             "type": "integer",
             "format": "int64"
+          },
+          "onchain": {
+            "type": "boolean"
           },
           "outpoint": {
             "type": "string"

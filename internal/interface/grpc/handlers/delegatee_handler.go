@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"time"
 
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 
@@ -23,41 +24,33 @@ func New(version string, svc application.Service) delegateev1.DelegateeServiceSe
 	return &handler{version: version, svc: svc}
 }
 
-func (h *handler) GetInfo(
-	_ context.Context, req *delegateev1.GetInfoRequest,
-) (*delegateev1.GetInfoResponse, error) {
-	info, err := h.svc.Info(domain.Params{
-		RenewalWindow: req.GetRenewalWindow(), MaxFee: req.GetMaxFee(),
-	})
-	if err != nil {
-		return nil, toStatus(err)
-	}
+func (h *handler) GetInfo(context.Context, *delegateev1.GetInfoRequest) (*delegateev1.GetInfoResponse, error) {
+	info := h.svc.Info()
 	return &delegateev1.GetInfoResponse{
-		Version:               h.version,
-		Network:               info.Network,
-		DelegatePubkey:        info.DelegatePubKey,
-		ServerPubkey:          info.ServerPubKey,
-		EmulatorPubkey:        info.EmulatorPubKey,
-		EmulatorTweakedPubkey: info.EmulatorTweakedPubKey,
-		ArkadeScript:          info.ArkadeScript,
-		DelegateTapscript:     info.DelegateTapscript,
-		RenewalWindow:         info.Params.RenewalWindow,
-		MaxFee:                info.Params.MaxFee,
+		Version: h.version, Network: info.Network, DelegatePubkey: info.DelegatePubKey,
+		ServerPubkey: info.ServerPubKey, EmulatorPubkey: info.EmulatorPubKey,
+		EncryptionPubkey: info.EncryptionPubKey,
 	}, nil
 }
 
 func (h *handler) RegisterDelegation(
 	ctx context.Context, req *delegateev1.RegisterDelegationRequest,
 ) (*delegateev1.RegisterDelegationResponse, error) {
-	if len(req.GetTapscripts()) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "missing tapscripts")
+	if req.GetTemplateId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing template_id")
 	}
-	d, err := h.svc.RegisterDelegation(ctx, req.GetTapscripts(), domain.Params{
-		RenewalWindow: req.GetRenewalWindow(), MaxFee: req.GetMaxFee(),
-	})
+	var expiresAt *time.Time
+	if req.GetExpiresAt() < 0 {
+		return nil, status.Error(codes.InvalidArgument, "negative expires_at")
+	} else if req.GetExpiresAt() > 0 {
+		at := time.Unix(req.GetExpiresAt(), 0)
+		expiresAt = &at
+	}
+	d, err := h.svc.RegisterDelegation(ctx, req.GetTemplateId(), variablesOf(req.GetVariables()), expiresAt)
 	if err != nil {
 		return nil, toStatus(err)
 	}
+	audit(ctx, "register delegation", idString(d.ID), "", "")
 	return &delegateev1.RegisterDelegationResponse{Delegation: toDelegation(d)}, nil
 }
 
@@ -71,44 +64,107 @@ func (h *handler) GetDelegation(
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	vtxos, err := h.svc.Vtxos(ctx, d)
+	return delegationDetail(ctx, h.svc, d)
+}
+
+func delegationDetail(ctx context.Context, svc application.Service, d *domain.Delegation) (*delegateev1.GetDelegationResponse, error) {
+	vtxos, err := svc.Vtxos(ctx, d)
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	renewals, err := h.svc.ListRenewals(ctx, d)
+	renewals, err := svc.ListRenewals(ctx, d)
 	if err != nil {
 		return nil, toStatus(err)
+	}
+	due, err := svc.RenewableAt(ctx, d, vtxos)
+	if err != nil {
+		log.WithError(err).WithField("address", d.Address).Debug("delegation cannot be instantiated")
+	}
+	converted := toVtxos(vtxos, due)
+	for i, v := range vtxos {
+		for _, slot := range d.Slots {
+			if slot.Onchain && slot.Script == v.Script {
+				converted[i].Onchain = true
+			}
+		}
 	}
 	return &delegateev1.GetDelegationResponse{
-		Delegation: toDelegation(d),
-		Vtxos:      h.toVtxos(d, vtxos),
-		Renewals:   toRenewals(renewals),
+		Delegation: toDelegation(d), Vtxos: converted, Renewals: toRenewals(renewals),
 	}, nil
 }
 
-func (h *handler) RevokeDelegation(
-	ctx context.Context, req *delegateev1.RevokeDelegationRequest,
-) (*delegateev1.RevokeDelegationResponse, error) {
-	if req.GetAddress() == "" || req.GetPubkey() == "" || req.GetSignature() == "" {
-		return nil, status.Error(codes.InvalidArgument, "missing address, pubkey or signature")
+func (h *handler) RegisterArtifact(ctx context.Context, req *delegateev1.RegisterArtifactRequest) (*delegateev1.RegisterArtifactResponse, error) {
+	if req.GetDocument() == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing document")
 	}
-	if err := h.svc.RevokeDelegation(ctx, req.GetAddress(), req.GetPubkey(), req.GetSignature(), req.GetTimestamp()); err != nil {
+	a, err := h.svc.RegisterArtifact(ctx, []byte(req.GetDocument()))
+	if err != nil {
 		return nil, toStatus(err)
 	}
-	return &delegateev1.RevokeDelegationResponse{}, nil
+	audit(ctx, "register artifact", a.ID, "", "")
+	return &delegateev1.RegisterArtifactResponse{Artifact: toArtifact(a)}, nil
+}
+
+func (h *handler) GetArtifact(ctx context.Context, req *delegateev1.GetArtifactRequest) (*delegateev1.GetArtifactResponse, error) {
+	if req.GetId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing id")
+	}
+	a, err := h.svc.GetArtifact(ctx, req.GetId())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &delegateev1.GetArtifactResponse{Artifact: toArtifact(a)}, nil
+}
+
+func (h *handler) RegisterTemplate(ctx context.Context, req *delegateev1.RegisterTemplateRequest) (*delegateev1.RegisterTemplateResponse, error) {
+	if req.GetDocument() == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing document")
+	}
+	t, err := h.svc.RegisterTemplate(ctx, []byte(req.GetDocument()))
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	audit(ctx, "register template", t.ID, "", "")
+	return &delegateev1.RegisterTemplateResponse{Template: toTemplate(t, true)}, nil
+}
+
+func (h *handler) GetTemplate(ctx context.Context, req *delegateev1.GetTemplateRequest) (*delegateev1.GetTemplateResponse, error) {
+	if req.GetId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing id")
+	}
+	t, err := h.svc.GetTemplate(ctx, req.GetId())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &delegateev1.GetTemplateResponse{Template: toTemplate(t, true)}, nil
+}
+
+func (h *handler) ListTemplates(ctx context.Context, _ *delegateev1.ListTemplatesRequest) (*delegateev1.ListTemplatesResponse, error) {
+	ts, err := h.svc.ListTemplates(ctx, domain.TemplateStatusActive)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	out := make([]*delegateev1.Template, len(ts))
+	for i := range ts {
+		out[i] = toTemplate(&ts[i], false)
+	}
+	return &delegateev1.ListTemplatesResponse{Templates: out}, nil
 }
 
 func toStatus(err error) error {
 	switch {
-	case errors.Is(err, domain.ErrDelegationNotFound):
+	case errors.Is(err, domain.ErrDelegationNotFound), errors.Is(err, domain.ErrTemplateNotFound), errors.Is(err, domain.ErrArtifactNotFound):
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, domain.ErrDelegationAlreadyExists):
 		return status.Error(codes.AlreadyExists, err.Error())
 	case errors.Is(err, application.ErrFull):
 		return status.Error(codes.ResourceExhausted, err.Error())
-	case errors.Is(err, application.ErrInvalidSignature):
-		return status.Error(codes.PermissionDenied, err.Error())
-	case errors.Is(err, application.ErrInvalidScript):
+	case errors.Is(err, domain.ErrTemplateInUse), errors.Is(err, domain.ErrArtifactInUse), errors.Is(err, domain.ErrTemplateDisabled), errors.Is(err, domain.ErrBlocked), errors.Is(err, domain.ErrNotCancelled),
+		errors.Is(err, application.ErrDelegateKeyLeaf), errors.Is(err, application.ErrSecretsRequired),
+		errors.Is(err, application.ErrUnsupported), errors.Is(err, application.ErrIneligible):
+		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, application.ErrInvalidDocument), errors.Is(err, application.ErrInvalidStatus),
+		errors.Is(err, application.ErrInvalidArgs):
 		return status.Error(codes.InvalidArgument, err.Error())
 	default:
 		log.WithError(err).Error("request failed")
@@ -116,20 +172,49 @@ func toStatus(err error) error {
 	}
 }
 
-func toDelegation(d *domain.Delegation) *delegateev1.Delegation {
-	return &delegateev1.Delegation{
-		Id:            d.ID,
-		Address:       d.Address,
-		Status:        d.Status,
-		Tapscripts:    d.Tapscripts,
-		RenewalWindow: d.RenewalWindow,
-		MaxFee:        d.MaxFee,
-		CreatedAt:     d.CreatedAt.Unix(),
-		UpdatedAt:     d.UpdatedAt.Unix(),
-	}
+func toArtifact(a *domain.Artifact) *delegateev1.Artifact {
+	return &delegateev1.Artifact{Id: a.ID, Document: string(a.Document), CreatedAt: a.CreatedAt.Unix()}
 }
 
-func (h *handler) toVtxos(d *domain.Delegation, vtxos []clientlib.Vtxo) []*delegateev1.Vtxo {
+func toTemplate(t *domain.Template, withDocument bool) *delegateev1.Template {
+	params := make([]*delegateev1.Param, len(t.Params))
+	for i, p := range t.Params {
+		params[i] = &delegateev1.Param{Name: p.Name, Type: p.Type}
+	}
+	out := &delegateev1.Template{
+		Id: t.ID, ArtifactIds: t.ArtifactIDs, Params: params, Status: t.Status,
+		CreatedAt: t.CreatedAt.Unix(),
+	}
+	if withDocument {
+		out.Document = string(t.Document)
+	}
+	return out
+}
+
+func toDelegation(d *domain.Delegation) *delegateev1.Delegation {
+	slots := make([]*delegateev1.Slot, len(d.Slots))
+	for i, s := range d.Slots {
+		slots[i] = &delegateev1.Slot{Name: s.Name, Onchain: s.Onchain, Tapscripts: s.Tapscripts, Outpoint: s.Outpoint}
+	}
+	out := &delegateev1.Delegation{
+		Id:         d.ID,
+		Address:    d.Address,
+		Status:     d.Status,
+		TemplateId: d.TemplateID,
+		Variables:  d.Variables,
+		ParentId:   d.ParentID,
+		Slots:      slots,
+		CreatedAt:  d.CreatedAt.Unix(),
+		UpdatedAt:  d.UpdatedAt.Unix(),
+	}
+	if d.ExpiresAt != nil {
+		out.ExpiresAt = d.ExpiresAt.Unix()
+	}
+	return out
+}
+
+// toVtxos leaves RenewableAt unset without due: a rotated key or a removed template still lists its vtxos.
+func toVtxos(vtxos []clientlib.Vtxo, due []time.Time) []*delegateev1.Vtxo {
 	out := make([]*delegateev1.Vtxo, len(vtxos))
 	for i, v := range vtxos {
 		assets := make([]*delegateev1.Asset, len(v.Assets))
@@ -141,9 +226,11 @@ func (h *handler) toVtxos(d *domain.Delegation, vtxos []clientlib.Vtxo) []*deleg
 			Amount:       v.Amount,
 			ExpiresAt:    v.ExpiresAt.Unix(),
 			CreatedAt:    v.CreatedAt.Unix(),
-			RenewableAt:  h.svc.DueAt(d, v).Unix(),
 			Preconfirmed: v.Preconfirmed,
 			Assets:       assets,
+		}
+		if due != nil {
+			out[i].RenewableAt = due[i].Unix()
 		}
 	}
 	return out
@@ -165,4 +252,11 @@ func toRenewal(r domain.Renewal) *delegateev1.Renewal {
 		Error:          r.Error,
 		AttemptedAt:    r.AttemptedAt.Unix(),
 	}
+}
+
+func variablesOf(v map[string]string) map[string]string {
+	if v == nil {
+		return map[string]string{}
+	}
+	return v
 }
