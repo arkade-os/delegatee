@@ -643,7 +643,7 @@ func ownedInput(t *testing.T, env *testEnv, amount uint64) renewalInput {
 	w, err := env.svc.watch(t.Context(), env.advertised(t, v))
 	require.NoError(t, err)
 	coin := vtxoCoin(0, v)
-	return renewalInput{coin: coin, watched: w, due: dueTime(w.instance, coin)}
+	return renewalInput{coin: coin, watched: w, due: dueTime(w.instance, coin, noTip)}
 }
 
 // dueInput is a coin of the user's renewal watch paying up to maxFee.
@@ -654,7 +654,7 @@ func dueInput(t *testing.T, env *testEnv, maxFee int64, amount uint64) renewalIn
 	require.NoError(t, err)
 	require.NotNil(t, w)
 	coin := vtxoCoin(0, v)
-	return renewalInput{coin: coin, watched: w, due: dueTime(w.instance, coin)}
+	return renewalInput{coin: coin, watched: w, due: dueTime(w.instance, coin, noTip)}
 }
 
 func builtIntent(t *testing.T, env *testEnv, in renewalInput) *pendingIntent {

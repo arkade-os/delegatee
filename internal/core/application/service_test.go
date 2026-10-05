@@ -482,7 +482,7 @@ func TestScanHoldingsAndStatus(t *testing.T) {
 	require.ElementsMatch(t, []string{first.Txid, second.Txid}, []string{coins[0].Txid, coins[1].Txid})
 	w, err := env.svc.watch(ctx, busy)
 	require.NoError(t, err)
-	require.Equal(t, soon.ExpiresAt.Add(-1024*time.Second), dueTime(w.instance, vtxoCoin(0, soon)))
+	require.Equal(t, soon.ExpiresAt.Add(-1024*time.Second), dueTime(w.instance, vtxoCoin(0, soon), noTip))
 }
 
 func TestScanFailures(t *testing.T) {
@@ -618,6 +618,8 @@ func TestLateAndScannerHealth(t *testing.T) {
 	require.False(t, late(now.Add(time.Hour), due, now), "half the room left")
 	require.True(t, late(now.Add(10*time.Minute), due, now), "last quarter")
 	require.False(t, late(due, due, now), "no room at all is not late, it is a zero window")
+	require.True(t, late(due.Add(-time.Second), due, now), "due after expiry never renews")
+	require.False(t, late(time.Time{}, due, now), "no expiry, nothing to be late for")
 
 	// renewable 1024s before expiry: late in the last 256s
 	stuck := env.coin(t, env.userKey.PubKey(), 5000, 3*time.Minute)

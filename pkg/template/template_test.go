@@ -270,11 +270,6 @@ func TestVHTLC(t *testing.T) {
 			require.ErrorIs(t, err, ErrInvalidTemplate)
 		})
 	}
-
-	_, err = Parse(t.Context(), edited(t, doc, func(m map[string]any) {
-		m["inputs"].([]any)[0].(map[string]any)["spend"] = map[string]any{"function": "refundWithoutReceiver", "leaf": "refundWithoutReceiver"}
-	}), nil)
-	require.ErrorIs(t, err, ErrUnsupported, "an absolute locktime path")
 }
 
 func TestSecretsOnlyHashedInScripts(t *testing.T) {

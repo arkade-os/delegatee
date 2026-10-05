@@ -58,6 +58,7 @@ func (i *Instance) Build(_ context.Context, sources []*Source, fee Fee) (*Action
 		}
 	}
 	d := newDraft(t.typ, sources)
+	i.lock(d.tx, d.index(0))
 
 	spends, err := i.spends(d)
 	if err != nil {
@@ -83,6 +84,7 @@ func (i *Instance) Build(_ context.Context, sources []*Source, fee Fee) (*Action
 	for _, s := range sources {
 		tx.AddTxIn(&wire.TxIn{PreviousOutPoint: s.Outpoint, Sequence: wire.MaxTxInSequenceNum})
 	}
+	i.lock(tx, 0)
 	n := len(t.outputs)
 	if t.packets != nil {
 		n++
@@ -124,6 +126,17 @@ func (i *Instance) Build(_ context.Context, sources []*Source, fee Fee) (*Action
 		return nil, err
 	}
 	return act, nil
+}
+
+// lock matches offchain.BuildTxs: the highest locktime, and a non-final sequence on its inputs,
+// which start at first in tx
+func (i *Instance) lock(tx *wire.MsgTx, first int) {
+	for slot, lt := range i.locktimes {
+		if lt != nil {
+			tx.LockTime = max(tx.LockTime, uint32(*lt))
+			tx.TxIn[first+slot].Sequence = wire.MaxTxInSequenceNum - 1
+		}
+	}
 }
 
 func (i *Instance) spends(d *draft) ([]spending, error) {

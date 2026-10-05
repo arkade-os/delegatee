@@ -26,6 +26,7 @@ import (
 	"github.com/arkade-os/arkd/pkg/ark-lib/intent"
 	"github.com/arkade-os/arkd/pkg/ark-lib/tree"
 	"github.com/arkade-os/delegatee/internal/core/domain"
+	"github.com/arkade-os/delegatee/internal/core/ports"
 	"github.com/arkade-os/delegatee/pkg/template"
 	"github.com/arkade-os/delegatee/pkg/template/ecies"
 	"github.com/arkade-os/delegatee/pkg/template/packets"
@@ -756,6 +757,8 @@ type fakeExplorer struct {
 	lostReply bool // Broadcast relays the transaction and fails
 	feeRate   float64
 	feeErr    error
+	tip       ports.ChainTip
+	tipErr    error
 }
 
 func (e *fakeExplorer) GetTxHex(id string) (string, error) {
@@ -779,6 +782,11 @@ func (e *fakeExplorer) GetTxOutspends(id string) ([]clientlib.SpentStatus, error
 	}
 	return out, nil
 }
+
+func (e *fakeExplorer) ChainTip() (ports.ChainTip, error) { return e.tip, e.tipErr }
+
+// noTip is a tip for due times of coins without a locktime, which never ask for it
+func noTip() (ports.ChainTip, error) { return ports.ChainTip{}, errors.New("no explorer") }
 
 func (e *fakeExplorer) GetUtxos(addresses []string) ([]clientlib.ExplorerUtxo, error) {
 	var out []clientlib.ExplorerUtxo

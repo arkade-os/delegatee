@@ -37,6 +37,7 @@ import (
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/config"
 	"github.com/arkade-os/delegatee/internal/core/application"
+	delegateeexplorer "github.com/arkade-os/delegatee/internal/infrastructure/explorer"
 	grpcservice "github.com/arkade-os/delegatee/internal/interface/grpc"
 	jsontemplate "github.com/arkade-os/delegatee/pkg/template"
 	"github.com/arkade-os/delegatee/pkg/template/ecies"
@@ -541,6 +542,15 @@ func newSwap(t *testing.T, d delegatee) swap {
 		},
 		receiverScript: append([]byte{0x51, 0x20}, program...),
 	}
+}
+
+func medianTime(t *testing.T) int64 {
+	t.Helper()
+	ex, err := delegateeexplorer.New(explorerURL, arklib.BitcoinRegTest)
+	require.NoError(t, err)
+	tip, err := ex.ChainTip()
+	require.NoError(t, err)
+	return tip.MedianTime
 }
 
 // waitForVtxo waits for a spendable vtxo at script not spent by funding.

@@ -14,6 +14,7 @@ import (
 	"github.com/arkade-os/arkd/pkg/ark-lib/txutils"
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 	"github.com/arkade-os/delegatee/internal/core/domain"
+	"github.com/arkade-os/delegatee/internal/core/ports"
 	"github.com/arkade-os/emulator/pkg/arkade"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -278,6 +279,87 @@ func TestOffchainPendingTxOfASpentCoin(t *testing.T) {
 	require.Empty(t, e.repo.settled())
 }
 
+func TestDiscoverWaitsForHeightLocktime(t *testing.T) {
+	e, _, d := refundEnv(t, 200)
+	pkScript, err := hex.DecodeString(d.Slots[0].Script)
+	require.NoError(t, err)
+	coin := e.vtxoAt(t, pkScript, 10_000, time.Hour)
+	active := map[string]struct{}{d.TemplateID: {}}
+
+	e.explorer.tip.Height = 199
+	e.indexer.serve(coin) // the fake serves a coin once
+	held, _, inputs, err := e.svc.discover(t.Context(), []domain.Delegation{*d}, active, time.Now())
+	require.NoError(t, err)
+	require.Empty(t, inputs, "arkd would refuse it below height 200")
+	require.WithinDuration(t, time.Now().Add(10*time.Minute), held[d.ID].NextDue, time.Minute, "due in about a block")
+
+	e.explorer.tip, e.explorer.tipErr = ports.ChainTip{}, errors.New("explorer down")
+	e.indexer.serve(coin) // the fake serves a coin once
+	_, _, inputs, err = e.svc.discover(t.Context(), []domain.Delegation{*d}, active, time.Now())
+	require.NoError(t, err)
+	require.Empty(t, inputs, "an unknown tip waits")
+
+	e.explorer.tip, e.explorer.tipErr = ports.ChainTip{Height: 200}, nil
+	e.indexer.serve(coin) // the fake serves a coin once
+	_, _, inputs, err = e.svc.discover(t.Context(), []domain.Delegation{*d}, active, time.Now())
+	require.NoError(t, err)
+	require.Len(t, inputs, 1)
+}
+
+func TestDiscoverWaitsForMedianTime(t *testing.T) {
+	now := time.Now()
+	e, _, d := refundEnv(t, now.Add(-time.Hour).Unix())
+	pkScript, err := hex.DecodeString(d.Slots[0].Script)
+	require.NoError(t, err)
+	coin := e.vtxoAt(t, pkScript, 10_000, time.Hour)
+	active := map[string]struct{}{d.TemplateID: {}}
+
+	e.explorer.tip.MedianTime = now.Add(-2 * time.Hour).Unix()
+	e.indexer.serve(coin) // the fake serves a coin once
+	_, _, inputs, err := e.svc.discover(t.Context(), []domain.Delegation{*d}, active, now)
+	require.NoError(t, err)
+	require.Empty(t, inputs, "arkd compares a timestamp with the median time past, which lags the clock")
+
+	e.explorer.tip.MedianTime = now.Add(-time.Hour).Unix()
+	e.indexer.serve(coin)
+	_, _, inputs, err = e.svc.discover(t.Context(), []domain.Delegation{*d}, active, now)
+	require.NoError(t, err)
+	require.Len(t, inputs, 1)
+}
+
+func TestOffchainRefundSetsLocktime(t *testing.T) {
+	e, server, d := refundEnv(t, 200)
+	e.explorer.tip.Height = 200
+	inputs := dueAt(t, e, d)
+	e.emulator.submitTx = func(tx string, cps []string) (string, []string, error) { return tx, cps, nil }
+	e.ark.submitTx = func(ark string, cps []string) (string, string, []string, error) {
+		ptx, signed := signAs(t, server, ark)
+		require.EqualValues(t, 200, ptx.UnsignedTx.LockTime)
+		require.Equal(t, uint32(wire.MaxTxInSequenceNum-1), ptx.UnsignedTx.TxIn[0].Sequence)
+		cp, cpSigned := signAs(t, server, cps[0])
+		require.EqualValues(t, 200, cp.UnsignedTx.LockTime, "the checkpoint spends the CLTV leaf")
+		return ptx.UnsignedTx.TxHash().String(), signed, []string{cpSigned}, nil
+	}
+	_, st, accepted, err := e.svc.runOffchain(t.Context(), e.svc.cosigners[0], inputs, e.ark.info.Fees.IntentFees)
+	require.NoError(t, err)
+	require.True(t, accepted)
+	require.Equal(t, "5120"+d.Variables["sender_program"], hex.EncodeToString(st.tx.TxOut[0].PkScript))
+}
+
+func TestOffchainLockedRefusalRetries(t *testing.T) {
+	e, _, d := refundEnv(t, 200)
+	e.explorer.tip.Height = 200
+	inputs := dueAt(t, e, d)
+	e.emulator.submitTx = func(tx string, cps []string) (string, []string, error) { return tx, cps, nil }
+	e.ark.submitTx = func(string, []string) (string, string, []string, error) {
+		return "", "", nil, status.Error(codes.FailedPrecondition, "FORFEIT_CLOSURE_LOCKED: 200 > 199 (blockheight)")
+	}
+	_, _, _, err := e.svc.runOffchain(t.Context(), e.svc.cosigners[0], inputs, e.ark.info.Fees.IntentFees)
+	require.Error(t, err)
+	require.False(t, permanent(err), "the next scan retries")
+	require.NotErrorIs(t, err, errIntentRejected, "an early spend says nothing against the template")
+}
+
 func claimEnv(t *testing.T) (*testEnv, *btcec.PrivateKey, []renewalInput) {
 	e, server := serverEnv(t)
 	secrets, _ := hexKey(t)
@@ -285,6 +367,23 @@ func claimEnv(t *testing.T) (*testEnv, *btcec.PrivateKey, []renewalInput) {
 	d, err := e.svc.RegisterDelegation(t.Context(), e.trust(t, e.fixture(t, "vhtlc_claim.json")), claimVars(t, secrets.PubKey()), nil)
 	require.NoError(t, err)
 	return e, server, dueAt(t, e, d)
+}
+
+// refundEnv watches the VHTLC refund path, which needs no preimage after locktime.
+func refundEnv(t *testing.T, locktime int64) (*testEnv, *btcec.PrivateKey, *domain.Delegation) {
+	t.Helper()
+	e, server := serverEnv(t)
+	secrets, _ := hexKey(t)
+	e.svc.encryptionKeys = []*btcec.PrivateKey{secrets}
+	tmpl, err := e.svc.RegisterTemplate(t.Context(), document(t, "vhtlc_refund.json"))
+	require.NoError(t, err)
+	vars := claimVars(t, secrets.PubKey())
+	lock, err := arkade.BigNumFromInt64(locktime).Bytes()
+	require.NoError(t, err)
+	vars["refund_locktime"] = hex.EncodeToString(lock)
+	d, err := e.svc.RegisterDelegation(t.Context(), e.trust(t, tmpl.ID), vars, nil)
+	require.NoError(t, err)
+	return e, server, d
 }
 
 func serverEnv(t *testing.T) (*testEnv, *btcec.PrivateKey) {

@@ -87,12 +87,12 @@ func TestDueTime(t *testing.T) {
 	inst, err := env.svc.newInstance(t.Context(), tmpl, env.svc.cosigners[0], nil, nil, nil)
 	require.NoError(t, err)
 	created := time.Now().Add(-time.Hour).Truncate(time.Second)
-	require.Equal(t, created, dueTime(inst, coin{CreatedAt: created}))
+	require.Equal(t, created, dueTime(inst, coin{CreatedAt: created}, noTip))
 	for name, c := range map[string]coin{
 		"immediate":       {},
 		"malformed asset": {CreatedAt: created, Assets: []clientlib.Asset{{AssetId: "x"}}},
 	} {
-		require.WithinDuration(t, time.Now(), dueTime(inst, c), time.Minute, name)
+		require.WithinDuration(t, time.Now(), dueTime(inst, c, noTip), time.Minute, name)
 	}
 }
 

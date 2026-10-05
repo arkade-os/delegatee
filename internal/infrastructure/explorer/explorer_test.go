@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
+	"github.com/arkade-os/delegatee/internal/core/ports"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,5 +44,29 @@ func TestConfirmations(t *testing.T) {
 	for _, txid := range []string{"future", "noheight", "garbage", "missing"} {
 		_, err := e.Confirmations(txid)
 		require.Error(t, err, txid)
+	}
+}
+
+func TestChainTip(t *testing.T) {
+	block := `[{"height":812,"mediantime":1790864398},{"height":811,"mediantime":1790864000}]`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/blocks" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(block))
+	}))
+	defer srv.Close()
+	e, err := New(srv.URL, arklib.BitcoinRegTest)
+	require.NoError(t, err)
+
+	tip, err := e.ChainTip()
+	require.NoError(t, err)
+	require.Equal(t, ports.ChainTip{Height: 812, MedianTime: 1790864398}, tip)
+
+	for _, body := range []string{`[`, `[]`, `[{"height":812}]`, `[{"mediantime":1790864398}]`} {
+		block = body
+		_, err = e.ChainTip()
+		require.Error(t, err, "an incomplete tip would stall every locktime silently: %s", body)
 	}
 }

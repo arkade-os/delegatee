@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
 )
 
@@ -27,7 +28,8 @@ type Instance struct {
 	keys      Keys
 	vars      map[string][]byte
 	decrypt   func([]byte) ([]byte, error)
-	contracts []*contract // per slot
+	contracts []*contract                // per slot
+	locktimes []*arklib.AbsoluteLocktime // per slot, nil without a CLTV spend leaf
 }
 
 // ContextFree reports whether the input contracts can be built without sources.
@@ -108,15 +110,20 @@ func (t *Template) Instantiate(_ context.Context, c Context) (*Instance, error) 
 		if err != nil {
 			return nil, fmt.Errorf("input %q: %w", in.name, err)
 		}
-		if err := checkClosure(in, ct); err != nil {
+		lt, err := checkClosure(in, ct)
+		if err != nil {
 			return nil, err
 		}
+		i.locktimes = append(i.locktimes, lt)
 		if !watch {
 			if err := checkSourceScript(in, sources[slot], ct); err != nil {
 				return nil, err
 			}
 		}
 		i.contracts = append(i.contracts, ct)
+	}
+	if !sameDomain(i.locktimes) {
+		return nil, fmt.Errorf("%w: locktimes mix block heights and timestamps", ErrUnsupported)
 	}
 	return i, nil
 }
@@ -143,19 +150,54 @@ func (i *Instance) contractOf(c *construction, d *draft, slot int, watch bool) (
 	return build(c.def, args, i.keys)
 }
 
-// the emulator accepts only ark-lib closures on a leaf naming its key
-func checkClosure(in input, ct *contract) error {
+func isCLTV(tok string) bool { return tok == "OP_CHECKLOCKTIMEVERIFY" || tok == "OP_NOP2" }
+
+// checkClosure returns the spend leaf's absolute locktime, nil without one. The emulator accepts
+// only ark-lib closures on a leaf naming its key, and arkd builds a locktime only from a CLTV multisig.
+func checkClosure(in input, ct *contract) (*arklib.AbsoluteLocktime, error) {
 	f, _ := in.contract.def.function(in.function)
 	l, _ := f.leaf(in.leaf)
-	if !slices.ContainsFunc(l.Asm, func(tok string) bool {
+	emulated := slices.ContainsFunc(l.Asm, func(tok string) bool {
 		return strings.HasPrefix(tok, "<EMULATOR_KEY:") || strings.HasPrefix(tok, "<TWEAK:")
-	}) {
-		return nil
+	})
+	cltv := slices.ContainsFunc(l.Asm, isCLTV)
+	if !emulated && !cltv {
+		return nil, nil
 	}
-	if _, err := script.DecodeClosure(ct.proofs[[2]string{in.function, in.leaf}].Script); err != nil {
-		return fmt.Errorf("%w: input %q: leaf %q is not a closure", ErrUnsupported, in.name, in.leaf)
+	c, err := script.DecodeClosure(ct.proofs[[2]string{in.function, in.leaf}].Script)
+	lock, isLock := c.(*script.CLTVMultisigClosure)
+	switch {
+	case cltv && !isLock:
+		return nil, fmt.Errorf("%w: input %q: leaf %q is not a CLTV multisig closure", ErrUnsupported, in.name, in.leaf)
+	case err != nil:
+		return nil, fmt.Errorf("%w: input %q: leaf %q is not a closure", ErrUnsupported, in.name, in.leaf)
+	case cltv:
+		return &lock.Locktime, nil
 	}
-	return nil
+	return nil, nil
+}
+
+// offchain.BuildTxs refuses heights and timestamps in one transaction; refusing here names the delegation
+func sameDomain(lts []*arklib.AbsoluteLocktime) bool {
+	var first *arklib.AbsoluteLocktime
+	for _, lt := range lts {
+		if lt == nil {
+			continue
+		}
+		if first != nil && first.IsSeconds() != lt.IsSeconds() {
+			return false
+		}
+		first = lt
+	}
+	return true
+}
+
+// Locktime is the absolute locktime of slot's spend leaf, which arkd compares with its chain tip.
+func (i *Instance) Locktime(slot int) (arklib.AbsoluteLocktime, bool) {
+	if lt := i.locktimes[slot]; lt != nil {
+		return *lt, true
+	}
+	return 0, false
 }
 
 func checkSourceScript(in input, s *Source, ct *contract) error {
@@ -233,9 +275,20 @@ func (i *Instance) lead(slot int) time.Duration {
 	return time.Duration(n) * time.Second
 }
 
-// DueAt is the window start for an expiry lead, else the source's creation, or now when unknown.
-// A fee-paying instance waits at least half the source's life: a longer lead would pay in every round.
+// DueAt is the schedule's due time, no earlier than a timestamp locktime; a height is the caller's to check.
 func (i *Instance) DueAt(slot int, s *Source, now time.Time) time.Time {
+	due := i.scheduleDue(slot, s, now)
+	if lt := i.locktimes[slot]; lt != nil && lt.IsSeconds() {
+		if at := time.Unix(int64(*lt), 0); at.After(due) {
+			return at
+		}
+	}
+	return due
+}
+
+// scheduleDue is the window start for an expiry lead, else the source's creation, or now when unknown.
+// A fee-paying instance waits at least half the source's life: a longer lead would pay in every round.
+func (i *Instance) scheduleDue(slot int, s *Source, now time.Time) time.Time {
 	sch := i.tmpl.inputs[slot].schedule
 	lead := i.lead(slot)
 	if cap, _ := i.FeeCap(); cap > 0 && !s.CreatedAt.IsZero() {

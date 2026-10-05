@@ -436,9 +436,10 @@ func (s *service) RenewableAt(ctx context.Context, d *domain.Delegation, vtxos [
 	if err != nil {
 		return nil, err
 	}
+	tip := sync.OnceValues(s.explorer.ChainTip)
 	due := make([]time.Time, len(vtxos))
 	for i, v := range vtxos {
-		due[i] = dueTime(inst, vtxoCoin(0, v))
+		due[i] = dueTime(inst, vtxoCoin(0, v), tip)
 	}
 	return due, nil
 }
@@ -1029,10 +1030,10 @@ func templateOutcomes(results []renewalResult) map[string]tally {
 	return out
 }
 
-// late means less than a quarter of the time between renewable and expiry is left.
+// late means less than a quarter of the time between renewable and expiry is left, or none: a locktime past expiry.
 func late(expiry, due, now time.Time) bool {
 	room := expiry.Sub(due)
-	return room > 0 && expiry.Sub(now) < room/4
+	return !expiry.IsZero() && room != 0 && (room < 0 || expiry.Sub(now) < room/4)
 }
 
 // outpoints is nil for a watch

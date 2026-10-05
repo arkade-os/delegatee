@@ -29,19 +29,15 @@ func New(url string, network arklib.Network) (ports.Explorer, error) {
 }
 
 func (e *service) Confirmations(txid string) (int, error) {
-	resp, err := e.http.Get(strings.TrimRight(e.BaseUrl(), "/") + "/tx/" + txid + "/status")
+	raw, err := e.read("/tx/" + txid + "/status")
 	if err != nil {
 		return 0, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("explorer: HTTP %d", resp.StatusCode)
 	}
 	var status struct {
 		Confirmed bool  `json:"confirmed"`
 		Height    int64 `json:"block_height"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 65536)).Decode(&status); err != nil {
+	if err := json.Unmarshal(raw, &status); err != nil {
 		return 0, err
 	}
 	if !status.Confirmed {
@@ -55,4 +51,34 @@ func (e *service) Confirmations(txid string) (int, error) {
 		return 0, fmt.Errorf("inconsistent explorer block heights")
 	}
 	return int(tip - status.Height + 1), nil
+}
+
+func (e *service) ChainTip() (ports.ChainTip, error) {
+	raw, err := e.read("/blocks") // the latest blocks, tip first
+	if err != nil {
+		return ports.ChainTip{}, err
+	}
+	var blocks []struct {
+		Height     int64 `json:"height"`
+		MedianTime int64 `json:"mediantime"`
+	}
+	if err := json.Unmarshal(raw, &blocks); err != nil {
+		return ports.ChainTip{}, err
+	}
+	if len(blocks) == 0 || blocks[0].Height <= 0 || blocks[0].MedianTime <= 0 {
+		return ports.ChainTip{}, fmt.Errorf("explorer: tip block without height or median time")
+	}
+	return ports.ChainTip{Height: blocks[0].Height, MedianTime: blocks[0].MedianTime}, nil
+}
+
+func (e *service) read(path string) ([]byte, error) {
+	resp, err := e.http.Get(strings.TrimRight(e.BaseUrl(), "/") + path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("explorer: HTTP %d", resp.StatusCode)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, 65536))
 }

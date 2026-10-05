@@ -495,8 +495,9 @@ func (p *parser) spend(in *input, v any) error {
 	if err != nil {
 		return err
 	}
-	if slices.ContainsFunc(l.Asm, func(tok string) bool { return tok == "OP_CHECKLOCKTIMEVERIFY" || tok == "OP_NOP2" }) {
-		return fmt.Errorf("%w: leaf %q needs an absolute locktime", ErrUnsupported, l.Name)
+	// arkd sets an absolute locktime only when it builds an offchain spend
+	if slices.ContainsFunc(l.Asm, isCLTV) && p.t.typ != Offchain {
+		return fmt.Errorf("%w: leaf %q needs an absolute locktime, which only an offchain template sets", ErrUnsupported, l.Name)
 	}
 	in.function, in.leaf = f.Name, l.Name
 	args, err := list(m, "arguments")

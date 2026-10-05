@@ -239,8 +239,8 @@ func (h *batchHandler) failedResults(ctx context.Context, err error) []renewalRe
 
 // outages, shutdowns and the daemon's own misconfiguration must not count against a template
 func isRejection(ctx context.Context, err error) bool {
-	// arkd holds the transaction already
-	if ctx.Err() != nil || strings.Contains(err.Error(), "duplicated offchain tx") {
+	// arkd holds the transaction already, or its tip has not reached the locktime yet
+	if ctx.Err() != nil || strings.Contains(err.Error(), "duplicated offchain tx") || strings.Contains(err.Error(), "FORFEIT_CLOSURE_LOCKED") {
 		return false
 	}
 	switch status.Code(err) {

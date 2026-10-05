@@ -75,6 +75,25 @@ func TestOnchainRelease(t *testing.T) {
 	require.LessOrEqual(t, fee, int64(1000), "the fee stays under the cap")
 }
 
+func TestVHTLCRefundAfterLocktime(t *testing.T) {
+	d := startDelegatee(t)
+	refund := registerTemplate(t, d, "vhtlc_refund.json")
+	trust(t, d, refund)
+	swap := newSwap(t, d)
+	// arkd compares a timestamp with the median time past, which an idle regtest leaves far behind the clock
+	swap.variables["refund_locktime"] = scriptNum(medianTime(t))
+
+	w := watch(t, d, refund, swap.variables)
+	alice := fundedWallet(t)
+	funding, err := alice.SendOffChain(t.Context(), []clientlib.Receiver{{To: w.Address, Amount: 10_000}})
+	require.NoError(t, err)
+
+	sender, err := hex.DecodeString(swap.variables["sender_program"])
+	require.NoError(t, err)
+	paid := waitForVtxo(t, d, append([]byte{0x51, 0x20}, sender...), funding)
+	require.EqualValues(t, 10_000, paid.Amount)
+}
+
 func TestUntrustedTemplateCannotUseTheDelegateKey(t *testing.T) {
 	d := startDelegatee(t)
 	release := registerTemplate(t, d, "onchain_release.json")

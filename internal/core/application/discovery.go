@@ -9,15 +9,18 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 	"github.com/arkade-os/delegatee/internal/core/domain"
+	"github.com/arkade-os/delegatee/internal/core/ports"
 	"github.com/arkade-os/delegatee/pkg/template"
 	"github.com/arkade-os/delegatee/pkg/template/packets"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/wire/v2"
+	log "github.com/sirupsen/logrus"
 )
 
 // coin is a bound vtxo or onchain utxo, tagged with its slot and source transaction.
@@ -236,6 +239,13 @@ func (s *service) slotCoins(sl domain.SlotBinding, slot int, byScript map[string
 
 // discover also settles a bound delegation whose coins are all gone.
 func (s *service) discover(ctx context.Context, delegations []domain.Delegation, active map[string]struct{}, now time.Time) (map[int64]Holdings, map[int64]string, []renewalInput, error) {
+	tip := sync.OnceValues(func() (ports.ChainTip, error) {
+		t, err := s.explorer.ChainTip()
+		if err != nil {
+			log.WithError(err).Warn("chain tip unknown: locktimes wait")
+		}
+		return t, err
+	})
 	slices.SortFunc(delegations, func(a, b domain.Delegation) int { return cmp.Compare(a.ID, b.ID) })
 	maps.DeleteFunc(s.consumed, func(_ string, at time.Time) bool { return now.Sub(at) > 24*time.Hour })
 	holdings := map[int64]Holdings{}
@@ -299,9 +309,9 @@ next:
 					complete = false
 					continue
 				}
-				due := dueTime(w.instance, c)
+				due := dueTime(w.instance, c, tip)
 				h.add(c, due, now)
-				if now.Before(due) || (sl.Onchain && c.Confirms < w.tmpl.Inputs()[slot].Schedule.MinConfirmations) {
+				if now.Before(due) || (sl.Onchain && c.Confirms < w.tmpl.Inputs()[slot].Schedule.MinConfirmations) || !locktimeReached(w.instance, slot, tip) {
 					complete = false
 					continue
 				}
@@ -461,4 +471,20 @@ func (s *service) successor(ctx context.Context, d *domain.Delegation, id string
 		Fingerprint: domain.Fingerprint(id, nil, raw), DelegatePubKey: d.DelegatePubKey, Slots: slots,
 	}, own)
 	return err
+}
+
+// arkd refuses a locktime above its tip's height, or its median time past for a timestamp
+func locktimeReached(inst *template.Instance, slot int, tip func() (ports.ChainTip, error)) bool {
+	lt, ok := inst.Locktime(slot)
+	if !ok {
+		return true
+	}
+	t, err := tip()
+	if err != nil {
+		return false
+	}
+	if lt.IsSeconds() {
+		return t.MedianTime >= int64(lt)
+	}
+	return t.Height >= int64(lt)
 }

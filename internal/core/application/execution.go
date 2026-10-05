@@ -12,6 +12,7 @@ import (
 
 	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
 	"github.com/arkade-os/delegatee/internal/core/domain"
+	"github.com/arkade-os/delegatee/internal/core/ports"
 	"github.com/arkade-os/delegatee/pkg/template"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/psbt/v2"
@@ -106,12 +107,26 @@ func sourceOf(c coin) (*template.Source, error) {
 }
 
 // dueTime of a coin with malformed assets is now: its build then fails.
-func dueTime(inst *template.Instance, c coin) time.Time {
+// A locktime ahead of the tip adds the wait: ten minutes a block, or the median time's lag.
+func dueTime(inst *template.Instance, c coin, tip func() (ports.ChainTip, error)) time.Time {
+	now := time.Now()
 	src, err := sourceOf(c)
 	if err != nil {
-		return time.Now()
+		return now
 	}
-	return inst.DueAt(c.Slot, src, time.Now())
+	due := inst.DueAt(c.Slot, src, now)
+	if lt, ok := inst.Locktime(c.Slot); ok {
+		if t, err := tip(); err == nil {
+			wait := time.Duration(int64(lt)-t.Height) * 10 * time.Minute
+			if lt.IsSeconds() {
+				wait = time.Duration(int64(lt)-t.MedianTime) * time.Second
+			}
+			if at := now.Add(wait); wait > 0 && at.After(due) {
+				due = at
+			}
+		}
+	}
+	return due
 }
 
 // moduleError keeps err in the chain under the daemon's sentinel, else fallback.
