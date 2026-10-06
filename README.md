@@ -20,11 +20,11 @@ make test-e2e     # end-to-end tests on the regtest stack
 make regtest-down
 ```
 
-In production use `ghcr.io/arkade-os/delegatee` with the variables below;
-[`envs/mutinynet.env`](envs/mutinynet.env) is an example. Port 7080 is the
-public API ([service.proto](api-spec/protobuf/delegatee/v1/service.proto)),
-7081 the admin API and UI: keep it private. Back up the delegate and encryption keys; the delegate key is in
-every delegate address. Operations: [docs/runbook.md](docs/runbook.md).
+In production use `ghcr.io/arkade-os/delegatee` with the variables below.
+Port 7080 is the public API
+([service.proto](api-spec/protobuf/delegatee/v1/service.proto)), 7081 the
+admin API and UI: keep it private. Back up the delegate and encryption keys;
+the delegate key is in every delegate address.
 
 ## Configuration
 

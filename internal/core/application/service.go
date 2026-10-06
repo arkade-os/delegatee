@@ -888,11 +888,10 @@ func (s *service) scan(ctx context.Context) {
 	}
 	// a transaction of its own gains nothing from waiting for others
 	s.dispatch(&s.direct, direct)
-	// one cosigner key means one batch session at a time
-	if s.batch.wasBusy {
-		return
+	// one cosigner key means one batch session at a time: nothing to collect for while one runs
+	if !s.batch.wasBusy {
+		s.collectUntil = s.collectionDeadline(batch, time.Now())
 	}
-	s.collectUntil = s.collectionDeadline(batch, time.Now())
 	if s.collectUntil.IsZero() {
 		s.dispatch(&s.batch, batch)
 	}

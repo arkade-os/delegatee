@@ -22,6 +22,18 @@ func TestDirectInputsSkipTheCollectionWindow(t *testing.T) {
 	require.NotEmpty(t, e.ark.finalized, "claimed by the scan that found it")
 }
 
+func TestBatchInputsWaitForTheBatchInFlight(t *testing.T) {
+	env := newTestEnv(t)
+	v := env.coin(t, env.userKey.PubKey(), 1000, time.Minute)
+	env.advertised(t, v)
+	env.svc.batch.busy.Store(1)
+	env.indexer.serve(v)
+	env.svc.scan(t.Context())
+	require.Empty(t, env.emulator.submitted, "one batch session at a time")
+	require.True(t, env.svc.batch.waiting.Load(), "the batch wakes the scan when it ends")
+	require.Empty(t, env.svc.wake)
+}
+
 func TestClaimBesideABatch(t *testing.T) {
 	e, coin := claimable(t)
 	e.svc.batch.busy.Store(1)

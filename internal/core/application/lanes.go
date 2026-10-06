@@ -13,7 +13,7 @@ import (
 // lane runs one group of inputs at a time.
 type lane struct {
 	busy    atomic.Int64 // vtxos in flight
-	waiting atomic.Bool  // a scan left it inputs while busy; batch inputs wait for the poll instead
+	waiting atomic.Bool  // a scan left it inputs while busy
 	wasBusy bool         // as the scan began; the scan's alone
 	// lost on restart: the failure is then reported again
 	lastFailure map[string]string
