@@ -211,12 +211,27 @@ const (
 // The coins of a batch not seen landing are held for a landing window.
 func (s *service) finishSettlements(ctx context.Context) error {
 	s.held = map[string]bool{}
-	s.unsaved = slices.DeleteFunc(s.unsaved, func(st settlement) bool { return s.keep(ctx, st) == nil })
+	for _, st := range s.listUnsaved() {
+		// retried once its lane is idle
+		if s.sampled[st.delegation.ID] {
+			continue
+		}
+		if err := s.keep(ctx, st); err == nil {
+			s.dropUnsaved(st.tx.TxHash().String())
+		}
+	}
 	rows, err := s.repo.ListSettlements(ctx)
 	if err != nil {
 		return fmt.Errorf("list settlements: %w", err)
 	}
 	for _, row := range rows {
+		if s.sampled[row.DelegationID] {
+			// its lane settles it
+			for _, op := range row.Coins {
+				s.held[op] = true
+			}
+			continue
+		}
 		st, err := s.restore(ctx, row)
 		if err != nil {
 			log.WithError(err).WithField("txid", row.Txid).Error("read settlement")
@@ -273,24 +288,20 @@ func (s *service) finalize(ctx context.Context, st settlement) {
 	if err != nil && isRejection(ctx, err) { // arkd no longer holds it
 		log.WithError(err).WithField("txid", txid).Warn("offchain tx dropped")
 		s.forget(ctx, st)
-		for _, op := range st.coins {
-			delete(s.consumed, op)
-		}
+		s.release(st.coins...)
 		return
 	}
 	if s.refusedFor(txid, refused) > s.renewalTimeout {
 		s.abandon(ctx, st, err)
 		return
 	}
-	for _, op := range st.coins {
-		s.consumed[op] = time.Now()
-	}
+	s.consume(st.coins...)
 	if err != nil {
 		log.WithError(err).WithField("txid", txid).Warn("finalize offchain tx")
 		return
 	}
 	st.finals = nil
-	s.finalizedUnsaved(txid)
+	s.dropUnsaved(txid)
 	s.renewed.Add(uint64(len(st.coins)))
 	log.WithFields(log.Fields{"delegation": st.delegation.ID, "txid": txid}).Info("offchain tx finalized")
 	ren := domain.Renewal{DelegationID: st.delegation.ID, Outpoints: st.coins, CommitmentTxid: txid, Success: true}
@@ -306,7 +317,7 @@ func (s *service) recoverPending(ctx context.Context, st settlement) {
 	if err == nil && finals != nil {
 		st.finals = finals
 		if err = s.keep(ctx, st); err != nil {
-			s.unsaved = append(s.unsaved, st)
+			s.keepUnsaved(st)
 		}
 		s.finalize(ctx, st)
 		return
@@ -476,9 +487,4 @@ func (s *service) refusedFor(txid string, refused bool) time.Duration {
 		s.refusedSince[txid] = time.Now()
 	}
 	return time.Since(s.refusedSince[txid])
-}
-
-// finalizedUnsaved drops txid's record still to write: its finals are spent.
-func (s *service) finalizedUnsaved(txid string) {
-	s.unsaved = slices.DeleteFunc(s.unsaved, func(st settlement) bool { return st.tx.TxHash().String() == txid })
 }

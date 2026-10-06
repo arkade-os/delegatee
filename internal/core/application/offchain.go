@@ -159,7 +159,7 @@ func (s *service) runOffchain(ctx context.Context, c *cosigner, inputs []renewal
 	st.finals = finals
 	if err := s.keep(ctx, st); err != nil {
 		log.WithError(err).WithField("txid", txid).Error("pending offchain tx kept in memory until recorded")
-		s.unsaved = append(s.unsaved, st)
+		s.keepUnsaved(st)
 	}
 	if err = s.ark.FinalizeTx(ctx, txid, finals); err != nil {
 		if isRejection(ctx, err) {
@@ -167,12 +167,12 @@ func (s *service) runOffchain(ctx context.Context, c *cosigner, inputs []renewal
 		} else {
 			// submitting it again would be a duplicate: the next scan finishes it
 			for _, in := range inputs {
-				s.consumed[in.coin.Outpoint.String()] = time.Now()
+				s.consume(in.coin.Outpoint.String())
 			}
 		}
 		return "", settlement{}, true, fmt.Errorf("finalize offchain tx: %w", err)
 	}
-	s.finalizedUnsaved(txid)
+	s.dropUnsaved(txid)
 	st.finals = nil
 	return txid, st, true, nil
 }

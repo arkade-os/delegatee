@@ -26,4 +26,7 @@ type Ark interface {
 type Indexer interface {
 	GetVtxos(ctx context.Context, opts ...clientlib.GetVtxosOption) (*clientlib.VtxosResponse, error)
 	GetVirtualTxs(ctx context.Context, txids []string, opts ...clientlib.PageOption) (*clientlib.VirtualTxsResponse, error)
+	// NewSubscription streams what happens to scripts until ctx ends or its stop function runs: either closes the channel.
+	NewSubscription(ctx context.Context, scripts []string) (string, <-chan clientlib.ScriptEvent, func(), error)
+	UpdateSubscription(ctx context.Context, subscriptionID string, scriptsToAdd, scriptsToRemove []string) error
 }

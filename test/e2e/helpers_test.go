@@ -544,6 +544,21 @@ func newSwap(t *testing.T, d delegatee) swap {
 	}
 }
 
+// swapClaim funds a VHTLC watched under file's template and waits for its claim.
+func swapClaim(t *testing.T, d delegatee, file string) (clientlib.Vtxo, time.Duration) {
+	t.Helper()
+	claim := registerTemplate(t, d, file)
+	trust(t, d, claim)
+	swap := newSwap(t, d)
+
+	w := watch(t, d, claim, swap.variables)
+	alice := fundedWallet(t)
+	funding, err := alice.SendOffChain(t.Context(), []clientlib.Receiver{{To: w.Address, Amount: 10_000}})
+	require.NoError(t, err)
+	sent := time.Now()
+	return waitForVtxo(t, d, swap.receiverScript, funding), time.Since(sent)
+}
+
 func medianTime(t *testing.T) int64 {
 	t.Helper()
 	ex, err := delegateeexplorer.New(explorerURL, arklib.BitcoinRegTest)

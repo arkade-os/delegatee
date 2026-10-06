@@ -64,6 +64,25 @@ func TestOnchainDiscovery(t *testing.T) {
 
 }
 
+func TestOnchainCacheKeepsADropMadeDuringAFetch(t *testing.T) {
+	e := newTestEnv(t)
+	d := e.boarding(t, e.userKey.PubKey())
+	e.deposit(t, d, 10_000)
+	script := d.Slots[0].Script
+	// a lane spends the script while the scan asks the explorer
+	e.explorer.onUtxos = func() { e.svc.dropOnchain(script) }
+	_, err := e.svc.onchainCoins(d.Slots[0], 0, time.Now())
+	require.NoError(t, err)
+	_, _, cached := e.svc.cachedOnchain(script)
+	require.False(t, cached, "the snapshot predates the spend")
+
+	e.explorer.onUtxos = nil
+	_, err = e.svc.onchainCoins(d.Slots[0], 0, time.Now())
+	require.NoError(t, err)
+	_, _, cached = e.svc.cachedOnchain(script)
+	require.True(t, cached)
+}
+
 func TestSuccessorValidatesBoundScripts(t *testing.T) {
 	e := newTestEnv(t)
 	renewal := e.fixture(t, ownedRenewal)

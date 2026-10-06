@@ -195,7 +195,7 @@ func (s *service) settleSpent(ctx context.Context, d domain.Delegation, arkTxid 
 }
 
 func (s *service) onchainCoins(sl domain.SlotBinding, slot int, now time.Time) ([]coin, error) {
-	cached, ok := s.onchainCache[sl.Script]
+	cached, drops, ok := s.cachedOnchain(sl.Script)
 	if !ok || now.Sub(cached.at) >= s.onchainPollInterval {
 		utxos, err := s.onchainUtxos(sl)
 		if err != nil {
@@ -212,7 +212,7 @@ func (s *service) onchainCoins(sl domain.SlotBinding, slot int, now time.Time) (
 			}
 			cached.coins = append(cached.coins, utxoCoin(0, u, confirms))
 		}
-		s.onchainCache[sl.Script] = cached
+		s.cacheOnchain(sl.Script, cached, drops)
 	}
 	var coins []coin
 	for _, c := range cached.coins {
@@ -247,7 +247,7 @@ func (s *service) discover(ctx context.Context, delegations []domain.Delegation,
 		return t, err
 	})
 	slices.SortFunc(delegations, func(a, b domain.Delegation) int { return cmp.Compare(a.ID, b.ID) })
-	maps.DeleteFunc(s.consumed, func(_ string, at time.Time) bool { return now.Sub(at) > 24*time.Hour })
+	s.pruneConsumed(now)
 	holdings := map[int64]Holdings{}
 	unwatched := map[int64]string{}
 	scripts := s.watchAll(ctx, delegations, active, unwatched)
@@ -299,7 +299,7 @@ next:
 			}
 			for _, c := range coins {
 				op := c.Outpoint.String()
-				if _, spent := s.consumed[op]; spent || s.held[op] {
+				if s.isConsumed(op) || s.held[op] {
 					continue
 				}
 				if owner, ok := boundOwners[op]; ok && owner != d.ID {
@@ -319,7 +319,8 @@ next:
 			}
 		}
 		holdings[d.ID] = h
-		if !d.IsWatch() && missing == len(d.Slots) {
+		// a delegation in flight is settled by its lane
+		if !d.IsWatch() && missing == len(d.Slots) && !s.sampled[d.ID] {
 			spent, arkTxid, err := s.spent(ctx, d.Slots)
 			if err == nil && spent {
 				err = s.settleSpent(ctx, d, arkTxid)
@@ -387,6 +388,8 @@ func (s *service) pruneCaches() {
 			}
 		}
 	}
+	s.shared.Lock()
+	defer s.shared.Unlock()
 	maps.DeleteFunc(s.onchainCache, func(script string, _ onchainSnapshot) bool { return !live[script] })
 }
 

@@ -121,7 +121,7 @@ func (s *service) runOnchain(ctx context.Context, c *cosigner, inputs []renewalI
 		return "", settlement{}, errors.New("broadcast returned a different txid")
 	}
 	for _, in := range inputs {
-		delete(s.onchainCache, in.watched.delegation.Slots[in.coin.Slot].Script)
+		s.dropOnchain(in.watched.delegation.Slots[in.coin.Slot].Script)
 	}
 	return txid, st, nil
 }

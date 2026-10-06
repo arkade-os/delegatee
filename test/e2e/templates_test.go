@@ -7,6 +7,7 @@ import (
 
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
+	"github.com/arkade-os/delegatee/internal/config"
 	"github.com/arkade-os/delegatee/pkg/template/packets"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -46,18 +47,16 @@ func TestCounter(t *testing.T) {
 }
 
 func TestVHTLCClaim(t *testing.T) {
-	d := startDelegatee(t)
-	claim := registerTemplate(t, d, "vhtlc_claim.json")
-	trust(t, d, claim)
-	swap := newSwap(t, d)
-
-	w := watch(t, d, claim, swap.variables)
-	alice := fundedWallet(t)
-	funding, err := alice.SendOffChain(t.Context(), []clientlib.Receiver{{To: w.Address, Amount: 10_000}})
-	require.NoError(t, err)
-
-	paid := waitForVtxo(t, d, swap.receiverScript, funding)
+	paid, _ := swapClaim(t, startDelegatee(t), "vhtlc_claim.json")
 	require.EqualValues(t, 10_000, paid.Amount)
+}
+
+// the poll is an hour: only the subscription can wake the scan
+func TestVHTLCClaimIsPrompt(t *testing.T) {
+	d := startDelegatee(t, func(cfg *config.Config) { cfg.PollInterval = time.Hour })
+	paid, took := swapClaim(t, d, "vhtlc_claim.json")
+	require.EqualValues(t, 10_000, paid.Amount)
+	require.Less(t, took, 30*time.Second)
 }
 
 func TestOnchainRelease(t *testing.T) {

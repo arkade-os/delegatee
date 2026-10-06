@@ -180,21 +180,26 @@ type service struct {
 	forfeitPkScript []byte
 	emulatorPubKey  *btcec.PublicKey
 
-	renewing atomic.Int64 // vtxos in the batch session in flight
-	renewed  atomic.Uint64
-	failed   atomic.Uint64
-	started  time.Time
-	// lost on restart: the failure is then reported again
-	lastFailure map[string]string
-	lastPrune   time.Time
+	batch, direct lane
+	renewed       atomic.Uint64
+	failed        atomic.Uint64
+	started       time.Time
+	lastPrune     time.Time
 
-	// the scan and the renewal it starts never run at once: no lock
+	// shared guards what the scan and the lanes both touch
+	shared       sync.Mutex
 	consumed     map[string]time.Time // coins spent by a renewal, until the indexer says so
-	held         map[string]bool      // coins of the daemon's settlements that may still land, as of the scan
 	unsaved      []settlement         // pending offchain txs whose record failed
-	refusedSince map[string]time.Time // pending txs arkd refuses, since the first refusal
 	onchainCache map[string]onchainSnapshot
-	watched      map[int64]*watched // nil for a delegation of another key
+	onchainDrops uint64
+	inFlight     map[int64]bool // delegations a lane is working on
+
+	// the scan alone
+	held         map[string]bool      // coins of the daemon's settlements that may still land, as of the scan
+	refusedSince map[string]time.Time // pending txs arkd refuses, since the first refusal
+	watched      map[int64]*watched   // nil for a delegation of another key
+	sub          *subscription
+	sampled      map[int64]bool // inFlight as the scan began
 
 	// mu guards what the last completed scan saw
 	mu        sync.Mutex
@@ -205,6 +210,7 @@ type service struct {
 	wg      sync.WaitGroup
 	stop    context.CancelFunc
 	stopped chan struct{}
+	wake    chan struct{}
 }
 
 type cosigner struct {
@@ -325,12 +331,13 @@ func NewServiceWithKeys(
 		forfeitPubKey:       forfeitPubKey,
 		forfeitPkScript:     forfeitPkScript,
 		emulatorPubKey:      emuPubKey,
-		lastFailure:         map[string]string{},
 		watched:             map[int64]*watched{},
 		consumed:            consumed,
+		inFlight:            map[int64]bool{},
 		onchainCache:        map[string]onchainSnapshot{},
 		refusedSince:        map[string]time.Time{},
 		started:             time.Now(),
+		wake:                make(chan struct{}, 1),
 	}, nil
 }
 
@@ -381,13 +388,21 @@ func (s *service) Start() {
 		defer timer.Stop()
 		for {
 			s.scan(ctx)
-			timer.Reset(s.nextScanDelay(time.Now()))
+			scanned := time.Now()
+			timer.Reset(s.nextScanDelay(scanned))
 			select {
 			case <-ctx.Done():
-				s.wg.Wait()
-				return
 			case <-timer.C:
+				continue
+			case <-s.wake:
+				select {
+				case <-ctx.Done():
+				case <-time.After(minScanGap - time.Since(scanned)):
+					continue
+				}
 			}
+			s.wg.Wait()
+			return
 		}
 	}()
 }
@@ -425,10 +440,14 @@ func (s *service) RegisterDelegation(
 	if err != nil {
 		return nil, err
 	}
-	return s.create(ctx, domain.Delegation{
+	d, err := s.create(ctx, domain.Delegation{
 		Fingerprint: fingerprint, Address: addr, TemplateID: templateID, Variables: variables,
 		ExpiresAt: expiresAt, DelegatePubKey: s.cosigners[0].pubKey, Slots: slots,
 	}, false)
+	if err == nil && tmpl.Type() != template.Intent {
+		s.wakeScan() // the coin may be there already
+	}
+	return d, err
 }
 
 func (s *service) RenewableAt(ctx context.Context, d *domain.Delegation, vtxos []clientlib.Vtxo) ([]time.Time, error) {
@@ -498,7 +517,7 @@ func (s *service) Status() Status {
 	defer s.mu.Unlock()
 	return Status{
 		LastScan:      s.lastScan,
-		RenewingVtxos: int(s.renewing.Load()),
+		RenewingVtxos: int(s.batch.busy.Load() + s.direct.busy.Load()),
 		PollInterval:  s.pollInterval,
 		Renewed:       s.renewed.Load(),
 		Failed:        s.failed.Load(),
@@ -573,9 +592,6 @@ func (s *service) Health(ctx context.Context) map[string]error {
 
 // scannerHealth fails when scans stopped: a wedged loop looks alive otherwise.
 func (s *service) scannerHealth(now time.Time) error {
-	if s.renewing.Load() > 0 {
-		return nil // scans pause during a batch
-	}
 	s.mu.Lock()
 	last := s.lastScan
 	s.mu.Unlock()
@@ -829,9 +845,7 @@ func (s *service) spendableVtxos(ctx context.Context, scripts []string) (map[str
 
 func (s *service) scan(ctx context.Context) {
 	s.collectUntil = time.Time{}
-	if s.renewing.Load() > 0 {
-		return
-	}
+	s.sampleLanes()
 	now := time.Now()
 	s.prune(ctx, now)
 	if err := s.finishSettlements(ctx); err != nil {
@@ -863,22 +877,25 @@ func (s *service) scan(ctx context.Context) {
 	s.mu.Lock()
 	s.lastScan, s.holdings, s.unwatched = now, holdings, unwatched
 	s.mu.Unlock()
-	if len(inputs) == 0 {
-		return
+	s.syncSubscription(ctx, s.wakeScripts())
+	var batch, direct []renewalInput
+	for _, in := range inputs {
+		if s.laneOf(in) == &s.direct {
+			direct = append(direct, in)
+		} else {
+			batch = append(batch, in)
+		}
 	}
-	s.collectUntil = s.collectionDeadline(inputs, time.Now())
-	if !s.collectUntil.IsZero() {
-		return
-	}
+	// a transaction of its own gains nothing from waiting for others
+	s.dispatch(&s.direct, direct)
 	// one cosigner key means one batch session at a time
-	// Stop waits for it: an abandoned intent stalls arkd rounds
-	s.renewing.Store(int64(len(inputs)))
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		defer s.renewing.Store(0)
-		s.renewAndRecord(context.Background(), inputs)
-	}()
+	if s.batch.wasBusy {
+		return
+	}
+	s.collectUntil = s.collectionDeadline(batch, time.Now())
+	if s.collectUntil.IsZero() {
+		s.dispatch(&s.batch, batch)
+	}
 }
 
 func (s *service) prune(ctx context.Context, now time.Time) {
@@ -922,13 +939,17 @@ func (s *service) renewAndRecord(ctx context.Context, inputs []renewalInput) {
 
 // recordRenewals reports a vtxo failing the same way every poll once.
 func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, results []renewalResult) {
+	l := &s.batch
+	if len(inputs) > 0 {
+		l = s.laneOf(inputs[0])
+	}
 	due := make(map[string]string, len(inputs))
 	for _, in := range inputs {
-		if msg, ok := s.lastFailure[in.coin.Outpoint.String()]; ok {
+		if msg, ok := l.lastFailure[in.coin.Outpoint.String()]; ok {
 			due[in.coin.Outpoint.String()] = msg
 		}
 	}
-	s.lastFailure = due
+	l.lastFailure = due
 
 	type key struct {
 		delegation int64
@@ -944,11 +965,11 @@ func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, res
 		}
 		for _, in := range res.inputs {
 			outpoint := in.coin.Outpoint.String()
-			if errMsg != "" && s.lastFailure[outpoint] == errMsg {
+			if errMsg != "" && l.lastFailure[outpoint] == errMsg {
 				continue
 			}
-			if delete(s.lastFailure, outpoint); errMsg != "" {
-				s.lastFailure[outpoint] = errMsg
+			if delete(l.lastFailure, outpoint); errMsg != "" {
+				l.lastFailure[outpoint] = errMsg
 			}
 			k := key{in.watched.delegation.ID, res.commitmentTxid, errMsg}
 			ren, ok := byDelegation[k]
@@ -967,9 +988,7 @@ func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, res
 		ren := byDelegation[k]
 		logger := log.WithFields(log.Fields{"delegation": ren.DelegationID, "vtxos": ren.Outpoints})
 		if ren.Success {
-			for _, op := range ren.Outpoints {
-				s.consumed[op] = time.Now()
-			}
+			s.consume(ren.Outpoints...)
 			s.renewed.Add(uint64(len(ren.Outpoints)))
 			logger.WithField("commitment_txid", ren.CommitmentTxid).Info("vtxos renewed")
 		} else {

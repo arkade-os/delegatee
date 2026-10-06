@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"maps"
 	"os"
@@ -64,6 +65,10 @@ type fakeRepo struct {
 	getErr            error // returned by GetByID when set
 	settlements       map[[2]string]domain.Settlement
 	artifactErr       error // returned by GetArtifact when set
+	// afterListSettlements runs once, after the next ListSettlements took its rows
+	afterListSettlements func()
+	// afterDeleteSettlement runs once, after the next DeleteSettlement
+	afterDeleteSettlement func()
 }
 
 func (r *fakeRepo) Create(_ context.Context, d domain.Delegation, max int) (*domain.Delegation, error) {
@@ -484,6 +489,12 @@ func (r *fakeRepo) ListSettlements(context.Context) ([]domain.Settlement, error)
 	}
 	out := slices.Collect(maps.Values(r.settlements))
 	slices.SortFunc(out, func(a, b domain.Settlement) int { return a.CreatedAt.Compare(b.CreatedAt) })
+	if hook := r.afterListSettlements; hook != nil {
+		r.afterListSettlements = nil
+		r.mu.Unlock()
+		hook()
+		r.mu.Lock()
+	}
 	return out, nil
 }
 
@@ -494,6 +505,12 @@ func (r *fakeRepo) DeleteSettlement(_ context.Context, txid, spentBy string) err
 		return r.err
 	}
 	delete(r.settlements, [2]string{txid, spentBy})
+	if hook := r.afterDeleteSettlement; hook != nil {
+		r.afterDeleteSettlement = nil
+		r.mu.Unlock()
+		hook()
+		r.mu.Lock()
+	}
 	return nil
 }
 
@@ -657,6 +674,14 @@ type fakeIndexer struct {
 	prevMiss  bool
 	txLookups int
 	known     []clientlib.Vtxo // answers a lookup by outpoint alone, spent coins included
+
+	subscribed    map[string]bool // scripts of the open subscription
+	subscriptions int
+	events        chan clientlib.ScriptEvent
+	endEvents     func()
+	subErr        error
+	updateErr     error
+	opened        [][]string // scripts each NewSubscription received
 }
 
 // GetVtxos serves everything to a scan's first request by scripts.
@@ -684,6 +709,58 @@ func (i *fakeIndexer) serve(vtxos ...clientlib.Vtxo) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.vtxos, i.served, i.calls = vtxos, false, 0
+}
+
+func (i *fakeIndexer) NewSubscription(_ context.Context, scripts []string) (string, <-chan clientlib.ScriptEvent, func(), error) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.subErr != nil {
+		return "", nil, nil, i.subErr
+	}
+	i.subscriptions++
+	i.opened = append(i.opened, slices.Clone(scripts))
+	i.subscribed = map[string]bool{}
+	for _, script := range scripts {
+		i.subscribed[script] = true
+	}
+	events := make(chan clientlib.ScriptEvent, 8)
+	i.events = events
+	i.endEvents = sync.OnceFunc(func() { close(events) })
+	stop := i.endEvents
+	return fmt.Sprintf("sub-%d", i.subscriptions), events, func() {
+		stop()
+		i.mu.Lock()
+		defer i.mu.Unlock()
+		i.subscribed = nil
+	}, nil
+}
+
+func (i *fakeIndexer) UpdateSubscription(_ context.Context, _ string, add, remove []string) error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.updateErr != nil {
+		return i.updateErr
+	}
+	for _, script := range add {
+		i.subscribed[script] = true
+	}
+	for _, script := range remove {
+		delete(i.subscribed, script)
+	}
+	return nil
+}
+
+func (i *fakeIndexer) subscribedScripts() []string {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return slices.Sorted(maps.Keys(i.subscribed))
+}
+
+// closeSubscription ends the stream as arkd going away for good does.
+func (i *fakeIndexer) closeSubscription() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.endEvents()
 }
 
 func (i *fakeIndexer) GetVirtualTxs(_ context.Context, txids []string, _ ...clientlib.PageOption) (*clientlib.VirtualTxsResponse, error) {
@@ -759,6 +836,7 @@ type fakeExplorer struct {
 	feeErr    error
 	tip       ports.ChainTip
 	tipErr    error
+	onUtxos   func() // runs inside GetUtxos
 }
 
 func (e *fakeExplorer) GetTxHex(id string) (string, error) {
@@ -789,6 +867,9 @@ func (e *fakeExplorer) ChainTip() (ports.ChainTip, error) { return e.tip, e.tipE
 func noTip() (ports.ChainTip, error) { return ports.ChainTip{}, errors.New("no explorer") }
 
 func (e *fakeExplorer) GetUtxos(addresses []string) ([]clientlib.ExplorerUtxo, error) {
+	if e.onUtxos != nil {
+		e.onUtxos()
+	}
 	var out []clientlib.ExplorerUtxo
 	for _, a := range addresses {
 		addr, err := address.DecodeAddress(a, &chaincfg.RegressionNetParams)
@@ -1261,6 +1342,41 @@ func (b *fakeBatch) aggregate(nonces tree.TreeNonces) {
 		b.send(clientlib.TreeTxEvent{Id: "b1", BatchIndex: 1, Node: node})
 	}
 	b.send(clientlib.BatchFinalizationEvent{Id: "b1", Tx: b.batch.commitment})
+}
+
+// claimable is claimEnv with an emulator and an arkd that sign.
+func claimable(t *testing.T) (*testEnv, clientlib.Vtxo) {
+	t.Helper()
+	e, server, inputs := claimEnv(t)
+	e.emulator.submitTx = func(tx string, cps []string) (string, []string, error) { return tx, cps, nil }
+	e.ark.submitTx = func(ark string, cps []string) (string, string, []string, error) {
+		ptx, signed := signAs(t, server, ark)
+		_, cp := signAs(t, server, cps[0])
+		return ptx.UnsignedTx.TxHash().String(), signed, []string{cp}, nil
+	}
+	return e, asVtxo(inputs[0].coin)
+}
+
+// laneEndsDuringScan has the batch lane run in and end once the next scan listed the settlements.
+func (e *testEnv) laneEndsDuringScan(in renewalInput, end func()) {
+	e.svc.batch.busy.Store(1)
+	e.svc.setInFlight([]renewalInput{in}, true)
+	e.repo.afterListSettlements = func() {
+		end()
+		e.svc.setInFlight([]renewalInput{in}, false)
+		e.svc.batch.busy.Store(0)
+	}
+}
+
+// openSubscription scans once and drains the wakes of the registration and of the opening.
+func (e *testEnv) openSubscription(t *testing.T) {
+	t.Helper()
+	e.indexer.serve()
+	e.scan(t)
+	require.NotNil(t, e.svc.sub)
+	for len(e.svc.wake) > 0 {
+		<-e.svc.wake
+	}
 }
 
 // ownedRenewal reads its owner from packet 2 of the source and advertises itself: a successor chain, unlike the renewal watch.

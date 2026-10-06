@@ -500,12 +500,12 @@ func TestScanFailures(t *testing.T) {
 	env.svc.scan(t.Context())
 	require.True(t, env.svc.Status().LastScan.IsZero())
 
-	// a batch in flight pauses scanning
+	// scans run beside a batch in flight
 	env.indexer.err = nil
-	env.svc.renewing.Store(1)
+	env.svc.batch.busy.Store(1)
 	calls := env.indexer.calls
 	env.svc.scan(t.Context())
-	require.Equal(t, calls, env.indexer.calls)
+	require.Greater(t, env.indexer.calls, calls)
 	require.Equal(t, 1, env.svc.Status().RenewingVtxos)
 }
 
@@ -555,8 +555,8 @@ func TestRenewalFailuresAreRecordedOnce(t *testing.T) {
 	next := env.coin(t, env.userKey.PubKey(), 1000, time.Minute)
 	env.advertised(t, next)
 	scan(next)
-	require.NotContains(t, env.svc.lastFailure, due.Outpoint.String())
-	require.Contains(t, env.svc.lastFailure, next.Outpoint.String())
+	require.NotContains(t, env.svc.batch.lastFailure, due.Outpoint.String())
+	require.Contains(t, env.svc.batch.lastFailure, next.Outpoint.String())
 
 	renewals, err := env.svc.ListRenewals(t.Context(), d)
 	require.NoError(t, err)
@@ -639,9 +639,6 @@ func TestLateAndScannerHealth(t *testing.T) {
 	// the scanner is healthy right after start, then stale
 	require.NoError(t, env.svc.scannerHealth(now))
 	require.Error(t, env.svc.scannerHealth(now.Add(4*time.Hour)))
-	env.svc.renewing.Store(1)
-	require.NoError(t, env.svc.scannerHealth(now.Add(4*time.Hour)), "a batch in flight pauses scans")
-	env.svc.renewing.Store(0)
 	require.NoError(t, env.svc.Health(t.Context())["scanner"], "just scanned")
 	n, err := env.svc.CountActive(t.Context())
 	require.NoError(t, err)
@@ -788,6 +785,14 @@ func TestSecretsNeedATrustedTemplate(t *testing.T) {
 	require.NoError(t, e.svc.SetTemplateTrusted(t.Context(), tmpl.ID, false))
 	_, _, err = e.svc.instantiate(t.Context(), d)
 	require.ErrorIs(t, err, ErrSecretsRequired, "nor renews once distrusted")
+}
+
+func TestSecretTemplateRegistersWithoutAKey(t *testing.T) {
+	e := newTestEnv(t)
+	id := e.trust(t, e.fixture(t, "vhtlc_claim.json"))
+	secrets, _ := hexKey(t)
+	_, err := e.svc.RegisterDelegation(t.Context(), id, claimVars(t, secrets.PubKey()), nil)
+	require.ErrorIs(t, err, ErrSecretsRequired)
 }
 
 func TestNewInstance(t *testing.T) {
