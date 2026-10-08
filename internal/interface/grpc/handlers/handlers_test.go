@@ -174,6 +174,9 @@ func TestAdminHandlers(t *testing.T) {
 	require.Equal(t, uint64(9000), mine.GetTotalAmount())
 	require.Equal(t, t0.Add(time.Hour).Unix(), mine.GetNextExpiry())
 	require.Equal(t, t0.Unix(), mine.GetNextRenewalAt())
+	require.Equal(t, t0.Add(30*time.Minute).Unix(), mine.GetNextDeadline())
+	require.Equal(t, t0.Add(20*time.Minute).Unix(), mine.GetNextBatchAt())
+	require.True(t, mine.GetRenewing())
 	require.Equal(t, "cc", mine.GetLastRenewal().GetCommitmentTxid())
 	require.False(t, other.GetManaged(), "not seen by the scanner")
 	require.Equal(t, "template disabled", other.GetUnmanagedReason())
@@ -186,7 +189,18 @@ func TestAdminHandlers(t *testing.T) {
 	require.Equal(t, t0.Unix(), st.GetLastScanAt())
 	require.Equal(t, int32(2), st.GetRenewingVtxos())
 	require.Equal(t, int64(60), st.GetPollInterval())
+	require.Equal(t, int64(6*3600), st.GetRenewalReserve())
+	require.Equal(t, int64(600), st.GetBoardingMaxWait())
+	require.Len(t, st.GetBatches(), 2)
+	require.Equal(t, t0.Add(5*time.Minute).Unix(), st.GetBatches()[0].GetAt())
+	require.Equal(t, int64(9), st.GetBatches()[0].GetForcedByDelegationId())
+	require.Equal(t, "ab:1", st.GetBatches()[1].GetForcedByOutpoint())
+	require.Equal(t, uint64(9000), st.GetBatches()[1].GetTotalAmount())
 	require.Equal(t, "200.0", st.GetIntentFees().GetOffchainInput())
+
+	byID, err := h.GetDelegationById(ctx, &delegateev1.GetDelegationByIdRequest{Id: 7})
+	require.NoError(t, err)
+	require.Equal(t, map[string]int64{"ab:1": t0.Add(20 * time.Minute).Unix()}, byID.GetBatchAt(), "the planned coins of this delegation only")
 	// arkd down: the status still answers, without fees
 	svc.feesErr = errBoom
 	st, err = h.GetStatus(ctx, &delegateev1.GetStatusRequest{})
@@ -390,8 +404,18 @@ func (f *fakeService) LastRenewals(context.Context) (map[int64]domain.Renewal, e
 func (f *fakeService) Status() application.Status {
 	return application.Status{
 		LastScan: t0, RenewingVtxos: 2, PollInterval: time.Minute,
-		Holdings:  map[int64]application.Holdings{7: {Vtxos: 2, Amount: 9000, NextExpiry: t0.Add(time.Hour), NextDue: t0}},
+		Holdings: map[int64]application.Holdings{
+			7: {Vtxos: 2, Amount: 9000, NextExpiry: t0.Add(time.Hour), NextDue: t0, NextDeadline: t0.Add(30 * time.Minute), NextBatchAt: t0.Add(20 * time.Minute), Renewing: true},
+			9: {Vtxos: 1, Amount: 100, NextDue: t0, NextBatchAt: t0.Add(5 * time.Minute)}, // boarding: no expiry
+		},
 		Unwatched: map[int64]string{8: "template disabled"},
+		Batches: []application.PlannedBatch{
+			{At: t0.Add(5 * time.Minute), Vtxos: 1, Amount: 100, Delegations: 1, ForcedBy: "dd:0", ForcedByDelegation: 9},
+			{At: t0.Add(20 * time.Minute), Vtxos: 2, Amount: 9000, Delegations: 1, ForcedBy: "ab:1", ForcedByDelegation: 7},
+		},
+		BatchAt:         map[string]time.Time{"ab:1": t0.Add(20 * time.Minute), "dd:0": t0.Add(5 * time.Minute)},
+		Reserve:         6 * time.Hour,
+		BoardingMaxWait: 10 * time.Minute,
 	}
 }
 func (f *fakeService) IntentFees(context.Context) (arkfee.Config, error) {

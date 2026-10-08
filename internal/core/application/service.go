@@ -2,6 +2,7 @@
 package application
 
 import (
+	"cmp"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -64,11 +65,14 @@ type Info struct {
 }
 
 type Holdings struct {
-	Vtxos      int
-	Amount     uint64
-	NextExpiry time.Time // zero without vtxos
-	NextDue    time.Time
-	// Late counts vtxos in the last quarter between renewable and expiry.
+	Vtxos        int
+	Amount       uint64
+	NextExpiry   time.Time // zero without vtxos
+	NextDue      time.Time
+	NextDeadline time.Time // of the soonest coin; zero without a plan entry
+	NextBatchAt  time.Time // the batch its soonest coin joins; zero without a plan entry
+	Renewing     bool      // a lane holds it
+	// Late counts coins a session's worth of time past their batch time and still here.
 	Late       int
 	LateAmount uint64
 }
@@ -83,6 +87,11 @@ type Status struct {
 	Holdings        map[int64]Holdings
 	// Unwatched is why an active delegation is missing from Holdings, by id.
 	Unwatched map[int64]string
+	// the batch lane's forecast as of the last scan; BatchAt is shared, never written after publication
+	Batches         []PlannedBatch
+	BatchAt         map[string]time.Time
+	Reserve         time.Duration
+	BoardingMaxWait time.Duration
 }
 
 type Service interface {
@@ -169,7 +178,8 @@ type service struct {
 	cosigners           []*cosigner
 	pollInterval        time.Duration
 	renewalTimeout      time.Duration
-	collectionWindow    time.Duration
+	renewalReserve      time.Duration
+	boardingMaxWait     time.Duration
 	collectUntil        time.Time
 	limits              Limits
 	registerMu          sync.Mutex
@@ -192,10 +202,13 @@ type service struct {
 	unsaved      []settlement         // pending offchain txs whose record failed
 	onchainCache map[string]onchainSnapshot
 	onchainDrops uint64
-	inFlight     map[int64]bool // delegations a lane is working on
+	inFlight     map[int64]bool       // delegations a lane is working on
+	quarantined  map[string]time.Time // coins of an intent that sank a batch, kept out until then
 
 	// the scan alone
 	held         map[string]bool      // coins of the daemon's settlements that may still land, as of the scan
+	entries      []planEntry          // the batch lane's future intents, as the scan found them
+	plan         *plan                // published under mu
 	refusedSince map[string]time.Time // pending txs arkd refuses, since the first refusal
 	watched      map[int64]*watched   // nil for a delegation of another key
 	sub          *subscription
@@ -245,7 +258,7 @@ func NewServiceWithKeys(
 	maxOnchainFeeRate float64,
 	encryptionKeys []*btcec.PrivateKey,
 	keys []*btcec.PrivateKey,
-	pollInterval, renewalTimeout, collectionWindow time.Duration,
+	pollInterval, renewalTimeout, renewalReserve, boardingMaxWait time.Duration,
 	limits Limits,
 ) (Service, error) {
 	if onchainPollInterval <= 0 {
@@ -255,11 +268,15 @@ func NewServiceWithKeys(
 	if err != nil {
 		return nil, err
 	}
-	if collectionWindow < 0 {
-		return nil, fmt.Errorf("collection window must not be negative")
-	}
 	if pollInterval <= 0 || renewalTimeout <= 0 {
 		return nil, fmt.Errorf("poll interval and renewal timeout must be positive")
+	}
+	// a session that times out and a retry session: a lane that ends wakes the scan, no poll in between
+	if renewalReserve < 2*renewalTimeout {
+		return nil, fmt.Errorf("renewal reserve must be at least twice the renewal timeout (%s)", 2*renewalTimeout)
+	}
+	if boardingMaxWait < 0 {
+		return nil, fmt.Errorf("boarding max wait must not be negative")
 	}
 	if err := limits.validate(); err != nil {
 		return nil, err
@@ -324,7 +341,8 @@ func NewServiceWithKeys(
 		cosigners:           cosigners,
 		pollInterval:        pollInterval,
 		renewalTimeout:      renewalTimeout,
-		collectionWindow:    collectionWindow,
+		renewalReserve:      renewalReserve,
+		boardingMaxWait:     boardingMaxWait,
 		limits:              limits,
 		network:             network,
 		serverPubKey:        serverPubKey,
@@ -334,6 +352,8 @@ func NewServiceWithKeys(
 		watched:             map[int64]*watched{},
 		consumed:            consumed,
 		inFlight:            map[int64]bool{},
+		quarantined:         map[string]time.Time{},
+		plan:                &plan{},
 		onchainCache:        map[string]onchainSnapshot{},
 		refusedSince:        map[string]time.Time{},
 		started:             time.Now(),
@@ -516,13 +536,17 @@ func (s *service) Status() Status {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return Status{
-		LastScan:      s.lastScan,
-		RenewingVtxos: int(s.batch.busy.Load() + s.direct.busy.Load()),
-		PollInterval:  s.pollInterval,
-		Renewed:       s.renewed.Load(),
-		Failed:        s.failed.Load(),
-		Holdings:      maps.Clone(s.holdings),
-		Unwatched:     maps.Clone(s.unwatched),
+		LastScan:        s.lastScan,
+		RenewingVtxos:   int(s.batch.busy.Load() + s.direct.busy.Load()),
+		PollInterval:    s.pollInterval,
+		Renewed:         s.renewed.Load(),
+		Failed:          s.failed.Load(),
+		Holdings:        maps.Clone(s.holdings),
+		Unwatched:       maps.Clone(s.unwatched),
+		Batches:         s.plan.batches,
+		BatchAt:         s.plan.batchAt,
+		Reserve:         s.renewalReserve,
+		BoardingMaxWait: s.boardingMaxWait,
 	}
 }
 
@@ -867,22 +891,13 @@ func (s *service) scan(ctx context.Context) {
 		log.WithError(err).Error("discover coins")
 		return
 	}
-	var lateVtxos int
-	for _, h := range holdings {
-		lateVtxos += h.Late
-	}
-	if lateVtxos > 0 {
-		log.WithField("count", lateVtxos).Warn("late vtxos: arkd rounds may be stalled")
-	}
-	s.mu.Lock()
-	s.lastScan, s.holdings, s.unwatched = now, holdings, unwatched
-	s.mu.Unlock()
+	p := s.planBatches(s.entries, now)
 	s.syncSubscription(ctx, s.wakeScripts())
 	var batch, direct []renewalInput
 	for _, in := range inputs {
 		if s.laneOf(in) == &s.direct {
 			direct = append(direct, in)
-		} else {
+		} else if !s.isQuarantined(in.coin.Outpoint.String(), now) {
 			batch = append(batch, in)
 		}
 	}
@@ -890,11 +905,53 @@ func (s *service) scan(ctx context.Context) {
 	s.dispatch(&s.direct, direct)
 	// one cosigner key means one batch session at a time: nothing to collect for while one runs
 	if !s.batch.wasBusy {
-		s.collectUntil = s.collectionDeadline(batch, time.Now())
+		s.collectUntil = p.submitAt(time.Now())
 	}
 	if s.collectUntil.IsZero() {
 		s.dispatch(&s.batch, batch)
 	}
+	lateVtxos := s.countLate(holdings, p, now)
+	if lateVtxos > 0 {
+		log.WithField("count", lateVtxos).Warn("late vtxos: arkd rounds may be stalled")
+	}
+	s.mu.Lock()
+	s.lastScan, s.holdings, s.unwatched, s.plan = now, holdings, unwatched, p
+	s.mu.Unlock()
+}
+
+// countLate marks the coins a session's worth of time past their batch time, and returns how many.
+// A delegation in flight has no plan entry: its coins are late a session past its deadline, or its due when boarding.
+func (s *service) countLate(holdings map[int64]Holdings, p *plan, now time.Time) int {
+	s.shared.Lock()
+	inFlight := maps.Clone(s.inFlight)
+	s.shared.Unlock()
+	latest := now.Add(-s.renewalTimeout)
+	n := 0
+	for id, h := range holdings {
+		if h.Renewing = inFlight[id]; h.Renewing && cmp.Or(h.NextDeadline, h.NextDue).Before(latest) {
+			h.Late, h.LateAmount = h.Vtxos, h.Amount
+			n += h.Vtxos
+		}
+		holdings[id] = h
+	}
+	for _, e := range s.entries {
+		// planned before this scan's dispatch took it: counted above
+		if inFlight[e.delegation] {
+			continue
+		}
+		h := holdings[e.delegation]
+		at := p.batchAt[e.outpoints[0]]
+		if h.NextBatchAt.IsZero() || at.Before(h.NextBatchAt) {
+			h.NextBatchAt = at
+		}
+		if at.Before(latest) {
+			h.Late += len(e.outpoints)
+			h.LateAmount += e.amount
+			n += len(e.outpoints)
+		}
+		holdings[e.delegation] = h
+	}
+	return n
 }
 
 func (s *service) prune(ctx context.Context, now time.Time) {
@@ -949,6 +1006,11 @@ func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, res
 		}
 	}
 	l.lastFailure = due
+	for _, res := range results {
+		if res.blamed {
+			s.quarantine(res.inputs)
+		}
+	}
 
 	type key struct {
 		delegation int64
@@ -1046,12 +1108,6 @@ func templateOutcomes(results []renewalResult) map[string]tally {
 		}
 	}
 	return out
-}
-
-// late means less than a quarter of the time between renewable and expiry is left, or none: a locktime past expiry.
-func late(expiry, due, now time.Time) bool {
-	room := expiry.Sub(due)
-	return !expiry.IsZero() && room != 0 && (room < 0 || expiry.Sub(now) < room/4)
 }
 
 // outpoints is nil for a watch

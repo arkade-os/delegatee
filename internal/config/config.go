@@ -54,8 +54,9 @@ type Config struct {
 
 	PollInterval        time.Duration
 	OnchainPollInterval time.Duration
-	CollectionWindow    time.Duration // maximum extra wait from renewal eligibility; zero disables
 	RenewalTimeout      time.Duration // must cover the gap between two arkd sessions
+	RenewalReserve      time.Duration // the batch lane submits at the latest this long before a vtxo expires
+	BoardingMaxWait     time.Duration // how long a confirmed deposit waits for a renewal batch; zero never waits
 	MinWatchExpiry      time.Duration // how far ahead a watch's expires_at must be; zero disables
 
 	MaxOnchainFeeRate float64 // sat/vB cap on the explorer's fee rate for onchain templates
@@ -103,11 +104,14 @@ func LoadConfig() (*Config, error) {
 	if cfg.RenewalTimeout, err = envPositive("RENEWAL_TIMEOUT", 2*time.Hour); err != nil {
 		return nil, err
 	}
-	if cfg.CollectionWindow, err = envDuration("COLLECTION_WINDOW", 30*time.Second); err != nil {
+	if cfg.RenewalReserve, err = envPositive("RENEWAL_RESERVE", 6*time.Hour); err != nil {
 		return nil, err
 	}
-	if cfg.CollectionWindow < 0 {
-		return nil, fmt.Errorf("%sCOLLECTION_WINDOW must not be negative", envPrefix)
+	if cfg.BoardingMaxWait, err = envDuration("BOARDING_MAX_WAIT", 10*time.Minute); err != nil {
+		return nil, err
+	}
+	if cfg.BoardingMaxWait < 0 {
+		return nil, fmt.Errorf("%sBOARDING_MAX_WAIT must not be negative", envPrefix)
 	}
 	if cfg.MinWatchExpiry, err = envDuration("MIN_WATCH_EXPIRY", 24*time.Hour); err != nil {
 		return nil, err
@@ -220,7 +224,7 @@ func (c *Config) AppService(ctx context.Context) (_ application.Service, err err
 	}
 	svc, err := application.NewServiceWithKeys(
 		ctx, repo, ark, indexerSvc, emulatorclient.NewGRPCClient(emuConn), explorerSvc, c.OnchainPollInterval, c.MaxOnchainFeeRate, c.EncryptionKeys,
-		c.DelegateKeys, c.PollInterval, c.RenewalTimeout, c.CollectionWindow,
+		c.DelegateKeys, c.PollInterval, c.RenewalTimeout, c.RenewalReserve, c.BoardingMaxWait,
 		application.Limits{
 			MinWatchExpiry: c.MinWatchExpiry, MaxDelegations: c.MaxDelegations, MaxTemplates: c.MaxTemplates, MaxArtifacts: c.MaxArtifacts,
 			MaxDocumentBytes: c.MaxDocumentBytes, TemplateMaxFailures: c.TemplateMaxFailures,

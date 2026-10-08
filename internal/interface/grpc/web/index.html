@@ -93,10 +93,10 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 #rows li button[aria-current=true] { background: var(--current); box-shadow: inset 3px 0 0 var(--accent); }
 #rows li button:focus-visible { outline-offset: -2px; }
 .dot { width: .55rem; height: .55rem; border-radius: 50%; align-self: center; background: var(--line); }
-.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); } .dot.late { background: var(--window); } .dot.off { background: none; border: 1px solid var(--faint); }
+.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); } .dot.late { background: var(--bad); } .dot.renewing { background: var(--window); } .dot.off { background: none; border: 1px solid var(--faint); }
 #rows .when, #rows .sub { color: var(--muted); font-size: .8rem; white-space: nowrap; }
 #rows .sub { grid-column: 2 / 4; overflow: hidden; text-overflow: ellipsis; }
-#rows .sub.bad { color: var(--bad); } #rows .sub.late { color: var(--window); }
+#rows .sub.bad, #rows .sub.late { color: var(--bad); } #rows .sub.renewing { color: var(--window); }
 .empty { padding: 1.25rem 1rem; color: var(--muted); max-width: 36rem; line-height: 1.55; }
 #hint { padding: .45rem .9rem; border-top: 1px solid var(--line); color: var(--faint); font-size: .78rem; }
 
@@ -129,7 +129,8 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 .badge::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--faint); }
 .badge.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; } .badge.ok::before { background: var(--ok); }
 .badge.bad { color: var(--bad); background: var(--bad-soft); border-color: transparent; } .badge.bad::before { background: var(--bad); }
-.badge.late { color: var(--window); background: var(--window-a); border-color: transparent; } .badge.late::before { background: var(--window); }
+.badge.late { color: var(--bad); background: var(--bad-soft); border-color: transparent; } .badge.late::before { background: var(--bad); }
+.badge.renewing { color: var(--window); background: var(--window-a); border-color: transparent; } .badge.renewing::before { background: var(--window); }
 .note { border-left: 3px solid var(--bad); padding: .6rem .9rem; margin: 1rem 0 0; background: var(--bad-soft); border-radius: 0 var(--r) var(--r) 0; max-width: 46rem; }
 .paths { list-style: none; margin: 0; padding: 0; max-width: 46rem; }
 .paths li { display: flex; justify-content: space-between; gap: 1rem; padding: .5rem 0; border-bottom: 1px solid var(--line); } .paths li:last-child { border-bottom: 0; }
@@ -143,23 +144,30 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 .life .elapsed { position: absolute; inset: 0 auto 0 0; background: var(--elapsed); z-index: 1; border-radius: 4px 0 0 4px; }
 .life .window { position: absolute; inset: 0 0 0 auto; background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); border-radius: 0 4px 4px 0; }
 .life .now { position: absolute; z-index: 2; top: -3px; bottom: -3px; width: 2px; background: var(--ink); border-radius: 1px; }
+.life .reserve, .horizon .lane .reserve, .legend i.r { background: repeating-linear-gradient(45deg, var(--bad-soft) 0 4px, var(--track) 4px 8px); border-left: 2px solid var(--bad); }
+.life .reserve { position: absolute; inset: 0 0 0 auto; z-index: 1; border-radius: 0 4px 4px 0; }
+.life .batch, .horizon .lane .batch, .legend i.b { position: absolute; z-index: 3; top: 50%; width: .7rem; height: .7rem; margin: -.35rem 0 0 -.35rem; border-radius: 50%; background: var(--ink); border: 2px solid var(--surface); box-sizing: border-box; }
+.legend i.b { position: static; display: inline-block; margin: 0 .35rem 0 .2rem; vertical-align: middle; }
 .state { font-size: .82rem; color: var(--muted); }
-.state.in { color: var(--window); font-weight: 600; } .state.late { color: var(--bad); font-weight: 600; }
+.state.in, .state.renewing { color: var(--window); font-weight: 600; } .state.late { color: var(--bad); font-weight: 600; }
 
 /* overview: every address on one time axis */
 .horizon { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto; gap: .5rem 1rem; align-items: center; font-size: .86rem; }
 .horizon button { all: unset; font: .86em var(--mono); cursor: pointer; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 2px; }
 .horizon button:hover { color: var(--ink); text-decoration: underline; }
 .horizon button:focus-visible { outline: 2px solid var(--accent); }
-.horizon .lane { display: flex; height: .8rem; background: var(--track); border-radius: 4px; overflow: hidden; }
+.horizon .lane { position: relative; display: flex; height: .8rem; background: var(--track); border-radius: 4px; }
+.horizon .lane .left, .horizon .lane .window, .horizon .lane .reserve { height: 100%; }
+.horizon .lane .left { border-radius: 4px 0 0 4px; } .horizon .lane .reserve { border-radius: 0 4px 4px 0; }
 .horizon .lane .left { background: var(--elapsed); }
 .horizon .lane .window { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
 .horizon .lane.late { background: var(--bad-soft); box-shadow: inset 3px 0 0 var(--bad); }
-.horizon .lane .window, .life .window { min-width: 3px; }
+.horizon .lane .window, .life .window, .horizon .lane .reserve, .life .reserve { min-width: 3px; }
 .horizon .axis { position: relative; height: 1.4rem; border-top: 1px solid var(--line); margin-top: .1rem; font-size: .74rem; color: var(--faint); }
 .horizon .axis i { position: absolute; top: 0; padding: .2rem 0 0 .3rem; border-left: 1px solid var(--line); font-style: normal; white-space: nowrap; }
 .horizon .t { color: var(--muted); white-space: nowrap; text-align: right; }
-.horizon .t.in { color: var(--window); font-weight: 600; } .horizon .t.late { color: var(--bad); font-weight: 600; }
+.horizon .t.in, .horizon .t.renewing { color: var(--window); font-weight: 600; } .horizon .t.late { color: var(--bad); font-weight: 600; }
+.plan td.n { white-space: nowrap; }
 .legend { display: flex; flex-wrap: wrap; gap: .3rem 1.25rem; margin: .75rem 0 0; color: var(--muted); font-size: .8rem; }
 .legend i { display: inline-block; width: 1.1rem; height: .55rem; border-radius: 2px; vertical-align: middle; margin-right: .35rem; background: var(--elapsed); }
 .legend i.w { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
@@ -279,12 +287,14 @@ function stateOf(d) {
   if (d.delegation.status !== "active") return { key: "off", dot: "off", text: d.delegation.status === "cancelled" ? "stopped" : d.delegation.status };
   if (d.unmanagedReason)
     return { key: "bad", dot: "bad", skipped: true, text: d.unmanagedReason, why: "The scanner skips it: " + d.unmanagedReason + "." };
+  if (d.renewing) return { key: "ok", dot: "renewing", text: "in a batch now", why: "A batch session holds its coins; the result shows up when it ends." };
   if (r && !r.success) return { key: "bad", dot: "bad", text: "failed " + ago(r.attemptedAt), why: r.error };
-  // late: three quarters of the way from "renewable" to "expired" and still there
-  const left = num(d.nextExpiry) - nowSecs(), room = num(d.nextExpiry) - num(d.nextRenewalAt);
-  if (num(d.nextExpiry) && left < room / 4)
-    return { key: "late", dot: "late", text: left <= 0 ? "expired" : "expires " + ago(d.nextExpiry),
-      why: left <= 0 ? "A VTXO expired without being renewed." : "Renewable for a while and not renewed yet. Check that arkd rounds are running." };
+  // overdue: its planned batch time passed and it is still here
+  const left = num(d.nextExpiry) - nowSecs(), at = num(d.nextBatchAt), overdue = at ? nowSecs() - at : 0;
+  if (num(d.nextExpiry) && left <= 0)
+    return { key: "late", dot: "late", text: "expired " + ago(d.nextExpiry), why: "A VTXO expired without being renewed." };
+  if (overdue > 0)
+    return { key: "late", dot: "late", text: "overdue by " + span(overdue), why: "Past its deadline and not renewed: check that arkd rounds are running." };
   if (!r) return { key: "ok", dot: "", text: "not " + done + " yet" };
   return { key: "ok", dot: "ok", text: done + " " + ago(r.attemptedAt) };
 }
@@ -396,11 +406,12 @@ function renderStatus() {
   const stale = !busy && last > 0 && nowSecs() - last > Math.max(3 * poll, 30);
   const active = delegations.filter((d) => d.delegation.status === "active" && d.managed);
   const total = active.reduce((a, d) => a + num(d.totalAmount), 0), vtxos = active.reduce((a, d) => a + num(d.vtxoCount), 0);
-  const fees = status.intentFees, charged = fees && Object.values(fees).some(charges);
+  const fees = status.intentFees, charged = fees && Object.values(fees).some(charges), next = (status.batches || [])[0];
   $("status").innerHTML = [
     busy ? `<span class="busy"><i class="pulse"></i>Renewing <b>${status.renewingVtxos}</b> VTXO${status.renewingVtxos > 1 ? "s" : ""} in a batch now, scans resume after</span>`
-      : !last ? `<span>First scan pending</span>`
-      : `<span class="${stale ? "warn" : ""}">Scanned <b>${ago(last)}</b>, ${stale ? `expected every ${span(poll)}: check the logs` : `every ${span(poll)}`}</span>`,
+      : next ? `<span>Next batch <b>${num(next.at) <= nowSecs() ? "now" : ago(next.at)}</b>: <b class="n">${next.vtxoCount}</b> VTXO${next.vtxoCount > 1 ? "s" : ""} at <b class="n">${next.delegationCount}</b> address${next.delegationCount > 1 ? "es" : ""}, <b class="n">${sats(next.totalAmount)}</b></span>`
+      : !last ? `<span>First scan pending</span>` : `<span>No batch planned</span>`,
+    !last ? "" : `<span class="${stale ? "warn" : ""}">Scanned <b>${ago(last)}</b>, ${stale ? `expected every ${span(poll)}: check the logs` : `every ${span(poll)}`}</span>`,
     `<span>Watching <b class="n">${sats(total)}</b> in <b class="n">${vtxos}</b> VTXO${vtxos === 1 ? "" : "s"} at <b class="n">${active.length}</b> address${active.length === 1 ? "" : "es"}</span>`,
     !fees ? `<span class="warn">arkd fees unknown, arkd is unreachable</span>`
       : `<span>arkd ${charged ? `<b>charges intent fees</b>, <button class="link" id="see-fees">see them</button>` : "charges no intent fee"}</span>`,
@@ -452,17 +463,35 @@ function renderOverview() {
   // log axis: a linear one would hide the near end
   const far = Math.max(...shown.map((d) => num(d.nextExpiry) - now), 2 * AXIS_UNIT);
   const pct = (x) => Math.log1p(Math.max(0, x) / AXIS_UNIT) / Math.log1p(far / AXIS_UNIT) * 100;
+  const batches = status?.batches || [], reserve = num(status?.renewalReserve), wait = num(status?.boardingMaxWait);
+  const forcing = (at) => batches.find((b) => num(b.at) === at);
   const lanes = shown.map((d) => {
     const address = d.delegation.address;
     const left = num(d.nextExpiry) - now, win = num(d.nextExpiry) - num(d.nextRenewalAt), st = stateOf(d);
-    const cls = left <= 0 || st.key !== "ok" ? "late" : left <= win ? "in" : "";
+    // the reserve starts at the deadline: the window's end when it is shorter than the reserve
+    const deadline = Math.max(num(d.nextDeadline) - now, left - win), at = num(d.nextBatchAt), joins = at ? Math.max(at - now, 0) : null;
+    const cls = left <= 0 || st.key !== "ok" ? "late" : st.dot === "renewing" ? "renewing" : left <= win ? "in" : "";
+    const text = left <= 0 ? "expired " + ago(d.nextExpiry) : st.key === "bad" ? "not renewing, " + span(left) + " left"
+      : st.dot === "renewing" ? "in the batch now" : st.key === "late" ? st.text
+      : joins === null ? (left <= win ? "renewable now, not planned yet" : "renewable " + ago(d.nextRenewalAt))
+      : `${left <= win ? "renewable now" : "renewable " + ago(d.nextRenewalAt)}, joins the batch ${joins ? ago(at) : "now"}${deadline - joins > 60 ? `, ${span(deadline - joins)} before its deadline` : ""}`;
+    const forced = at && forcing(Math.max(at, Math.floor(now)))?.forcedByOutpoint;
     return `<button data-address="${esc("id/" + d.delegation.id)}" class="hash" title="${esc(address)}">${esc(address ? short(address, 8) : "#" + d.delegation.id)}</button>
-      <div class="lane ${left <= 0 ? "late" : ""}" role="img" aria-label="expires ${ago(d.nextExpiry)}">
-        <div class="left" style="width:${pct(left - win)}%"></div><div class="window" style="width:${pct(left) - pct(left - win)}%"></div></div>
-      <span class="t n ${cls}">${left <= 0 ? "expired " + ago(d.nextExpiry) : st.key === "bad" ? "not renewing, " + span(left) + " left" : left <= win ? "renewable now, " + span(left) + " left" : "renewable " + ago(d.nextRenewalAt)}</span>`;
+      <div class="lane ${left <= 0 ? "late" : ""}" role="img" aria-label="${esc(text)}, expires ${ago(d.nextExpiry)}" title="${forced ? esc("batch forced by " + short(forced, 8)) : ""}">
+        <div class="left" style="width:${pct(left - win)}%"></div><div class="window" style="width:${pct(deadline) - pct(left - win)}%"></div><div class="reserve" style="width:${pct(left) - pct(deadline)}%"></div>
+        ${joins === null || st.dot === "renewing" ? "" : `<i class="batch" style="left:${pct(joins)}%"></i>`}</div>
+      <span class="t n ${cls}">${text}</span>`;
   }).join("");
   const ticks = [3600, 6 * 3600, 86400, 3 * 86400, 7 * 86400, 14 * 86400, 30 * 86400, 90 * 86400].filter((t) => t < far * 0.85);
   const axis = `<span></span><div class="axis"><i style="left:0">now</i>${ticks.map((t) => `<i style="left:${pct(t)}%">${span(t)}</i>`).join("")}</div><span></span>`;
+  const byId = Object.fromEntries(delegations.map((d) => [num(d.delegation.id), d]));
+  const planRows = batches.map((b) => {
+    const at = num(b.at), d = byId[num(b.forcedByDelegationId)], expiry = d ? num(d.nextExpiry) : 0;
+    const why = expiry > at ? `, ${span(expiry - at)} before it expires` : expiry ? "" : ", a deposit";
+    return `<tr><td class="n">${at <= now ? "now" : ago(b.at)}</td>
+      <td class="n">${b.vtxoCount} VTXO${b.vtxoCount > 1 ? "s" : ""} at ${b.delegationCount} address${b.delegationCount > 1 ? "es" : ""}, ${sats(b.totalAmount)}</td>
+      <td>forced by <button class="link hash" data-address="${esc("id/" + b.forcedByDelegationId)}" title="${esc(b.forcedByOutpoint)}">${esc(short(b.forcedByOutpoint, 8))}</button>${why}</td></tr>`;
+  }).join("");
 
   const f = status?.intentFees, rows = f && [["each VTXO renewed", f.offchainInput], ["each output created", f.offchainOutput]].filter((r) => charges(r[1]));
   const strangers = delegations.filter((d) => d.unmanagedReason === "registered under another key").length;
@@ -470,9 +499,13 @@ function renderOverview() {
   $("detail").innerHTML = `
     <h2>Overview</h2>
     ${strangers ? `<p class="note"><b>${strangers}</b> active delegation${strangers > 1 ? "s were" : " was"} registered under another delegate key and cannot be renewed by this instance. If the key was rotated by mistake, restore the previous key in the configured keyring.</p>` : ""}
+    <h3>Planned batches</h3>
+    <p>A batch is submitted at the latest <b>${span(reserve)}</b> before its first VTXO expires, or as soon as a VTXO is renewable when its window is shorter, so that every VTXO renewable by then renews with it. Deposits wait at most <b>${span(wait)}</b> for a batch.</p>
+    ${planRows ? `<div class="scroll"><table class="plan"><thead><tr><th>When</th><th>Carries</th><th>Why then</th></tr></thead><tbody>${planRows}</tbody></table></div>`
+      : `<p class="empty">No batch planned: nothing renewable is in sight.</p>`}
     <h3>Next to expire</h3>
-    <p>Each bar runs from now to the address's earliest expiry. The hatched end is when it can be renewed; a bar that is all hatch is renewable now.</p>
-    ${shown.length ? `<div class="horizon">${lanes}${axis}</div><p class="legend"><span><i></i>waiting</span><span><i class="w"></i>renewal window</span></p>${held.length > shown.length ? `<p class="state">and ${held.length - shown.length} more, later</p>` : ""}`
+    <p>Each bar runs from now to the address's earliest expiry. The hatched part is when it can be renewed, the red end is the reserve the daemon never submits in, and the dot is the batch it joins.</p>
+    ${shown.length ? `<div class="horizon">${lanes}${axis}</div><p class="legend"><span><i></i>waiting</span><span><i class="w"></i>renewable</span><span><i class="r"></i>reserve</span><span><i class="b"></i>planned batch</span></p>${held.length > shown.length ? `<p class="state">and ${held.length - shown.length} more, later</p>` : ""}`
       : `<p class="empty">No VTXO is being watched yet. They show up here after the next scan once coins sit at a registered address.</p>`}
     <h3>What arkd charges</h3>
     ${!f ? `<p>Unknown: arkd is unreachable.</p>`
@@ -525,18 +558,27 @@ async function loadDetail() {
   renderDetail();
 }
 
-function lifeBar(v) {
-  if (!num(v.expiresAt)) return `<div class="state">onchain, boarded at the next batch${num(v.renewableAt) ? " from " + ago(v.renewableAt) : ""}</div>`;
-  const now = nowSecs(), born = num(v.createdAt), dies = num(v.expiresAt), windowSecs = dies - num(v.renewableAt);
+// batchAt is the planned batch time, 0 without one; renewing when a session holds the delegation
+function lifeBar(v, batchAt, renewing, company) {
+  const now = nowSecs(), at = num(batchAt);
+  const joins = renewing ? "in the batch now" : !at ? "" : at <= now ? `overdue by ${span(now - at)}` : `joins the batch ${ago(at)}${company}`;
+  if (!num(v.expiresAt)) return `<div class="state ${renewing ? "renewing" : at && at <= now ? "late" : ""}">onchain, ${joins || `boarded at the next batch${num(v.renewableAt) ? " from " + ago(v.renewableAt) : ""}`}</div>`;
+  const born = num(v.createdAt), dies = num(v.expiresAt), windowSecs = dies - num(v.renewableAt), reserve = num(status?.renewalReserve);
   const life = Math.max(dies - born, 1), pct = (x) => Math.min(100, Math.max(0, (x / life) * 100)), left = dies - now;
+  const deadline = Math.max(num(v.renewableAt), dies - reserve);
   const [cls, text] = left <= 0 ? ["late", `expired ${ago(dies)}`]
-    : left <= windowSecs ? ["in", `renewable now, expires ${ago(dies)}`]
-    : ["", `renewable ${ago(v.renewableAt)}, expires ${ago(dies)}`];
-  return `<div class="life" role="img" aria-label="${esc(text)}">
+    : renewing ? ["renewing", joins]
+    : at && at <= now ? ["late", joins]
+    : num(v.renewableAt) >= dies ? ["late", "cannot be renewed before it expires"]
+    : left <= windowSecs ? ["in", `renewable since ${span(now - num(v.renewableAt))}, ${joins || "not planned yet: waiting for a locktime or confirmations"}`]
+    : ["", `renewable ${ago(v.renewableAt)}, ${joins || "not planned yet"}`];
+  return `<div class="life" role="img" aria-label="${esc(text)}, expires ${ago(dies)}">
       <div class="elapsed" style="width:${pct(now - born)}%"></div>
       <div class="window" style="width:${pct(windowSecs)}%"></div>
+      <div class="reserve" style="width:${pct(dies - deadline)}%"></div>
       <div class="now" style="left:${pct(now - born)}%"></div>
-    </div><div class="state ${cls}">${text}${v.preconfirmed ? ", not in a batch yet" : ""}</div>`;
+      ${at && !renewing ? `<i class="batch" style="left:${pct(Math.max(at, now) - born)}%"></i>` : ""}
+    </div><div class="state ${cls}">${text}, expires ${ago(dies)}${v.preconfirmed ? ", not in a batch yet" : ""}</div>`;
 }
 
 function renderDetail() {
@@ -547,9 +589,17 @@ function renderDetail() {
   const inList = delegations.find((x) => x.delegation.id === d.id), st = inList && stateOf(inList);
   const slots = d.slots || [], watch = boards(d), done = watch ? "boarded" : "renewed";
   const types = Object.fromEntries((templates.find((t) => t.id === d.templateId)?.params || []).map((p) => [p.name, p.type]));
+  const batchAt = detail.batchAt || {}, renewing = Boolean(inList?.renewing), reserve = num(status?.renewalReserve);
+  // who else is in a vtxo's batch: the others here, and the batch's count when it is among the ones listed
+  const company = (v) => {
+    const at = num(batchAt[v.outpoint]), here = vtxos.filter((x) => num(batchAt[x.outpoint]) === at).length - 1;
+    const b = (status?.batches || []).find((x) => num(x.at) === Math.max(at, Math.floor(nowSecs())));
+    const elsewhere = b ? num(b.vtxoCount) - here - 1 : 0;
+    return !at || (!here && !elsewhere) ? "" : ` with ${here ? `${here} other${here > 1 ? "s" : ""} here` : ""}${here && elsewhere ? " and " : ""}${elsewhere ? `${elsewhere} elsewhere` : ""}`;
+  };
   $("detail").innerHTML = `
     <div class="title">
-      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : "ok"}">${!active ? (d.status === "cancelled" ? "stopped by an operator" : esc(d.status)) : st?.skipped ? esc(st.text) : st?.key === "bad" ? "not renewing" : st?.key === "late" ? "late" : watch ? "active" : "renewing"}</span></h2>
+      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : st?.dot === "renewing" ? "renewing" : "ok"}">${!active ? (d.status === "cancelled" ? "stopped by an operator" : esc(d.status)) : st?.skipped ? esc(st.text) : st?.key === "bad" ? "not renewing" : st?.key === "late" ? "overdue" : st?.dot === "renewing" ? "in a batch now" : watch ? "active" : "renewing"}</span></h2>
         <div class="hash">${esc(d.address)}</div></div>
       <div class="actions"><button data-copy="${esc(d.address)}">Copy address</button>
         ${active ? `<button class="danger" id="stop">Stop renewing</button>` : d.status === "cancelled" ? `<button class="primary" id="resume">Resume renewing</button>` : ""}</div>
@@ -562,9 +612,10 @@ function renderDetail() {
     ${st?.why && active ? `<p class="note">${esc(st.why)}</p>` : ""}
     <h3>VTXOs at this address</h3>
     ${vtxos.length > 1 ? `<p><b class="n">${vtxos.length}</b> VTXOs holding <b class="n">${sats(held)}</b>, soonest to renew first.</p>` : ""}
+    ${vtxos.length && !watch ? `<p class="state">A renewable VTXO waits for the batch of the first one to reach its deadline, ${span(reserve)} before expiry, so that they renew together. The dot is that batch.</p>` : ""}
     ${vtxos.length ? shownVtxos.map((v) => `<div class="vtxo"><div class="top"><span class="hash">${esc(v.outpoint)}</span>
         <span class="amount n">${sats(v.amount)}${(v.assets || []).map((a) => ` + ${num(a.amount).toLocaleString()} of ${esc(short(a.assetId, 6))}`).join("")}</span></div>
-        ${lifeBar(v)}</div>`).join("") + (vtxos.length > shownVtxos.length ? `<p class="state"><button class="link" id="all-vtxos">Show all ${vtxos.length}</button>, the ${shownVtxos.length} soonest are above.</p>` : "")
+        ${lifeBar(v, batchAt[v.outpoint], renewing, company(v))}</div>`).join("") + (vtxos.length > shownVtxos.length ? `<p class="state"><button class="link" id="all-vtxos">Show all ${vtxos.length}</button>, the ${shownVtxos.length} soonest are above.</p>` : "")
       : `<p class="empty">Nothing to renew: no spendable VTXO sits at this address right now.</p>`}
     <h3>${watch ? "Boarding" : "Renewal"} attempts</h3>
     ${renewals.length ? `<div class="scroll"><table><thead><tr><th>When</th><th>Result</th><th>VTXOs</th><th>Batch or reason</th></tr></thead><tbody>

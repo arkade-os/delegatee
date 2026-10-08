@@ -42,7 +42,17 @@ the delegate key is in every delegate address.
 | `DELEGATEE_MIN_WATCH_EXPIRY` | minimum lead of a watch's expiry | `24h` |
 | `DELEGATEE_POLL_INTERVAL` | scan interval | `1m` |
 | `DELEGATEE_RENEWAL_TIMEOUT` | intent to batch finalization limit | `2h` |
+| `DELEGATEE_RENEWAL_RESERVE` | latest submission, before a vtxo expires | `6h` |
+| `DELEGATEE_BOARDING_MAX_WAIT` | how long a confirmed deposit waits for a renewal batch | `10m` |
 | `DELEGATEE_MAX_DELEGATIONS` | active delegations cap | `50000` |
 | `DELEGATEE_LOG_LEVEL` | logrus level | `4` |
+
+Renewals are batched: the daemon submits at the latest `RENEWAL_RESERVE`
+before the first renewable vtxo expires, so every vtxo renewable by then
+shares one batch session. The reserve must be at least twice
+`RENEWAL_TIMEOUT`: one session that times out and a retry. A session
+already running when a deadline passes delays
+the retry by its own length, so set the reserve higher where sessions are
+long. The admin UI shows the planned batches and why each is when it is.
 
 Other limits and intervals are in [`internal/config/config.go`](internal/config/config.go).

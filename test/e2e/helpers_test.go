@@ -78,6 +78,8 @@ func baseConfig(t *testing.T) *config.Config {
 		ArkURL: arkURL, EmulatorURL: emulatorURL, DatabaseURL: dsn,
 		Port: freePort(t), AdminPort: freePort(t),
 		PollInterval: 2 * time.Second, OnchainPollInterval: time.Second, RenewalTimeout: 2 * time.Minute,
+		// above the 1024-second renewal window: a coin's deadline is then its due, and it renews at the next scan
+		RenewalReserve: 20 * time.Minute, BoardingMaxWait: 10 * time.Minute,
 		MaxDelegations: 50_000,
 		MaxTemplates:   1000, MaxArtifacts: 1000, MaxDocumentBytes: 65536, TemplateMaxFailures: 10,
 		DefaultTemplates: true,

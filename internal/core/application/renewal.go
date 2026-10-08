@@ -43,6 +43,7 @@ type renewalResult struct {
 	commitmentTxid string
 	err            error
 	registered     bool // arkd accepted the intent, whatever became of its batch
+	blamed         bool // its finalization sank the batch
 }
 
 type pendingIntent struct {
@@ -228,7 +229,7 @@ func (h *batchHandler) failedResults(ctx context.Context, err error) []renewalRe
 		}
 	}
 	for _, p := range append(h.inBatch, h.pending...) {
-		res := renewalResult{inputs: p.inputs, err: fmt.Errorf("batch session: %w", err), registered: p.registered}
+		res := renewalResult{inputs: p.inputs, err: fmt.Errorf("batch session: %w", err), registered: p.registered, blamed: p == h.failed}
 		if p == h.failed && ctx.Err() == nil && (isRejection(ctx, h.failure) || status.Code(h.failure) == codes.Unknown) {
 			res.err, res.registered = fmt.Errorf("%w: finalization: %v", errIntentRejected, h.failure), false
 		}

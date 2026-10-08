@@ -14,6 +14,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// the dashboard shows the next few batches; the rest is reachable through each delegation
+const maxPlannedBatches = 20
+
 type adminHandler struct {
 	svc application.Service
 }
@@ -33,7 +36,14 @@ func (h *adminHandler) GetDelegationById(
 	if err != nil {
 		return nil, err
 	}
-	return &delegateev1.GetDelegationByIdResponse{Delegation: detail.Delegation, Vtxos: detail.Vtxos, Renewals: detail.Renewals}, nil
+	st := h.svc.Status()
+	batchAt := map[string]int64{}
+	for _, v := range detail.Vtxos {
+		if at, ok := st.BatchAt[v.Outpoint]; ok {
+			batchAt[v.Outpoint] = at.Unix()
+		}
+	}
+	return &delegateev1.GetDelegationByIdResponse{Delegation: detail.Delegation, Vtxos: detail.Vtxos, Renewals: detail.Renewals, BatchAt: batchAt}, nil
 }
 
 func (h *adminHandler) ListDelegations(
@@ -75,6 +85,9 @@ func (h *adminHandler) ListDelegations(
 				summary.NextExpiry = held.NextExpiry.Unix()
 				summary.NextRenewalAt = held.NextDue.Unix()
 			}
+			summary.NextDeadline = unix(held.NextDeadline)
+			summary.NextBatchAt = unix(held.NextBatchAt)
+			summary.Renewing = held.Renewing
 		}
 		summary.UnmanagedReason = st.Unwatched[ds[i].ID]
 		out[i] = summary
@@ -87,8 +100,16 @@ func (h *adminHandler) GetStatus(
 ) (*delegateev1.GetStatusResponse, error) {
 	st := h.svc.Status()
 	resp := &delegateev1.GetStatusResponse{
-		RenewingVtxos: int32(st.RenewingVtxos),
-		PollInterval:  int64(st.PollInterval.Seconds()),
+		RenewingVtxos:   int32(st.RenewingVtxos),
+		PollInterval:    int64(st.PollInterval.Seconds()),
+		RenewalReserve:  int64(st.Reserve.Seconds()),
+		BoardingMaxWait: int64(st.BoardingMaxWait.Seconds()),
+	}
+	for _, b := range st.Batches[:min(len(st.Batches), maxPlannedBatches)] {
+		resp.Batches = append(resp.Batches, &delegateev1.PlannedBatch{
+			At: b.At.Unix(), VtxoCount: int32(b.Vtxos), TotalAmount: b.Amount, DelegationCount: int32(b.Delegations),
+			ForcedByOutpoint: b.ForcedBy, ForcedByDelegationId: b.ForcedByDelegation,
+		})
 	}
 	// bounded and optional: the UI polls this, also while arkd is down
 	feesCtx, cancel := context.WithTimeout(ctx, 2*time.Second)

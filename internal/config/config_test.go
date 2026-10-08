@@ -40,17 +40,18 @@ func TestLoad(t *testing.T) {
 	require.Equal(t, 5*time.Second, cfg.PollInterval)
 	require.Equal(t, 30*time.Second, cfg.OnchainPollInterval)
 	require.Empty(t, cfg.EncryptionKeys)
-	require.Equal(t, 30*time.Second, cfg.CollectionWindow)
+	require.Equal(t, 6*time.Hour, cfg.RenewalReserve)
+	require.Equal(t, 10*time.Minute, cfg.BoardingMaxWait)
 	require.Equal(t, 24*time.Hour, cfg.MinWatchExpiry)
 	t.Setenv("DELEGATEE_MIN_WATCH_EXPIRY", "0")
 	disabled, err := LoadConfig()
 	require.NoError(t, err)
 	require.Zero(t, disabled.MinWatchExpiry)
-	for _, window := range []time.Duration{0, 10 * time.Second} {
-		t.Setenv("DELEGATEE_COLLECTION_WINDOW", window.String())
+	for _, wait := range []time.Duration{0, 10 * time.Second} {
+		t.Setenv("DELEGATEE_BOARDING_MAX_WAIT", wait.String())
 		configured, err := LoadConfig()
 		require.NoError(t, err)
-		require.Equal(t, window, configured.CollectionWindow)
+		require.Equal(t, wait, configured.BoardingMaxWait)
 	}
 	require.Len(t, cfg.DelegateKeys, 1)
 	require.Len(t, cfg.AdminUsers, 1)
@@ -81,7 +82,7 @@ func TestLoadRejectsBadValues(t *testing.T) {
 	}
 	for name, bad := range map[string]string{
 		"DELEGATEE_PORT": "http", "DELEGATEE_ADMIN_PORT": "x", "DELEGATEE_LOG_LEVEL": "debug",
-		"DELEGATEE_COLLECTION_WINDOW":     "soon",
+		"DELEGATEE_RENEWAL_RESERVE": "soon", "DELEGATEE_BOARDING_MAX_WAIT": "soon",
 		"DELEGATEE_MIN_WATCH_EXPIRY":      "-1h",
 		"DELEGATEE_ONCHAIN_POLL_INTERVAL": "soon",
 		"DELEGATEE_POLL_INTERVAL":         "10", "DELEGATEE_RENEWAL_TIMEOUT": "soon",
@@ -103,7 +104,7 @@ func TestLoadRejectsBadValues(t *testing.T) {
 	}
 	for name, bad := range map[string]string{
 		"DELEGATEE_PORT": "0", "DELEGATEE_ADMIN_PORT": "65536",
-		"DELEGATEE_COLLECTION_WINDOW":     "-1s",
+		"DELEGATEE_RENEWAL_RESERVE": "0s", "DELEGATEE_BOARDING_MAX_WAIT": "-1s",
 		"DELEGATEE_ONCHAIN_POLL_INTERVAL": "0s",
 		"DELEGATEE_POLL_INTERVAL":         "0s", "DELEGATEE_RENEWAL_TIMEOUT": "-1s",
 		"DELEGATEE_MAX_DELEGATIONS":   "0",

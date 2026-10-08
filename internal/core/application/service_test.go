@@ -41,14 +41,14 @@ func TestNewService(t *testing.T) {
 			env := newTestEnv(t)
 			tweak(env)
 			_, err := NewServiceWithKeys(t.Context(), env.repo, env.ark, env.indexer, env.emulator, nil, 30*time.Second, 50, nil,
-				[]*btcec.PrivateKey{env.userKey}, time.Hour, time.Minute, 0,
+				[]*btcec.PrivateKey{env.userKey}, time.Hour, time.Minute, 2*time.Hour, 0,
 				Limits{MaxDelegations: 100, MaxTemplates: 100, MaxArtifacts: 100, MaxDocumentBytes: 4096, TemplateMaxFailures: 3})
 			require.Error(t, err)
 		})
 	}
 	env := newTestEnv(t)
 	_, err := NewServiceWithKeys(t.Context(), env.repo, env.ark, env.indexer, env.emulator, nil, 30*time.Second, 50, nil,
-		[]*btcec.PrivateKey{env.userKey}, time.Hour, time.Minute, 0, Limits{})
+		[]*btcec.PrivateKey{env.userKey}, time.Hour, time.Minute, 2*time.Hour, 0, Limits{})
 	require.Error(t, err, "zero max delegations")
 }
 
@@ -334,7 +334,7 @@ func TestWatchSkipsATreeThatMoved(t *testing.T) {
 	// arkd and the emulator rotated their keys since registration
 	other := newTestEnv(t)
 	rotated, err := NewServiceWithKeys(t.Context(), env.repo, other.ark, other.indexer, other.emulator, nil, 30*time.Second, 50, nil,
-		[]*btcec.PrivateKey{env.svc.cosigners[0].key}, time.Hour, time.Minute, 0, env.svc.limits)
+		[]*btcec.PrivateKey{env.svc.cosigners[0].key}, time.Hour, time.Minute, 2*time.Hour, 0, env.svc.limits)
 	require.NoError(t, err)
 	w, err := rotated.(*service).watch(t.Context(), d)
 	require.Nil(t, w)
@@ -387,7 +387,7 @@ func TestKeyRotationWatchesPreviousDelegations(t *testing.T) {
 	require.NoError(t, err)
 	rotated, err := NewServiceWithKeys(
 		t.Context(), env.repo, env.ark, env.indexer, env.emulator, env.explorer, 30*time.Second, 50, nil,
-		[]*btcec.PrivateKey{newKey, oldKey}, time.Hour, time.Minute, 0, env.svc.limits,
+		[]*btcec.PrivateKey{newKey, oldKey}, time.Hour, time.Minute, 2*time.Hour, 0, env.svc.limits,
 	)
 	require.NoError(t, err)
 	rotatedSvc := rotated.(*service)
@@ -459,14 +459,15 @@ func TestScanHoldingsAndStatus(t *testing.T) {
 	require.WithinDuration(t, time.Now(), st.LastScan, time.Minute)
 	require.Equal(t, time.Hour, st.PollInterval)
 	require.Zero(t, st.RenewingVtxos)
+	due := soon.ExpiresAt.Add(-1024 * time.Second)
 	require.Equal(t, Holdings{
-		Vtxos: 1, Amount: 3000, NextExpiry: soon.ExpiresAt, NextDue: soon.ExpiresAt.Add(-1024 * time.Second),
-	}, st.Holdings[busy.ID])
+		Vtxos: 1, Amount: 3000, NextExpiry: soon.ExpiresAt, NextDue: due, NextDeadline: due, NextBatchAt: due,
+	}, st.Holdings[busy.ID], "the window is shorter than the reserve: due, deadline and batch coincide")
 	boarded := st.Holdings[board.ID]
 	require.WithinDuration(t, time.Now().Add(time.Hour), boarded.NextDue, time.Minute, "unconfirmed: looked at again later")
 	boarded.NextDue = time.Time{}
 	require.Equal(t, Holdings{Vtxos: 2, Amount: 7000}, boarded)
-	require.Equal(t, Holdings{Vtxos: 2, Amount: 3000, NextExpiry: sooner.ExpiresAt, NextDue: sooner.CreatedAt}, st.Holdings[claim.ID], "the sooner coin, whatever the order served")
+	require.Equal(t, Holdings{Vtxos: 2, Amount: 3000, NextExpiry: sooner.ExpiresAt, NextDue: sooner.CreatedAt, NextDeadline: sooner.CreatedAt}, st.Holdings[claim.ID], "the sooner coin, whatever the order served; a transaction of its own goes at due")
 	require.Equal(t, Holdings{}, st.Holdings[empty.ID])
 	require.NotContains(t, st.Holdings, foreign.ID)
 	require.Equal(t, errOtherKey.Error(), st.Unwatched[foreign.ID])
@@ -614,14 +615,7 @@ func TestDecoders(t *testing.T) {
 func TestLateAndScannerHealth(t *testing.T) {
 	env := newTestEnv(t)
 	now := time.Now()
-	due := now.Add(-time.Hour)
-	require.False(t, late(now.Add(time.Hour), due, now), "half the room left")
-	require.True(t, late(now.Add(10*time.Minute), due, now), "last quarter")
-	require.False(t, late(due, due, now), "no room at all is not late, it is a zero window")
-	require.True(t, late(due.Add(-time.Second), due, now), "due after expiry never renews")
-	require.False(t, late(time.Time{}, due, now), "no expiry, nothing to be late for")
-
-	// renewable 1024s before expiry: late in the last 256s
+	// renewable 1024s before expiry, a window shorter than the reserve: due at once, late once its batch time passed untaken
 	stuck := env.coin(t, env.userKey.PubKey(), 5000, 3*time.Minute)
 	other, _ := hexKey(t)
 	fresh := env.coin(t, other.PubKey(), 1000, 50*time.Minute)
@@ -630,9 +624,13 @@ func TestLateAndScannerHealth(t *testing.T) {
 	env.indexer.serve(stuck, fresh)
 	env.scan(t)
 	h := env.svc.Status().Holdings
-	require.Equal(t, 1, h[stuckD.ID].Late)
+	require.Equal(t, 1, h[stuckD.ID].Late, "a session past its batch time, whether in one or not")
 	require.Equal(t, uint64(5000), h[stuckD.ID].LateAmount)
+	require.True(t, h[stuckD.ID].Renewing, "taken by the lane at this scan")
 	require.Zero(t, h[freshD.ID].Late)
+	require.Equal(t, fresh.ExpiresAt.Add(-1024*time.Second), h[freshD.ID].NextDue)
+	require.Equal(t, h[freshD.ID].NextDue, h[freshD.ID].NextDeadline, "the window is shorter than the reserve")
+	require.Equal(t, h[freshD.ID].NextDeadline, h[freshD.ID].NextBatchAt)
 	require.Equal(t, uint64(1), env.svc.Status().Failed, "only the due coin was tried")
 	require.Zero(t, env.svc.Status().Renewed)
 
@@ -734,7 +732,7 @@ func TestEncryptionKeyRotation(t *testing.T) {
 	require.NoError(t, err)
 	keys := []*btcec.PrivateKey{active, old}
 	svc, err := NewServiceWithKeys(t.Context(), env.repo, env.ark, env.indexer, env.emulator, nil,
-		30*time.Second, 50, keys, []*btcec.PrivateKey{env.svc.cosigners[0].key}, time.Hour, time.Minute, 0, env.svc.limits)
+		30*time.Second, 50, keys, []*btcec.PrivateKey{env.svc.cosigners[0].key}, time.Hour, time.Minute, 2*time.Hour, 0, env.svc.limits)
 	require.NoError(t, err)
 	s := svc.(*service)
 	keys[0] = old // constructor owns its keyring slice

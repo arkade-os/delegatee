@@ -87,6 +87,11 @@ message DelegationSummary {
   int64 next_expiry = 6;
   int64 next_renewal_at = 7;
   Renewal last_renewal = 8;
+  // next_deadline is the latest the soonest vtxo is submitted; next_batch_at the planned batch it joins, 0 without a plan.
+  int64 next_deadline = 9;
+  int64 next_batch_at = 10;
+  // renewing is true while a session holds the delegation's coins.
+  bool renewing = 11;
 }
 
 message GetDelegationByIdRequest {
@@ -96,6 +101,8 @@ message GetDelegationByIdResponse {
   Delegation delegation = 1;
   repeated Vtxo vtxos = 2;
   repeated Renewal renewals = 3;
+  // batch_at is the planned batch time by outpoint; a coin in a session, or waiting on something unforeseeable, is absent.
+  map<string, int64> batch_at = 4;
 }
 
 message GetStatusRequest {}
@@ -104,6 +111,21 @@ message GetStatusResponse {
   int32 renewing_vtxos = 2;
   int64 poll_interval = 3;
   IntentFees intent_fees = 4;
+  // renewal_reserve and boarding_max_wait are seconds; batches are the next planned sessions, soonest first, at most 20.
+  int64 renewal_reserve = 5;
+  int64 boarding_max_wait = 6;
+  repeated PlannedBatch batches = 7;
+}
+
+message PlannedBatch {
+  // at is never in the past: a batch an overdue coin forces is due now.
+  int64 at = 1;
+  int32 vtxo_count = 2;
+  uint64 total_amount = 3;
+  int32 delegation_count = 4;
+  // the coin with the earliest deadline, which sets the time
+  string forced_by_outpoint = 5;
+  int64 forced_by_delegation_id = 6;
 }
 
 message IntentFees {

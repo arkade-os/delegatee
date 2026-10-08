@@ -968,7 +968,7 @@ func (e *testEnv) newService(t testing.TB) *service {
 	scalar[31] = 1
 	key, _ := btcec.PrivKeyFromBytes(scalar[:])
 	svc, err := NewServiceWithKeys(t.Context(), e.repo, e.ark, e.indexer, e.emulator, e.explorer, 30*time.Second, 50, nil,
-		[]*btcec.PrivateKey{key}, time.Hour, time.Minute, 0,
+		[]*btcec.PrivateKey{key}, time.Hour, time.Minute, 2*time.Hour, 10*time.Minute,
 		Limits{MaxDelegations: 100, MaxTemplates: 100, MaxArtifacts: 100, MaxDocumentBytes: 16 << 10, TemplateMaxFailures: 3})
 	require.NoError(t, err)
 	return svc.(*service)

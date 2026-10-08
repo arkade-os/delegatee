@@ -12,13 +12,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func TestDirectInputsSkipTheCollectionWindow(t *testing.T) {
+func TestDirectInputsSkipThePlan(t *testing.T) {
 	e, coin := claimable(t)
-	e.svc.collectionWindow = 30 * time.Second
-	coin.CreatedAt = time.Now() // due now: a batch input would wait for the window
+	e.svc.renewalReserve = 5 * time.Minute
+	coin.CreatedAt = time.Now() // due now: a batch input would wait for its deadline
 	e.indexer.serve(coin)
 	e.scan(t)
 	require.True(t, e.svc.collectUntil.IsZero())
+	require.Empty(t, e.svc.Status().Batches, "a transaction of its own is not planned")
 	require.NotEmpty(t, e.ark.finalized, "claimed by the scan that found it")
 }
 

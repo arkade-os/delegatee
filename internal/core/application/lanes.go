@@ -148,3 +148,21 @@ func (s *service) dropOnchain(script string) {
 	delete(s.onchainCache, script)
 	s.onchainDrops++
 }
+
+// quarantine keeps the coins of an intent that sank a batch out of the retry right after it.
+func (s *service) quarantine(inputs []renewalInput) {
+	s.shared.Lock()
+	defer s.shared.Unlock()
+	until := time.Now().Add(s.pollInterval)
+	for _, in := range inputs {
+		s.quarantined[in.coin.Outpoint.String()] = until
+	}
+}
+
+func (s *service) isQuarantined(op string, now time.Time) bool {
+	s.shared.Lock()
+	defer s.shared.Unlock()
+	maps.DeleteFunc(s.quarantined, func(_ string, until time.Time) bool { return !now.Before(until) })
+	_, ok := s.quarantined[op]
+	return ok
+}

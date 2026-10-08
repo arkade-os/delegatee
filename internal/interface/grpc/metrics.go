@@ -18,7 +18,7 @@ var (
 	descForeign    = prometheus.NewDesc("delegatee_delegations_foreign", "Active delegations registered under another key, which this instance cannot renew.", nil, nil)
 	descVtxos      = prometheus.NewDesc("delegatee_vtxos_watched", "Spendable vtxos at the addresses this instance renews, as of the last scan.", nil, nil)
 	descSats       = prometheus.NewDesc("delegatee_sats_watched", "Amount of those vtxos, in sats.", nil, nil)
-	descLate       = prometheus.NewDesc("delegatee_vtxos_late", "Vtxos renewable for a while and still not renewed. Alert on this.", nil, nil)
+	descLate       = prometheus.NewDesc("delegatee_vtxos_late", "Vtxos a session's worth of time past their planned batch and still not renewed. Alert on this.", nil, nil)
 	descLateSats   = prometheus.NewDesc("delegatee_sats_late", "Amount of the late vtxos, in sats.", nil, nil)
 	descRenewing   = prometheus.NewDesc("delegatee_vtxos_renewing", "Vtxos in the batch session in flight.", nil, nil)
 	descLastScan   = prometheus.NewDesc("delegatee_last_scan_timestamp_seconds", "Unix time of the last completed scan, 0 before the first.", nil, nil)

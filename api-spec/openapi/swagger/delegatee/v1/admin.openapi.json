@@ -677,6 +677,15 @@
             "type": "boolean",
             "description": "managed is false when this instance cannot renew the delegation; unmanaged_reason says why."
           },
+          "nextBatchAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nextDeadline": {
+            "type": "integer",
+            "description": "next_deadline is the latest the soonest vtxo is submitted; next_batch_at the planned batch it joins, 0 without a plan.",
+            "format": "int64"
+          },
           "nextExpiry": {
             "type": "integer",
             "format": "int64"
@@ -684,6 +693,10 @@
           "nextRenewalAt": {
             "type": "integer",
             "format": "int64"
+          },
+          "renewing": {
+            "type": "boolean",
+            "description": "renewing is true while a session holds the delegation's coins."
           },
           "totalAmount": {
             "type": "integer",
@@ -738,6 +751,14 @@
         "title": "GetDelegationByIdResponse",
         "type": "object",
         "properties": {
+          "batchAt": {
+            "type": "object",
+            "description": "batch_at is the planned batch time by outpoint; a coin in a session, or waiting on something unforeseeable, is absent.",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
           "delegation": {
             "$ref": "#/components/schemas/Delegation"
           },
@@ -763,6 +784,16 @@
         "title": "GetStatusResponse",
         "type": "object",
         "properties": {
+          "batches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlannedBatch"
+            }
+          },
+          "boardingMaxWait": {
+            "type": "integer",
+            "format": "int64"
+          },
           "intentFees": {
             "$ref": "#/components/schemas/IntentFees"
           },
@@ -772,6 +803,11 @@
           },
           "pollInterval": {
             "type": "integer",
+            "format": "int64"
+          },
+          "renewalReserve": {
+            "type": "integer",
+            "description": "renewal_reserve and boarding_max_wait are seconds; batches are the next planned sessions, soonest first, at most 20.",
             "format": "int64"
           },
           "renewingVtxos": {
@@ -881,6 +917,37 @@
           },
           "type": {
             "type": "string"
+          }
+        }
+      },
+      "PlannedBatch": {
+        "title": "PlannedBatch",
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "integer",
+            "description": "at is never in the past: a batch an overdue coin forces is due now.",
+            "format": "int64"
+          },
+          "delegationCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "forcedByDelegationId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "forcedByOutpoint": {
+            "type": "string",
+            "description": "the coin with the earliest deadline, which sets the time"
+          },
+          "totalAmount": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "vtxoCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

@@ -125,7 +125,7 @@ func crashAt(t *testing.T, cfg *config.Config, ark *crashingArk) {
 	require.NoError(t, err)
 	svc, err := application.NewServiceWithKeys(
 		ctx, repo, ark, indexerSvc, emulatorclient.NewGRPCClient(emuConn), explorerSvc, cfg.OnchainPollInterval, cfg.MaxOnchainFeeRate,
-		cfg.EncryptionKeys, cfg.DelegateKeys, cfg.PollInterval, cfg.RenewalTimeout, 0,
+		cfg.EncryptionKeys, cfg.DelegateKeys, cfg.PollInterval, cfg.RenewalTimeout, cfg.RenewalReserve, cfg.BoardingMaxWait,
 		application.Limits{MaxDelegations: 100, MaxTemplates: 100, MaxArtifacts: 100, MaxDocumentBytes: 1 << 16, TemplateMaxFailures: 10},
 	)
 	require.NoError(t, err)

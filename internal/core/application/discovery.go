@@ -270,6 +270,7 @@ func (s *service) discover(ctx context.Context, delegations []domain.Delegation,
 	used := map[string]int64{}
 	watchScripts := map[string]int64{}
 	var inputs []renewalInput
+	s.entries = s.entries[:0]
 next:
 	for _, d := range delegations {
 		w := s.watched[d.ID]
@@ -280,6 +281,8 @@ next:
 		var group []renewalInput
 		complete := true
 		missing := 0
+		var planned []plannedCoin
+		plannable := true
 		for slot, sl := range d.Slots {
 			if sl.Outpoint == "" {
 				if owner, exists := watchScripts[sl.Script]; exists {
@@ -310,15 +313,31 @@ next:
 					continue
 				}
 				due := dueTime(w.instance, c, tip)
-				h.add(c, due, now)
-				if now.Before(due) || (sl.Onchain && c.Confirms < w.tmpl.Inputs()[slot].Schedule.MinConfirmations) || !locktimeReached(w.instance, slot, tip) {
+				deadline := s.deadline(c, due)
+				if sl.Onchain {
+					deadline = time.Time{} // the plan decides
+				}
+				h.add(c, due, deadline)
+				unconfirmed := sl.Onchain && (c.Confirms < w.tmpl.Inputs()[slot].Schedule.MinConfirmations || c.CreatedAt.IsZero())
+				eligible := !now.Before(due) && !unconfirmed && locktimeReached(w.instance, slot, tip)
+				// a vtxo's due is read off its expiry: the plan can count on it. A deposit, locktime or confirmation count cannot be foreseen.
+				if eligible || (!sl.Onchain && !c.Expiry.IsZero() && locktimeReached(w.instance, slot, tip)) {
+					planned = append(planned, plannedCoin{coin: c, slot: slot, due: due, deadline: deadline, onchain: sl.Onchain})
+				}
+				if !eligible {
 					complete = false
 					continue
 				}
 				group = append(group, renewalInput{watched: w, coin: c, due: due, onchain: sl.Onchain})
 			}
+			if n := slices.IndexFunc(planned, func(p plannedCoin) bool { return p.slot == slot }); n < 0 || (len(d.Slots) > 1 && len(planned) != slot+1) {
+				plannable = false
+			}
 		}
 		holdings[d.ID] = h
+		if w.tmpl.Type() == template.Intent && plannable && !s.sampled[d.ID] {
+			s.entries = append(s.entries, entriesOf(d.ID, len(d.Slots), planned)...)
+		}
 		// a delegation in flight is settled by its lane
 		if !d.IsWatch() && missing == len(d.Slots) && !s.sampled[d.ID] {
 			spent, arkTxid, err := s.spent(ctx, d.Slots)
@@ -393,7 +412,7 @@ func (s *service) pruneCaches() {
 	maps.DeleteFunc(s.onchainCache, func(script string, _ onchainSnapshot) bool { return !live[script] })
 }
 
-func (h *Holdings) add(c coin, due, now time.Time) {
+func (h *Holdings) add(c coin, due, deadline time.Time) {
 	h.Vtxos++
 	h.Amount += c.Amount
 	if !c.Expiry.IsZero() && (h.NextExpiry.IsZero() || c.Expiry.Before(h.NextExpiry)) {
@@ -402,10 +421,46 @@ func (h *Holdings) add(c coin, due, now time.Time) {
 	if h.NextDue.IsZero() || due.Before(h.NextDue) {
 		h.NextDue = due
 	}
-	if late(c.Expiry, due, now) {
-		h.Late++
-		h.LateAmount += c.Amount
+	if !deadline.IsZero() && (h.NextDeadline.IsZero() || deadline.Before(h.NextDeadline)) {
+		h.NextDeadline = deadline
 	}
+}
+
+type plannedCoin struct {
+	coin          coin
+	slot          int
+	due, deadline time.Time
+	onchain       bool
+}
+
+// entriesOf: a watch's coins are an intent each; a multi-slot delegation spends all its slots in one.
+func entriesOf(id int64, slots int, coins []plannedCoin) []planEntry {
+	if slots == 1 {
+		entries := make([]planEntry, 0, len(coins))
+		for _, c := range coins {
+			entries = append(entries, planEntry{
+				outpoints: []string{c.coin.Outpoint.String()}, delegation: id, amount: c.coin.Amount,
+				due: c.due, deadline: c.deadline, deposit: c.onchain, confirmed: c.coin.CreatedAt,
+			})
+		}
+		return entries
+	}
+	e := planEntry{delegation: id, deposit: true}
+	var deadline time.Time
+	for _, c := range coins {
+		e.outpoints = append(e.outpoints, c.coin.Outpoint.String())
+		e.amount += c.coin.Amount
+		e.due = maxTime(e.due, c.due)
+		e.deposit = e.deposit && c.onchain
+		if !c.deadline.IsZero() && (deadline.IsZero() || c.deadline.Before(deadline)) {
+			deadline = c.deadline
+		}
+		if c.onchain && (e.confirmed.IsZero() || c.coin.CreatedAt.Before(e.confirmed)) {
+			e.confirmed = c.coin.CreatedAt
+		}
+	}
+	e.deadline = maxTime(e.due, deadline)
+	return []planEntry{e}
 }
 
 // own exempts the successors from the delegation cap: the daemon built tx
