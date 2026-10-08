@@ -63,6 +63,21 @@ func TestBuildTreeShapes(t *testing.T) {
 	}
 }
 
+// A covenant compares a key against a taproot witness program, so it needs the
+// x-only bytes a leaf gets; arkadec's own e2e binds pubkeys the same way.
+func TestBuildCovenantPushesXOnlyPubkey(t *testing.T) {
+	owner := testKey(t, 2)
+	def := parseDef(t, `{"contractName":"C","constructorInputs":[{"name":"owner","type":"pubkey"}],"functions":[
+	 {"name":"pay","arkade":{"inputs":[],"asm":["<owner>","OP_DROP","OP_1"]},"leaves":[{"name":"pay","asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","<EMULATOR_KEY:pay>","OP_CHECKSIG"],"witness":[]}]}]}`)
+	c, err := build(def, map[string]value{"owner": {"pubkey", owner.SerializeCompressed()}}, Keys{Server: testKey(t, 1), Emulator: testKey(t, 3)})
+	require.NoError(t, err)
+
+	want, err := txscript.NewScriptBuilder().
+		AddData(schnorr.SerializePubKey(owner)).AddOp(txscript.OP_DROP).AddOp(txscript.OP_1).Script()
+	require.NoError(t, err)
+	require.Equal(t, want, c.covenants["pay"])
+}
+
 func TestBuildRejects(t *testing.T) {
 	keys := Keys{Server: testKey(t, 1), Emulator: testKey(t, 3)}
 	def := parseDef(t, `{"contractName":"C","constructorInputs":[],"functions":[

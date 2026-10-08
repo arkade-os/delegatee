@@ -31,6 +31,18 @@ func build(def *Definition, args map[string]value, keys Keys) (*contract, error)
 		}
 		return v, nil
 	}
+	// covenants and leaves both see a pubkey as the x-only key taproot uses
+	keyField := func(name string) (value, error) {
+		v, err := field(name)
+		if err != nil || v.typ != "pubkey" {
+			return v, err
+		}
+		pk, err := btcec.ParsePubKey(v.raw)
+		if err != nil {
+			return value{}, err
+		}
+		return value{"bytes32", schnorr.SerializePubKey(pk)}, nil
+	}
 
 	delegate := func() (*btcec.PublicKey, error) {
 		if keys.Delegate == nil {
@@ -41,7 +53,7 @@ func build(def *Definition, args map[string]value, keys Keys) (*contract, error)
 	// intent messages spell cosigner keys in hex
 	covenantLookup := func(name string) (value, error) {
 		if name != "DELEGATE_KEY" {
-			return field(name)
+			return keyField(name)
 		}
 		pk, err := delegate()
 		if err != nil {
@@ -94,18 +106,7 @@ func build(def *Definition, args map[string]value, keys Keys) (*contract, error)
 			}
 			return tweak(pk, parts[2])
 		}
-		v, err := field(name)
-		if err != nil {
-			return value{}, err
-		}
-		if v.typ == "pubkey" {
-			pk, err := btcec.ParsePubKey(v.raw)
-			if err != nil {
-				return value{}, err
-			}
-			return value{"bytes32", schnorr.SerializePubKey(pk)}, nil
-		}
-		return v, nil
+		return keyField(name)
 	}
 
 	var leaves []txscript.TapLeaf
