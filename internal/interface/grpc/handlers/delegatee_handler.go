@@ -67,6 +67,35 @@ func (h *handler) GetDelegation(
 	return delegationDetail(ctx, h.svc, d)
 }
 
+func (h *handler) RegisterSpend(
+	ctx context.Context, req *delegateev1.RegisterSpendRequest,
+) (*delegateev1.RegisterSpendResponse, error) {
+	d, err := h.svc.RegisterSpend(
+		ctx, req.GetTemplateId(), variablesOf(req.GetVariables()), req.GetOutpoints(), time.Unix(req.GetExpiresAt(), 0),
+		req.GetPubkey(), req.GetSignature(),
+	)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	audit(ctx, "register spend", idString(d.ID), "", "")
+	return &delegateev1.RegisterSpendResponse{Id: d.Fingerprint, Delegation: toDelegation(d)}, nil
+}
+
+func (h *handler) GetSpend(ctx context.Context, req *delegateev1.GetSpendRequest) (*delegateev1.GetSpendResponse, error) {
+	if req.GetId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing id")
+	}
+	d, err := h.svc.GetSpend(ctx, req.GetId())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	detail, err := delegationDetail(ctx, h.svc, d)
+	if err != nil {
+		return nil, err
+	}
+	return &delegateev1.GetSpendResponse{Delegation: detail.Delegation, Vtxos: detail.Vtxos, Renewals: detail.Renewals}, nil
+}
+
 func delegationDetail(ctx context.Context, svc application.Service, d *domain.Delegation) (*delegateev1.GetDelegationResponse, error) {
 	vtxos, err := svc.Vtxos(ctx, d)
 	if err != nil {

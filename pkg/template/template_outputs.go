@@ -28,9 +28,10 @@ func (p *parser) output(v any) error {
 	if err != nil {
 		return err
 	}
-	if o.from, err = p.inputIndex(vm["from"], "value"); err != nil {
+	if o.pool, err = p.pool(vm["from"]); err != nil {
 		return err
 	}
+	o.from = o.pool[0]
 	if raw, ok := vm["amount"]; ok {
 		if o.amount, err = p.amount(raw); err != nil {
 			return err
@@ -46,7 +47,7 @@ func (p *parser) output(v any) error {
 	if len(assets) > maxSlots {
 		return bad("output %q has more than %d asset routes", o.name, maxSlots)
 	}
-	if len(assets) > 0 && (o.onchain || p.t.inputs[o.from].onchain) {
+	if len(assets) > 0 && (o.onchain || slices.ContainsFunc(o.pool, func(i int) bool { return p.t.inputs[i].onchain })) {
 		return bad("output %q cannot carry assets", o.name)
 	}
 	for _, a := range assets {
@@ -61,6 +62,31 @@ func (p *parser) output(v any) error {
 	}
 	p.t.outputs = append(p.t.outputs, o)
 	return nil
+}
+
+// pool reads one input name or a list of them.
+func (p *parser) pool(v any) ([]int, error) {
+	names, ok := v.([]any)
+	if !ok {
+		i, err := p.inputIndex(v, "value")
+		return []int{i}, err
+	}
+	if len(names) == 0 {
+		return nil, bad("value names no input")
+	}
+	var pool []int
+	for _, n := range names {
+		i, err := p.inputIndex(n, "value")
+		if err != nil {
+			return nil, err
+		}
+		if slices.Contains(pool, i) {
+			return nil, bad("value names input %q twice", n)
+		}
+		pool = append(pool, i)
+	}
+	slices.Sort(pool)
+	return pool, nil
 }
 
 func (p *parser) locking(v any) (locking, error) {
@@ -113,12 +139,19 @@ func (p *parser) route(v any) (assetRoute, error) {
 	return r, err
 }
 
-// checkBalances requires one satoshi remainder output per input and one remainder route per input and asset.
+// checkBalances: one pool per input, one remainder output per pool, one remainder route per input and asset.
 func (t *Template) checkBalances() error {
 	for i, in := range t.inputs {
+		pool := t.poolOf(i)
 		n := 0
 		for _, o := range t.outputs {
-			if o.from == i && o.amount == nil {
+			if !slices.Contains(o.pool, i) {
+				continue
+			}
+			if !slices.Equal(o.pool, pool) {
+				return bad("input %q shares its value with two sets of inputs", in.name)
+			}
+			if o.amount == nil {
 				n++
 			}
 		}
@@ -136,6 +169,16 @@ func (t *Template) checkBalances() error {
 				return bad("input %q has two remainder routes for one asset", t.inputs[r.from].name)
 			}
 			remainders = append(remainders, r)
+		}
+	}
+	return nil
+}
+
+// poolOf is nil when no output draws from slot.
+func (t *Template) poolOf(slot int) []int {
+	for _, o := range t.outputs {
+		if slices.Contains(o.pool, slot) {
+			return o.pool
 		}
 	}
 	return nil

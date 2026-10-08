@@ -478,8 +478,9 @@ func TestBuildIntentChecksTheTemplateTx(t *testing.T) {
 
 func TestTemplateOutcomes(t *testing.T) {
 	in := func(templateID string) renewalInput {
-		return renewalInput{watched: &watched{delegation: domain.Delegation{TemplateID: templateID}}}
+		return renewalInput{watched: &watched{delegation: domain.Delegation{TemplateID: templateID, Address: "ark1"}}}
 	}
+	spend := renewalInput{watched: &watched{delegation: domain.Delegation{TemplateID: "f", ExpiresAt: &time.Time{}}}}
 	got := templateOutcomes([]renewalResult{
 		{inputs: []renewalInput{in("a")}, err: fmt.Errorf("%w: emulator: boom", errIntentRejected)},
 		{inputs: []renewalInput{in("a")}, commitmentTxid: "c1"},
@@ -488,12 +489,14 @@ func TestTemplateOutcomes(t *testing.T) {
 		{inputs: []renewalInput{in("b"), in("b")}, err: fmt.Errorf("%w: arkd: boom", errIntentRejected)},
 		{inputs: []renewalInput{in("d")}, err: errors.New("event stream: boom")},
 		{inputs: []renewalInput{in("e")}, err: errors.New("batch session: boom"), registered: true},
+		{inputs: []renewalInput{spend}, err: fmt.Errorf("%w: emulator: boom", errIntentRejected)},
 	})
 	require.Equal(t, tally{accepted: true, rejected: 1}, got["a"], "one accepted intent makes the cycle a success")
 	require.Equal(t, tally{rejected: 3}, got["b"], "counted per vtxo")
 	require.Equal(t, tally{}, got["c"], "never reached arkd")
 	require.Equal(t, tally{}, got["d"], "accepted by the emulator, lost before arkd: not the template's doing")
 	require.Equal(t, tally{accepted: true}, got["e"], "registered by arkd: accepted, whatever the batch did")
+	require.NotContains(t, got, "f", "a wallet's spend says nothing of its template")
 }
 
 func TestBatchHandlerSelection(t *testing.T) {

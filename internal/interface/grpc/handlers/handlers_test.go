@@ -324,6 +324,33 @@ var (
 )
 
 // fakeService returns canned values, or err from every call that can fail.
+func TestSpendHandlers(t *testing.T) {
+	ctx := t.Context()
+	svc := newFake()
+	h := New("v", svc)
+	valid := &delegateev1.RegisterSpendRequest{
+		TemplateId: "tmpl1", Outpoints: []string{"ab:0", "ab:1"}, ExpiresAt: 1700000000, Pubkey: "aa", Signature: "bb",
+	}
+	svc.delegation.Fingerprint = "fp1"
+	reg, err := h.RegisterSpend(ctx, valid)
+	require.NoError(t, err)
+	require.Equal(t, "fp1", reg.GetId())
+	require.Equal(t, "tmpl1", reg.GetDelegation().GetTemplateId())
+	require.Equal(t, [6]any{"tmpl1", map[string]string{}, []string{"ab:0", "ab:1"}, time.Unix(1700000000, 0), "aa", "bb"}, svc.spent)
+
+	_, err = h.GetSpend(ctx, &delegateev1.GetSpendRequest{})
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+	detail, err := h.GetSpend(ctx, &delegateev1.GetSpendRequest{Id: "fp1"})
+	require.NoError(t, err)
+	require.Equal(t, "fp1", svc.gotSpendID)
+	require.Equal(t, "tmpl1", detail.GetDelegation().GetTemplateId())
+	require.Len(t, detail.GetVtxos(), 1)
+
+	svc.err = domain.ErrDelegationNotFound
+	_, err = h.GetSpend(ctx, &delegateev1.GetSpendRequest{Id: "nope"})
+	require.Equal(t, codes.NotFound, status.Code(err))
+}
+
 type fakeService struct {
 	application.Service
 	err          error
@@ -331,6 +358,8 @@ type fakeService struct {
 	gotTemplate  string
 	gotVariables map[string]string
 	gotExpiresAt *time.Time
+	spent        [6]any
+	gotSpendID   string
 	cancelled    string
 	cancelledID  int64
 	resumed      int64
@@ -357,6 +386,16 @@ func (f *fakeService) RegisterDelegation(
 	_ context.Context, templateID string, variables map[string]string, expiresAt *time.Time,
 ) (*domain.Delegation, error) {
 	f.gotTemplate, f.gotVariables, f.gotExpiresAt = templateID, variables, expiresAt
+	return &f.delegation, f.err
+}
+func (f *fakeService) RegisterSpend(
+	_ context.Context, templateID string, variables map[string]string, outpoints []string, expiresAt time.Time, pubkey, signature string,
+) (*domain.Delegation, error) {
+	f.spent = [6]any{templateID, variables, outpoints, expiresAt, pubkey, signature}
+	return &f.delegation, f.err
+}
+func (f *fakeService) GetSpend(_ context.Context, id string) (*domain.Delegation, error) {
+	f.gotSpendID = id
 	return &f.delegation, f.err
 }
 func (f *fakeService) GetDelegationByID(ctx context.Context, _ int64) (*domain.Delegation, error) {

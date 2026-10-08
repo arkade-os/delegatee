@@ -96,7 +96,7 @@ type Delegation struct {
 	TemplateID     string
 	Variables      map[string]string
 	ParentID       int64      // the delegation whose settled transaction advertised this one; 0 for a watch
-	ExpiresAt      *time.Time // watches only; nil never expires
+	ExpiresAt      *time.Time // watches and spends; nil never expires
 	DelegatePubKey string     // the cosigner key it was instantiated with
 	// one per template input; a watch has exactly one
 	Slots     []SlotBinding
@@ -108,6 +108,11 @@ type Delegation struct {
 // IsWatch: RegisterDelegation watches an address, a successor binds outpoints.
 func (d *Delegation) IsWatch() bool {
 	return d.Address != "" && !slices.ContainsFunc(d.Slots, func(s SlotBinding) bool { return s.Outpoint != "" })
+}
+
+// IsSpend: bound by RegisterSpend.
+func (d *Delegation) IsSpend() bool {
+	return d.Address == "" && d.ExpiresAt != nil
 }
 
 type SlotBinding struct {

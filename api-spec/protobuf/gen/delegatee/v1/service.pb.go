@@ -352,6 +352,247 @@ func (x *GetDelegationResponse) GetRenewals() []*Renewal {
 	return nil
 }
 
+type RegisterSpendRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TemplateId    string                 `protobuf:"bytes,1,opt,name=template_id,json=templateId,proto3" json:"template_id,omitempty"`
+	Variables     map[string]string      `protobuf:"bytes,2,rep,name=variables,proto3" json:"variables,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Outpoints     []string               `protobuf:"bytes,3,rep,name=outpoints,proto3" json:"outpoints,omitempty"`
+	ExpiresAt     int64                  `protobuf:"varint,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Pubkey        string                 `protobuf:"bytes,5,opt,name=pubkey,proto3" json:"pubkey,omitempty"`
+	Signature     string                 `protobuf:"bytes,6,opt,name=signature,proto3" json:"signature,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterSpendRequest) Reset() {
+	*x = RegisterSpendRequest{}
+	mi := &file_delegatee_v1_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterSpendRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterSpendRequest) ProtoMessage() {}
+
+func (x *RegisterSpendRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterSpendRequest.ProtoReflect.Descriptor instead.
+func (*RegisterSpendRequest) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *RegisterSpendRequest) GetTemplateId() string {
+	if x != nil {
+		return x.TemplateId
+	}
+	return ""
+}
+
+func (x *RegisterSpendRequest) GetVariables() map[string]string {
+	if x != nil {
+		return x.Variables
+	}
+	return nil
+}
+
+func (x *RegisterSpendRequest) GetOutpoints() []string {
+	if x != nil {
+		return x.Outpoints
+	}
+	return nil
+}
+
+func (x *RegisterSpendRequest) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
+}
+
+func (x *RegisterSpendRequest) GetPubkey() string {
+	if x != nil {
+		return x.Pubkey
+	}
+	return ""
+}
+
+func (x *RegisterSpendRequest) GetSignature() string {
+	if x != nil {
+		return x.Signature
+	}
+	return ""
+}
+
+type RegisterSpendResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// id is the spend's fingerprint.
+	Id            string      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Delegation    *Delegation `protobuf:"bytes,2,opt,name=delegation,proto3" json:"delegation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterSpendResponse) Reset() {
+	*x = RegisterSpendResponse{}
+	mi := &file_delegatee_v1_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterSpendResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterSpendResponse) ProtoMessage() {}
+
+func (x *RegisterSpendResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterSpendResponse.ProtoReflect.Descriptor instead.
+func (*RegisterSpendResponse) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *RegisterSpendResponse) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RegisterSpendResponse) GetDelegation() *Delegation {
+	if x != nil {
+		return x.Delegation
+	}
+	return nil
+}
+
+type GetSpendRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSpendRequest) Reset() {
+	*x = GetSpendRequest{}
+	mi := &file_delegatee_v1_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSpendRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSpendRequest) ProtoMessage() {}
+
+func (x *GetSpendRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSpendRequest.ProtoReflect.Descriptor instead.
+func (*GetSpendRequest) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetSpendRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type GetSpendResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Delegation    *Delegation            `protobuf:"bytes,1,opt,name=delegation,proto3" json:"delegation,omitempty"`
+	Vtxos         []*Vtxo                `protobuf:"bytes,2,rep,name=vtxos,proto3" json:"vtxos,omitempty"`
+	Renewals      []*Renewal             `protobuf:"bytes,3,rep,name=renewals,proto3" json:"renewals,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSpendResponse) Reset() {
+	*x = GetSpendResponse{}
+	mi := &file_delegatee_v1_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSpendResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSpendResponse) ProtoMessage() {}
+
+func (x *GetSpendResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSpendResponse.ProtoReflect.Descriptor instead.
+func (*GetSpendResponse) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetSpendResponse) GetDelegation() *Delegation {
+	if x != nil {
+		return x.Delegation
+	}
+	return nil
+}
+
+func (x *GetSpendResponse) GetVtxos() []*Vtxo {
+	if x != nil {
+		return x.Vtxos
+	}
+	return nil
+}
+
+func (x *GetSpendResponse) GetRenewals() []*Renewal {
+	if x != nil {
+		return x.Renewals
+	}
+	return nil
+}
+
 // Delegation is an instance of a template.
 type Delegation struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -375,7 +616,7 @@ type Delegation struct {
 
 func (x *Delegation) Reset() {
 	*x = Delegation{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[6]
+	mi := &file_delegatee_v1_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -387,7 +628,7 @@ func (x *Delegation) String() string {
 func (*Delegation) ProtoMessage() {}
 
 func (x *Delegation) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[6]
+	mi := &file_delegatee_v1_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -400,7 +641,7 @@ func (x *Delegation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Delegation.ProtoReflect.Descriptor instead.
 func (*Delegation) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{6}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Delegation) GetId() int64 {
@@ -487,7 +728,7 @@ type Slot struct {
 
 func (x *Slot) Reset() {
 	*x = Slot{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[7]
+	mi := &file_delegatee_v1_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -499,7 +740,7 @@ func (x *Slot) String() string {
 func (*Slot) ProtoMessage() {}
 
 func (x *Slot) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[7]
+	mi := &file_delegatee_v1_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -512,7 +753,7 @@ func (x *Slot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Slot.ProtoReflect.Descriptor instead.
 func (*Slot) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{7}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Slot) GetName() string {
@@ -559,7 +800,7 @@ type Vtxo struct {
 
 func (x *Vtxo) Reset() {
 	*x = Vtxo{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[8]
+	mi := &file_delegatee_v1_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -571,7 +812,7 @@ func (x *Vtxo) String() string {
 func (*Vtxo) ProtoMessage() {}
 
 func (x *Vtxo) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[8]
+	mi := &file_delegatee_v1_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -584,7 +825,7 @@ func (x *Vtxo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Vtxo.ProtoReflect.Descriptor instead.
 func (*Vtxo) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{8}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Vtxo) GetOutpoint() string {
@@ -653,7 +894,7 @@ type Asset struct {
 
 func (x *Asset) Reset() {
 	*x = Asset{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[9]
+	mi := &file_delegatee_v1_service_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -665,7 +906,7 @@ func (x *Asset) String() string {
 func (*Asset) ProtoMessage() {}
 
 func (x *Asset) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[9]
+	mi := &file_delegatee_v1_service_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -678,7 +919,7 @@ func (x *Asset) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Asset.ProtoReflect.Descriptor instead.
 func (*Asset) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{9}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Asset) GetAssetId() string {
@@ -708,7 +949,7 @@ type Renewal struct {
 
 func (x *Renewal) Reset() {
 	*x = Renewal{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[10]
+	mi := &file_delegatee_v1_service_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -720,7 +961,7 @@ func (x *Renewal) String() string {
 func (*Renewal) ProtoMessage() {}
 
 func (x *Renewal) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[10]
+	mi := &file_delegatee_v1_service_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -733,7 +974,7 @@ func (x *Renewal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Renewal.ProtoReflect.Descriptor instead.
 func (*Renewal) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{10}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Renewal) GetOutpoints() []string {
@@ -780,7 +1021,7 @@ type RegisterArtifactRequest struct {
 
 func (x *RegisterArtifactRequest) Reset() {
 	*x = RegisterArtifactRequest{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[11]
+	mi := &file_delegatee_v1_service_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -792,7 +1033,7 @@ func (x *RegisterArtifactRequest) String() string {
 func (*RegisterArtifactRequest) ProtoMessage() {}
 
 func (x *RegisterArtifactRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[11]
+	mi := &file_delegatee_v1_service_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -805,7 +1046,7 @@ func (x *RegisterArtifactRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterArtifactRequest.ProtoReflect.Descriptor instead.
 func (*RegisterArtifactRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{11}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RegisterArtifactRequest) GetDocument() string {
@@ -824,7 +1065,7 @@ type RegisterArtifactResponse struct {
 
 func (x *RegisterArtifactResponse) Reset() {
 	*x = RegisterArtifactResponse{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[12]
+	mi := &file_delegatee_v1_service_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -836,7 +1077,7 @@ func (x *RegisterArtifactResponse) String() string {
 func (*RegisterArtifactResponse) ProtoMessage() {}
 
 func (x *RegisterArtifactResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[12]
+	mi := &file_delegatee_v1_service_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -849,7 +1090,7 @@ func (x *RegisterArtifactResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterArtifactResponse.ProtoReflect.Descriptor instead.
 func (*RegisterArtifactResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{12}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RegisterArtifactResponse) GetArtifact() *Artifact {
@@ -868,7 +1109,7 @@ type GetArtifactRequest struct {
 
 func (x *GetArtifactRequest) Reset() {
 	*x = GetArtifactRequest{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[13]
+	mi := &file_delegatee_v1_service_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -880,7 +1121,7 @@ func (x *GetArtifactRequest) String() string {
 func (*GetArtifactRequest) ProtoMessage() {}
 
 func (x *GetArtifactRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[13]
+	mi := &file_delegatee_v1_service_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -893,7 +1134,7 @@ func (x *GetArtifactRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetArtifactRequest.ProtoReflect.Descriptor instead.
 func (*GetArtifactRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{13}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetArtifactRequest) GetId() string {
@@ -912,7 +1153,7 @@ type GetArtifactResponse struct {
 
 func (x *GetArtifactResponse) Reset() {
 	*x = GetArtifactResponse{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[14]
+	mi := &file_delegatee_v1_service_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -924,7 +1165,7 @@ func (x *GetArtifactResponse) String() string {
 func (*GetArtifactResponse) ProtoMessage() {}
 
 func (x *GetArtifactResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[14]
+	mi := &file_delegatee_v1_service_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -937,7 +1178,7 @@ func (x *GetArtifactResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetArtifactResponse.ProtoReflect.Descriptor instead.
 func (*GetArtifactResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{14}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetArtifactResponse) GetArtifact() *Artifact {
@@ -958,7 +1199,7 @@ type Artifact struct {
 
 func (x *Artifact) Reset() {
 	*x = Artifact{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[15]
+	mi := &file_delegatee_v1_service_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -970,7 +1211,7 @@ func (x *Artifact) String() string {
 func (*Artifact) ProtoMessage() {}
 
 func (x *Artifact) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[15]
+	mi := &file_delegatee_v1_service_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -983,7 +1224,7 @@ func (x *Artifact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Artifact.ProtoReflect.Descriptor instead.
 func (*Artifact) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{15}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Artifact) GetId() string {
@@ -1016,7 +1257,7 @@ type RegisterTemplateRequest struct {
 
 func (x *RegisterTemplateRequest) Reset() {
 	*x = RegisterTemplateRequest{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[16]
+	mi := &file_delegatee_v1_service_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1028,7 +1269,7 @@ func (x *RegisterTemplateRequest) String() string {
 func (*RegisterTemplateRequest) ProtoMessage() {}
 
 func (x *RegisterTemplateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[16]
+	mi := &file_delegatee_v1_service_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1041,7 +1282,7 @@ func (x *RegisterTemplateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterTemplateRequest.ProtoReflect.Descriptor instead.
 func (*RegisterTemplateRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{16}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *RegisterTemplateRequest) GetDocument() string {
@@ -1060,7 +1301,7 @@ type RegisterTemplateResponse struct {
 
 func (x *RegisterTemplateResponse) Reset() {
 	*x = RegisterTemplateResponse{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[17]
+	mi := &file_delegatee_v1_service_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1072,7 +1313,7 @@ func (x *RegisterTemplateResponse) String() string {
 func (*RegisterTemplateResponse) ProtoMessage() {}
 
 func (x *RegisterTemplateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[17]
+	mi := &file_delegatee_v1_service_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1085,7 +1326,7 @@ func (x *RegisterTemplateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterTemplateResponse.ProtoReflect.Descriptor instead.
 func (*RegisterTemplateResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{17}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *RegisterTemplateResponse) GetTemplate() *Template {
@@ -1104,7 +1345,7 @@ type GetTemplateRequest struct {
 
 func (x *GetTemplateRequest) Reset() {
 	*x = GetTemplateRequest{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[18]
+	mi := &file_delegatee_v1_service_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1116,7 +1357,7 @@ func (x *GetTemplateRequest) String() string {
 func (*GetTemplateRequest) ProtoMessage() {}
 
 func (x *GetTemplateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[18]
+	mi := &file_delegatee_v1_service_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1129,7 +1370,7 @@ func (x *GetTemplateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTemplateRequest.ProtoReflect.Descriptor instead.
 func (*GetTemplateRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{18}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GetTemplateRequest) GetId() string {
@@ -1148,7 +1389,7 @@ type GetTemplateResponse struct {
 
 func (x *GetTemplateResponse) Reset() {
 	*x = GetTemplateResponse{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[19]
+	mi := &file_delegatee_v1_service_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1160,7 +1401,7 @@ func (x *GetTemplateResponse) String() string {
 func (*GetTemplateResponse) ProtoMessage() {}
 
 func (x *GetTemplateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[19]
+	mi := &file_delegatee_v1_service_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1173,7 +1414,7 @@ func (x *GetTemplateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTemplateResponse.ProtoReflect.Descriptor instead.
 func (*GetTemplateResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{19}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetTemplateResponse) GetTemplate() *Template {
@@ -1192,7 +1433,7 @@ type ListTemplatesRequest struct {
 
 func (x *ListTemplatesRequest) Reset() {
 	*x = ListTemplatesRequest{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[20]
+	mi := &file_delegatee_v1_service_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1204,7 +1445,7 @@ func (x *ListTemplatesRequest) String() string {
 func (*ListTemplatesRequest) ProtoMessage() {}
 
 func (x *ListTemplatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[20]
+	mi := &file_delegatee_v1_service_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1217,7 +1458,7 @@ func (x *ListTemplatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTemplatesRequest.ProtoReflect.Descriptor instead.
 func (*ListTemplatesRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{20}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{24}
 }
 
 type ListTemplatesResponse struct {
@@ -1229,7 +1470,7 @@ type ListTemplatesResponse struct {
 
 func (x *ListTemplatesResponse) Reset() {
 	*x = ListTemplatesResponse{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[21]
+	mi := &file_delegatee_v1_service_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1241,7 +1482,7 @@ func (x *ListTemplatesResponse) String() string {
 func (*ListTemplatesResponse) ProtoMessage() {}
 
 func (x *ListTemplatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[21]
+	mi := &file_delegatee_v1_service_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1254,7 +1495,7 @@ func (x *ListTemplatesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTemplatesResponse.ProtoReflect.Descriptor instead.
 func (*ListTemplatesResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{21}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ListTemplatesResponse) GetTemplates() []*Template {
@@ -1274,7 +1515,7 @@ type Param struct {
 
 func (x *Param) Reset() {
 	*x = Param{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[22]
+	mi := &file_delegatee_v1_service_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1286,7 +1527,7 @@ func (x *Param) String() string {
 func (*Param) ProtoMessage() {}
 
 func (x *Param) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[22]
+	mi := &file_delegatee_v1_service_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1299,7 +1540,7 @@ func (x *Param) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Param.ProtoReflect.Descriptor instead.
 func (*Param) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{22}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *Param) GetName() string {
@@ -1330,7 +1571,7 @@ type Template struct {
 
 func (x *Template) Reset() {
 	*x = Template{}
-	mi := &file_delegatee_v1_service_proto_msgTypes[23]
+	mi := &file_delegatee_v1_service_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1342,7 +1583,7 @@ func (x *Template) String() string {
 func (*Template) ProtoMessage() {}
 
 func (x *Template) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_service_proto_msgTypes[23]
+	mi := &file_delegatee_v1_service_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1355,7 +1596,7 @@ func (x *Template) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Template.ProtoReflect.Descriptor instead.
 func (*Template) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{23}
+	return file_delegatee_v1_service_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *Template) GetId() string {
@@ -1429,6 +1670,31 @@ const file_delegatee_v1_service_proto_rawDesc = "" +
 	"\x14GetDelegationRequest\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\"\xae\x01\n" +
 	"\x15GetDelegationResponse\x128\n" +
+	"\n" +
+	"delegation\x18\x01 \x01(\v2\x18.delegatee.v1.DelegationR\n" +
+	"delegation\x12(\n" +
+	"\x05vtxos\x18\x02 \x03(\v2\x12.delegatee.v1.VtxoR\x05vtxos\x121\n" +
+	"\brenewals\x18\x03 \x03(\v2\x15.delegatee.v1.RenewalR\brenewals\"\xb9\x02\n" +
+	"\x14RegisterSpendRequest\x12\x1f\n" +
+	"\vtemplate_id\x18\x01 \x01(\tR\n" +
+	"templateId\x12O\n" +
+	"\tvariables\x18\x02 \x03(\v21.delegatee.v1.RegisterSpendRequest.VariablesEntryR\tvariables\x12\x1c\n" +
+	"\toutpoints\x18\x03 \x03(\tR\toutpoints\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\x03R\texpiresAt\x12\x16\n" +
+	"\x06pubkey\x18\x05 \x01(\tR\x06pubkey\x12\x1c\n" +
+	"\tsignature\x18\x06 \x01(\tR\tsignature\x1a<\n" +
+	"\x0eVariablesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"a\n" +
+	"\x15RegisterSpendResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x128\n" +
+	"\n" +
+	"delegation\x18\x02 \x01(\v2\x18.delegatee.v1.DelegationR\n" +
+	"delegation\"!\n" +
+	"\x0fGetSpendRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xa9\x01\n" +
+	"\x10GetSpendResponse\x128\n" +
 	"\n" +
 	"delegation\x18\x01 \x01(\v2\x18.delegatee.v1.DelegationR\n" +
 	"delegation\x12(\n" +
@@ -1515,12 +1781,14 @@ const file_delegatee_v1_service_proto_rawDesc = "" +
 	"\x06params\x18\x04 \x03(\v2\x13.delegatee.v1.ParamR\x06params\x12\x16\n" +
 	"\x06status\x18\x05 \x01(\tR\x06status\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x06 \x01(\x03R\tcreatedAt2\x96\a\n" +
+	"created_at\x18\x06 \x01(\x03R\tcreatedAt2\xe3\b\n" +
 	"\x10DelegateeService\x12U\n" +
 	"\aGetInfo\x12\x1c.delegatee.v1.GetInfoRequest\x1a\x1d.delegatee.v1.GetInfoResponse\"\r\xb2J\n" +
 	"\x12\b/v1/info\x12}\n" +
 	"\x12RegisterDelegation\x12'.delegatee.v1.RegisterDelegationRequest\x1a(.delegatee.v1.RegisterDelegationResponse\"\x14\xb2J\x11B\x01*\"\f/v1/delegate\x12u\n" +
-	"\rGetDelegation\x12\".delegatee.v1.GetDelegationRequest\x1a#.delegatee.v1.GetDelegationResponse\"\x1b\xb2J\x18\x12\x16/v1/delegate/{address}\x12w\n" +
+	"\rGetDelegation\x12\".delegatee.v1.GetDelegationRequest\x1a#.delegatee.v1.GetDelegationResponse\"\x1b\xb2J\x18\x12\x16/v1/delegate/{address}\x12k\n" +
+	"\rRegisterSpend\x12\".delegatee.v1.RegisterSpendRequest\x1a#.delegatee.v1.RegisterSpendResponse\"\x11\xb2J\x0eB\x01*\"\t/v1/spend\x12^\n" +
+	"\bGetSpend\x12\x1d.delegatee.v1.GetSpendRequest\x1a\x1e.delegatee.v1.GetSpendResponse\"\x13\xb2J\x10\x12\x0e/v1/spend/{id}\x12w\n" +
 	"\x10RegisterArtifact\x12%.delegatee.v1.RegisterArtifactRequest\x1a&.delegatee.v1.RegisterArtifactResponse\"\x14\xb2J\x11B\x01*\"\f/v1/artifact\x12j\n" +
 	"\vGetArtifact\x12 .delegatee.v1.GetArtifactRequest\x1a!.delegatee.v1.GetArtifactResponse\"\x16\xb2J\x13\x12\x11/v1/artifact/{id}\x12w\n" +
 	"\x10RegisterTemplate\x12%.delegatee.v1.RegisterTemplateRequest\x1a&.delegatee.v1.RegisterTemplateResponse\"\x14\xb2J\x11B\x01*\"\f/v1/template\x12j\n" +
@@ -1540,7 +1808,7 @@ func file_delegatee_v1_service_proto_rawDescGZIP() []byte {
 	return file_delegatee_v1_service_proto_rawDescData
 }
 
-var file_delegatee_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_delegatee_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_delegatee_v1_service_proto_goTypes = []any{
 	(*GetInfoRequest)(nil),             // 0: delegatee.v1.GetInfoRequest
 	(*GetInfoResponse)(nil),            // 1: delegatee.v1.GetInfoResponse
@@ -1548,63 +1816,77 @@ var file_delegatee_v1_service_proto_goTypes = []any{
 	(*RegisterDelegationResponse)(nil), // 3: delegatee.v1.RegisterDelegationResponse
 	(*GetDelegationRequest)(nil),       // 4: delegatee.v1.GetDelegationRequest
 	(*GetDelegationResponse)(nil),      // 5: delegatee.v1.GetDelegationResponse
-	(*Delegation)(nil),                 // 6: delegatee.v1.Delegation
-	(*Slot)(nil),                       // 7: delegatee.v1.Slot
-	(*Vtxo)(nil),                       // 8: delegatee.v1.Vtxo
-	(*Asset)(nil),                      // 9: delegatee.v1.Asset
-	(*Renewal)(nil),                    // 10: delegatee.v1.Renewal
-	(*RegisterArtifactRequest)(nil),    // 11: delegatee.v1.RegisterArtifactRequest
-	(*RegisterArtifactResponse)(nil),   // 12: delegatee.v1.RegisterArtifactResponse
-	(*GetArtifactRequest)(nil),         // 13: delegatee.v1.GetArtifactRequest
-	(*GetArtifactResponse)(nil),        // 14: delegatee.v1.GetArtifactResponse
-	(*Artifact)(nil),                   // 15: delegatee.v1.Artifact
-	(*RegisterTemplateRequest)(nil),    // 16: delegatee.v1.RegisterTemplateRequest
-	(*RegisterTemplateResponse)(nil),   // 17: delegatee.v1.RegisterTemplateResponse
-	(*GetTemplateRequest)(nil),         // 18: delegatee.v1.GetTemplateRequest
-	(*GetTemplateResponse)(nil),        // 19: delegatee.v1.GetTemplateResponse
-	(*ListTemplatesRequest)(nil),       // 20: delegatee.v1.ListTemplatesRequest
-	(*ListTemplatesResponse)(nil),      // 21: delegatee.v1.ListTemplatesResponse
-	(*Param)(nil),                      // 22: delegatee.v1.Param
-	(*Template)(nil),                   // 23: delegatee.v1.Template
-	nil,                                // 24: delegatee.v1.RegisterDelegationRequest.VariablesEntry
-	nil,                                // 25: delegatee.v1.Delegation.VariablesEntry
+	(*RegisterSpendRequest)(nil),       // 6: delegatee.v1.RegisterSpendRequest
+	(*RegisterSpendResponse)(nil),      // 7: delegatee.v1.RegisterSpendResponse
+	(*GetSpendRequest)(nil),            // 8: delegatee.v1.GetSpendRequest
+	(*GetSpendResponse)(nil),           // 9: delegatee.v1.GetSpendResponse
+	(*Delegation)(nil),                 // 10: delegatee.v1.Delegation
+	(*Slot)(nil),                       // 11: delegatee.v1.Slot
+	(*Vtxo)(nil),                       // 12: delegatee.v1.Vtxo
+	(*Asset)(nil),                      // 13: delegatee.v1.Asset
+	(*Renewal)(nil),                    // 14: delegatee.v1.Renewal
+	(*RegisterArtifactRequest)(nil),    // 15: delegatee.v1.RegisterArtifactRequest
+	(*RegisterArtifactResponse)(nil),   // 16: delegatee.v1.RegisterArtifactResponse
+	(*GetArtifactRequest)(nil),         // 17: delegatee.v1.GetArtifactRequest
+	(*GetArtifactResponse)(nil),        // 18: delegatee.v1.GetArtifactResponse
+	(*Artifact)(nil),                   // 19: delegatee.v1.Artifact
+	(*RegisterTemplateRequest)(nil),    // 20: delegatee.v1.RegisterTemplateRequest
+	(*RegisterTemplateResponse)(nil),   // 21: delegatee.v1.RegisterTemplateResponse
+	(*GetTemplateRequest)(nil),         // 22: delegatee.v1.GetTemplateRequest
+	(*GetTemplateResponse)(nil),        // 23: delegatee.v1.GetTemplateResponse
+	(*ListTemplatesRequest)(nil),       // 24: delegatee.v1.ListTemplatesRequest
+	(*ListTemplatesResponse)(nil),      // 25: delegatee.v1.ListTemplatesResponse
+	(*Param)(nil),                      // 26: delegatee.v1.Param
+	(*Template)(nil),                   // 27: delegatee.v1.Template
+	nil,                                // 28: delegatee.v1.RegisterDelegationRequest.VariablesEntry
+	nil,                                // 29: delegatee.v1.RegisterSpendRequest.VariablesEntry
+	nil,                                // 30: delegatee.v1.Delegation.VariablesEntry
 }
 var file_delegatee_v1_service_proto_depIdxs = []int32{
-	24, // 0: delegatee.v1.RegisterDelegationRequest.variables:type_name -> delegatee.v1.RegisterDelegationRequest.VariablesEntry
-	6,  // 1: delegatee.v1.RegisterDelegationResponse.delegation:type_name -> delegatee.v1.Delegation
-	6,  // 2: delegatee.v1.GetDelegationResponse.delegation:type_name -> delegatee.v1.Delegation
-	8,  // 3: delegatee.v1.GetDelegationResponse.vtxos:type_name -> delegatee.v1.Vtxo
-	10, // 4: delegatee.v1.GetDelegationResponse.renewals:type_name -> delegatee.v1.Renewal
-	25, // 5: delegatee.v1.Delegation.variables:type_name -> delegatee.v1.Delegation.VariablesEntry
-	7,  // 6: delegatee.v1.Delegation.slots:type_name -> delegatee.v1.Slot
-	9,  // 7: delegatee.v1.Vtxo.assets:type_name -> delegatee.v1.Asset
-	15, // 8: delegatee.v1.RegisterArtifactResponse.artifact:type_name -> delegatee.v1.Artifact
-	15, // 9: delegatee.v1.GetArtifactResponse.artifact:type_name -> delegatee.v1.Artifact
-	23, // 10: delegatee.v1.RegisterTemplateResponse.template:type_name -> delegatee.v1.Template
-	23, // 11: delegatee.v1.GetTemplateResponse.template:type_name -> delegatee.v1.Template
-	23, // 12: delegatee.v1.ListTemplatesResponse.templates:type_name -> delegatee.v1.Template
-	22, // 13: delegatee.v1.Template.params:type_name -> delegatee.v1.Param
-	0,  // 14: delegatee.v1.DelegateeService.GetInfo:input_type -> delegatee.v1.GetInfoRequest
-	2,  // 15: delegatee.v1.DelegateeService.RegisterDelegation:input_type -> delegatee.v1.RegisterDelegationRequest
-	4,  // 16: delegatee.v1.DelegateeService.GetDelegation:input_type -> delegatee.v1.GetDelegationRequest
-	11, // 17: delegatee.v1.DelegateeService.RegisterArtifact:input_type -> delegatee.v1.RegisterArtifactRequest
-	13, // 18: delegatee.v1.DelegateeService.GetArtifact:input_type -> delegatee.v1.GetArtifactRequest
-	16, // 19: delegatee.v1.DelegateeService.RegisterTemplate:input_type -> delegatee.v1.RegisterTemplateRequest
-	18, // 20: delegatee.v1.DelegateeService.GetTemplate:input_type -> delegatee.v1.GetTemplateRequest
-	20, // 21: delegatee.v1.DelegateeService.ListTemplates:input_type -> delegatee.v1.ListTemplatesRequest
-	1,  // 22: delegatee.v1.DelegateeService.GetInfo:output_type -> delegatee.v1.GetInfoResponse
-	3,  // 23: delegatee.v1.DelegateeService.RegisterDelegation:output_type -> delegatee.v1.RegisterDelegationResponse
-	5,  // 24: delegatee.v1.DelegateeService.GetDelegation:output_type -> delegatee.v1.GetDelegationResponse
-	12, // 25: delegatee.v1.DelegateeService.RegisterArtifact:output_type -> delegatee.v1.RegisterArtifactResponse
-	14, // 26: delegatee.v1.DelegateeService.GetArtifact:output_type -> delegatee.v1.GetArtifactResponse
-	17, // 27: delegatee.v1.DelegateeService.RegisterTemplate:output_type -> delegatee.v1.RegisterTemplateResponse
-	19, // 28: delegatee.v1.DelegateeService.GetTemplate:output_type -> delegatee.v1.GetTemplateResponse
-	21, // 29: delegatee.v1.DelegateeService.ListTemplates:output_type -> delegatee.v1.ListTemplatesResponse
-	22, // [22:30] is the sub-list for method output_type
-	14, // [14:22] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	28, // 0: delegatee.v1.RegisterDelegationRequest.variables:type_name -> delegatee.v1.RegisterDelegationRequest.VariablesEntry
+	10, // 1: delegatee.v1.RegisterDelegationResponse.delegation:type_name -> delegatee.v1.Delegation
+	10, // 2: delegatee.v1.GetDelegationResponse.delegation:type_name -> delegatee.v1.Delegation
+	12, // 3: delegatee.v1.GetDelegationResponse.vtxos:type_name -> delegatee.v1.Vtxo
+	14, // 4: delegatee.v1.GetDelegationResponse.renewals:type_name -> delegatee.v1.Renewal
+	29, // 5: delegatee.v1.RegisterSpendRequest.variables:type_name -> delegatee.v1.RegisterSpendRequest.VariablesEntry
+	10, // 6: delegatee.v1.RegisterSpendResponse.delegation:type_name -> delegatee.v1.Delegation
+	10, // 7: delegatee.v1.GetSpendResponse.delegation:type_name -> delegatee.v1.Delegation
+	12, // 8: delegatee.v1.GetSpendResponse.vtxos:type_name -> delegatee.v1.Vtxo
+	14, // 9: delegatee.v1.GetSpendResponse.renewals:type_name -> delegatee.v1.Renewal
+	30, // 10: delegatee.v1.Delegation.variables:type_name -> delegatee.v1.Delegation.VariablesEntry
+	11, // 11: delegatee.v1.Delegation.slots:type_name -> delegatee.v1.Slot
+	13, // 12: delegatee.v1.Vtxo.assets:type_name -> delegatee.v1.Asset
+	19, // 13: delegatee.v1.RegisterArtifactResponse.artifact:type_name -> delegatee.v1.Artifact
+	19, // 14: delegatee.v1.GetArtifactResponse.artifact:type_name -> delegatee.v1.Artifact
+	27, // 15: delegatee.v1.RegisterTemplateResponse.template:type_name -> delegatee.v1.Template
+	27, // 16: delegatee.v1.GetTemplateResponse.template:type_name -> delegatee.v1.Template
+	27, // 17: delegatee.v1.ListTemplatesResponse.templates:type_name -> delegatee.v1.Template
+	26, // 18: delegatee.v1.Template.params:type_name -> delegatee.v1.Param
+	0,  // 19: delegatee.v1.DelegateeService.GetInfo:input_type -> delegatee.v1.GetInfoRequest
+	2,  // 20: delegatee.v1.DelegateeService.RegisterDelegation:input_type -> delegatee.v1.RegisterDelegationRequest
+	4,  // 21: delegatee.v1.DelegateeService.GetDelegation:input_type -> delegatee.v1.GetDelegationRequest
+	6,  // 22: delegatee.v1.DelegateeService.RegisterSpend:input_type -> delegatee.v1.RegisterSpendRequest
+	8,  // 23: delegatee.v1.DelegateeService.GetSpend:input_type -> delegatee.v1.GetSpendRequest
+	15, // 24: delegatee.v1.DelegateeService.RegisterArtifact:input_type -> delegatee.v1.RegisterArtifactRequest
+	17, // 25: delegatee.v1.DelegateeService.GetArtifact:input_type -> delegatee.v1.GetArtifactRequest
+	20, // 26: delegatee.v1.DelegateeService.RegisterTemplate:input_type -> delegatee.v1.RegisterTemplateRequest
+	22, // 27: delegatee.v1.DelegateeService.GetTemplate:input_type -> delegatee.v1.GetTemplateRequest
+	24, // 28: delegatee.v1.DelegateeService.ListTemplates:input_type -> delegatee.v1.ListTemplatesRequest
+	1,  // 29: delegatee.v1.DelegateeService.GetInfo:output_type -> delegatee.v1.GetInfoResponse
+	3,  // 30: delegatee.v1.DelegateeService.RegisterDelegation:output_type -> delegatee.v1.RegisterDelegationResponse
+	5,  // 31: delegatee.v1.DelegateeService.GetDelegation:output_type -> delegatee.v1.GetDelegationResponse
+	7,  // 32: delegatee.v1.DelegateeService.RegisterSpend:output_type -> delegatee.v1.RegisterSpendResponse
+	9,  // 33: delegatee.v1.DelegateeService.GetSpend:output_type -> delegatee.v1.GetSpendResponse
+	16, // 34: delegatee.v1.DelegateeService.RegisterArtifact:output_type -> delegatee.v1.RegisterArtifactResponse
+	18, // 35: delegatee.v1.DelegateeService.GetArtifact:output_type -> delegatee.v1.GetArtifactResponse
+	21, // 36: delegatee.v1.DelegateeService.RegisterTemplate:output_type -> delegatee.v1.RegisterTemplateResponse
+	23, // 37: delegatee.v1.DelegateeService.GetTemplate:output_type -> delegatee.v1.GetTemplateResponse
+	25, // 38: delegatee.v1.DelegateeService.ListTemplates:output_type -> delegatee.v1.ListTemplatesResponse
+	29, // [29:39] is the sub-list for method output_type
+	19, // [19:29] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_delegatee_v1_service_proto_init() }
@@ -1618,7 +1900,7 @@ func file_delegatee_v1_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_delegatee_v1_service_proto_rawDesc), len(file_delegatee_v1_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   26,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

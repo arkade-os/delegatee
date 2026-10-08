@@ -56,3 +56,21 @@ the retry by its own length, so set the reserve higher where sessions are
 long. The admin UI shows the planned batches and why each is when it is.
 
 Other limits and intervals are in [`internal/config/config.go`](internal/config/config.go).
+
+## Spends
+
+`POST /v1/spend` asks the daemon to spend given coins once through a
+template, typically an offchain or intent template whose arkade scripts check
+signatures the wallet put in the variables. The outpoints follow the
+template's inputs. The request is signed by the owner: `pubkey` (x-only) must
+be the only key of a CSV exit leaf of every input, and `signature` its BIP340
+signature over `tagged_hash("delegatee/spend", id || expires_at)`, where `id`
+is the spend's fingerprint (see `RegisterSpendResponse`) and `expires_at` a
+big-endian uint64 at most a day ahead. The daemon retries until the coins are
+spent or the spend expires; `GET /v1/spend/{id}` shows its status and attempts.
+A spend never holds a coin back from a watch: a watch due to act on a coin
+still does.
+
+An output may draw from several inputs: `"value": {"from": ["a", "b"]}` pools
+their satoshis, so one payment and one change can spend many coins. An input
+belongs to one pool, and each pool has one output without an `amount`.

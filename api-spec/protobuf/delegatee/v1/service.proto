@@ -32,6 +32,21 @@ service DelegateeService {
     };
   }
 
+  // RegisterSpend spends outpoints once through a template, signed by their owner.
+  rpc RegisterSpend(RegisterSpendRequest) returns (RegisterSpendResponse) {
+    option (meshapi.gateway.http) = {
+      post: "/v1/spend"
+      body: "*"
+    };
+  }
+
+  // GetSpend returns a spend with its coins and attempts.
+  rpc GetSpend(GetSpendRequest) returns (GetSpendResponse) {
+    option (meshapi.gateway.http) = {
+      get: "/v1/spend/{id}"
+    };
+  }
+
   // RegisterArtifact stores a compiler artifact templates may reference. Idempotent on its id.
   rpc RegisterArtifact(RegisterArtifactRequest) returns (RegisterArtifactResponse) {
     option (meshapi.gateway.http) = { post: "/v1/artifact" body: "*" };
@@ -77,6 +92,29 @@ message GetDelegationRequest {
   string address = 1;
 }
 message GetDelegationResponse {
+  Delegation delegation = 1;
+  repeated Vtxo vtxos = 2;
+  repeated Renewal renewals = 3;
+}
+
+message RegisterSpendRequest {
+  string template_id = 1;
+  map<string, string> variables = 2;
+  repeated string outpoints = 3;
+  int64 expires_at = 4;
+  string pubkey = 5;
+  string signature = 6;
+}
+message RegisterSpendResponse {
+  // id is the spend's fingerprint.
+  string id = 1;
+  Delegation delegation = 2;
+}
+
+message GetSpendRequest {
+  string id = 1;
+}
+message GetSpendResponse {
   Delegation delegation = 1;
   repeated Vtxo vtxos = 2;
   repeated Renewal renewals = 3;

@@ -996,8 +996,11 @@ const cosignerHex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b1
 
 func document(t testing.TB, file string) []byte {
 	t.Helper()
-	if file == ownedRenewal {
+	switch file {
+	case ownedRenewal:
 		return []byte(ownedRenewalDoc)
+	case pooledSpend:
+		return []byte(pooledSpendDoc)
 	}
 	doc, err := os.ReadFile(filepath.Join("..", "..", "..", "pkg", "template", "testdata", file))
 	if errors.Is(err, fs.ErrNotExist) {
@@ -1417,3 +1420,35 @@ const ownedRenewalDoc = `{
     "advertise": [{"template": "self", "outputs": ["renewed"]}]
   }
 }`
+
+const pooledSpend = "pooled_spend.json"
+
+// pooledSpendDoc pays <amount> on chain from two coins, the rest back.
+var pooledSpendDoc = strings.ReplaceAll(`{
+  "format": "delegateed-template/v1",
+  "type": "intent",
+  "variables": {"owner": "pubkey", "amount": "int"},
+  "inputs": [
+    {"name": "a", "contract": {"definition": {"artifact": "SPENDABLE"}, "arguments": {"owner": "<owner>"}}, "spend": {"function": "pay", "leaf": "pay"}},
+    {"name": "b", "contract": {"definition": {"artifact": "SPENDABLE"}, "arguments": {"owner": "<owner>"}}, "spend": {"function": "pay", "leaf": "pay"}}
+  ],
+  "outputs": [
+    {"name": "change", "index": 0, "value": {"from": ["a", "b"]}, "locking": {"from": "a"}},
+    {"name": "payment", "type": "onchain", "index": 2, "value": {"from": ["a", "b"], "amount": "<amount>"},
+      "locking": "5120f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"}
+  ],
+  "fees": {"from": "a", "max": 1000},
+  "packets": {"output_index": 1}
+}`, `{"artifact": "SPENDABLE"}`, `{
+  "contractName": "Spendable",
+  "constructorInputs": [{"name": "owner", "type": "pubkey"}],
+  "structs": [],
+  "functions": [
+    {"name": "exit", "leaves": [{"name": "exit", "asm": ["144", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<owner>", "OP_CHECKSIG"],
+      "witness": [{"name": "ownerSig", "type": "signature", "encoding": "schnorr-64"}]}]},
+    {"name": "pay", "arkade": {"inputs": [], "asm": ["OP_1"]},
+      "leaves": [{"name": "pay", "asm": ["<SERVER_KEY>", "OP_CHECKSIGVERIFY", "<EMULATOR_KEY:pay>", "OP_CHECKSIG"],
+      "witness": [{"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
+                  {"name": "emulatorSig", "type": "signature", "encoding": "schnorr-64", "injected": true}]}]}
+  ]
+}`)

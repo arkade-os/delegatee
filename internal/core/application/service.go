@@ -108,6 +108,12 @@ type Service interface {
 	ResumeDelegation(ctx context.Context, id int64) error
 	GetDelegation(ctx context.Context, address string) (*domain.Delegation, error)
 	GetDelegationByID(ctx context.Context, id int64) (*domain.Delegation, error)
+	// RegisterSpend spends outpoints once, signed by their owner.
+	RegisterSpend(
+		ctx context.Context, templateID string, variables map[string]string, outpoints []string, expiresAt time.Time, pubkey, signature string,
+	) (*domain.Delegation, error)
+	// GetSpend finds a spend by its fingerprint.
+	GetSpend(ctx context.Context, id string) (*domain.Delegation, error)
 	// ListDelegations lists up to limit delegations of a non-empty status, newest first, with ids below a non-zero cursor.
 	ListDelegations(ctx context.Context, status string, cursor int64, limit int) ([]domain.Delegation, error)
 	ListRenewals(ctx context.Context, d *domain.Delegation) ([]domain.Renewal, error)
@@ -1096,6 +1102,10 @@ func templateOutcomes(results []renewalResult) map[string]tally {
 	out := map[string]tally{}
 	for _, res := range results {
 		for _, in := range res.inputs {
+			// spends do not count against their template
+			if in.watched.delegation.IsSpend() {
+				continue
+			}
 			id := in.watched.delegation.TemplateID
 			t := out[id]
 			switch {

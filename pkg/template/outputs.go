@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/bits"
+	"slices"
 )
 
 // 21 million bitcoin in satoshis
@@ -16,7 +17,7 @@ type allocation struct {
 	fee    uint64
 }
 
-// allocate balances every input separately; fee goes to fees.from and dust is the minimum output.
+// allocate balances every pool separately; fee goes to fees.from's pool and dust is the minimum output.
 func (i *Instance) allocate(d *draft, sources []*Source, fee uint64, dust uint64) (*allocation, error) {
 	t := i.tmpl
 	feeCap, _ := i.FeeCap()
@@ -28,15 +29,15 @@ func (i *Instance) allocate(d *draft, sources []*Source, fee uint64, dust uint64
 	case len(sources) != len(t.inputs):
 		return nil, fmt.Errorf("%w: %d sources for %d inputs", ErrIneligible, len(sources), len(t.inputs))
 	}
+	if k := slices.Index(sources, nil); k >= 0 {
+		return nil, fmt.Errorf("%w: input %q has no source", ErrIneligible, t.inputs[k].name)
+	}
 	a := &allocation{sats: make([]uint64, len(t.outputs)), assets: make([]map[string]uint64, len(t.outputs)), fee: fee}
 	for k := range a.assets {
 		a.assets[k] = map[string]uint64{}
 	}
 	for slot, s := range sources {
 		name := t.inputs[slot].name
-		if s == nil {
-			return nil, fmt.Errorf("%w: input %q has no source", ErrIneligible, name)
-		}
 		if s.Amount > maxAmount {
 			return nil, fmt.Errorf("%w: input %q holds more than 21e14 satoshis", ErrIneligible, name)
 		}
@@ -50,8 +51,14 @@ func (i *Instance) allocate(d *draft, sources []*Source, fee uint64, dust uint64
 			}
 		}
 
-		if err := i.routeSats(d, slot, s.Amount, dust, a); err != nil {
-			return nil, err
+		if pool := t.poolOf(slot); pool[0] == slot {
+			var sum uint64
+			for _, k := range pool {
+				sum += sources[k].Amount
+			}
+			if err := i.routeSats(d, pool, sum, dust, a); err != nil {
+				return nil, err
+			}
 		}
 		if err := i.routeAssets(d, slot, held, a); err != nil {
 			return nil, err
@@ -65,14 +72,14 @@ func (i *Instance) allocate(d *draft, sources []*Source, fee uint64, dust uint64
 	return a, nil
 }
 
-func (i *Instance) routeSats(d *draft, slot int, amount, dust uint64, a *allocation) error {
+func (i *Instance) routeSats(d *draft, pool []int, amount, dust uint64, a *allocation) error {
 	t := i.tmpl
 	left := amount
 	for k, o := range t.outputs {
-		if o.from != slot || o.amount == nil {
+		if !slices.Equal(o.pool, pool) || o.amount == nil {
 			continue
 		}
-		n, err := i.fixedAmount(o.amount, d, slot)
+		n, err := i.fixedAmount(o.amount, d, o.from)
 		if err != nil {
 			return fmt.Errorf("output %q: %w", o.name, err)
 		}
@@ -82,14 +89,14 @@ func (i *Instance) routeSats(d *draft, slot int, amount, dust uint64, a *allocat
 		left -= n
 		a.sats[k] = n
 	}
-	if t.fee != nil && t.fee.from == slot {
+	if t.fee != nil && slices.Contains(pool, t.fee.from) {
 		if a.fee > left {
-			return fmt.Errorf("%w: input %q cannot pay fee %d", ErrIneligible, t.inputs[slot].name, a.fee)
+			return fmt.Errorf("%w: input %q cannot pay fee %d", ErrIneligible, t.inputs[t.fee.from].name, a.fee)
 		}
 		left -= a.fee
 	}
 	for k, o := range t.outputs {
-		if o.from == slot && o.amount == nil {
+		if slices.Equal(o.pool, pool) && o.amount == nil {
 			if left < dust {
 				return fmt.Errorf("%w: output %q remainder %d below %d", ErrIneligible, o.name, left, dust)
 			}

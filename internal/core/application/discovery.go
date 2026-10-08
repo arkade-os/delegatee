@@ -255,10 +255,10 @@ func (s *service) discover(ctx context.Context, delegations []domain.Delegation,
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	// a bound coin is not the watch's
+	// a bound coin is not the watch's, except a spend's
 	boundOwners := map[string]int64{}
 	for _, d := range delegations {
-		if s.watched[d.ID] == nil {
+		if s.watched[d.ID] == nil || d.IsSpend() {
 			continue
 		}
 		for _, sl := range d.Slots {
@@ -314,8 +314,11 @@ next:
 				}
 				due := dueTime(w.instance, c, tip)
 				deadline := s.deadline(c, due)
-				if sl.Onchain {
+				switch {
+				case sl.Onchain:
 					deadline = time.Time{} // the plan decides
+				case d.IsSpend():
+					deadline = due // a wallet waits for it
 				}
 				h.add(c, due, deadline)
 				unconfirmed := sl.Onchain && (c.Confirms < w.tmpl.Inputs()[slot].Schedule.MinConfirmations || c.CreatedAt.IsZero())
