@@ -359,6 +359,7 @@ func NewServiceWithKeys(
 		consumed:            consumed,
 		inFlight:            map[int64]bool{},
 		quarantined:         map[string]time.Time{},
+		batch:               lane{queued: map[string]*pendingIntent{}},
 		plan:                &plan{},
 		onchainCache:        map[string]onchainSnapshot{},
 		refusedSince:        map[string]time.Time{},

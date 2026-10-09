@@ -540,6 +540,81 @@ func TestBatchHandlerSelection(t *testing.T) {
 	require.False(t, done)
 }
 
+func TestBatchHandlerConfirmsInParallel(t *testing.T) {
+	env := newTestEnv(t)
+	env.ark.confirmDelay = 20 * time.Millisecond
+	env.ark.confirmErr = map[string]error{"i2": status.Error(codes.InvalidArgument, "unknown intent")}
+	var intents []*pendingIntent
+	var hashes []string
+	for i := range 6 {
+		id := fmt.Sprintf("i%d", i)
+		intents = append(intents, &pendingIntent{id: id})
+		sum := sha256.Sum256([]byte(id))
+		hashes = append(hashes, hex.EncodeToString(sum[:]))
+	}
+	h := &batchHandler{svc: env.svc, pending: slices.Clone(intents)}
+
+	skip, _, err := h.OnBatchStarted(t.Context(), clientlib.BatchStartedEvent{Id: "b1", HashedIntentIds: hashes, BatchExpiry: 1024})
+	require.NoError(t, err)
+	require.False(t, skip)
+	require.Greater(t, env.ark.maxConfirming, 1, "confirmed in parallel")
+	require.ElementsMatch(t, []*pendingIntent{intents[0], intents[1], intents[3], intents[4], intents[5]}, h.inBatch)
+	require.Equal(t, []*pendingIntent{intents[2]}, h.pending, "arkd queues an unconfirmed intent again")
+
+	h = &batchHandler{svc: env.svc, pending: []*pendingIntent{intents[2]}}
+	skip, _, err = h.OnBatchStarted(t.Context(), clientlib.BatchStartedEvent{Id: "b2", HashedIntentIds: hashes, BatchExpiry: 1024})
+	require.NoError(t, err)
+	require.True(t, skip, "nothing confirmed: the batch goes on without us")
+	require.Empty(t, h.inBatch)
+	require.Equal(t, []*pendingIntent{intents[2]}, h.pending)
+}
+
+func TestRequeuedIntentJoinsTheNextBatch(t *testing.T) {
+	e := newTestEnv(t)
+	in := dueInput(t, e, 0, 10_000)
+	batch := e.playBatch(t)
+	batch.failConfirmationOnce = true
+	e.indexer.serve(asVtxo(in.coin))
+	e.scan(t)
+	e.requireSettledOnce(t, in, batch)
+	require.Len(t, e.ark.registered, 1, "registered once")
+	require.Equal(t, []string{"intent-a", "intent-a"}, e.ark.confirmed, "confirmed for both batches")
+}
+
+func TestQueuedIntentIsFollowedAgain(t *testing.T) {
+	e := newTestEnv(t)
+	in := dueInput(t, e, 0, 10_000)
+	results := e.svc.renew(t.Context(), []renewalInput{in})
+	require.ErrorContains(t, results[0].err, "event stream closed")
+	require.Len(t, e.ark.registered, 1)
+
+	e.ark.registerErr = status.Error(codes.Internal,
+		"INTERNAL_ERROR (0): failed to push intent: failed to push intent after max number of retries: duplicated input")
+	batch := e.playBatch(t)
+	results = e.svc.renew(t.Context(), []renewalInput{in})
+	require.NoError(t, results[0].err)
+	require.Equal(t, batch.txid, results[0].commitmentTxid)
+	require.Len(t, e.ark.registered, 1, "never registered again")
+}
+
+func TestBatchConfirmedWhileRegistering(t *testing.T) {
+	e := newTestEnv(t)
+	first, second := dueInput(t, e, 0, 10_000), dueInput(t, e, 1, 20_000)
+	e.ark.holdRegistration, e.ark.firstConfirm = 1, make(chan struct{})
+	batch := e.playBatch(t)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+
+	results := e.svc.renew(ctx, []renewalInput{first, second})
+	require.Len(t, results, 2)
+	byCoin := map[string]renewalResult{}
+	for _, r := range results {
+		byCoin[r.inputs[0].coin.Outpoint.String()] = r
+	}
+	require.Equal(t, batch.txid, byCoin[first.coin.Outpoint.String()].commitmentTxid)
+	require.True(t, byCoin[second.coin.Outpoint.String()].registered, "registered once the batch was confirmed")
+}
+
 func TestForfeits(t *testing.T) {
 	env := newTestEnv(t)
 	p := builtIntent(t, env, dueInput(t, env, 0, 1000))

@@ -146,19 +146,25 @@ func (s *service) renewForCosigner(ctx context.Context, cosigner *cosigner, inpu
 	}
 	defer stop()
 
-	// register everything before the first batch so they can share it
-	registered := make([]*pendingIntent, 0, len(pending))
-	for _, p := range pending {
-		id, err := s.ark.RegisterIntent(ctx, p.intent.Proof, p.intent.Message)
-		if err != nil {
-			results = append(results, renewalResult{inputs: p.inputs, err: refusal(ctx, "arkd", err)})
-			continue
-		}
-		p.id, p.registered = id, true
-		log.WithField("intent_id", p.id).Info("intent registered")
-		registered = append(registered, p)
+	return append(results, s.followBatches(ctx, cosigner, eventsCh, pending)...)
+}
+
+func (s *service) register(ctx context.Context, h *batchHandler, p *pendingIntent) (*pendingIntent, error) {
+	id, err := s.ark.RegisterIntent(ctx, p.intent.Proof, p.intent.Message)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if q := s.batch.queued[queuedKey(p)]; err != nil && q != nil && strings.Contains(err.Error(), "duplicated input") {
+		log.WithField("intent_id", q.id).Info("intent still queued in arkd: following it")
+		q.forfeitSent, q.settled, q.commitment = false, nil, ""
+		return q, nil
 	}
-	return append(results, s.followBatches(ctx, cosigner, eventsCh, registered)...)
+	if err != nil {
+		return nil, refusal(ctx, "arkd", err)
+	}
+	p.id, p.registered = id, true
+	s.batch.queued[queuedKey(p)] = p
+	log.WithField("intent_id", p.id).Info("intent registered")
+	return p, nil
 }
 
 // spends groups inputs one per coin, or one per delegation with several slots.
@@ -202,22 +208,69 @@ func (s *service) buildIntents(ctx context.Context, cosigner *cosigner, chunks [
 	return pending, failed
 }
 
-func (s *service) followBatches(ctx context.Context, cosigner *cosigner, events <-chan clientlib.BatchEventChannel, registered []*pendingIntent) []renewalResult {
-	var results []renewalResult
-	h := &batchHandler{svc: s, pending: registered}
-	for len(h.pending) > 0 {
-		h.signerSession = tree.NewTreeSignerSession(cosigner.key)
-		commitmentTxid, _, _, _, _, err := batchsessionhandler.JoinBatchSession(ctx, events, h)
-		if err != nil {
-			return append(results, h.failedResults(ctx, err)...)
+func (s *service) followBatches(ctx context.Context, cosigner *cosigner, events <-chan clientlib.BatchEventChannel, intents []*pendingIntent) []renewalResult {
+	h := &batchHandler{svc: s}
+	var refused []renewalResult
+	registered := make(chan struct{})
+	idle := make(chan struct{})
+	go func() {
+		defer close(registered)
+		for _, p := range intents {
+			q, err := s.register(ctx, h, p)
+			if err != nil {
+				refused = append(refused, renewalResult{inputs: p.inputs, err: err})
+				continue
+			}
+			h.mu.Lock()
+			h.pending = append(h.pending, q)
+			h.mu.Unlock()
 		}
-		for _, p := range h.inBatch {
+		if h.following() == 0 {
+			close(idle)
+		}
+	}()
+	var results []renewalResult
+	for {
+		select {
+		case <-registered:
+			if h.following() == 0 {
+				return append(results, refused...)
+			}
+		default:
+		}
+		h.signerSession = tree.NewTreeSignerSession(cosigner.key)
+		commitmentTxid, _, _, _, _, err := batchsessionhandler.JoinBatchSession(ctx, events, h, batchsessionhandler.WithCancel(idle))
+		if err != nil && h.batchFailed && !h.signing {
+			log.WithField("batch", h.batchID).Info("following the intents of a failed batch to the next one")
+			h.mu.Lock()
+			h.pending, h.inBatch = append(h.pending, h.inBatch...), nil
+			h.mu.Unlock()
+			h.batchID, h.batchFailed = "", false
+			continue
+		}
+		if err != nil {
+			<-registered
+			return append(append(results, h.failedResults(ctx, err)...), refused...)
+		}
+		log.WithFields(log.Fields{"batch": h.batchID, "commitment_txid": commitmentTxid, "intents": len(h.inBatch)}).Info("batch finalized")
+		h.mu.Lock()
+		settled := h.inBatch
+		h.inBatch = nil
+		for _, p := range settled {
+			delete(s.batch.queued, queuedKey(p))
+		}
+		h.mu.Unlock()
+		for _, p := range settled {
 			s.settle(ctx, p.settlement())
 			results = append(results, renewalResult{inputs: p.inputs, commitmentTxid: commitmentTxid, registered: p.registered})
 		}
-		h.inBatch = nil
 	}
-	return results
+}
+
+func (h *batchHandler) following() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.pending) + len(h.inBatch)
 }
 
 // failedResults blames the intent that sank the batch, and drops the settlements that cannot land.
@@ -500,6 +553,7 @@ type batchHandler struct {
 	batchID     string
 	batchExpiry arklib.RelativeLocktime
 	batchFailed bool // arkd failed it: its forfeits are void
+	signing     bool
 
 	mu      sync.Mutex
 	failed  *pendingIntent // the first intent whose finalization failed
@@ -530,6 +584,7 @@ func (h *batchHandler) OnTreeNonces(context.Context, clientlib.TreeNoncesEvent) 
 
 func (h *batchHandler) OnBatchStarted(ctx context.Context, event clientlib.BatchStartedEvent) (bool, time.Duration, error) {
 	var inBatch, pending []*pendingIntent
+	h.mu.Lock()
 	for _, p := range h.pending {
 		sum := sha256.Sum256([]byte(p.id))
 		if slices.Contains(event.HashedIntentIds, hex.EncodeToString(sum[:])) {
@@ -538,16 +593,41 @@ func (h *batchHandler) OnBatchStarted(ctx context.Context, event clientlib.Batch
 			pending = append(pending, p)
 		}
 	}
+	h.pending = pending
+	h.mu.Unlock()
 	if len(inBatch) == 0 {
 		return true, -1, nil
 	}
-	for _, p := range inBatch {
-		if err := h.svc.ark.ConfirmRegistration(ctx, p.id); err != nil {
-			return false, -1, err
-		}
+	start := time.Now()
+	errs := make([]error, len(inBatch))
+	var g errgroup.Group
+	g.SetLimit(concurrency)
+	for i, p := range inBatch {
+		g.Go(func() error {
+			errs[i] = h.svc.ark.ConfirmRegistration(ctx, p.id)
+			return nil
+		})
 	}
-	h.inBatch, h.pending = inBatch, pending
-	h.batchID = event.Id
+	_ = g.Wait()
+	var confirmed, unconfirmed []*pendingIntent
+	for i, p := range inBatch {
+		if errs[i] != nil {
+			log.WithError(errs[i]).WithFields(log.Fields{"batch": event.Id, "intent_id": p.id}).Warn("intent not confirmed")
+			unconfirmed = append(unconfirmed, p)
+			continue
+		}
+		confirmed = append(confirmed, p)
+	}
+	log.WithFields(log.Fields{
+		"batch": event.Id, "intents": len(event.HashedIntentIds), "ours": len(inBatch), "confirmed": len(confirmed), "took": time.Since(start),
+	}).Info("batch started")
+	h.mu.Lock()
+	h.pending, h.inBatch = append(h.pending, unconfirmed...), confirmed
+	h.mu.Unlock()
+	if len(confirmed) == 0 {
+		return true, -1, nil
+	}
+	h.batchID, h.signing = event.Id, false
 	h.batchExpiry = arklib.RelativeLocktime{Type: arklib.LocktimeTypeBlock, Value: uint32(event.BatchExpiry)}
 	if event.BatchExpiry >= 512 {
 		h.batchExpiry.Type = arklib.LocktimeTypeSecond
@@ -557,6 +637,7 @@ func (h *batchHandler) OnBatchStarted(ctx context.Context, event clientlib.Batch
 
 func (h *batchHandler) OnBatchFailed(_ context.Context, event clientlib.BatchFailedEvent) error {
 	if event.Id == h.batchID {
+		log.WithFields(log.Fields{"batch": event.Id, "reason": event.Reason, "signing": h.signing}).Warn("batch failed")
 		h.batchFailed = true
 		return fmt.Errorf("batch %s failed: %s", event.Id, event.Reason)
 	}
@@ -566,6 +647,7 @@ func (h *batchHandler) OnBatchFailed(_ context.Context, event clientlib.BatchFai
 func (h *batchHandler) OnTreeSigningStarted(
 	ctx context.Context, event clientlib.TreeSigningStartedEvent, vtxoTree *tree.TxTree,
 ) (bool, error) {
+	h.signing = true
 	if !slices.Contains(event.CosignersPubkeys, h.signerSession.GetPublicKey()) {
 		return true, nil
 	}

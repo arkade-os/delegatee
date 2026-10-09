@@ -367,7 +367,6 @@ const showDocument = (kind, id) => api(`/v1/${kind}/` + encodeURIComponent(id))
   .then((r) => { shown[kind] = { id, document: r[kind].document }; renderOverview(); $(kind + "-doc")?.scrollIntoView({ block: "nearest" }); },
     (e) => toast(`Could not load the ${kind}: ` + e.message, true));
 
-// ponytail: JSON.parse rounds numbers past 2^53, copy gives the exact document
 function jsonHtml(v, pad = "") {
   const p = (c) => `<span class="j-p">${c}</span>`, inner = pad + "  ";
   if (v === null || typeof v !== "object") return `<span class="${typeof v === "string" ? "j-s" : typeof v === "number" ? "j-n" : "j-b"}">${esc(JSON.stringify(v))}</span>`;
