@@ -118,11 +118,11 @@ func (s *service) renewForCosigner(ctx context.Context, cosigner *cosigner, inpu
 	var results []renewalResult
 	var intents [][]renewalInput
 	for _, chunk := range spends(inputs) {
+		slices.SortStableFunc(chunk, func(a, b renewalInput) int { return a.coin.Slot - b.coin.Slot })
 		if chunk[0].watched.tmpl.Type() != template.Intent {
 			results = append(results, s.runDirect(ctx, cosigner, chunk, fees))
 			continue
 		}
-		slices.SortStableFunc(chunk, func(a, b renewalInput) int { return a.coin.Slot - b.coin.Slot })
 		intents = append(intents, chunk)
 	}
 	pending, failed := s.buildIntents(ctx, cosigner, intents, fees)
