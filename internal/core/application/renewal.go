@@ -100,7 +100,7 @@ func uniqueInputs(inputs []renewalInput) []renewalInput {
 	for _, in := range inputs {
 		op := in.coin.Outpoint.String()
 		if _, ok := seen[op]; ok {
-			log.WithFields(log.Fields{"vtxo": op, "delegation": in.watched.delegation.ID}).Warn("vtxo met twice in one renewal: dropped the duplicate")
+			log.WithFields(log.Fields{"vtxo": op, "delegation": in.watched.delegation.ID}).Warn("vtxo met twice in one cycle: dropped the duplicate")
 			continue
 		}
 		seen[op] = struct{}{}

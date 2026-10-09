@@ -7,18 +7,18 @@
 <style>
 :root {
   color-scheme: light dark;
-  --paper: #f3f4f6; --surface: #ffffff; --ink: #1c2130; --muted: #667085; --faint: #98a2b3; --line: #e3e6eb; --hover: #f5f6f8; --current: #e9eefb;
-  --ok: #1e7a4e; --ok-soft: #e4f4ec; --window: #a86a00; --window-a: #fbf0d3; --window-b: #f3dc99; --bad: #b42318; --bad-soft: #fbe9e7;
-  --track: #e6e8ee; --elapsed: rgba(28, 33, 48, .28); --accent: #2c56c9; --accent-ink: #ffffff; --shadow: 0 12px 32px rgba(16, 24, 40, .18);
+  --paper: #f6f6f4; --surface: #ffffff; --ink: #17181c; --muted: #63656e; --faint: #9a9ca5; --line: #e6e6e3; --hover: #f3f3f1; --current: #efedfd;
+  --ok: #18794e; --ok-soft: #e3f4ea; --window: #a35f00; --window-a: #fbefd6; --window-b: #f2d9a0; --bad: #c4321f; --bad-soft: #fcebe8;
+  --track: #ececea; --elapsed: rgba(23, 24, 28, .22); --accent: #5b4bdb; --accent-ink: #ffffff; --shadow: 0 16px 40px rgba(23, 24, 28, .16);
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --r: 6px;
+  --r: 8px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #0f141f; --surface: #161c2a; --ink: #e8ebf2; --muted: #98a2b8; --faint: #6b7590; --line: #27304a; --hover: #1c2436; --current: #24304f;
-    --ok: #5ccf9c; --ok-soft: #14301f; --window: #f0b94a; --window-a: #3e3213; --window-b: #5b4818; --bad: #ff8a80; --bad-soft: #3b1c1a;
-    --track: #232b3f; --elapsed: rgba(232, 235, 242, .26); --accent: #8fb0ff; --accent-ink: #0f141f; --shadow: 0 12px 32px rgba(0, 0, 0, .5);
+    --paper: #0c0c0e; --surface: #141417; --ink: #ececf0; --muted: #9b9ca5; --faint: #66676f; --line: #25252a; --hover: #1b1b1f; --current: #221f38;
+    --ok: #4cc38a; --ok-soft: #12291d; --window: #e9a83b; --window-a: #33270f; --window-b: #4d3b14; --bad: #f2735f; --bad-soft: #36160f;
+    --track: #222226; --elapsed: rgba(236, 236, 240, .22); --accent: #a99bff; --accent-ink: #0c0c0e; --shadow: 0 16px 40px rgba(0, 0, 0, .55);
   }
 }
 * { box-sizing: border-box; }
@@ -34,7 +34,7 @@ kbd { font: .8em var(--mono); border: 1px solid var(--line); border-radius: 4px;
 [hidden] { display: none !important; }
 
 /* buttons */
-button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: var(--r); padding: 0 .8rem; min-height: 2.25rem; font-weight: 500; transition: background .12s, border-color .12s, color .12s; }
+button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: var(--r); padding: 0 .85rem; min-height: 2rem; font-weight: 500; font-size: .88rem; transition: background .12s, border-color .12s, color .12s; }
 button:hover { background: var(--hover); border-color: var(--faint); }
 button:active { background: var(--current); }
 button:disabled { cursor: default; opacity: .55; }
@@ -47,6 +47,9 @@ button.danger.solid { background: var(--bad); color: #fff; border-color: var(--b
 button.danger.solid:hover { filter: brightness(1.08); background: var(--bad); }
 button.link { border: 0; background: none; padding: 0; min-height: 0; font-weight: inherit; color: var(--accent); text-decoration: underline; text-underline-offset: .15em; border-radius: 2px; }
 button.link:hover { background: none; color: var(--ink); }
+/* hashes read as data: ink, underlined on hover only */
+button.link.hash, .horizon button, a.hash { color: var(--ink); text-decoration: none; }
+button.link.hash:hover, .horizon button:hover, a.hash:hover { color: var(--accent); text-decoration: underline; text-underline-offset: .2em; }
 button.mini { min-height: 0; padding: 0 .45rem; margin-left: .5rem; font: 500 .74rem/1.6 var(--sans); color: var(--muted); border-radius: 4px; vertical-align: .1em; }
 button.mini:hover { color: var(--ink); }
 button[aria-busy=true] { pointer-events: none; opacity: .7; }
@@ -54,7 +57,8 @@ button[aria-busy=true]::after { content: "…"; }
 
 /* header */
 header { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center; padding: .6rem clamp(1rem, 3vw, 2rem); background: var(--surface); border-bottom: 1px solid var(--line); }
-header h1 { font-size: 1.05rem; letter-spacing: -.02em; }
+header h1 { font-size: 1rem; letter-spacing: -.01em; display: flex; align-items: center; gap: .5rem; }
+header h1::before { content: ""; width: .7rem; height: .7rem; border-radius: 3px; background: var(--accent); }
 header h1 button { all: unset; cursor: pointer; border-radius: 2px; }
 header h1 button:hover { color: var(--accent); }
 header .meta { color: var(--muted); font-size: .86rem; display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; }
@@ -66,39 +70,53 @@ header .meta button:hover { color: var(--accent); }
 #health.down { color: var(--bad); }
 
 /* status */
-#status { display: flex; flex-wrap: wrap; padding: .35rem clamp(1rem, 3vw, 2rem); background: var(--surface); border-bottom: 1px solid var(--line); font-size: .86rem; color: var(--muted); min-height: 2.5rem; }
-#status > span { padding: .3rem 1.5rem .3rem 0; margin-right: 1.5rem; border-right: 1px solid var(--line); }
-#status > span:last-child { border-right: 0; margin-right: 0; }
+#status { display: flex; flex-wrap: wrap; gap: .25rem 2.25rem; padding: .5rem clamp(1rem, 3vw, 2rem); background: var(--paper); border-bottom: 1px solid var(--line); font-size: .84rem; color: var(--muted); min-height: 2.5rem; align-items: center; }
 #status b { color: var(--ink); font-weight: 600; }
 #status .warn, #status .warn b { color: var(--bad); }
 #status .busy, #status .busy b { color: var(--window); }
 .pulse { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: var(--window); margin-right: .4rem; vertical-align: middle; animation: pulse 1.4s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .25; } }
 
-main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr); min-height: calc(100vh - 6rem); }
+main { display: grid; grid-template-columns: minmax(20rem, 27rem) minmax(0, 1fr); min-height: calc(100vh - 6rem); }
 #list { border-right: 1px solid var(--line); background: var(--surface); min-width: 0; }
 #list .pane { display: flex; flex-direction: column; height: calc(100vh - 5.25rem); position: sticky; top: 0; }
 .filters { display: flex; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .filters button { flex: 1; border: 0; border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: .65rem .5rem; min-height: 0; color: var(--muted); font-size: .86rem; font-weight: 500; background: none; white-space: nowrap; }
 .filters button:hover { background: var(--hover); color: var(--ink); }
-.filters button[aria-pressed=true] { color: var(--ink); border-bottom-color: var(--ink); }
+.filters button[aria-pressed=true] { color: var(--ink); border-bottom-color: var(--accent); }
 .filters .n { color: var(--faint); margin-left: .15rem; }
 .filters .alert .n { color: var(--bad); font-weight: 600; }
 .filters button[aria-pressed=true] .n { color: var(--muted); }
-#search { margin: .6rem .75rem; padding: .5rem .7rem; min-height: 2.25rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
+.listbar { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: 0 .75rem .6rem; }
+.kinds { display: flex; gap: .35rem; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.kinds::-webkit-scrollbar { display: none; }
+.kinds.more { mask-image: linear-gradient(to right, #000 82%, transparent); }
+.kinds button { flex: none; }
+.sort { position: relative; flex: none; color: var(--muted); }
+.sort:hover { color: var(--ink); }
+.sort select { appearance: none; -webkit-appearance: none; border: 0; background: none; color: inherit; font: 500 .76rem var(--sans); padding: .25rem 1.15rem .25rem .4rem; border-radius: var(--r); cursor: pointer; }
+.sort select:hover { background: var(--hover); }
+.sort::after { content: ""; position: absolute; right: .45rem; top: 50%; width: .32rem; height: .32rem; margin-top: -.24rem; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); pointer-events: none; }
+.kinds button { min-height: 0; padding: .15rem .6rem; border: 1px solid var(--line); border-radius: 99px; background: none; color: var(--muted); font-size: .76rem; font-weight: 500; }
+.kinds button[aria-pressed=true] { color: var(--accent); border-color: var(--accent); background: var(--current); }
+.kinds .n { color: var(--faint); margin-left: .2rem; }
+#rows .amt { font-variant-numeric: tabular-nums; font-size: .86rem; font-weight: 600; white-space: nowrap; }
+#rows .count { color: var(--faint); font-size: .76rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#rows .kind { color: var(--faint); }
+#search { display: block; width: calc(100% - 1.5rem); margin: .65rem .75rem .55rem; padding: .5rem .7rem; min-height: 2.25rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
 #search:focus, #register textarea:focus { background: var(--surface); border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
-#rows { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
-#rows li button { display: grid; grid-template-columns: .6rem minmax(0, 1fr) auto; gap: .15rem .65rem; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: .7rem .85rem .7rem .95rem; min-height: 0; font-weight: 400; background: none; box-shadow: inset 3px 0 0 transparent; }
+#rows { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; min-height: 0; }
+#list .pane > :not(#rows) { flex-shrink: 0; }
+#rows li button { display: grid; grid-template-columns: .6rem minmax(0, 1fr) auto; gap: .2rem .7rem; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: .75rem 1rem .75rem 1rem; min-height: 0; font-weight: 400; background: none; box-shadow: inset 3px 0 0 transparent; }
 #rows li button:hover { background: var(--hover); }
 #rows li button[aria-current=true] { background: var(--current); box-shadow: inset 3px 0 0 var(--accent); }
 #rows li button:focus-visible { outline-offset: -2px; }
-.dot { width: .55rem; height: .55rem; border-radius: 50%; align-self: center; background: var(--line); }
-.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); } .dot.late { background: var(--bad); } .dot.renewing { background: var(--window); } .dot.off { background: none; border: 1px solid var(--faint); }
-#rows .when, #rows .sub { color: var(--muted); font-size: .8rem; white-space: nowrap; }
-#rows .sub { grid-column: 2 / 4; overflow: hidden; text-overflow: ellipsis; }
+.dot { width: .5rem; height: .5rem; border-radius: 50%; align-self: center; background: var(--line); }
+.dot.ok { background: var(--ok); } .dot.bad, .dot.late { background: var(--bad); } .dot.renewing { background: var(--window); } .dot.off { background: none; border: 1px solid var(--faint); }
+#rows .sub { color: var(--muted); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #rows .sub.bad, #rows .sub.late { color: var(--bad); } #rows .sub.renewing { color: var(--window); }
 .empty { padding: 1.25rem 1rem; color: var(--muted); max-width: 36rem; line-height: 1.55; }
-#hint { padding: .45rem .9rem; border-top: 1px solid var(--line); color: var(--faint); font-size: .78rem; }
+#hint { display: flex; justify-content: space-between; gap: .5rem; padding: .45rem .9rem; border-top: 1px solid var(--line); color: var(--faint); font-size: .78rem; }
 
 /* skeletons */
 .sk { display: block; height: .8em; border-radius: 3px; background: var(--track); animation: sk 1.2s ease-in-out infinite; }
@@ -112,24 +130,25 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 @media (prefers-reduced-motion: reduce) { .pulse, .sk { animation: none; } button { transition: none; } }
 
 /* detail */
-#detail { padding: 1.75rem clamp(1rem, 3vw, 2.5rem) 4rem; min-width: 0; max-width: 78rem; }
-#detail h2 { font-size: 1.35rem; letter-spacing: -.02em; display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; }
-#detail h3 { font-size: 1rem; margin: 2.75rem 0 .5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+#detail { padding: 2rem clamp(1rem, 3.5vw, 3rem) 5rem; min-width: 0; max-width: 76rem; }
+#detail h2 { font-size: 1.45rem; letter-spacing: -.025em; display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; }
+#detail h3 { font-size: .98rem; margin: 3rem 0 .4rem; padding-top: 1.5rem; border-top: 1px solid var(--line); letter-spacing: -.01em; }
 #detail h3:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
-#detail h3 + p { margin: 0 0 1rem; color: var(--muted); max-width: 44rem; }
+#detail h3 + p { margin: 0 0 1.1rem; color: var(--muted); max-width: 42rem; font-size: .86rem; }
 #detail .empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 1.25rem; }
 .title { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; align-items: flex-start; justify-content: space-between; }
 .title .hash { margin-top: .3rem; font-size: .9rem; max-width: 46rem; color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, max-content)); gap: .75rem 3rem; margin: 1.5rem 0 0; padding: 1rem 0; border-top: 1px solid var(--line); }
 .facts div { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
-.facts dt { color: var(--muted); font-size: .8rem; }
-.facts dd { margin: 0; font-weight: 600; font-size: 1.02rem; overflow-wrap: anywhere; }
+.facts dt { color: var(--muted); font-size: .76rem; }
+.facts dd { margin: 0; font-weight: 600; font-size: .98rem; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .45rem; }
+.facts dd .mini { margin-left: 0; flex: none; }
+.facts dd .hash { word-break: normal; }
 .badge { display: inline-flex; align-items: center; gap: .4rem; border-radius: 99px; padding: .1rem .65rem .1rem .5rem; font-size: .78rem; font-weight: 500; border: 1px solid var(--line); color: var(--muted); }
 .badge::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--faint); }
 .badge.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; } .badge.ok::before { background: var(--ok); }
-.badge.bad { color: var(--bad); background: var(--bad-soft); border-color: transparent; } .badge.bad::before { background: var(--bad); }
-.badge.late { color: var(--bad); background: var(--bad-soft); border-color: transparent; } .badge.late::before { background: var(--bad); }
+.badge.bad, .badge.late { color: var(--bad); background: var(--bad-soft); border-color: transparent; } .badge.bad::before, .badge.late::before { background: var(--bad); }
 .badge.renewing { color: var(--window); background: var(--window-a); border-color: transparent; } .badge.renewing::before { background: var(--window); }
 .note { border-left: 3px solid var(--bad); padding: .6rem .9rem; margin: 1rem 0 0; background: var(--bad-soft); border-radius: 0 var(--r) var(--r) 0; max-width: 46rem; }
 .paths { list-style: none; margin: 0; padding: 0; max-width: 46rem; }
@@ -137,28 +156,27 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 .paths .words { font-family: var(--mono); font-size: .86em; }
 
 /* lifetime bar: birth to expiry, renewal window hatched */
-.vtxo { padding: .9rem 0; border-bottom: 1px solid var(--line); } .vtxo:last-of-type { border-bottom: 0; }
+.vtxo { padding: .9rem 0; } .vtxo + .vtxo { border-top: 1px solid var(--line); }
 .vtxo .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; }
 .vtxo .amount { font-weight: 600; }
-.life { position: relative; height: .8rem; margin: .6rem 0 .4rem; background: var(--track); border-radius: 4px; }
+.life { position: relative; height: .55rem; margin: .65rem 0 .45rem; background: var(--track); border-radius: 99px; }
 .life .elapsed { position: absolute; inset: 0 auto 0 0; background: var(--elapsed); z-index: 1; border-radius: 4px 0 0 4px; }
 .life .window { position: absolute; inset: 0 0 0 auto; background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); border-radius: 0 4px 4px 0; }
 .life .now { position: absolute; z-index: 2; top: -3px; bottom: -3px; width: 2px; background: var(--ink); border-radius: 1px; }
 .life .reserve, .horizon .lane .reserve, .legend i.r { background: repeating-linear-gradient(45deg, var(--bad-soft) 0 4px, var(--track) 4px 8px); border-left: 2px solid var(--bad); }
 .life .reserve { position: absolute; inset: 0 0 0 auto; z-index: 1; border-radius: 0 4px 4px 0; }
-.life .batch, .horizon .lane .batch, .legend i.b { position: absolute; z-index: 3; top: 50%; width: .7rem; height: .7rem; margin: -.35rem 0 0 -.35rem; border-radius: 50%; background: var(--ink); border: 2px solid var(--surface); box-sizing: border-box; }
+.life .batch, .horizon .lane .batch, .legend i.b { position: absolute; z-index: 3; top: 50%; width: .7rem; height: .7rem; margin: -.35rem 0 0 -.35rem; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-sizing: border-box; }
 .legend i.b { position: static; display: inline-block; margin: 0 .35rem 0 .2rem; vertical-align: middle; }
 .state { font-size: .82rem; color: var(--muted); }
 .state.in, .state.renewing { color: var(--window); font-weight: 600; } .state.late { color: var(--bad); font-weight: 600; }
 
 /* overview: every address on one time axis */
 .horizon { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto; gap: .5rem 1rem; align-items: center; font-size: .86rem; }
-.horizon button { all: unset; font: .86em var(--mono); cursor: pointer; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 2px; }
-.horizon button:hover { color: var(--ink); text-decoration: underline; }
+.horizon button { all: unset; font: .86em var(--mono); cursor: pointer; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 2px; }
 .horizon button:focus-visible { outline: 2px solid var(--accent); }
-.horizon .lane { position: relative; display: flex; height: .8rem; background: var(--track); border-radius: 4px; }
+.horizon .lane { position: relative; display: flex; height: .55rem; background: var(--track); border-radius: 99px; }
 .horizon .lane .left, .horizon .lane .window, .horizon .lane .reserve { height: 100%; }
-.horizon .lane .left { border-radius: 4px 0 0 4px; } .horizon .lane .reserve { border-radius: 0 4px 4px 0; }
+.horizon .lane .left { border-radius: 99px 0 0 99px; } .horizon .lane .reserve { border-radius: 0 99px 99px 0; }
 .horizon .lane .left { background: var(--elapsed); }
 .horizon .lane .window { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
 .horizon .lane.late { background: var(--bad-soft); box-shadow: inset 3px 0 0 var(--bad); }
@@ -178,15 +196,15 @@ main { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr)
 .j-k { color: var(--accent); } .j-s { color: var(--ok); } .j-n { color: var(--window); } .j-b { color: var(--bad); } .j-p { color: var(--faint); }
 #register textarea { display: block; width: 100%; max-width: 46rem; min-height: 10rem; margin-bottom: .75rem; padding: .6rem .75rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); color: var(--ink); font: .84rem/1.5 var(--mono); resize: vertical; }
 table { border-collapse: collapse; width: 100%; font-size: .88rem; }
-th { text-align: left; font-weight: 500; color: var(--muted); font-size: .8rem; padding: .35rem .75rem .45rem 0; border-bottom: 1px solid var(--line); }
-td { padding: .55rem .75rem .55rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { text-align: left; font-weight: 500; color: var(--faint); font-size: .76rem; padding: .4rem .75rem .5rem 0; border-bottom: 1px solid var(--line); }
+td { padding: .6rem .75rem .6rem 0; border-bottom: 1px solid var(--line); vertical-align: top; font-variant-numeric: tabular-nums; }
 tbody tr:hover td { background: var(--hover); }
 td:first-child, td.hash { white-space: nowrap; word-break: normal; }
 td.res { white-space: nowrap; font-weight: 500; } td.res.ok { color: var(--ok); } td.res.bad { color: var(--bad); }
 .scroll { overflow-x: auto; }
 
 dialog { border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem 1.5rem 1.5rem; width: min(30rem, calc(100vw - 2rem)); color: var(--ink); background: var(--surface); box-shadow: var(--shadow); }
-dialog::backdrop { background: rgba(10, 16, 28, .5); }
+dialog::backdrop { background: rgba(12, 12, 14, .55); backdrop-filter: blur(2px); }
 dialog h2 { font-size: 1.05rem; }
 dialog p { margin: .6rem 0 1.5rem; color: var(--muted); }
 dialog .actions { justify-content: flex-end; }
@@ -201,7 +219,10 @@ dialog .actions { justify-content: flex-end; }
   #list .pane { position: static; height: auto; max-height: 45vh; }
   #rows li button { padding-top: .75rem; padding-bottom: .75rem; }
   #hint { display: none; }
-  .facts { grid-template-columns: 1fr 1fr; }
+  .facts { grid-template-columns: 1fr 1fr; gap: .75rem 1.5rem; }
+  table { display: block; overflow-x: auto; white-space: nowrap; }
+  .horizon { grid-template-columns: minmax(5.5rem, 7.5rem) minmax(0, 1fr); gap: .2rem .75rem; }
+  .horizon .t { grid-column: 2; text-align: left; white-space: normal; font-size: .76rem; margin-bottom: .45rem; }
 }
 </style>
 </head>
@@ -215,16 +236,20 @@ dialog .actions { justify-content: flex-end; }
 <main>
   <section id="list" aria-label="Delegations"><div class="pane">
     <div class="filters" id="filters"></div>
-    <input id="search" type="search" placeholder="Find an address" aria-label="Find an address">
+    <input id="search" type="search" placeholder="Address, #id, key or outpoint" aria-label="Find a delegation">
+    <div class="listbar">
+      <div class="kinds" id="kinds"></div>
+      <label class="sort"><select id="sort" aria-label="Sort the list"><option value="urgency">Urgent</option><option value="amount">Largest</option><option value="newest">Newest</option></select></label>
+    </div>
     <ul id="rows"><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li></ul>
-    <div id="hint"><kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>/</kbd> find, <kbd>Esc</kbd> overview</div>
+    <div id="hint"><span id="shown"></span><span><kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>/</kbd> find, <kbd>Esc</kbd> overview</span></div>
   </div></section>
   <section id="detail" aria-live="polite" aria-busy="true"></section>
 </main>
 <dialog id="confirm" aria-labelledby="confirm-title">
-  <h2 id="confirm-title">Stop renewing this address?</h2>
+  <h2 id="confirm-title"></h2>
   <p id="confirm-text"></p>
-  <div class="actions"><button value="no">Keep renewing</button><button class="danger solid" id="confirm-yes">Stop renewing</button></div>
+  <div class="actions"><button value="no"></button><button class="danger solid" id="confirm-yes"></button></div>
 </dialog>
 <div id="toast" role="status" hidden></div>
 <script>
@@ -237,6 +262,14 @@ const nowSecs = () => Date.now() / 1000;
 const charges = (program) => Boolean(program) && Number(program) !== 0; // "0.0" is a fee program too
 const skeleton = (n) => `<div class="sk-detail" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<i class="sk" style="width:${[55, 90, 40, 70, 30][i % 5]}%"></i>`).join("")}</div>`;
 
+const EXPLORERS = { bitcoin: "https://arkade.space", mutinynet: "https://explorer.mutinynet.arkade.sh" };
+const explorer = () => EXPLORERS[info?.network];
+// explore links a txid, an outpoint or an Ark address to the network's explorer, else shows it as is
+function explore(value, label = value) {
+  if (!explorer() || !value) return esc(label);
+  const path = /^t?ark1/.test(value) ? "address/" + value : "tx/" + value.split(":")[0];
+  return `<a class="hash" href="${esc(explorer() + "/" + path)}" target="_blank" rel="noopener" title="Open in the explorer">${esc(label)}</a>`;
+}
 let delegations = [], status = null, filter = null, selected = location.hash.slice(1), detail = null, allVtxos = false, info = null;
 let templates = [], artifacts = [];
 let loadLimit = 5000, moreRows = false; // newest first, a page of 1000 at a time
@@ -282,9 +315,22 @@ function scriptWords(hex) {
 
 // a watch boards an onchain coin, the rest renew VTXOs
 const boards = (delegation) => (delegation.slots || []).some((s) => s.onchain);
+// a spend binds coins until it expires, as RegisterSpend does
+const spends = (delegation) => !delegation.address && num(delegation.expiresAt) > 0;
+const WATCH = { coins: "VTXOs at this address", stop: "Stop renewing", resume: "Resume renewing" };
+const KINDS = {
+  spend: { done: "spent", doing: "spending", attempts: "Spend attempts", coins: "Coins it spends", stop: "Cancel spend", resume: "Resume spend",
+    noAttempt: "No attempt yet. A spend runs at the next scan.", noCoin: "No coin left: the spend ran, or something else spent its coins." },
+  boarding: { ...WATCH, done: "boarded", doing: "active", attempts: "Boarding attempts",
+    noAttempt: "No attempt yet. A deposit is boarded once it confirms.", noCoin: "Nothing to board: no deposit sits at this address right now." },
+  renewal: { ...WATCH, done: "renewed", doing: "renewing", attempts: "Renewal attempts",
+    noAttempt: "No attempt yet. A VTXO is first renewed when it enters its renewal window.", noCoin: "Nothing to renew: no spendable VTXO sits at this address right now." },
+};
+const kindKey = (delegation) => (spends(delegation) ? "spend" : boards(delegation) ? "boarding" : "renewal");
+const kindOf = (delegation) => KINDS[kindKey(delegation)];
 function stateOf(d) {
-  const r = d.lastRenewal, done = boards(d.delegation) ? "boarded" : "renewed";
-  if (d.delegation.status !== "active") return { key: "off", dot: "off", text: d.delegation.status === "cancelled" ? "stopped" : d.delegation.status };
+  const r = d.lastRenewal, done = kindOf(d.delegation).done;
+  if (d.delegation.status !== "active") return { key: "off", dot: "off", text: d.delegation.status === "cancelled" ? "stopped" : d.delegation.status === "done" ? done : d.delegation.status };
   if (d.unmanagedReason)
     return { key: "bad", dot: "bad", skipped: true, text: d.unmanagedReason, why: "The scanner skips it: " + d.unmanagedReason + "." };
   if (d.renewing) return { key: "ok", dot: "renewing", text: "in a batch now", why: "A batch session holds its coins; the result shows up when it ends." };
@@ -298,13 +344,13 @@ function stateOf(d) {
   if (!r) return { key: "ok", dot: "", text: "not " + done + " yet" };
   return { key: "ok", dot: "ok", text: done + " " + ago(r.attemptedAt) };
 }
-const MAX_ROWS = 300; // the list is sorted by urgency
+const MAX_ROWS = 300; // the first ones in the chosen order
 const MAX_LANES = 20, MAX_VTXOS = 40, AXIS_UNIT = 600; // ten minutes: the horizon's finest step
 const URGENCY = { bad: 0, late: 1, ok: 2, off: 3 };
 const FILTERS = [
-  ["attention", "Needs attention", (d) => ["bad", "late"].includes(stateOf(d).key)],
+  ["attention", "Attention", (d) => ["bad", "late"].includes(stateOf(d).key)],
   ["active", "Active", (d) => d.delegation.status === "active"],
-  ["cancelled", "Stopped", (d) => d.delegation.status !== "active"],
+  ["cancelled", "Ended", (d) => d.delegation.status !== "active"],
   ["all", "All", () => true],
 ];
 
@@ -418,11 +464,29 @@ function renderStatus() {
   ].join("");
 }
 
+let kindFilter = "all";
+// a delegation matches its address, #id, template id, a variable value or a bound outpoint
+const matches = (d, q) => {
+  const x = d.delegation;
+  return !q || q.replace("#", "") === String(x.id) || [x.address, x.templateId, ...Object.values(x.variables || {}), ...(x.slots || []).map((s) => s.outpoint || "")]
+    .some((v) => v && v.toLowerCase().includes(q));
+};
+const SORTS = {
+  urgency: (a, b) => URGENCY[stateOf(a).key] - URGENCY[stateOf(b).key] || (num(a.nextExpiry) || Infinity) - (num(b.nextExpiry) || Infinity),
+  amount: (a, b) => num(b.totalAmount) - num(a.totalAmount),
+  newest: (a, b) => num(b.delegation.createdAt) - num(a.delegation.createdAt),
+};
 function visibleRows() {
   const q = $("search").value.trim().toLowerCase(), fn = FILTERS.find((f) => f[0] === filter)[2];
-  return delegations.filter((d) => fn(d) && d.delegation.address.toLowerCase().includes(q))
-    .sort((a, b) => URGENCY[stateOf(a).key] - URGENCY[stateOf(b).key]
-      || (num(a.nextExpiry) || Infinity) - (num(b.nextExpiry) || Infinity));
+  return delegations.filter((d) => fn(d) && (kindFilter === "all" || kindKey(d.delegation) === kindFilter) && matches(d, q)).sort(SORTS[$("sort").value]);
+}
+// nextOf says what comes next for an active delegation, else what happened last
+function nextOf(d, st) {
+  const k = kindOf(d.delegation), at = num(d.nextBatchAt), due = num(d.nextRenewalAt);
+  if (st.key !== "ok" || st.dot === "renewing" || d.delegation.status !== "active") return st.why || st.text;
+  if (at) return (at <= nowSecs() ? "joins a batch now" : "joins a batch " + ago(at));
+  if (due && k === KINDS.renewal) return (due <= nowSecs() ? "renewable now" : "renews " + ago(due));
+  return st.text;
 }
 
 function renderList() {
@@ -430,10 +494,17 @@ function renderList() {
     const n = delegations.filter(fn).length;
     return `<button data-filter="${id}" aria-pressed="${id === filter}" class="${id === "attention" && n ? "alert" : ""}">${label} <span class="n">${n}</span></button>`;
   }).join("");
+  const inFilter = delegations.filter(FILTERS.find((f) => f[0] === filter)[2]);
+  $("kinds").innerHTML = [["all", "All"], ["renewal", "Renewal"], ["boarding", "Boarding"], ["spend", "Spend"]].map(([id, label]) => {
+    const n = id === "all" ? inFilter.length : inFilter.filter((d) => kindKey(d.delegation) === id).length;
+    return n || id === "all" || id === kindFilter ? `<button data-kind="${id}" aria-pressed="${id === kindFilter}">${label}<span class="n">${n}</span></button>` : "";
+  }).join("");
+  $("kinds").classList.toggle("more", $("kinds").scrollWidth > $("kinds").clientWidth);
   const rows = visibleRows();
+  $("shown").textContent = `${rows.length.toLocaleString()} shown, ${sats(rows.reduce((a, d) => a + num(d.totalAmount), 0))}`;
   if (!rows.length) {
-    $("rows").innerHTML = `<li class="empty">${$("search").value.trim() ? "No address matches your search."
-      : filter === "attention" ? "Nothing needs attention: every active delegation is renewed on time."
+    $("rows").innerHTML = `<li class="empty">${$("search").value.trim() ? "Nothing matches your search."
+      : filter === "attention" ? "Nothing needs attention: every active delegation runs on time."
       : delegations.length ? "No delegations here."
       : "No delegations yet. Wallets register one with POST /v1/delegate on the public port."}</li>`;
     return;
@@ -443,13 +514,13 @@ function renderList() {
     const st = stateOf(d), address = d.delegation.address;
     const selection = "id/" + d.delegation.id;
     const parent = num(d.delegation.parentId);
-    const label = address ? short(address, 12) : parent ? `#${d.delegation.id}, successor of #${parent}` : `#${d.delegation.id}`;
-    const holds = d.delegation.status !== "active" || !d.managed ? ""
-      : num(d.vtxoCount) ? `${sats(d.totalAmount)} in ${d.vtxoCount} VTXO${d.vtxoCount > 1 ? "s" : ""}, next expiry ${ago(d.nextExpiry)}` : "no VTXO at this address";
-    return `<li><button data-address="${esc(selection)}" aria-current="${selection === selected}">
-      <span class="dot ${st.dot}"></span><span class="hash">${esc(label)}</span><span class="when">${esc(st.text)}</span>
-      ${st.why ? `<span class="sub ${st.key}" title="${esc(st.why)}">${esc(st.why)}</span>` : holds ? `<span class="sub n">${holds}</span>` : ""}</button></li>`;
-  }).join("") + (more > 0 ? `<li class="empty">${more.toLocaleString()} more, by urgency. Find an address to narrow down.</li>` : "")
+    const kind = kindKey(d.delegation), coins = num(d.vtxoCount), next = nextOf(d, st);
+    // addresses of one server share their first characters: the tail tells them apart
+    const label = address ? "…" + address.slice(-16) : parent ? `#${d.delegation.id} successor of #${parent}` : `#${d.delegation.id}`;
+    return `<li><button data-address="${esc(selection)}" aria-current="${selection === selected}" title="${esc(address || "#" + d.delegation.id)}">
+      <span class="dot ${st.dot}"></span><span class="hash">${esc(label)}</span><span class="amt">${coins ? sats(d.totalAmount) : ""}</span>
+      <span></span><span class="sub ${st.key !== "ok" ? st.key : st.dot}" title="${esc(next)}"><span class="kind">${kind}</span> · ${esc(next)}</span><span class="count">${coins ? `${coins} coin${coins > 1 ? "s" : ""}` : ""}</span></button></li>`;
+  }).join("") + (more > 0 ? `<li class="empty">${more.toLocaleString()} more. Search or filter to narrow down.</li>` : "")
     + (moreRows ? `<li class="empty">Only the newest ${delegations.length.toLocaleString()} delegations are loaded. <button class="link" id="load-more">Load more</button></li>` : "");
   $("rows").querySelector("[aria-current=true]")?.scrollIntoView({ block: "nearest" });
 }
@@ -476,7 +547,7 @@ function renderOverview() {
       : joins === null ? (left <= win ? "renewable now, not planned yet" : "renewable " + ago(d.nextRenewalAt))
       : `${left <= win ? "renewable now" : "renewable " + ago(d.nextRenewalAt)}, joins the batch ${joins ? ago(at) : "now"}${deadline - joins > 60 ? `, ${span(deadline - joins)} before its deadline` : ""}`;
     const forced = at && forcing(Math.max(at, Math.floor(now)))?.forcedByOutpoint;
-    return `<button data-address="${esc("id/" + d.delegation.id)}" class="hash" title="${esc(address)}">${esc(address ? short(address, 8) : "#" + d.delegation.id)}</button>
+    return `<button data-address="${esc("id/" + d.delegation.id)}" class="hash" title="${esc(address)}">${esc(address ? "…" + address.slice(-14) : "#" + d.delegation.id)}</button>
       <div class="lane ${left <= 0 ? "late" : ""}" role="img" aria-label="${esc(text)}, expires ${ago(d.nextExpiry)}" title="${forced ? esc("batch forced by " + short(forced, 8)) : ""}">
         <div class="left" style="width:${pct(left - win)}%"></div><div class="window" style="width:${pct(deadline) - pct(left - win)}%"></div><div class="reserve" style="width:${pct(left) - pct(deadline)}%"></div>
         ${joins === null || st.dot === "renewing" ? "" : `<i class="batch" style="left:${pct(joins)}%"></i>`}</div>
@@ -587,7 +658,7 @@ function renderDetail() {
   const held = vtxos.reduce((a, v) => a + num(v.amount), 0), shownVtxos = allVtxos ? vtxos : vtxos.slice(0, MAX_VTXOS);
   const active = d.status === "active";
   const inList = delegations.find((x) => x.delegation.id === d.id), st = inList && stateOf(inList);
-  const slots = d.slots || [], watch = boards(d), done = watch ? "boarded" : "renewed";
+  const slots = d.slots || [], kind = kindOf(d), spend = kind === KINDS.spend, done = kind.done;
   const types = Object.fromEntries((templates.find((t) => t.id === d.templateId)?.params || []).map((p) => [p.name, p.type]));
   const batchAt = detail.batchAt || {}, renewing = Boolean(inList?.renewing), reserve = num(status?.renewalReserve);
   // who else is in a vtxo's batch: the others here, and the batch's count when it is among the ones listed
@@ -599,10 +670,11 @@ function renderDetail() {
   };
   $("detail").innerHTML = `
     <div class="title">
-      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : st?.dot === "renewing" ? "renewing" : "ok"}">${!active ? (d.status === "cancelled" ? "stopped by an operator" : esc(d.status)) : st?.skipped ? esc(st.text) : st?.key === "bad" ? "not renewing" : st?.key === "late" ? "overdue" : st?.dot === "renewing" ? "in a batch now" : watch ? "active" : "renewing"}</span></h2>
-        <div class="hash">${esc(d.address)}</div></div>
-      <div class="actions"><button data-copy="${esc(d.address)}">Copy address</button>
-        ${active ? `<button class="danger" id="stop">Stop renewing</button>` : d.status === "cancelled" ? `<button class="primary" id="resume">Resume renewing</button>` : ""}</div>
+      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : st?.dot === "renewing" ? "renewing" : "ok"}">${!active ? (d.status === "cancelled" ? "stopped by an operator" : d.status === "done" ? done : esc(d.status)) : st?.skipped ? esc(st.text) : st?.key === "bad" ? (spend ? "failing" : "not renewing") : st?.key === "late" ? "overdue" : st?.dot === "renewing" ? "in a batch now" : kind.doing}</span></h2>
+        ${d.address ? `<div class="hash">${esc(d.address)}</div>` : ""}</div>
+      <div class="actions">${d.address ? `<button data-copy="${esc(d.address)}">Copy address</button>` : ""}
+        ${explorer() && /^t?ark1/.test(d.address) ? `<button data-open="${esc(explorer() + "/address/" + d.address)}">View in explorer</button>` : ""}
+        ${active ? `<button class="danger" id="stop">${kind.stop}</button>` : d.status === "cancelled" ? `<button class="primary" id="resume">${kind.resume}</button>` : ""}</div>
     </div>
     <dl class="facts"><div><dt>Template</dt><dd class="hash" title="${esc(d.templateId)}">${esc(short(d.templateId, 8))}<button class="mini" data-copy="${esc(d.templateId)}" title="Copy the template id">copy</button></dd></div>
       ${num(d.parentId) ? `<div><dt>Successor of</dt><dd><a href="#id/${num(d.parentId)}">#${num(d.parentId)}</a></dd></div>` : ""}
@@ -610,26 +682,26 @@ function renderDetail() {
       <div><dt>Registered</dt><dd>${ago(d.createdAt)}</dd></div>
       <div><dt>Expires</dt><dd>${num(d.expiresAt) ? `<span title="${new Date(num(d.expiresAt) * 1000).toLocaleString()}">${ago(d.expiresAt)}</span>` : "never"}</dd></div></dl>
     ${st?.why && active ? `<p class="note">${esc(st.why)}</p>` : ""}
-    <h3>VTXOs at this address</h3>
-    ${vtxos.length > 1 ? `<p><b class="n">${vtxos.length}</b> VTXOs holding <b class="n">${sats(held)}</b>, soonest to renew first.</p>` : ""}
-    ${vtxos.length && !watch ? `<p class="state">A renewable VTXO waits for the batch of the first one to reach its deadline, ${span(reserve)} before expiry, so that they renew together. The dot is that batch.</p>` : ""}
-    ${vtxos.length ? shownVtxos.map((v) => `<div class="vtxo"><div class="top"><span class="hash">${esc(v.outpoint)}</span>
+    <h3>${kind.coins}</h3>
+    ${vtxos.length > 1 ? `<p><b class="n">${vtxos.length}</b> VTXOs holding <b class="n">${sats(held)}</b>${spend ? "" : ", soonest to renew first"}.</p>` : ""}
+    ${vtxos.length && kind === KINDS.renewal ? `<p class="state">A renewable VTXO waits for the batch of the first one to reach its deadline, ${span(reserve)} before expiry, so that they renew together. The dot is that batch.</p>` : ""}
+    ${vtxos.length ? shownVtxos.map((v) => `<div class="vtxo"><div class="top"><span class="hash">${explore(v.outpoint)}</span>
         <span class="amount n">${sats(v.amount)}${(v.assets || []).map((a) => ` + ${num(a.amount).toLocaleString()} of ${esc(short(a.assetId, 6))}`).join("")}</span></div>
-        ${lifeBar(v, batchAt[v.outpoint], renewing, company(v))}</div>`).join("") + (vtxos.length > shownVtxos.length ? `<p class="state"><button class="link" id="all-vtxos">Show all ${vtxos.length}</button>, the ${shownVtxos.length} soonest are above.</p>` : "")
-      : `<p class="empty">Nothing to renew: no spendable VTXO sits at this address right now.</p>`}
-    <h3>${watch ? "Boarding" : "Renewal"} attempts</h3>
+        ${spend ? `<div class="state">${num(v.expiresAt) ? "expires " + ago(v.expiresAt) : "onchain"}</div>` : lifeBar(v, batchAt[v.outpoint], renewing, company(v))}</div>`).join("") + (vtxos.length > shownVtxos.length ? `<p class="state"><button class="link" id="all-vtxos">Show all ${vtxos.length}</button>, the ${shownVtxos.length} soonest are above.</p>` : "")
+      : `<p class="empty">${kind.noCoin}</p>`}
+    <h3>${kind.attempts}</h3>
     ${renewals.length ? `<div class="scroll"><table><thead><tr><th>When</th><th>Result</th><th>VTXOs</th><th>Batch or reason</th></tr></thead><tbody>
       ${renewals.map((r) => `<tr><td title="${new Date(num(r.attemptedAt) * 1000).toLocaleString()}">${ago(r.attemptedAt)}</td>
         <td class="res ${r.success ? "ok" : "bad"}">${r.success ? done : "failed"}</td>
-        <td class="hash">${(r.outpoints || []).map((o) => esc(short(o, 8))).join("<br>")}</td>
-        <td class="${r.success ? "hash" : ""}">${r.success ? `<button class="link hash" data-copy="${esc(r.commitmentTxid)}" title="Copy commitment txid">${esc(short(r.commitmentTxid, 12))}</button>` : esc(r.error)}</td></tr>`).join("")}
+        <td class="hash">${(r.outpoints || []).map((o) => explore(o, short(o, 8))).join("<br>")}</td>
+        <td class="${r.success ? "hash" : ""}">${!r.success ? esc(r.error) : explorer() ? explore(r.commitmentTxid, short(r.commitmentTxid, 12)) : `<button class="link hash" data-copy="${esc(r.commitmentTxid)}" title="Copy the txid">${esc(short(r.commitmentTxid, 12))}</button>`}</td></tr>`).join("")}
       </tbody></table></div>
       <p class="state">A failure that repeats is listed once, at the time it first happened.</p>`
-      : `<p class="empty">No attempt yet. A VTXO is first renewed when it enters its renewal window.</p>`}
+      : `<p class="empty">${kind.noAttempt}</p>`}
     <h3>Inputs</h3>
     <p>Each input of the template: what it watches or the output bound to it, and who can spend it, one tapscript each.</p>
     ${slots.map((sl) => `<h4>${esc(sl.name)} <span class="badge">${sl.onchain ? "onchain" : "offchain"}</span></h4>
-      ${sl.outpoint ? `<p class="hash">${esc(sl.outpoint)} <button class="mini" data-copy="${esc(sl.outpoint)}" title="Copy the outpoint">copy</button></p>` : ""}
+      ${sl.outpoint ? `<p class="hash">${explore(sl.outpoint)} <button class="mini" data-copy="${esc(sl.outpoint)}" title="Copy the outpoint">copy</button></p>` : ""}
       <ul class="paths">${(sl.tapscripts || []).map((t) => `<li><span class="words">${esc(scriptWords(t))}</span><button class="mini" data-copy="${esc(t)}" title="Copy the script hex">hex</button></li>`).join("")}</ul>`).join("")}`;
 }
 
@@ -639,14 +711,17 @@ async function setRenewing(on) {
   try {
     if (on) await send("POST", "/v1/admin/delegation/" + encodeURIComponent(d.id) + "/resume", {});
     else await api("/v1/admin/delegation/" + encodeURIComponent(d.id), { method: "DELETE" });
-    toast(on ? "Renewing resumed" : "Renewing stopped");
-  } catch (e) { toast(`Could not ${on ? "resume" : "stop"} renewing: ${e.message}`, true); }
+    toast(on ? "Resumed" : spends(d) ? "Spend cancelled" : "Renewing stopped");
+  } catch (e) { toast(`Could not ${on ? "resume" : "stop"} it: ${e.message}`, true); }
   refresh();
 }
 
 function askStop() {
-  const held = delegations.find((x) => x.delegation.id === detail.delegation.id);
-  $("confirm-text").textContent = (num(held?.vtxoCount)
+  const held = delegations.find((x) => x.delegation.id === detail.delegation.id), spend = spends(detail.delegation);
+  $("confirm-title").textContent = spend ? "Cancel this spend?" : "Stop renewing this address?";
+  $("confirm").querySelector("[value=no]").textContent = spend ? "Keep the spend" : "Keep renewing";
+  $("confirm-yes").textContent = kindOf(detail.delegation).stop;
+  $("confirm-text").textContent = spend ? "The daemon stops trying it: its coins stay with their owner, who can sign a new spend. Nothing is deleted." : (num(held?.vtxoCount)
     ? `${sats(held.totalAmount)} in ${held.vtxoCount} VTXO${held.vtxoCount > 1 ? "s" : ""}, the first expiring ${ago(held.nextExpiry)}, will expire`
     : "Coins sent to it later will expire") + " unless the owner exits or you resume. The owner cannot register it again until you resume. Nothing is deleted.";
   $("confirm").showModal();
@@ -657,7 +732,9 @@ const go = (address) => { location.hash = address || ""; if (!address) history.r
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.filter) { filter = b.dataset.filter; renderList(); }
+  else if (b.dataset.kind) { kindFilter = b.dataset.kind; renderList(); }
   else if (b.dataset.address) go(b.dataset.address);
+  else if (b.dataset.open) window.open(b.dataset.open, "_blank", "noopener");
   else if (b.dataset.copy) navigator.clipboard.writeText(b.dataset.copy).then(() => toast("Copied"), () => toast("Copy failed, select the text instead", true));
   else if (b.id === "home" || b.id === "home2" || b.id === "see-fees") go("");
   else if (b.id === "all-vtxos") { allVtxos = true; renderDetail(); }
@@ -699,6 +776,7 @@ document.addEventListener("keydown", (e) => {
   }
 });
 $("search").addEventListener("input", renderList);
+$("sort").addEventListener("change", renderList);
 addEventListener("hashchange", () => { selected = location.hash.slice(1); renderList(); loadDetail(); });
 
 function refresh() { loadHealth(); loadList().then(loadDetail); }
