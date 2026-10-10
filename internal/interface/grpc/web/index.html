@@ -7,25 +7,26 @@
 <style>
 :root {
   color-scheme: light dark;
-  --paper: #f6f6f4; --surface: #ffffff; --ink: #17181c; --muted: #63656e; --faint: #9a9ca5; --line: #e6e6e3; --hover: #f3f3f1; --current: #efedfd;
+  --paper: #f4f5f7; --surface: #ffffff; --ink: #16181d; --muted: #5f636d; --faint: #989ba4; --line: #e3e5e9; --hover: #f5f6f8; --current: #eeecfd;
   --ok: #18794e; --ok-soft: #e3f4ea; --window: #a35f00; --window-a: #fbefd6; --window-b: #f2d9a0; --bad: #c4321f; --bad-soft: #fcebe8;
-  --track: #ececea; --elapsed: rgba(23, 24, 28, .22); --accent: #5b4bdb; --accent-ink: #ffffff; --shadow: 0 16px 40px rgba(23, 24, 28, .16);
+  --track: #eceef1; --elapsed: rgba(22, 24, 29, .2); --accent: #5b4bdb; --accent-soft: #e9e6fc; --accent-ink: #ffffff; --shadow: 0 12px 32px rgba(22, 24, 29, .16);
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --r: 8px;
+  --r: 6px; --panel: 12px; --head: 3.25rem;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #0c0c0e; --surface: #141417; --ink: #ececf0; --muted: #9b9ca5; --faint: #66676f; --line: #25252a; --hover: #1b1b1f; --current: #221f38;
+    --paper: #0d0e11; --surface: #15161a; --ink: #ececf0; --muted: #9a9ca6; --faint: #686a73; --line: #26272d; --hover: #1c1d22; --current: #221f38;
     --ok: #4cc38a; --ok-soft: #12291d; --window: #e9a83b; --window-a: #33270f; --window-b: #4d3b14; --bad: #f2735f; --bad-soft: #36160f;
-    --track: #222226; --elapsed: rgba(236, 236, 240, .22); --accent: #a99bff; --accent-ink: #0c0c0e; --shadow: 0 16px 40px rgba(0, 0, 0, .55);
+    --track: #23242a; --elapsed: rgba(236, 236, 240, .22); --accent: #a99bff; --accent-soft: #29254a; --accent-ink: #0d0e11; --shadow: 0 12px 32px rgba(0, 0, 0, .55);
   }
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
-button, input { font: inherit; color: inherit; }
-h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.25; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); }
+h1, h2, h3, h4 { margin: 0; font-weight: 600; line-height: 1.25; }
 p { margin: 0; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .hash { font-family: var(--mono); font-size: .86em; word-break: break-all; }
@@ -34,10 +35,10 @@ kbd { font: .8em var(--mono); border: 1px solid var(--line); border-radius: 4px;
 [hidden] { display: none !important; }
 
 /* buttons */
-button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: var(--r); padding: 0 .85rem; min-height: 2rem; font-weight: 500; font-size: .88rem; transition: background .12s, border-color .12s, color .12s; }
+button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: var(--r); padding: 0 .8rem; min-height: 2rem; font-weight: 500; font-size: .86rem; transition: background .12s, border-color .12s, color .12s; }
 button:hover { background: var(--hover); border-color: var(--faint); }
 button:active { background: var(--current); }
-button:disabled { cursor: default; opacity: .55; }
+button:disabled { cursor: default; opacity: .5; }
 button:disabled:hover { background: var(--surface); border-color: var(--line); }
 button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 button.primary:hover { filter: brightness(1.08); background: var(--accent); }
@@ -45,7 +46,7 @@ button.danger { color: var(--bad); }
 button.danger:hover { background: var(--bad-soft); border-color: var(--bad); }
 button.danger.solid { background: var(--bad); color: #fff; border-color: var(--bad); }
 button.danger.solid:hover { filter: brightness(1.08); background: var(--bad); }
-button.link { border: 0; background: none; padding: 0; min-height: 0; font-weight: inherit; color: var(--accent); text-decoration: underline; text-underline-offset: .15em; border-radius: 2px; }
+button.link { border: 0; background: none; padding: 0; min-height: 0; font-weight: inherit; font-size: inherit; color: var(--accent); text-decoration: underline; text-underline-offset: .15em; border-radius: 2px; }
 button.link:hover { background: none; color: var(--ink); }
 /* hashes read as data: ink, underlined on hover only */
 button.link.hash, .horizon button, a.hash { color: var(--ink); text-decoration: none; }
@@ -55,31 +56,40 @@ button.mini:hover { color: var(--ink); }
 button[aria-busy=true] { pointer-events: none; opacity: .7; }
 button[aria-busy=true]::after { content: "…"; }
 
-/* header */
-header { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center; padding: .6rem clamp(1rem, 3vw, 2rem); background: var(--surface); border-bottom: 1px solid var(--line); }
-header h1 { font-size: 1rem; letter-spacing: -.01em; display: flex; align-items: center; gap: .5rem; }
-header h1::before { content: ""; width: .7rem; height: .7rem; border-radius: 3px; background: var(--accent); }
-header h1 button { all: unset; cursor: pointer; border-radius: 2px; }
-header h1 button:hover { color: var(--accent); }
-header .meta { color: var(--muted); font-size: .86rem; display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; }
-header .meta button { all: unset; cursor: pointer; color: var(--ink); font: .82rem var(--mono); text-decoration: underline dotted; text-underline-offset: .2em; border-radius: 2px; }
-header .meta button:hover { color: var(--accent); }
-#health { margin-left: auto; font-size: .86rem; color: var(--muted); display: flex; align-items: center; gap: .45rem; }
-#health i { width: .55rem; height: .55rem; border-radius: 50%; background: var(--faint); flex: none; }
-#health.ok i { background: var(--ok); } #health.down i { background: var(--bad); }
-#health.down { color: var(--bad); }
+/* tooltips */
+#tooltip { position: fixed; z-index: 50; max-width: 19rem; padding: .4rem .6rem; border-radius: var(--r); background: var(--ink); color: var(--paper); font: 400 .76rem/1.45 var(--sans); pointer-events: none; box-shadow: var(--shadow); }
+.tip { display: inline-grid; place-items: center; width: 1rem; height: 1rem; min-height: 0; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: none; color: var(--faint); font: 600 .64rem/1 var(--sans); vertical-align: .08em; cursor: help; }
+.tip:hover { color: var(--ink); background: none; }
 
-/* status */
-#status { display: flex; flex-wrap: wrap; gap: .25rem 2.25rem; padding: .5rem clamp(1rem, 3vw, 2rem); background: var(--paper); border-bottom: 1px solid var(--line); font-size: .84rem; color: var(--muted); min-height: 2.5rem; align-items: center; }
-#status b { color: var(--ink); font-weight: 600; }
-#status .warn, #status .warn b { color: var(--bad); }
-#status .busy, #status .busy b { color: var(--window); }
-.pulse { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: var(--window); margin-right: .4rem; vertical-align: middle; animation: pulse 1.4s ease-in-out infinite; }
+/* header */
+header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 1.75rem; height: var(--head); padding: 0 clamp(1rem, 3vw, 2rem); background: var(--surface); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: .55rem; font-weight: 650; font-size: .98rem; letter-spacing: -.015em; color: var(--ink); text-decoration: none; flex: none; }
+.brand::before { content: ""; width: .8rem; height: .8rem; border-radius: 3px; background: var(--accent); box-shadow: .3rem .3rem 0 -.1rem color-mix(in srgb, var(--accent) 40%, transparent); }
+nav { display: flex; align-self: stretch; gap: .25rem; }
+nav a { display: flex; align-items: center; gap: .4rem; padding: 0 .7rem; color: var(--muted); text-decoration: none; font-weight: 500; font-size: .88rem; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+nav a:hover { color: var(--ink); }
+nav a[aria-current=page] { color: var(--ink); border-bottom-color: var(--accent); }
+nav .count { min-width: 1.15rem; padding: 0 .35rem; border-radius: 99px; background: var(--bad); color: #fff; font-size: .7rem; font-weight: 600; text-align: center; line-height: 1.15rem; }
+.headright { margin-left: auto; display: flex; align-items: center; gap: 1.25rem; min-width: 0; }
+#pulse { display: inline-block; min-height: 1.85rem; padding: 0 .75rem; border-radius: 99px; background: var(--paper); border-color: var(--line); color: var(--muted); font-size: .8rem; font-weight: 500; white-space: nowrap; }
+#pulse b { color: var(--ink); font-weight: 600; }
+#pulse.busy, #pulse.busy b { color: var(--window); }
+#pulse.warn, #pulse.warn b { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+#meta { display: flex; align-items: center; gap: .9rem; color: var(--muted); font-size: .8rem; white-space: nowrap; }
+#meta .net { padding: .05rem .5rem; border-radius: 99px; border: 1px solid var(--line); color: var(--ink); font-weight: 500; }
+#meta button { all: unset; cursor: pointer; color: var(--ink); font: .78rem var(--mono); text-decoration: underline dotted; text-underline-offset: .2em; border-radius: 2px; }
+#meta button:hover { color: var(--accent); }
+#health { width: .6rem; height: .6rem; border-radius: 50%; background: var(--faint); flex: none; }
+#health.ok { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+#health.down { background: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }
+.pulse { display: inline-block; width: .5rem; height: .5rem; margin-right: .45rem; border-radius: 50%; background: var(--window); animation: pulse 1.4s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .25; } }
 
-main { display: grid; grid-template-columns: minmax(20rem, 27rem) minmax(0, 1fr); min-height: calc(100vh - 6rem); }
-#list { border-right: 1px solid var(--line); background: var(--surface); min-width: 0; }
-#list .pane { display: flex; flex-direction: column; height: calc(100vh - 5.25rem); position: sticky; top: 0; }
+/* split pages: a list on the left, what it selects on the right */
+.split { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr); min-height: calc(100vh - var(--head)); }
+.list { border-right: 1px solid var(--line); background: var(--surface); min-width: 0; }
+.list .pane { display: flex; flex-direction: column; height: calc(100vh - var(--head)); position: sticky; top: var(--head); }
+.list .pane > :not(.rows) { flex-shrink: 0; }
 .filters { display: flex; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .filters button { flex: 1; border: 0; border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: .65rem .5rem; min-height: 0; color: var(--muted); font-size: .86rem; font-weight: 500; background: none; white-space: nowrap; }
 .filters button:hover { background: var(--hover); color: var(--ink); }
@@ -87,73 +97,79 @@ main { display: grid; grid-template-columns: minmax(20rem, 27rem) minmax(0, 1fr)
 .filters .n { color: var(--faint); margin-left: .15rem; }
 .filters .alert .n { color: var(--bad); font-weight: 600; }
 .filters button[aria-pressed=true] .n { color: var(--muted); }
+.search { display: block; width: calc(100% - 1.5rem); margin: .65rem .75rem .55rem; padding: .45rem .7rem; min-height: 2.15rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
+.search:focus, .register textarea:focus { background: var(--surface); border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .listbar { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: 0 .75rem .6rem; }
 .kinds { display: flex; gap: .35rem; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .kinds::-webkit-scrollbar { display: none; }
 .kinds.more { mask-image: linear-gradient(to right, #000 82%, transparent); }
-.kinds button { flex: none; }
+.kinds button { flex: none; min-height: 0; padding: .15rem .6rem; border: 1px solid var(--line); border-radius: 99px; background: none; color: var(--muted); font-size: .76rem; font-weight: 500; }
+.kinds button[aria-pressed=true] { color: var(--accent); border-color: var(--accent); background: var(--current); }
+.kinds .n { color: var(--faint); margin-left: .25rem; }
 .sort { position: relative; flex: none; color: var(--muted); }
 .sort:hover { color: var(--ink); }
 .sort select { appearance: none; -webkit-appearance: none; border: 0; background: none; color: inherit; font: 500 .76rem var(--sans); padding: .25rem 1.15rem .25rem .4rem; border-radius: var(--r); cursor: pointer; }
 .sort select:hover { background: var(--hover); }
 .sort::after { content: ""; position: absolute; right: .45rem; top: 50%; width: .32rem; height: .32rem; margin-top: -.24rem; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); pointer-events: none; }
-.kinds button { min-height: 0; padding: .15rem .6rem; border: 1px solid var(--line); border-radius: 99px; background: none; color: var(--muted); font-size: .76rem; font-weight: 500; }
-.kinds button[aria-pressed=true] { color: var(--accent); border-color: var(--accent); background: var(--current); }
-.kinds .n { color: var(--faint); margin-left: .2rem; }
-#rows .amt { font-variant-numeric: tabular-nums; font-size: .86rem; font-weight: 600; white-space: nowrap; }
-#rows .count { color: var(--faint); font-size: .76rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
-#rows .kind { color: var(--faint); }
-#search { display: block; width: calc(100% - 1.5rem); margin: .65rem .75rem .55rem; padding: .5rem .7rem; min-height: 2.25rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
-#search:focus, #register textarea:focus { background: var(--surface); border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
-#rows { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; min-height: 0; }
-#list .pane > :not(#rows) { flex-shrink: 0; }
-#rows li button { display: grid; grid-template-columns: .6rem minmax(0, 1fr) auto; gap: .2rem .7rem; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: .75rem 1rem .75rem 1rem; min-height: 0; font-weight: 400; background: none; box-shadow: inset 3px 0 0 transparent; }
-#rows li button:hover { background: var(--hover); }
-#rows li button[aria-current=true] { background: var(--current); box-shadow: inset 3px 0 0 var(--accent); }
-#rows li button:focus-visible { outline-offset: -2px; }
-.dot { width: .5rem; height: .5rem; border-radius: 50%; align-self: center; background: var(--line); }
+.rows { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
+.rows li > button { display: grid; grid-template-columns: .6rem minmax(0, 1fr) auto; gap: .15rem .7rem; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: .7rem 1rem; min-height: 0; font-weight: 400; background: none; box-shadow: inset 3px 0 0 transparent; }
+.rows li > button:hover { background: var(--hover); }
+.rows li > button[aria-current=true] { background: var(--current); box-shadow: inset 3px 0 0 var(--accent); }
+.rows li > button:focus-visible { outline-offset: -2px; }
+.rows .amt { font-variant-numeric: tabular-nums; font-size: .86rem; font-weight: 600; white-space: nowrap; text-align: right; }
+.rows .count { color: var(--faint); font-size: .76rem; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+.rows .kind { color: var(--faint); }
+.rows .sub { color: var(--muted); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rows .sub.bad, .rows .sub.late { color: var(--bad); } .rows .sub.renewing { color: var(--window); }
+.dot { width: .5rem; height: .5rem; border-radius: 50%; align-self: center; background: var(--line); flex: none; }
 .dot.ok { background: var(--ok); } .dot.bad, .dot.late { background: var(--bad); } .dot.renewing { background: var(--window); } .dot.off { background: none; border: 1px solid var(--faint); }
-#rows .sub { color: var(--muted); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#rows .sub.bad, #rows .sub.late { color: var(--bad); } #rows .sub.renewing { color: var(--window); }
+.tag { display: inline-block; margin-right: .35rem; padding: 0 .4rem; border-radius: 4px; background: var(--track); color: var(--muted); font-size: .7rem; font-weight: 500; line-height: 1.5; vertical-align: .05em; }
+.tag.bad { background: var(--bad-soft); color: var(--bad); } .tag.ok { background: var(--accent-soft); color: var(--accent); }
 .empty { padding: 1.25rem 1rem; color: var(--muted); max-width: 36rem; line-height: 1.55; }
-#hint { display: flex; justify-content: space-between; gap: .5rem; padding: .45rem .9rem; border-top: 1px solid var(--line); color: var(--faint); font-size: .78rem; }
+.hint { display: flex; justify-content: space-between; gap: .5rem; padding: .45rem .9rem; border-top: 1px solid var(--line); color: var(--faint); font-size: .76rem; }
 
 /* skeletons */
 .sk { display: block; height: .8em; border-radius: 3px; background: var(--track); animation: sk 1.2s ease-in-out infinite; }
 @keyframes sk { 50% { opacity: .45; } }
-#rows li.sk-row { display: grid; grid-template-columns: .6rem 1fr auto; gap: .35rem .6rem; align-items: center; padding: .8rem .75rem .8rem .9rem; border-bottom: 1px solid var(--line); }
-#rows li.sk-row .sk:first-child { width: .55rem; height: .55rem; border-radius: 50%; }
-#rows li.sk-row .sk:last-child { width: 4rem; }
-#rows li.sk-row .sk:nth-child(4) { grid-column: 2 / 4; width: 60%; }
-#detail[aria-busy=true] { opacity: .85; }
+.rows li.sk-row { display: grid; grid-template-columns: .6rem 1fr auto; gap: .35rem .6rem; align-items: center; padding: .8rem .75rem .8rem .9rem; border-bottom: 1px solid var(--line); }
+.rows li.sk-row .sk:first-child { width: .55rem; height: .55rem; border-radius: 50%; }
+.rows li.sk-row .sk:last-child { width: 4rem; }
+.rows li.sk-row .sk:nth-child(4) { grid-column: 2 / 4; width: 60%; }
 .sk-detail .sk { margin: .6rem 0; }
 @media (prefers-reduced-motion: reduce) { .pulse, .sk { animation: none; } button { transition: none; } }
 
 /* detail */
-#detail { padding: 2rem clamp(1rem, 3.5vw, 3rem) 5rem; min-width: 0; max-width: 76rem; }
-#detail h2 { font-size: 1.45rem; letter-spacing: -.025em; display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; }
-#detail h3 { font-size: .98rem; margin: 3rem 0 .4rem; padding-top: 1.5rem; border-top: 1px solid var(--line); letter-spacing: -.01em; }
-#detail h3:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
-#detail h3 + p { margin: 0 0 1.1rem; color: var(--muted); max-width: 42rem; font-size: .86rem; }
-#detail .empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 1.25rem; }
+.detail { padding: 2rem clamp(1rem, 3.5vw, 3rem) 5rem; min-width: 0; max-width: 76rem; }
+.detail[aria-busy=true] { opacity: .85; }
+.detail h2 { font-size: 1.4rem; letter-spacing: -.025em; display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; }
+.detail h3 { display: flex; align-items: center; gap: .45rem; font-size: .96rem; margin: 2rem 0 .9rem; padding-top: 1.5rem; border-top: 1px solid var(--line); letter-spacing: -.01em; }
+.detail h3 .aside { margin-left: auto; color: var(--muted); font-size: .8rem; font-weight: 400; }
+.detail h4 { font-size: .88rem; margin: 1.25rem 0 .4rem; display: flex; align-items: center; gap: .5rem; }
+.detail .empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 1.1rem 1.25rem; }
+.blank { display: grid; place-content: center; min-height: 60vh; text-align: center; color: var(--muted); gap: .6rem; }
+.blank b { color: var(--ink); font-size: 1rem; }
 .title { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; align-items: flex-start; justify-content: space-between; }
-.title .hash { margin-top: .3rem; font-size: .9rem; max-width: 46rem; color: var(--muted); }
+.title .hash { margin-top: .35rem; font-size: .86rem; max-width: 46rem; color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, max-content)); gap: .75rem 3rem; margin: 1.5rem 0 0; padding: 1rem 0; border-top: 1px solid var(--line); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, max-content)); gap: .75rem 3rem; margin: 1.5rem 0 0; padding: 1rem 0 0; border-top: 1px solid var(--line); }
 .facts div { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
-.facts dt { color: var(--muted); font-size: .76rem; }
-.facts dd { margin: 0; font-weight: 600; font-size: .98rem; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .45rem; }
+.facts dt { color: var(--muted); font-size: .76rem; display: flex; align-items: center; gap: .35rem; }
+.facts dd { margin: 0; font-weight: 600; font-size: .96rem; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .45rem; }
 .facts dd .mini { margin-left: 0; flex: none; }
 .facts dd .hash { word-break: normal; }
-.badge { display: inline-flex; align-items: center; gap: .4rem; border-radius: 99px; padding: .1rem .65rem .1rem .5rem; font-size: .78rem; font-weight: 500; border: 1px solid var(--line); color: var(--muted); }
-.badge::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--faint); }
+.badge { display: inline-flex; align-items: center; gap: .4rem; border-radius: 99px; padding: .1rem .65rem .1rem .5rem; font-size: .76rem; font-weight: 500; letter-spacing: 0; border: 1px solid var(--line); color: var(--muted); }
+.badge::before { content: ""; width: .45rem; height: .45rem; border-radius: 50%; background: var(--faint); }
 .badge.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; } .badge.ok::before { background: var(--ok); }
 .badge.bad, .badge.late { color: var(--bad); background: var(--bad-soft); border-color: transparent; } .badge.bad::before, .badge.late::before { background: var(--bad); }
 .badge.renewing { color: var(--window); background: var(--window-a); border-color: transparent; } .badge.renewing::before { background: var(--window); }
-.note { border-left: 3px solid var(--bad); padding: .6rem .9rem; margin: 1rem 0 0; background: var(--bad-soft); border-radius: 0 var(--r) var(--r) 0; max-width: 46rem; }
+.badge.accent { color: var(--accent); background: var(--accent-soft); border-color: transparent; } .badge.accent::before { background: var(--accent); }
+.note { border-left: 3px solid var(--bad); padding: .55rem .9rem; margin: 1rem 0 0; background: var(--bad-soft); border-radius: 0 var(--r) var(--r) 0; max-width: 46rem; font-size: .88rem; }
 .paths { list-style: none; margin: 0; padding: 0; max-width: 46rem; }
 .paths li { display: flex; justify-content: space-between; gap: 1rem; padding: .5rem 0; border-bottom: 1px solid var(--line); } .paths li:last-child { border-bottom: 0; }
 .paths .words { font-family: var(--mono); font-size: .86em; }
+.refs { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; }
+.refs button { font: .8rem var(--mono); min-height: 1.75rem; }
+.refs .tag { font: .78rem var(--mono); padding: .15rem .5rem; }
 
 /* lifetime bar: birth to expiry, renewal window hatched */
 .vtxo { padding: .9rem 0; } .vtxo + .vtxo { border-top: 1px solid var(--line); }
@@ -170,97 +186,200 @@ main { display: grid; grid-template-columns: minmax(20rem, 27rem) minmax(0, 1fr)
 .state { font-size: .82rem; color: var(--muted); }
 .state.in, .state.renewing { color: var(--window); font-weight: 600; } .state.late { color: var(--bad); font-weight: 600; }
 
-/* overview: every address on one time axis */
-.horizon { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto; gap: .5rem 1rem; align-items: center; font-size: .86rem; }
+/* every address on one time axis */
+.horizon { display: grid; grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr) minmax(0, 22rem); gap: .55rem 1.25rem; align-items: center; font-size: .84rem; }
 .horizon button { all: unset; font: .86em var(--mono); cursor: pointer; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 2px; }
 .horizon button:focus-visible { outline: 2px solid var(--accent); }
 .horizon .lane { position: relative; display: flex; height: .55rem; background: var(--track); border-radius: 99px; }
 .horizon .lane .left, .horizon .lane .window, .horizon .lane .reserve { height: 100%; }
-.horizon .lane .left { border-radius: 99px 0 0 99px; } .horizon .lane .reserve { border-radius: 0 99px 99px 0; }
-.horizon .lane .left { background: var(--elapsed); }
+.horizon .lane .left { border-radius: 99px 0 0 99px; background: var(--elapsed); } .horizon .lane .reserve { border-radius: 0 99px 99px 0; }
 .horizon .lane .window { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
 .horizon .lane.late { background: var(--bad-soft); box-shadow: inset 3px 0 0 var(--bad); }
 .horizon .lane .window, .life .window, .horizon .lane .reserve, .life .reserve { min-width: 3px; }
-.horizon .axis { position: relative; height: 1.4rem; border-top: 1px solid var(--line); margin-top: .1rem; font-size: .74rem; color: var(--faint); }
-.horizon .axis i { position: absolute; top: 0; padding: .2rem 0 0 .3rem; border-left: 1px solid var(--line); font-style: normal; white-space: nowrap; }
-.horizon .t { color: var(--muted); white-space: nowrap; text-align: right; }
+.horizon .t { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .horizon .t.in, .horizon .t.renewing { color: var(--window); font-weight: 600; } .horizon .t.late { color: var(--bad); font-weight: 600; }
-.plan td.n { white-space: nowrap; }
-.legend { display: flex; flex-wrap: wrap; gap: .3rem 1.25rem; margin: .75rem 0 0; color: var(--muted); font-size: .8rem; }
+.axis { position: relative; height: 1.4rem; border-top: 1px solid var(--line); font-size: .72rem; color: var(--faint); }
+.axis i { position: absolute; top: 0; padding: .25rem 0 0 .3rem; border-left: 1px solid var(--line); font-style: normal; white-space: nowrap; }
+.legend { display: flex; flex-wrap: wrap; gap: .3rem 1.25rem; margin: 1rem 0 0; color: var(--muted); font-size: .78rem; }
 .legend i { display: inline-block; width: 1.1rem; height: .55rem; border-radius: 2px; vertical-align: middle; margin-right: .35rem; background: var(--elapsed); }
 .legend i.w { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
 
-.doc { max-width: 60rem; margin-top: .75rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
-.doc .bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .35rem .5rem .35rem .75rem; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .8rem; }
-.doc pre { margin: 0; padding: .75rem; overflow: auto; max-height: 36rem; font: .82rem/1.55 var(--mono); tab-size: 2; }
-.j-k { color: var(--accent); } .j-s { color: var(--ok); } .j-n { color: var(--window); } .j-b { color: var(--bad); } .j-p { color: var(--faint); }
-#register textarea { display: block; width: 100%; max-width: 46rem; min-height: 10rem; margin-bottom: .75rem; padding: .6rem .75rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); color: var(--ink); font: .84rem/1.5 var(--mono); resize: vertical; }
-table { border-collapse: collapse; width: 100%; font-size: .88rem; }
-th { text-align: left; font-weight: 500; color: var(--faint); font-size: .76rem; padding: .4rem .75rem .5rem 0; border-bottom: 1px solid var(--line); }
-td { padding: .6rem .75rem .6rem 0; border-bottom: 1px solid var(--line); vertical-align: top; font-variant-numeric: tabular-nums; }
+/* overview */
+.overview { max-width: 84rem; margin: 0 auto; padding: 1.75rem clamp(1rem, 3vw, 2rem) 4rem; }
+.ov-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem 1.5rem; margin-bottom: 1.1rem; }
+.ov-head h2 { font-size: 1.35rem; letter-spacing: -.025em; }
+.ov-head p { color: var(--muted); font-size: .84rem; }
+.ov-head .warn { color: var(--bad); font-weight: 500; }
+.overview > .note { margin: 0 0 1.1rem; max-width: none; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); margin: 0 0 1.25rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--panel); overflow: hidden; }
+.stat { display: flex; flex-direction: column; gap: .3rem; min-width: 0; padding: 1rem 1.25rem 1.1rem; margin: 0 0 0 -1px; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: none; text-align: left; font-weight: 400; color: var(--ink); }
+button.stat:hover { background: var(--hover); border-color: var(--line); }
+.stat .label { color: var(--muted); font-size: .8rem; font-weight: 500; }
+.stat .fig { font-size: clamp(1.3rem, 2.4vw, 1.6rem); font-weight: 600; letter-spacing: -.03em; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat .fig small { margin-left: .3rem; font-size: .78rem; font-weight: 500; letter-spacing: 0; color: var(--muted); }
+.stat .sub { color: var(--muted); font-size: .78rem; }
+.stat.alert .fig { color: var(--bad); }
+.stat.good .fig { color: var(--ok); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--panel); padding: 1.15rem 1.35rem 1.35rem; margin-bottom: 1.25rem; min-width: 0; }
+.ph { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1rem; margin-bottom: 1.1rem; }
+.ph h3, .detail .ph h3 { margin: 0; padding: 0; border: 0; display: flex; align-items: center; gap: .45rem; font-size: .96rem; letter-spacing: -.01em; }
+.ph .aside { margin-left: auto; color: var(--muted); font-size: .8rem; }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 1.25rem; }
+
+/* planned batches: the next one, then all of them on a log time axis */
+.hero { display: grid; grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr); gap: 1.5rem 2.5rem; align-items: center; padding-bottom: 1.35rem; }
+.next .label { color: var(--muted); font-size: .8rem; font-weight: 500; display: flex; align-items: center; gap: .45rem; }
+.next .when { margin: .2rem 0 .45rem; font-size: 2.1rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.next .when.busy { color: var(--window); }
+.next p { color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; }
+.next p b { color: var(--ink); font-weight: 600; }
+.tl { position: relative; height: 5.5rem; margin: 0 .75rem; }
+.tl .rail { position: absolute; left: 0; right: 0; top: 2.9rem; height: 2px; border-radius: 1px; background: var(--track); }
+.tl .rail::before { content: ""; position: absolute; left: -1px; top: -.4rem; width: 2px; height: calc(.8rem + 2px); border-radius: 1px; background: var(--ink); }
+.tl .m { position: absolute; top: 2.9rem; z-index: 2; width: var(--s); height: var(--s); margin: calc(var(--s) / -2 + 1px) 0 0 calc(var(--s) / -2); padding: 0; min-height: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--accent) 78%, var(--surface)); box-shadow: 0 0 0 2px var(--surface); }
+.tl .m:hover, .tl .m:focus-visible { background: var(--accent); }
+.tl .m.first { background: var(--accent); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); }
+.tl .m .v { position: absolute; bottom: calc(100% + .35rem); left: 50%; transform: translateX(-50%); color: var(--muted); font-size: .72rem; font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tl .m.first .v { color: var(--ink); font-weight: 600; }
+.tl .axis { position: absolute; left: 0; right: 0; top: 4rem; height: 1.4rem; border: 0; }
+.tl .axis i { border-left: 0; padding: 0; transform: translateX(-50%); }
+.tl .axis i:first-child { transform: none; }
+table { border-collapse: collapse; width: 100%; font-size: .86rem; }
+th { text-align: left; font-weight: 500; color: var(--muted); font-size: .76rem; padding: .5rem .75rem .5rem 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: .55rem .75rem .55rem 0; border-bottom: 1px solid var(--line); vertical-align: top; font-variant-numeric: tabular-nums; }
+tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover td { background: var(--hover); }
+th.r, td.r { text-align: right; }
 td:first-child, td.hash { white-space: nowrap; word-break: normal; }
 td.res { white-space: nowrap; font-weight: 500; } td.res.ok { color: var(--ok); } td.res.bad { color: var(--bad); }
 .scroll { overflow-x: auto; }
+.more { margin-top: .75rem; font-size: .82rem; color: var(--muted); }
 
-dialog { border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem 1.5rem 1.5rem; width: min(30rem, calc(100vw - 2rem)); color: var(--ink); background: var(--surface); box-shadow: var(--shadow); }
+/* value by earliest expiry */
+.dist { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: .55rem 1rem; align-items: center; font-size: .82rem; }
+.dist > span { color: var(--muted); white-space: nowrap; }
+.dist .bar { height: .7rem; border-radius: 0 4px 4px 0; background: color-mix(in srgb, var(--accent) 72%, var(--surface)); min-width: 2px; }
+.dist .bar.late { background: var(--bad); }
+.dist .v { color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.dist .v small { color: var(--faint); margin-left: .45rem; }
+.attn { list-style: none; margin: -.4rem 0 0; padding: 0; }
+.attn button { display: grid; grid-template-columns: .5rem minmax(0, 9rem) minmax(0, 1fr) auto; gap: .75rem; align-items: center; width: 100%; padding: .55rem .25rem; min-height: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; text-align: left; font-weight: 400; font-size: .84rem; }
+.attn li:last-child button { border-bottom: 0; }
+.attn .hash { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attn .why { color: var(--bad); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attn .amt { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.calm { display: flex; align-items: center; gap: .6rem; color: var(--muted); padding: .5rem 0; }
+.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem 2rem; margin: 0; }
+.settings div { display: flex; flex-direction: column; gap: .15rem; }
+.settings dt { color: var(--muted); font-size: .78rem; display: flex; align-items: center; gap: .35rem; }
+.settings dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* documents */
+.doc { max-width: 60rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
+.doc .bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .35rem .5rem .35rem .75rem; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .78rem; }
+.doc pre { margin: 0; padding: .75rem; overflow: auto; max-height: 36rem; font: .8rem/1.55 var(--mono); tab-size: 2; }
+.j-k { color: var(--accent); } .j-s { color: var(--ok); } .j-n { color: var(--window); } .j-b { color: var(--bad); } .j-p { color: var(--faint); }
+.register textarea { display: block; width: 100%; min-height: 12rem; margin-bottom: .75rem; padding: .6rem .75rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); color: var(--ink); font: .82rem/1.5 var(--mono); resize: vertical; }
+.register[aria-busy=true] { opacity: .7; pointer-events: none; }
+
+dialog { border: 1px solid var(--line); border-radius: var(--panel); padding: 1.25rem 1.5rem 1.5rem; width: min(30rem, calc(100vw - 2rem)); color: var(--ink); background: var(--surface); box-shadow: var(--shadow); }
 dialog::backdrop { background: rgba(12, 12, 14, .55); backdrop-filter: blur(2px); }
 dialog h2 { font-size: 1.05rem; }
 dialog p { margin: .6rem 0 1.5rem; color: var(--muted); }
 dialog .actions { justify-content: flex-end; }
-#toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: .55rem 1rem; border-radius: var(--r); font-size: .88rem; z-index: 10; box-shadow: var(--shadow); max-width: calc(100vw - 2rem); }
+#toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: .55rem 1rem; border-radius: var(--r); font-size: .86rem; z-index: 40; box-shadow: var(--shadow); max-width: calc(100vw - 2rem); }
 #toast.bad { background: var(--bad); color: #fff; }
 
+@media (max-width: 1100px) {
+  #meta .ver, #meta .key { display: none; }
+  .cols { grid-template-columns: minmax(0, 1fr); }
+  .horizon { grid-template-columns: minmax(6rem, 8rem) minmax(0, 1fr) minmax(0, 14rem); }
+}
 @media (max-width: 800px) {
-  main { grid-template-columns: minmax(0, 1fr); min-height: 0; }
-  #health { margin-left: 0; }
-  #status > span { border-right: 0; margin-right: 0; padding-right: 0; width: 100%; }
-  #list { border-right: 0; border-bottom: 1px solid var(--line); }
-  #list .pane { position: static; height: auto; max-height: 45vh; }
-  #rows li button { padding-top: .75rem; padding-bottom: .75rem; }
-  #hint { display: none; }
+  :root { --head: auto; }
+  header { position: static; flex-wrap: wrap; height: auto; gap: 0 1rem; padding-top: .55rem; }
+  nav { order: 3; width: 100%; height: 2.6rem; overflow-x: auto; margin: .2rem 0 0 -.7rem; }
+  #meta { display: none; }
+  .split { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .list { border-right: 0; border-bottom: 1px solid var(--line); }
+  .list .pane { position: static; height: auto; max-height: 50vh; }
+  .hint { display: none; }
+  .hero { grid-template-columns: minmax(0, 1fr); }
   .facts { grid-template-columns: 1fr 1fr; gap: .75rem 1.5rem; }
   table { display: block; overflow-x: auto; white-space: nowrap; }
   .horizon { grid-template-columns: minmax(5.5rem, 7.5rem) minmax(0, 1fr); gap: .2rem .75rem; }
-  .horizon .t { grid-column: 2; text-align: left; white-space: normal; font-size: .76rem; margin-bottom: .45rem; }
+  .horizon .t { grid-column: 2; white-space: normal; font-size: .76rem; margin-bottom: .45rem; }
+  .attn button { grid-template-columns: .5rem minmax(0, 1fr) auto; }
+  .attn .why { grid-column: 2 / 4; }
 }
 </style>
 </head>
 <body>
 <header>
-  <h1><button id="home" title="Overview">delegateed</button></h1>
-  <div class="meta" id="meta"></div>
-  <div id="health" role="status"><i></i><span>checking…</span></div>
+  <a class="brand" href="#">delegateed</a>
+  <nav aria-label="Pages">
+    <a href="#" data-page="overview">Overview</a>
+    <a href="#delegations" data-page="delegations">Delegations <span class="count" id="nav-attention" hidden></span></a>
+    <a href="#templates" data-page="catalog">Templates</a>
+  </nav>
+  <div class="headright">
+    <button id="pulse" data-go="" hidden></button>
+    <div id="meta"></div>
+    <span id="health" role="status" tabindex="0" data-tip="Checking…" aria-label="Checking…"></span>
+  </div>
 </header>
-<div id="status" role="status"><span><i class="sk" style="width:12rem"></i></span></div>
 <main>
-  <section id="list" aria-label="Delegations"><div class="pane">
-    <div class="filters" id="filters"></div>
-    <input id="search" type="search" placeholder="Address, #id, key or outpoint" aria-label="Find a delegation">
-    <div class="listbar">
-      <div class="kinds" id="kinds"></div>
-      <label class="sort"><select id="sort" aria-label="Sort the list"><option value="urgency">Urgent</option><option value="amount">Largest</option><option value="newest">Newest</option></select></label>
-    </div>
-    <ul id="rows"><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li></ul>
-    <div id="hint"><span id="shown"></span><span><kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>/</kbd> find, <kbd>Esc</kbd> overview</span></div>
-  </div></section>
-  <section id="detail" aria-live="polite" aria-busy="true"></section>
+  <section id="overview" class="overview" aria-live="polite">
+    <div class="sk-detail" aria-hidden="true"><i class="sk" style="width:9rem;height:1.4rem"></i><i class="sk" style="height:5.5rem"></i><i class="sk" style="height:14rem"></i></div>
+  </section>
+  <section id="delegations" class="split" hidden>
+    <aside class="list" aria-label="Delegations"><div class="pane">
+      <div class="filters" id="filters"></div>
+      <input id="search" class="search" type="search" placeholder="Address, #id, key or outpoint" aria-label="Find a delegation">
+      <div class="listbar">
+        <div class="kinds" id="kinds"></div>
+        <label class="sort"><select id="sort" aria-label="Sort the list"><option value="urgency">Urgent</option><option value="amount">Largest</option><option value="newest">Newest</option></select></label>
+      </div>
+      <ul class="rows" id="rows"><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li></ul>
+      <div class="hint"><span id="shown"></span><span><kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>/</kbd> find</span></div>
+    </div></aside>
+    <section id="detail" class="detail" aria-live="polite"></section>
+  </section>
+  <section id="catalog" class="split" hidden>
+    <aside class="list" aria-label="Templates and artifacts"><div class="pane">
+      <div class="filters" id="ctabs"></div>
+      <input id="csearch" class="search" type="search" aria-label="Find a document">
+      <div class="listbar">
+        <div class="kinds" id="cfilters"></div>
+        <label class="sort"><select id="csort" aria-label="Sort the list"></select></label>
+      </div>
+      <ul class="rows" id="crows"></ul>
+      <div class="hint"><span id="cshown"></span><span><kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>/</kbd> find</span></div>
+    </div></aside>
+    <section id="cdetail" class="detail" aria-live="polite"></section>
+  </section>
 </main>
 <dialog id="confirm" aria-labelledby="confirm-title">
-  <h2 id="confirm-title"></h2>
-  <p id="confirm-text"></p>
-  <div class="actions"><button value="no"></button><button class="danger solid" id="confirm-yes"></button></div>
+  <form method="dialog">
+    <h2 id="confirm-title"></h2>
+    <p id="confirm-text"></p>
+    <div class="actions"><button value="no" id="confirm-no"></button><button value="yes" class="danger solid" id="confirm-yes"></button></div>
+  </form>
 </dialog>
 <div id="toast" role="status" hidden></div>
+<div id="tooltip" aria-hidden="true" hidden></div>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const short = (s, n = 10) => (s.length > 2 * n + 1 ? s.slice(0, n) + "…" + s.slice(-n) : s);
 const num = (v) => Number(v || 0); // the gateway encodes int64 as strings
 const sats = (v) => num(v).toLocaleString() + " sats";
+const plural = (n, word, many = word + "s") => `${num(n).toLocaleString()} ${num(n) === 1 ? word : many}`;
 const nowSecs = () => Date.now() / 1000;
 const charges = (program) => Boolean(program) && Number(program) !== 0; // "0.0" is a fee program too
 const skeleton = (n) => `<div class="sk-detail" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<i class="sk" style="width:${[55, 90, 40, 70, 30][i % 5]}%"></i>`).join("")}</div>`;
+const tip = (text) => `<button type="button" class="tip" data-tip="${esc(text)}" aria-label="${esc(text)}">?</button>`;
+const dateOf = (ts) => new Date(num(ts) * 1000).toLocaleString();
 
 const EXPLORERS = { bitcoin: "https://arkade.space", mutinynet: "https://explorer.mutinynet.arkade.sh" };
 const explorer = () => EXPLORERS[info?.network];
@@ -270,9 +389,11 @@ function explore(value, label = value) {
   const path = /^t?ark1/.test(value) ? "address/" + value : "tx/" + value.split(":")[0];
   return `<a class="hash" href="${esc(explorer() + "/" + path)}" target="_blank" rel="noopener" title="Open in the explorer">${esc(label)}</a>`;
 }
-let delegations = [], status = null, filter = null, selected = location.hash.slice(1), detail = null, allVtxos = false, info = null;
-let templates = [], artifacts = [];
+let delegations = [], status = null, filter = null, detail = null, allVtxos = false, allBatches = false, info = null;
+let templates = [], artifacts = [], usedBy = {};
 let loadLimit = 5000, moreRows = false; // newest first, a page of 1000 at a time
+// page is overview, delegations or catalog; selected is "id/N" or an address, csel a template or artifact id
+let page = "overview", selected = "", ctab = "templates", csel = "";
 
 const OPS = { 0x75: "DROP", 0x87: "EQUAL", 0x88: "EQUALVERIFY", 0xa8: "SHA256", 0xa9: "HASH160", 0xac: "CHECKSIG", 0xad: "CHECKSIGVERIFY",
   0xae: "CHECKMULTISIG", 0xb1: "CHECKLOCKTIMEVERIFY", 0xb2: "CHECKSEQUENCEVERIFY", 0xba: "CHECKSIGADD" };
@@ -322,9 +443,9 @@ const KINDS = {
   spend: { done: "spent", doing: "spending", attempts: "Spend attempts", coins: "Coins it spends", stop: "Cancel spend", resume: "Resume spend",
     noAttempt: "No attempt yet. A spend runs at the next scan.", noCoin: "No coin left: the spend ran, or something else spent its coins." },
   boarding: { ...WATCH, done: "boarded", doing: "active", attempts: "Boarding attempts",
-    noAttempt: "No attempt yet. A deposit is boarded once it confirms.", noCoin: "Nothing to board: no deposit sits at this address right now." },
+    noAttempt: "No attempt yet. A deposit is boarded once it confirms.", noCoin: "No deposit sits at this address right now." },
   renewal: { ...WATCH, done: "renewed", doing: "renewing", attempts: "Renewal attempts",
-    noAttempt: "No attempt yet. A VTXO is first renewed when it enters its renewal window.", noCoin: "Nothing to renew: no spendable VTXO sits at this address right now." },
+    noAttempt: "No attempt yet. A VTXO is first renewed in its renewal window.", noCoin: "No spendable VTXO sits at this address right now." },
 };
 const kindKey = (delegation) => (spends(delegation) ? "spend" : boards(delegation) ? "boarding" : "renewal");
 const kindOf = (delegation) => KINDS[kindKey(delegation)];
@@ -344,11 +465,12 @@ function stateOf(d) {
   if (!r) return { key: "ok", dot: "", text: "not " + done + " yet" };
   return { key: "ok", dot: "ok", text: done + " " + ago(r.attemptedAt) };
 }
+const needsAttention = (d) => ["bad", "late"].includes(stateOf(d).key);
 const MAX_ROWS = 300; // the first ones in the chosen order
-const MAX_LANES = 20, MAX_VTXOS = 40, AXIS_UNIT = 600; // ten minutes: the horizon's finest step
+const MAX_LANES = 12, MAX_VTXOS = 40, MAX_BATCHES = 8, MAX_ATTENTION = 6, AXIS_UNIT = 600; // ten minutes: the horizon's finest step
 const URGENCY = { bad: 0, late: 1, ok: 2, off: 3 };
 const FILTERS = [
-  ["attention", "Attention", (d) => ["bad", "late"].includes(stateOf(d).key)],
+  ["attention", "Attention", needsAttention],
   ["active", "Active", (d) => d.delegation.status === "active"],
   ["cancelled", "Ended", (d) => d.delegation.status !== "active"],
   ["all", "All", () => true],
@@ -361,11 +483,16 @@ async function api(path, opts) {
   return body;
 }
 const send = (method, path, body) => api(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-const act = (request, done, failed) => request.then(() => { toast(done); refresh(); }, (e) => toast(failed + e.message, true));
-const shown = {}; // kind: { id, document }, kept across refreshes
-const showDocument = (kind, id) => api(`/v1/${kind}/` + encodeURIComponent(id))
-  .then((r) => { shown[kind] = { id, document: r[kind].document }; renderOverview(); $(kind + "-doc")?.scrollIntoView({ block: "nearest" }); },
-    (e) => toast(`Could not load the ${kind}: ` + e.message, true));
+const act = (request, done, failed) => request.then(() => { toast(done); refresh(); return true; }, (e) => { toast(failed + e.message, true); return false; });
+
+// ask opens the confirmation dialog and resolves to whether the operator said yes
+function ask(title, text, yes, no = "Cancel") {
+  const d = $("confirm");
+  $("confirm-title").textContent = title; $("confirm-text").textContent = text;
+  $("confirm-yes").textContent = yes; $("confirm-no").textContent = no;
+  d.returnValue = ""; d.showModal();
+  return new Promise((resolve) => d.addEventListener("close", () => resolve(d.returnValue === "yes"), { once: true }));
+}
 
 function jsonHtml(v, pad = "") {
   const p = (c) => `<span class="j-p">${c}</span>`, inner = pad + "  ";
@@ -377,13 +504,12 @@ function jsonHtml(v, pad = "") {
     return p("[") + entries.map(item).join(p(",") + " ") + p("]");
   return p(open) + "\n" + entries.map((e) => inner + item(e)).join(p(",") + "\n") + "\n" + pad + p(close);
 }
-function documentView(kind) {
-  const d = shown[kind];
-  if (!d) return "";
+function documentView(document) {
+  if (document === undefined) return skeleton(4);
   let body;
-  try { body = jsonHtml(JSON.parse(d.document)); } catch { body = esc(d.document); }
-  return `<div class="doc" id="${kind}-doc"><div class="bar"><span class="hash">${esc(short(d.id, 10))}</span>
-    <span><button class="mini" data-copy="${esc(d.document)}">copy</button><button class="mini" data-hide="${kind}">close</button></span></div><pre>${body}</pre></div>`;
+  try { body = jsonHtml(JSON.parse(document)); } catch { body = esc(document); }
+  return `<div class="doc"><div class="bar"><span>${(document.length / 1024).toFixed(1)} KiB</span>
+    <button class="mini" data-copy="${esc(document)}">copy</button></div><pre>${body}</pre></div>`;
 }
 
 function toast(msg, bad) {
@@ -401,25 +527,37 @@ function ago(ts) {
   const s = nowSecs() - num(ts);
   return s < 0 ? "in " + span(s) : span(s) + " ago";
 }
+// logScale maps seconds from now to a percent of an axis reaching far, so that the near end stays readable
+function logScale(far) {
+  return (x) => Math.log1p(Math.max(0, x) / AXIS_UNIT) / Math.log1p(far / AXIS_UNIT) * 100;
+}
+// ticks are the round spans before far that sit apart on the axis
+function ticks(far, pct) {
+  const out = [];
+  for (const t of [600, 3600, 6 * 3600, 86400, 3 * 86400, 7 * 86400, 14 * 86400, 30 * 86400, 90 * 86400])
+    if (t < far * 0.9 && pct(t) - (out.length ? pct(out[out.length - 1]) : 0) >= 9) out.push(t);
+  return `<i style="left:0">now</i>${out.map((t) => `<i style="left:${pct(t)}%">${span(t)}</i>`).join("")}`;
+}
 
 async function loadMeta() {
   try {
     const i = await api("/v1/info");
     info = i;
-    $("meta").innerHTML = `<span>${esc(i.network)}</span><span>${esc(i.version)}</span>
-      <span>delegate key <button class="hash" title="Copy delegate public key" data-copy="${esc(i.delegatePubkey)}">${esc(short(i.delegatePubkey, 8))}</button></span>`;
-  } catch { /* the health badge says why */ }
+    $("meta").innerHTML = `<span class="net">${esc(i.network)}</span><span class="ver">${esc(i.version)}</span>
+      <span class="key">key <button title="Copy the delegate public key" data-copy="${esc(i.delegatePubkey)}">${esc(short(i.delegatePubkey, 6))}</button></span>`;
+  } catch { /* the health dot says why */ }
 }
 
 async function loadHealth() {
   const h = $("health");
+  let ok = false, text = "delegateed is unreachable";
   try {
-    const r = await fetch("/healthz"), ok = r.ok && (await r.json()).status === "SERVING";
-    h.className = ok ? "ok" : "down";
-    h.lastElementChild.textContent = ok ? "arkd, emulator and database reachable" : "a dependency is unreachable, check the logs";
-  } catch {
-    h.className = "down"; h.lastElementChild.textContent = "delegateed is unreachable";
-  }
+    const r = await fetch("/healthz");
+    ok = r.ok && (await r.json()).status === "SERVING";
+    text = ok ? "arkd, emulator and database reachable" : "A dependency is unreachable, check the logs";
+  } catch { /* unreachable */ }
+  h.className = ok ? "ok" : "down";
+  h.dataset.tip = text; h.setAttribute("aria-label", text);
 }
 
 async function loadDelegations() {
@@ -441,29 +579,186 @@ async function loadList() {
     ]);
   } catch (e) { return toast("Could not load delegations: " + e.message, true); }
   templates = templates.map((t) => ({ ...t.template, ...t }));
-  if (!filter) filter = delegations.some(FILTERS[0][2]) ? "attention" : "active";
-  renderStatus(); renderList();
-  if (!selected) renderOverview();
+  usedBy = {};
+  for (const t of templates) for (const a of t.artifactIds || []) (usedBy[a] ||= []).push(t.id);
+  if (!filter) filter = delegations.some(needsAttention) ? "attention" : "active";
 }
 
-function renderStatus() {
+function parseRoute() {
+  const h = location.hash.slice(1), [head, ...rest] = h.split("/");
+  selected = csel = "";
+  if (head === "id" || /^t?ark1/.test(h)) { page = "delegations"; selected = h; }
+  else if (head === "delegations") page = "delegations";
+  else if (head === "templates" || head === "artifacts") { page = "catalog"; ctab = head; csel = decodeURIComponent(rest.join("/")); }
+  else page = "overview";
+}
+const go = (hash) => { location.hash = hash || ""; if (!hash) history.replaceState(null, "", location.pathname); };
+
+function render() {
+  for (const id of ["overview", "delegations", "catalog"]) $(id).hidden = id !== page;
+  for (const a of document.querySelectorAll("nav a")) a.dataset.page === page ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current");
+  $("tooltip").hidden = true;
+  if (!status) return;
+  renderHeader();
+  if (page === "overview") renderOverview();
+  else if (page === "delegations") { renderList(); loadDetail(); }
+  else { renderCatalog(); loadCatalogDetail(); }
+}
+
+function scanState() {
   const poll = num(status.pollInterval), last = num(status.lastScanAt), busy = status.renewingVtxos > 0;
-  const stale = !busy && last > 0 && nowSecs() - last > Math.max(3 * poll, 30);
-  const active = delegations.filter((d) => d.delegation.status === "active" && d.managed);
-  const total = active.reduce((a, d) => a + num(d.totalAmount), 0), vtxos = active.reduce((a, d) => a + num(d.vtxoCount), 0);
-  const fees = status.intentFees, charged = fees && Object.values(fees).some(charges), next = (status.batches || [])[0];
-  $("status").innerHTML = [
-    busy ? `<span class="busy"><i class="pulse"></i>Renewing <b>${status.renewingVtxos}</b> VTXO${status.renewingVtxos > 1 ? "s" : ""} in a batch now, scans resume after</span>`
-      : next ? `<span>Next batch <b>${num(next.at) <= nowSecs() ? "now" : ago(next.at)}</b>: <b class="n">${next.vtxoCount}</b> VTXO${next.vtxoCount > 1 ? "s" : ""} at <b class="n">${next.delegationCount}</b> address${next.delegationCount > 1 ? "es" : ""}, <b class="n">${sats(next.totalAmount)}</b></span>`
-      : !last ? `<span>First scan pending</span>` : `<span>No batch planned</span>`,
-    !last ? "" : `<span class="${stale ? "warn" : ""}">Scanned <b>${ago(last)}</b>, ${stale ? `expected every ${span(poll)}: check the logs` : `every ${span(poll)}`}</span>`,
-    `<span>Watching <b class="n">${sats(total)}</b> in <b class="n">${vtxos}</b> VTXO${vtxos === 1 ? "" : "s"} at <b class="n">${active.length}</b> address${active.length === 1 ? "" : "es"}</span>`,
-    !fees ? `<span class="warn">arkd fees unknown, arkd is unreachable</span>`
-      : `<span>arkd ${charged ? `<b>charges intent fees</b>, <button class="link" id="see-fees">see them</button>` : "charges no intent fee"}</span>`,
-  ].join("");
+  return { poll, last, busy, stale: !busy && last > 0 && nowSecs() - last > Math.max(3 * poll, 30) };
+}
+
+function renderHeader() {
+  const { busy, stale, last } = scanState(), next = (status.batches || [])[0], p = $("pulse");
+  p.className = busy ? "busy" : stale ? "warn" : "";
+  p.innerHTML = busy ? `<i class="pulse"></i>Renewing <b>${plural(status.renewingVtxos, "VTXO")}</b>`
+    : stale ? `Scanner stalled, last scan <b>${ago(last)}</b>`
+    : next ? `Next batch <b>${num(next.at) <= nowSecs() ? "now" : ago(next.at)}</b>, ${plural(next.vtxoCount, "VTXO")}`
+    : !last ? "First scan pending" : "No batch planned";
+  p.hidden = false;
+  const n = delegations.filter(needsAttention).length;
+  $("nav-attention").hidden = !n; $("nav-attention").textContent = n;
+}
+
+function renderOverview() {
+  const now = nowSecs(), { poll, last, busy, stale } = scanState();
+  const active = delegations.filter((d) => d.delegation.status === "active"), managed = active.filter((d) => d.managed);
+  const total = managed.reduce((a, d) => a + num(d.totalAmount), 0), vtxos = managed.reduce((a, d) => a + num(d.vtxoCount), 0);
+  const kinds = ["renewal", "boarding", "spend"].map((k) => [k, active.filter((d) => kindKey(d.delegation) === k).length]).filter(([, n]) => n);
+  const attention = delegations.filter(needsAttention).sort(SORTS.urgency), failing = attention.filter((d) => stateOf(d).key === "bad").length;
+  const recent = delegations.filter((d) => d.lastRenewal && now - num(d.lastRenewal.attemptedAt) < 86400), served = recent.filter((d) => d.lastRenewal.success).length;
+  const enabled = templates.filter((t) => t.status === "active").length, broken = templates.filter((t) => t.failures > 0).length;
+  const strangers = delegations.filter((d) => d.unmanagedReason === "registered under another key").length;
+
+  const stats = `<div class="stats">
+    <div class="stat"><span class="label">Under watch</span><span class="fig" title="${(total / 1e8).toFixed(8)} BTC">${total.toLocaleString()}<small>sats</small></span><span class="sub">${plural(vtxos, "VTXO")}</span></div>
+    <button class="stat" data-go="delegations" data-filter="active"><span class="label">Active delegations</span><span class="fig">${active.length.toLocaleString()}</span><span class="sub">${kinds.map(([k, n]) => `${n.toLocaleString()} ${k}`).join(", ") || "none yet"}</span></button>
+    <button class="stat ${attention.length ? "alert" : ""}" data-go="delegations" data-filter="attention"><span class="label">Needs attention</span><span class="fig">${attention.length.toLocaleString()}</span><span class="sub">${attention.length ? `${failing.toLocaleString()} failing, ${(attention.length - failing).toLocaleString()} late` : "everything on time"}</span></button>
+    <div class="stat"><span class="label">Served, last 24 h</span><span class="fig">${served.toLocaleString()}</span><span class="sub">${recent.length - served ? `${(recent.length - served).toLocaleString()} failed their last attempt` : "no failure"}</span></div>
+    <button class="stat" data-go="templates"><span class="label">Templates</span><span class="fig">${enabled.toLocaleString()}<small>active</small></span><span class="sub">${(templates.length - enabled).toLocaleString()} disabled${broken ? `, ${broken.toLocaleString()} failing` : ""}</span></button>
+  </div>`;
+
+  $("overview").innerHTML = `
+    <div class="ov-head"><h2>Overview</h2>
+      <p class="${stale ? "warn" : ""}">${!last ? "First scan pending" : `Scanned ${ago(last)}, ${stale ? `expected every ${span(poll)}` : `every ${span(poll)}`}`}</p></div>
+    ${strangers ? `<p class="note"><b>${plural(strangers, "active delegation")}</b> registered under another delegate key cannot be renewed by this instance. ${tip("If the key was rotated by mistake, restore the previous key in the configured keyring.")}</p>` : ""}
+    ${stats}
+    ${batchesPanel(now, busy)}
+    <div class="cols">
+      ${expiryPanel(managed, now)}
+      <section class="panel"><div class="ph"><h3>Needs attention</h3>${attention.length ? `<span class="aside">${plural(attention.length, "delegation")}</span>` : ""}</div>
+        ${attention.length ? `<ul class="attn">${attention.slice(0, MAX_ATTENTION).map((d) => {
+          const st = stateOf(d);
+          return `<li><button data-go="id/${esc(d.delegation.id)}" title="${esc(st.why || st.text)}"><span class="dot ${st.dot}"></span><span class="hash">${esc(label(d))}</span>
+            <span class="why">${esc(st.text)}</span><span class="amt">${num(d.vtxoCount) ? sats(d.totalAmount) : ""}</span></button></li>`;
+        }).join("")}</ul>${attention.length > MAX_ATTENTION ? `<p class="more"><button class="link" data-go="delegations" data-filter="attention">See all ${attention.length.toLocaleString()}</button></p>` : ""}`
+        : `<p class="calm"><span class="dot ok"></span>Every active delegation runs on time.</p>`}
+      </section>
+    </div>
+    ${horizonPanel(managed, now)}
+    ${daemonPanel()}`;
+}
+
+function batchesPanel(now, busy) {
+  const batches = status.batches || [], first = batches[0], byId = Object.fromEntries(delegations.map((d) => [num(d.delegation.id), d]));
+  const amount = batches.reduce((a, b) => a + num(b.totalAmount), 0);
+  const next = busy ? `<div class="next"><span class="label"><i class="pulse"></i>In progress</span><div class="when busy">Renewing now</div><p><b>${plural(status.renewingVtxos, "VTXO")}</b> in a batch session</p></div>`
+    : first ? `<div class="next"><span class="label">Next batch</span><div class="when">${num(first.at) <= now ? "now" : ago(first.at)}</div>
+        <p><b>${plural(first.vtxoCount, "VTXO")}</b> from ${plural(first.delegationCount, "delegation")}</p><p><b>${sats(first.totalAmount)}</b></p></div>`
+    : `<div class="next"><span class="label">Next batch</span><div class="when">None planned</div><p>Nothing renewable is in sight.</p></div>`;
+  let timeline = "";
+  if (batches.length) {
+    const far = Math.max(num(batches[batches.length - 1].at) - now, 2 * 3600), pct = logScale(far);
+    const big = Math.max(...batches.map((b) => num(b.vtxoCount)), 1);
+    let labelled = -Infinity;
+    timeline = `<div class="tl" role="img" aria-label="${plural(batches.length, "planned batch", "planned batches")} over the next ${span(far)}"><div class="rail"></div>
+      ${batches.map((b, i) => {
+        const x = pct(num(b.at) - now), size = 10 + 18 * Math.sqrt(num(b.vtxoCount) / big), show = x - labelled >= 10;
+        if (show) labelled = x;
+        const text = `${num(b.at) <= now ? "Now" : ago(b.at)}: ${plural(b.vtxoCount, "VTXO")} from ${plural(b.delegationCount, "delegation")}, ${sats(b.totalAmount)}`;
+        return `<button class="m ${i ? "" : "first"}" style="left:${x}%;--s:${size.toFixed(1)}px" data-go="id/${esc(b.forcedByDelegationId)}" data-tip="${esc(text)}" aria-label="${esc(text)}">${show ? `<span class="v">${num(b.vtxoCount).toLocaleString()}</span>` : ""}</button>`;
+      }).join("")}
+      <div class="axis">${ticks(far, pct)}</div></div>`;
+  }
+  const rows = (allBatches ? batches : batches.slice(0, MAX_BATCHES)).map((b) => {
+    const at = num(b.at), d = byId[num(b.forcedByDelegationId)], expiry = d ? num(d.nextExpiry) : 0;
+    return `<tr><td title="${esc(dateOf(at))}">${at <= now ? "now" : ago(b.at)}</td><td class="r">${num(b.vtxoCount).toLocaleString()}</td><td class="r">${num(b.delegationCount).toLocaleString()}</td>
+      <td class="r">${sats(b.totalAmount)}</td>
+      <td><button class="link hash" data-go="id/${esc(b.forcedByDelegationId)}" title="${esc(b.forcedByOutpoint)}">${esc(short(b.forcedByOutpoint, 8))}</button></td>
+      <td class="r">${expiry > at ? span(expiry - at) : expiry ? "" : "deposit"}</td></tr>`;
+  }).join("");
+  return `<section class="panel"><div class="ph"><h3>Planned batches ${tip(`A batch is submitted ${span(num(status.renewalReserve))} before its first VTXO expires at the latest, and takes every VTXO renewable by then. Deposits wait at most ${span(num(status.boardingMaxWait))}.`)}</h3>
+      ${batches.length ? `<span class="aside">${plural(batches.length, "batch", "batches")}, ${sats(amount)}</span>` : ""}</div>
+    <div class="hero">${next}${timeline}</div>
+    ${rows ? `<div class="scroll"><table><thead><tr><th>When</th><th class="r">VTXOs</th><th class="r">Delegations</th><th class="r">Amount</th>
+      <th>Forced by ${tip("The VTXO whose deadline sets the batch time.")}</th><th class="r">Margin ${tip("How long before that VTXO expires the batch runs.")}</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${batches.length > MAX_BATCHES ? `<p class="more"><button class="link" id="all-batches">${allBatches ? "Show fewer" : `Show all ${batches.length}`}</button></p>` : ""}` : ""}
+  </section>`;
+}
+
+const BUCKETS = [["Expired", 0], ["Under 1 h", 3600], ["1 to 6 h", 6 * 3600], ["6 to 24 h", 86400], ["1 to 3 days", 3 * 86400], ["3 to 7 days", 7 * 86400], ["Over a week", Infinity]];
+function expiryPanel(managed, now) {
+  const held = managed.filter((d) => num(d.nextExpiry));
+  const buckets = BUCKETS.map(([name, upTo]) => ({ name, upTo, value: 0, count: 0 }));
+  for (const d of held) {
+    const b = buckets.find((x) => num(d.nextExpiry) - now <= x.upTo);
+    b.value += num(d.totalAmount); b.count++;
+  }
+  const shown = buckets.filter((b) => b.count || b.upTo), top = Math.max(...shown.map((b) => b.value), 1);
+  return `<section class="panel"><div class="ph"><h3>Value by earliest expiry ${tip("Each delegation's balance, counted at the expiry of its soonest VTXO.")}</h3></div>
+    ${held.length ? `<div class="dist">${shown.map((b) => `<span>${b.name}</span><div class="bar ${b.upTo ? "" : "late"}" style="width:${(b.value / top) * 100}%" data-tip="${esc(`${plural(b.count, "delegation")}, ${sats(b.value)}`)}"></div>
+      <span class="v">${b.value ? sats(b.value) : "none"}<small>${b.count.toLocaleString()}</small></span>`).join("")}</div>`
+      : `<p class="calm">No VTXO is watched yet.</p>`}
+  </section>`;
+}
+
+function horizonPanel(managed, now) {
+  const held = managed.filter((d) => num(d.nextExpiry)).sort((a, b) => num(a.nextExpiry) - num(b.nextExpiry)), shown = held.slice(0, MAX_LANES);
+  if (!shown.length) return "";
+  const far = Math.max(...shown.map((d) => num(d.nextExpiry) - now), 2 * AXIS_UNIT), pct = logScale(far);
+  const batches = status.batches || [], forcing = (at) => batches.find((b) => num(b.at) === at);
+  const lanes = shown.map((d) => {
+    const left = num(d.nextExpiry) - now, win = num(d.nextExpiry) - num(d.nextRenewalAt), st = stateOf(d);
+    // the reserve starts at the deadline: the window's end when it is shorter than the reserve
+    const deadline = Math.max(num(d.nextDeadline) - now, left - win), at = num(d.nextBatchAt), joins = at ? Math.max(at - now, 0) : null;
+    const cls = left <= 0 || st.key !== "ok" ? "late" : st.dot === "renewing" ? "renewing" : left <= win ? "in" : "";
+    const text = left <= 0 ? "expired " + ago(d.nextExpiry) : st.key === "bad" ? "not renewing, " + span(left) + " left"
+      : st.dot === "renewing" ? "in the batch now" : st.key === "late" ? st.text
+      : joins === null ? (left <= win ? "renewable now, not planned yet" : "renewable " + ago(d.nextRenewalAt))
+      : `${left <= win ? "renewable now" : "renewable " + ago(d.nextRenewalAt)}, joins the batch ${joins ? ago(at) : "now"}${deadline - joins > 60 ? `, ${span(deadline - joins)} before its deadline` : ""}`;
+    const forced = at && forcing(Math.max(at, Math.floor(now)))?.forcedByOutpoint;
+    return `<button data-go="${esc("id/" + d.delegation.id)}" title="${esc(d.delegation.address)}">${esc(label(d, 12))}</button>
+      <div class="lane ${left <= 0 ? "late" : ""}" role="img" aria-label="${esc(text)}, expires ${ago(d.nextExpiry)}" title="${forced ? esc("batch forced by " + short(forced, 8)) : ""}">
+        <div class="left" style="width:${pct(left - win)}%"></div><div class="window" style="width:${pct(deadline) - pct(left - win)}%"></div><div class="reserve" style="width:${pct(left) - pct(deadline)}%"></div>
+        ${joins === null || st.dot === "renewing" ? "" : `<i class="batch" style="left:${Math.min(pct(joins), 100)}%"></i>`}</div>
+      <span class="t n ${cls}" title="${esc(text)}">${text}</span>`;
+  }).join("");
+  return `<section class="panel"><div class="ph"><h3>Next to expire ${tip("Each bar runs from now to the delegation's earliest expiry, on a log scale.")}</h3>
+      ${held.length > shown.length ? `<span class="aside">${shown.length} soonest of ${held.length.toLocaleString()}</span>` : ""}</div>
+    <div class="horizon">${lanes}<span></span><div class="axis">${ticks(far, pct)}</div><span></span></div>
+    <p class="legend"><span><i></i>waiting</span><span><i class="w"></i>renewable</span><span><i class="r"></i>reserve, never submitted in</span><span><i class="b"></i>planned batch</span></p>
+  </section>`;
+}
+
+function daemonPanel() {
+  const f = status.intentFees, fees = f && [["Fee per VTXO renewed", f.offchainInput], ["Fee per output created", f.offchainOutput]];
+  return `<section class="panel"><div class="ph"><h3>Daemon</h3></div><dl class="settings">
+    <div><dt>Scan interval</dt><dd>${span(num(status.pollInterval))}</dd></div>
+    <div><dt>Renewal reserve ${tip("The daemon never submits a VTXO this close to its expiry.")}</dt><dd>${span(num(status.renewalReserve))}</dd></div>
+    <div><dt>Boarding max wait ${tip("The longest a confirmed deposit waits for a batch.")}</dt><dd>${span(num(status.boardingMaxWait))}</dd></div>
+    ${!f ? `<div><dt>arkd intent fees</dt><dd class="state late">unknown, arkd is unreachable</dd></div>`
+      : fees.map(([k, v]) => `<div><dt>${k} ${tip("arkd fee program, in sats. A delegation whose template caps its fee lower is skipped.")}</dt><dd class="${charges(v) ? "hash" : ""}">${charges(v) ? esc(v) : "free"}</dd></div>`).join("")}
+  </dl></section>`;
 }
 
 let kindFilter = "all";
+// addresses of one server share their first characters: the tail tells them apart
+const label = (d, n = 16) => {
+  const address = d.delegation.address, parent = num(d.delegation.parentId);
+  return address ? "…" + address.slice(-n) : parent ? `#${d.delegation.id} successor of #${parent}` : `#${d.delegation.id}`;
+};
 // a delegation matches its address, #id, template id, a variable value or a bound outpoint
 const matches = (d, q) => {
   const x = d.delegation;
@@ -489,14 +784,14 @@ function nextOf(d, st) {
 }
 
 function renderList() {
-  $("filters").innerHTML = FILTERS.map(([id, label, fn]) => {
+  $("filters").innerHTML = FILTERS.map(([id, name, fn]) => {
     const n = delegations.filter(fn).length;
-    return `<button data-filter="${id}" aria-pressed="${id === filter}" class="${id === "attention" && n ? "alert" : ""}">${label} <span class="n">${n}</span></button>`;
+    return `<button data-filter="${id}" aria-pressed="${id === filter}" class="${id === "attention" && n ? "alert" : ""}">${name} <span class="n">${n.toLocaleString()}</span></button>`;
   }).join("");
   const inFilter = delegations.filter(FILTERS.find((f) => f[0] === filter)[2]);
-  $("kinds").innerHTML = [["all", "All"], ["renewal", "Renewal"], ["boarding", "Boarding"], ["spend", "Spend"]].map(([id, label]) => {
+  $("kinds").innerHTML = [["all", "All"], ["renewal", "Renewal"], ["boarding", "Boarding"], ["spend", "Spend"]].map(([id, name]) => {
     const n = id === "all" ? inFilter.length : inFilter.filter((d) => kindKey(d.delegation) === id).length;
-    return n || id === "all" || id === kindFilter ? `<button data-kind="${id}" aria-pressed="${id === kindFilter}">${label}<span class="n">${n}</span></button>` : "";
+    return n || id === "all" || id === kindFilter ? `<button data-kind="${id}" aria-pressed="${id === kindFilter}">${name}<span class="n">${n.toLocaleString()}</span></button>` : "";
   }).join("");
   $("kinds").classList.toggle("more", $("kinds").scrollWidth > $("kinds").clientWidth);
   const rows = visibleRows();
@@ -505,111 +800,28 @@ function renderList() {
     $("rows").innerHTML = `<li class="empty">${$("search").value.trim() ? "Nothing matches your search."
       : filter === "attention" ? "Nothing needs attention: every active delegation runs on time."
       : delegations.length ? "No delegations here."
-      : "No delegations yet. Wallets register one with POST /v1/delegate on the public port."}</li>`;
+      : "No delegations yet. Wallets register them on the public port."}</li>`;
     return;
   }
   const more = rows.length - MAX_ROWS;
   $("rows").innerHTML = rows.slice(0, MAX_ROWS).map((d) => {
-    const st = stateOf(d), address = d.delegation.address;
-    const selection = "id/" + d.delegation.id;
-    const parent = num(d.delegation.parentId);
+    const st = stateOf(d), selection = "id/" + d.delegation.id;
     const kind = kindKey(d.delegation), coins = num(d.vtxoCount), next = nextOf(d, st);
-    // addresses of one server share their first characters: the tail tells them apart
-    const label = address ? "…" + address.slice(-16) : parent ? `#${d.delegation.id} successor of #${parent}` : `#${d.delegation.id}`;
-    return `<li><button data-address="${esc(selection)}" aria-current="${selection === selected}" title="${esc(address || "#" + d.delegation.id)}">
-      <span class="dot ${st.dot}"></span><span class="hash">${esc(label)}</span><span class="amt">${coins ? sats(d.totalAmount) : ""}</span>
-      <span></span><span class="sub ${st.key !== "ok" ? st.key : st.dot}" title="${esc(next)}"><span class="kind">${kind}</span> · ${esc(next)}</span><span class="count">${coins ? `${coins} coin${coins > 1 ? "s" : ""}` : ""}</span></button></li>`;
+    return `<li><button data-go="${esc(selection)}" aria-current="${selection === selected}" title="${esc(d.delegation.address || "#" + d.delegation.id)}">
+      <span class="dot ${st.dot}"></span><span class="hash">${esc(label(d))}</span><span class="amt">${coins ? sats(d.totalAmount) : ""}</span>
+      <span></span><span class="sub ${st.key !== "ok" ? st.key : st.dot}" title="${esc(next)}"><span class="kind">${kind}</span>, ${esc(next)}</span><span class="count">${coins ? plural(coins, "coin") : ""}</span></button></li>`;
   }).join("") + (more > 0 ? `<li class="empty">${more.toLocaleString()} more. Search or filter to narrow down.</li>` : "")
     + (moreRows ? `<li class="empty">Only the newest ${delegations.length.toLocaleString()} delegations are loaded. <button class="link" id="load-more">Load more</button></li>` : "");
   $("rows").querySelector("[aria-current=true]")?.scrollIntoView({ block: "nearest" });
 }
 
-function renderOverview() {
-  // don't wipe a half-typed form on refresh
-  if ($("register")?.document.value) return;
-  const held = delegations.filter((d) => d.delegation.status === "active" && d.managed && num(d.nextExpiry))
-    .sort((a, b) => num(a.nextExpiry) - num(b.nextExpiry));
-  const now = nowSecs(), shown = held.slice(0, MAX_LANES);
-  // log axis: a linear one would hide the near end
-  const far = Math.max(...shown.map((d) => num(d.nextExpiry) - now), 2 * AXIS_UNIT);
-  const pct = (x) => Math.log1p(Math.max(0, x) / AXIS_UNIT) / Math.log1p(far / AXIS_UNIT) * 100;
-  const batches = status?.batches || [], reserve = num(status?.renewalReserve), wait = num(status?.boardingMaxWait);
-  const forcing = (at) => batches.find((b) => num(b.at) === at);
-  const lanes = shown.map((d) => {
-    const address = d.delegation.address;
-    const left = num(d.nextExpiry) - now, win = num(d.nextExpiry) - num(d.nextRenewalAt), st = stateOf(d);
-    // the reserve starts at the deadline: the window's end when it is shorter than the reserve
-    const deadline = Math.max(num(d.nextDeadline) - now, left - win), at = num(d.nextBatchAt), joins = at ? Math.max(at - now, 0) : null;
-    const cls = left <= 0 || st.key !== "ok" ? "late" : st.dot === "renewing" ? "renewing" : left <= win ? "in" : "";
-    const text = left <= 0 ? "expired " + ago(d.nextExpiry) : st.key === "bad" ? "not renewing, " + span(left) + " left"
-      : st.dot === "renewing" ? "in the batch now" : st.key === "late" ? st.text
-      : joins === null ? (left <= win ? "renewable now, not planned yet" : "renewable " + ago(d.nextRenewalAt))
-      : `${left <= win ? "renewable now" : "renewable " + ago(d.nextRenewalAt)}, joins the batch ${joins ? ago(at) : "now"}${deadline - joins > 60 ? `, ${span(deadline - joins)} before its deadline` : ""}`;
-    const forced = at && forcing(Math.max(at, Math.floor(now)))?.forcedByOutpoint;
-    return `<button data-address="${esc("id/" + d.delegation.id)}" class="hash" title="${esc(address)}">${esc(address ? "…" + address.slice(-14) : "#" + d.delegation.id)}</button>
-      <div class="lane ${left <= 0 ? "late" : ""}" role="img" aria-label="${esc(text)}, expires ${ago(d.nextExpiry)}" title="${forced ? esc("batch forced by " + short(forced, 8)) : ""}">
-        <div class="left" style="width:${pct(left - win)}%"></div><div class="window" style="width:${pct(deadline) - pct(left - win)}%"></div><div class="reserve" style="width:${pct(left) - pct(deadline)}%"></div>
-        ${joins === null || st.dot === "renewing" ? "" : `<i class="batch" style="left:${pct(joins)}%"></i>`}</div>
-      <span class="t n ${cls}">${text}</span>`;
-  }).join("");
-  const ticks = [3600, 6 * 3600, 86400, 3 * 86400, 7 * 86400, 14 * 86400, 30 * 86400, 90 * 86400].filter((t) => t < far * 0.85);
-  const axis = `<span></span><div class="axis"><i style="left:0">now</i>${ticks.map((t) => `<i style="left:${pct(t)}%">${span(t)}</i>`).join("")}</div><span></span>`;
-  const byId = Object.fromEntries(delegations.map((d) => [num(d.delegation.id), d]));
-  const planRows = batches.map((b) => {
-    const at = num(b.at), d = byId[num(b.forcedByDelegationId)], expiry = d ? num(d.nextExpiry) : 0;
-    const why = expiry > at ? `, ${span(expiry - at)} before it expires` : expiry ? "" : ", a deposit";
-    return `<tr><td class="n">${at <= now ? "now" : ago(b.at)}</td>
-      <td class="n">${b.vtxoCount} VTXO${b.vtxoCount > 1 ? "s" : ""} at ${b.delegationCount} address${b.delegationCount > 1 ? "es" : ""}, ${sats(b.totalAmount)}</td>
-      <td>forced by <button class="link hash" data-address="${esc("id/" + b.forcedByDelegationId)}" title="${esc(b.forcedByOutpoint)}">${esc(short(b.forcedByOutpoint, 8))}</button>${why}</td></tr>`;
-  }).join("");
-
-  const f = status?.intentFees, rows = f && [["each VTXO renewed", f.offchainInput], ["each output created", f.offchainOutput]].filter((r) => charges(r[1]));
-  const strangers = delegations.filter((d) => d.unmanagedReason === "registered under another key").length;
-  $("detail").removeAttribute("aria-busy");
-  $("detail").innerHTML = `
-    <h2>Overview</h2>
-    ${strangers ? `<p class="note"><b>${strangers}</b> active delegation${strangers > 1 ? "s were" : " was"} registered under another delegate key and cannot be renewed by this instance. If the key was rotated by mistake, restore the previous key in the configured keyring.</p>` : ""}
-    <h3>Planned batches</h3>
-    <p>A batch is submitted at the latest <b>${span(reserve)}</b> before its first VTXO expires, or as soon as a VTXO is renewable when its window is shorter, so that every VTXO renewable by then renews with it. Deposits wait at most <b>${span(wait)}</b> for a batch.</p>
-    ${planRows ? `<div class="scroll"><table class="plan"><thead><tr><th>When</th><th>Carries</th><th>Why then</th></tr></thead><tbody>${planRows}</tbody></table></div>`
-      : `<p class="empty">No batch planned: nothing renewable is in sight.</p>`}
-    <h3>Next to expire</h3>
-    <p>Each bar runs from now to the address's earliest expiry. The hatched part is when it can be renewed, the red end is the reserve the daemon never submits in, and the dot is the batch it joins.</p>
-    ${shown.length ? `<div class="horizon">${lanes}${axis}</div><p class="legend"><span><i></i>waiting</span><span><i class="w"></i>renewable</span><span><i class="r"></i>reserve</span><span><i class="b"></i>planned batch</span></p>${held.length > shown.length ? `<p class="state">and ${held.length - shown.length} more, later</p>` : ""}`
-      : `<p class="empty">No VTXO is being watched yet. They show up here after the next scan once coins sit at a registered address.</p>`}
-    <h3>What arkd charges</h3>
-    ${!f ? `<p>Unknown: arkd is unreachable.</p>`
-      : !rows.length ? `<p>Nothing.</p>`
-      : `<p>A renewal pays every line below. A delegation whose template caps its fee lower is skipped and shows up under Needs attention until the fee drops.</p>
-        <div class="scroll"><table><thead><tr><th>For</th><th>Fee program, in sats</th></tr></thead><tbody>
-        ${rows.map(([k, v]) => `<tr><td>${k}</td><td class="hash">${esc(v)}</td></tr>`).join("")}</tbody></table></div>`}
-    <h3>Templates</h3>
-    <p>What a delegation may be registered with. A disabled template registers nothing and renews nothing. A template whose intents keep being rejected is disabled by the daemon, unless it is trusted.</p>
-    ${templates.length ? `<div class="scroll"><table><thead><tr><th>Template</th><th>Variables</th><th>Status</th><th>Trusted</th><th>Delegations</th><th>Failed cycles</th><th></th></tr></thead><tbody>
-      ${templates.map((t) => `<tr><td class="hash"><button class="link hash" data-template="${esc(t.id)}" title="Show the document">${esc(short(t.id, 10))}</button></td>
-        <td class="hash">${(t.params || []).map((p) => `${esc(p.name)}: ${esc(p.type)}`).join("<br>")}</td>
-        <td class="res ${t.status === "active" ? "ok" : "bad"}">${esc(t.status)}</td>
-        <td>${t.trusted ? "yes" : "no"} <button class="link" data-template-trusted="${t.trusted ? "false" : "true"}" data-id="${esc(t.id)}">${t.trusted ? "Distrust" : "Trust"}</button></td>
-        <td class="n">${num(t.delegations)}</td><td class="n">${num(t.failures)}</td>
-        <td><button class="link" data-template-status="${t.status === "active" ? "disabled" : "active"}" data-id="${esc(t.id)}">${t.status === "active" ? "Disable" : "Enable"}</button>
-        ${num(t.delegations) ? "" : `<button class="link danger" data-template-delete="${esc(t.id)}">Delete</button>`}</td></tr>`).join("")}
-      </tbody></table></div>${documentView("template")}`
-      : `<p class="empty">No template registered. Developers register one with POST /v1/template on the public port.</p>`}
-    <h3>Artifacts</h3>
-    <p>Compiler artifacts templates may reference by id. An artifact still referenced by a template cannot be deleted.</p>
-    ${artifacts.length ? `<div class="scroll"><table><thead><tr><th>Artifact</th><th>Registered</th><th></th></tr></thead><tbody>
-      ${artifacts.map((a) => `<tr><td class="hash"><button class="link hash" data-artifact="${esc(a.id)}" title="Show the document">${esc(short(a.id, 10))}</button></td>
-        <td>${ago(a.createdAt)}</td><td><button class="link danger" data-artifact-delete="${esc(a.id)}">Delete</button></td></tr>`).join("")}
-      </tbody></table></div>${documentView("artifact")}`
-      : `<p class="empty">No artifact registered.</p>`}
-    <h3>Register</h3>
-    <p>Paste a document and register it. The same public endpoints developers use, served on this port.</p>
-    <form id="register"><textarea name="document" placeholder='{"format": "..."}' aria-label="Document"></textarea>
-      <div class="actions"><button class="primary" value="template">Register template</button><button value="artifact">Register artifact</button></div></form>`;
-}
-
 async function loadDetail() {
-  if (!selected) { detail = null; $("detail").removeAttribute("aria-busy"); return status && renderOverview(); }
+  if (!selected) {
+    detail = null;
+    $("detail").removeAttribute("aria-busy");
+    $("detail").innerHTML = `<div class="blank"><b>No delegation selected</b><p>Pick one in the list to see its coins, attempts and inputs.</p></div>`;
+    return;
+  }
   const address = selected;
   if ("id/" + detail?.delegation.id !== address) {
     allVtxos = false;
@@ -620,7 +832,7 @@ async function loadDetail() {
     detail = await api(address.startsWith("id/") ? "/v1/admin/delegation/" + encodeURIComponent(address.slice(3)) : "/v1/delegate/" + encodeURIComponent(address));
   } catch (e) {
     $("detail").removeAttribute("aria-busy");
-    $("detail").innerHTML = `<p class="empty">Could not load ${esc(short(address, 12))}: ${esc(e.message)}. <button class="link" id="home2">Back to the overview</button></p>`;
+    $("detail").innerHTML = `<p class="empty">Could not load ${esc(short(address, 12))}: ${esc(e.message)}. <button class="link" data-go="delegations">Back to the list</button></p>`;
     return;
   }
   if (address !== selected) return; // the operator moved on while this was loading
@@ -675,30 +887,27 @@ function renderDetail() {
         ${explorer() && /^t?ark1/.test(d.address) ? `<button data-open="${esc(explorer() + "/address/" + d.address)}">View in explorer</button>` : ""}
         ${active ? `<button class="danger" id="stop">${kind.stop}</button>` : d.status === "cancelled" ? `<button class="primary" id="resume">${kind.resume}</button>` : ""}</div>
     </div>
-    <dl class="facts"><div><dt>Template</dt><dd class="hash" title="${esc(d.templateId)}">${esc(short(d.templateId, 8))}<button class="mini" data-copy="${esc(d.templateId)}" title="Copy the template id">copy</button></dd></div>
+    <dl class="facts"><div><dt>Template</dt><dd class="hash" title="${esc(d.templateId)}"><button class="link hash" data-go="templates/${esc(d.templateId)}">${esc(short(d.templateId, 8))}</button><button class="mini" data-copy="${esc(d.templateId)}" title="Copy the template id">copy</button></dd></div>
       ${num(d.parentId) ? `<div><dt>Successor of</dt><dd><a href="#id/${num(d.parentId)}">#${num(d.parentId)}</a></dd></div>` : ""}
       ${Object.entries(d.variables || {}).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${variable(k, types[k], v)}</dd></div>`).join("")}
-      <div><dt>Registered</dt><dd>${ago(d.createdAt)}</dd></div>
-      <div><dt>Expires</dt><dd>${num(d.expiresAt) ? `<span title="${new Date(num(d.expiresAt) * 1000).toLocaleString()}">${ago(d.expiresAt)}</span>` : "never"}</dd></div></dl>
+      <div><dt>Registered</dt><dd title="${esc(dateOf(d.createdAt))}">${ago(d.createdAt)}</dd></div>
+      <div><dt>Expires</dt><dd>${num(d.expiresAt) ? `<span title="${esc(dateOf(d.expiresAt))}">${ago(d.expiresAt)}</span>` : "never"}</dd></div></dl>
     ${st?.why && active ? `<p class="note">${esc(st.why)}</p>` : ""}
-    <h3>${kind.coins}</h3>
-    ${vtxos.length > 1 ? `<p><b class="n">${vtxos.length}</b> VTXOs holding <b class="n">${sats(held)}</b>${spend ? "" : ", soonest to renew first"}.</p>` : ""}
-    ${vtxos.length && kind === KINDS.renewal ? `<p class="state">A renewable VTXO waits for the batch of the first one to reach its deadline, ${span(reserve)} before expiry, so that they renew together. The dot is that batch.</p>` : ""}
+    <h3>${kind.coins} ${vtxos.length && kind === KINDS.renewal ? tip(`A renewable VTXO waits for the batch of the first one to reach its deadline, ${span(reserve)} before expiry, so that they renew together. The dot is that batch.`) : ""}
+      ${vtxos.length > 1 ? `<span class="aside">${vtxos.length} VTXOs, ${sats(held)}</span>` : ""}</h3>
     ${vtxos.length ? shownVtxos.map((v) => `<div class="vtxo"><div class="top"><span class="hash">${explore(v.outpoint)}</span>
         <span class="amount n">${sats(v.amount)}${(v.assets || []).map((a) => ` + ${num(a.amount).toLocaleString()} of ${esc(short(a.assetId, 6))}`).join("")}</span></div>
         ${spend ? `<div class="state">${num(v.expiresAt) ? "expires " + ago(v.expiresAt) : "onchain"}</div>` : lifeBar(v, batchAt[v.outpoint], renewing, company(v))}</div>`).join("") + (vtxos.length > shownVtxos.length ? `<p class="state"><button class="link" id="all-vtxos">Show all ${vtxos.length}</button>, the ${shownVtxos.length} soonest are above.</p>` : "")
       : `<p class="empty">${kind.noCoin}</p>`}
-    <h3>${kind.attempts}</h3>
+    <h3>${kind.attempts} ${renewals.length ? tip("A failure that repeats is listed once, at the time it first happened.") : ""}</h3>
     ${renewals.length ? `<div class="scroll"><table><thead><tr><th>When</th><th>Result</th><th>VTXOs</th><th>Batch or reason</th></tr></thead><tbody>
-      ${renewals.map((r) => `<tr><td title="${new Date(num(r.attemptedAt) * 1000).toLocaleString()}">${ago(r.attemptedAt)}</td>
+      ${renewals.map((r) => `<tr><td title="${esc(dateOf(r.attemptedAt))}">${ago(r.attemptedAt)}</td>
         <td class="res ${r.success ? "ok" : "bad"}">${r.success ? done : "failed"}</td>
         <td class="hash">${(r.outpoints || []).map((o) => explore(o, short(o, 8))).join("<br>")}</td>
         <td class="${r.success ? "hash" : ""}">${!r.success ? esc(r.error) : explorer() ? explore(r.commitmentTxid, short(r.commitmentTxid, 12)) : `<button class="link hash" data-copy="${esc(r.commitmentTxid)}" title="Copy the txid">${esc(short(r.commitmentTxid, 12))}</button>`}</td></tr>`).join("")}
-      </tbody></table></div>
-      <p class="state">A failure that repeats is listed once, at the time it first happened.</p>`
+      </tbody></table></div>`
       : `<p class="empty">${kind.noAttempt}</p>`}
-    <h3>Inputs</h3>
-    <p>Each input of the template: what it watches or the output bound to it, and who can spend it, one tapscript each.</p>
+    <h3>Inputs ${tip("Each input of the template: what it watches or the output bound to it, and who can spend it, one tapscript each.")}</h3>
     ${slots.map((sl) => `<h4>${esc(sl.name)} <span class="badge">${sl.onchain ? "onchain" : "offchain"}</span></h4>
       ${sl.outpoint ? `<p class="hash">${explore(sl.outpoint)} <button class="mini" data-copy="${esc(sl.outpoint)}" title="Copy the outpoint">copy</button></p>` : ""}
       <ul class="paths">${(sl.tapscripts || []).map((t) => `<li><span class="words">${esc(scriptWords(t))}</span><button class="mini" data-copy="${esc(t)}" title="Copy the script hex">hex</button></li>`).join("")}</ul>`).join("")}`;
@@ -717,69 +926,238 @@ async function setRenewing(on) {
 
 function askStop() {
   const held = delegations.find((x) => x.delegation.id === detail.delegation.id), spend = spends(detail.delegation);
-  $("confirm-title").textContent = spend ? "Cancel this spend?" : "Stop renewing this address?";
-  $("confirm").querySelector("[value=no]").textContent = spend ? "Keep the spend" : "Keep renewing";
-  $("confirm-yes").textContent = kindOf(detail.delegation).stop;
-  $("confirm-text").textContent = spend ? "The daemon stops trying it: its coins stay with their owner, who can sign a new spend. Nothing is deleted." : (num(held?.vtxoCount)
-    ? `${sats(held.totalAmount)} in ${held.vtxoCount} VTXO${held.vtxoCount > 1 ? "s" : ""}, the first expiring ${ago(held.nextExpiry)}, will expire`
-    : "Coins sent to it later will expire") + " unless the owner exits or you resume. The owner cannot register it again until you resume. Nothing is deleted.";
-  $("confirm").showModal();
+  ask(spend ? "Cancel this spend?" : "Stop renewing this address?",
+    spend ? "The daemon stops trying it: its coins stay with their owner, who can sign a new spend. Nothing is deleted." : (num(held?.vtxoCount)
+      ? `${sats(held.totalAmount)} in ${plural(held.vtxoCount, "VTXO")}, the first expiring ${ago(held.nextExpiry)}, will expire`
+      : "Coins sent to it later will expire") + " unless the owner exits or you resume. The owner cannot register it again until you resume. Nothing is deleted.",
+    kindOf(detail.delegation).stop, spend ? "Keep the spend" : "Keep renewing").then((yes) => yes && setRenewing(false));
 }
 
-const go = (address) => { location.hash = address || ""; if (!address) history.replaceState(null, "", location.pathname); };
+// templates and artifacts
+const docs = {}; // "templates/id": document, immutable once registered
+const TPL = {
+  filters: [["all", "All", () => true], ["active", "Active", (t) => t.status === "active"], ["disabled", "Disabled", (t) => t.status !== "active"],
+    ["failing", "Failing", (t) => t.failures > 0], ["trusted", "Trusted", (t) => t.trusted], ["unused", "Unused", (t) => !num(t.delegations)]],
+  sorts: [["used", "Most used", (a, b) => num(b.delegations) - num(a.delegations) || num(b.createdAt) - num(a.createdAt)],
+    ["newest", "Newest", (a, b) => num(b.createdAt) - num(a.createdAt)], ["failures", "Failures", (a, b) => b.failures - a.failures || num(b.delegations) - num(a.delegations)]],
+  matches: (t, q) => [t.id, ...(t.params || []).map((p) => p.name), ...(t.artifactIds || [])].some((v) => v.toLowerCase().includes(q)),
+  placeholder: "Template id, variable or artifact id",
+};
+const ART = {
+  filters: [["all", "All", () => true], ["used", "In use", (a) => usedBy[a.id]], ["unused", "Unused", (a) => !usedBy[a.id]]],
+  sorts: [["newest", "Newest", (a, b) => num(b.createdAt) - num(a.createdAt)], ["used", "Most used", (a, b) => (usedBy[b.id]?.length || 0) - (usedBy[a.id]?.length || 0)]],
+  matches: (a, q) => a.id.includes(q),
+  placeholder: "Artifact id",
+};
+const cstate = { templates: { filter: "all", sort: "used", q: "" }, artifacts: { filter: "all", sort: "newest", q: "" } };
+const catalogOf = () => (ctab === "templates" ? [TPL, templates] : [ART, artifacts]);
+function catalogRows() {
+  const [c, items] = catalogOf(), s = cstate[ctab], q = s.q.trim().toLowerCase(), fn = c.filters.find((f) => f[0] === s.filter)[2];
+  return items.filter((x) => fn(x) && (!q || c.matches(x, q))).sort(c.sorts.find((x) => x[0] === s.sort)[2]);
+}
+
+function renderCatalog() {
+  const [c, items] = catalogOf(), s = cstate[ctab];
+  $("ctabs").innerHTML = [["templates", "Templates", templates], ["artifacts", "Artifacts", artifacts]].map(([id, name, list]) =>
+    `<button data-go="${id}" aria-pressed="${id === ctab}">${name} <span class="n">${list.length.toLocaleString()}</span></button>`).join("");
+  $("csearch").placeholder = c.placeholder;
+  if ($("csearch").value !== s.q) $("csearch").value = s.q;
+  $("cfilters").innerHTML = c.filters.map(([id, name, fn]) => {
+    const n = items.filter(fn).length;
+    return n || id === "all" || id === s.filter ? `<button data-cfilter="${id}" aria-pressed="${id === s.filter}">${name}<span class="n">${n.toLocaleString()}</span></button>` : "";
+  }).join("");
+  $("cfilters").classList.toggle("more", $("cfilters").scrollWidth > $("cfilters").clientWidth);
+  $("csort").innerHTML = c.sorts.map(([id, name]) => `<option value="${id}" ${id === s.sort ? "selected" : ""}>${name}</option>`).join("");
+  const rows = catalogRows();
+  $("cshown").textContent = `${rows.length.toLocaleString()} shown`;
+  if (!rows.length) {
+    $("crows").innerHTML = `<li class="empty">${s.q.trim() ? "Nothing matches your search." : items.length ? "None here." : `No ${ctab} registered yet.`}</li>`;
+    return;
+  }
+  const more = rows.length - MAX_ROWS;
+  $("crows").innerHTML = rows.slice(0, MAX_ROWS).map((x) => {
+    const here = `${ctab}/${x.id}`, current = `aria-current="${x.id === csel}"`;
+    if (ctab === "artifacts") {
+      const n = usedBy[x.id]?.length || 0;
+      return `<li><button data-go="${esc(here)}" ${current} title="${esc(x.id)}"><span class="dot ${n ? "ok" : "off"}"></span><span class="hash">${esc(short(x.id, 10))}</span>
+        <span class="amt">${n ? n.toLocaleString() : ""}</span><span></span><span class="sub">registered ${ago(x.createdAt)}</span><span class="count">${n ? (n === 1 ? "template" : "templates") : "unused"}</span></button></li>`;
+    }
+    const n = num(x.delegations), tags = (x.status !== "active" ? `<span class="tag">disabled</span>` : "") + (x.trusted ? `<span class="tag ok">trusted</span>` : "")
+      + (x.failures ? `<span class="tag bad">${x.failures} failed</span>` : "");
+    return `<li><button data-go="${esc(here)}" ${current} title="${esc(x.id)}"><span class="dot ${x.status !== "active" ? "off" : x.failures ? "bad" : "ok"}"></span><span class="hash">${esc(short(x.id, 10))}</span>
+      <span class="amt">${n ? n.toLocaleString() : ""}</span><span></span><span class="sub">${tags}${esc((x.params || []).map((p) => p.name).join(", ") || "no variable")}</span>
+      <span class="count">${n ? (n === 1 ? "delegation" : "delegations") : "unused"}</span></button></li>`;
+  }).join("") + (more > 0 ? `<li class="empty">${more.toLocaleString()} more. Search or filter to narrow down.</li>` : "");
+  $("crows").querySelector("[aria-current=true]")?.scrollIntoView({ block: "nearest" });
+}
+
+async function loadCatalogDetail() {
+  renderCatalogDetail();
+  const key = ctab + "/" + csel;
+  if (!csel || key in docs) return;
+  try {
+    const r = await api(`/v1/${ctab === "templates" ? "template" : "artifact"}/` + encodeURIComponent(csel));
+    docs[key] = (r.template || r.artifact).document;
+  } catch (e) { return toast("Could not load the document: " + e.message, true); }
+  if (key === ctab + "/" + csel) renderCatalogDetail();
+}
+
+function renderCatalogDetail() {
+  const box = $("cdetail");
+  // don't wipe a half-typed form on refresh
+  if (!csel && box.querySelector(".register")?.document.value) return;
+  if (!csel) return (box.innerHTML = catalogHome());
+  const doc = docs[ctab + "/" + csel];
+  if (ctab === "templates") {
+    const t = templates.find((x) => x.id === csel);
+    box.innerHTML = t ? templateView(t, doc) : missing("template");
+  } else {
+    const a = artifacts.find((x) => x.id === csel);
+    box.innerHTML = a ? artifactView(a, doc) : missing("artifact");
+  }
+}
+const missing = (kind) => `<p class="empty">No ${kind} ${esc(short(csel, 10))} is registered. <button class="link" data-go="${ctab}">Back to the list</button></p>`;
+
+function catalogHome() {
+  const tpl = ctab === "templates";
+  const cells = tpl ? [["Active", templates.filter((t) => t.status === "active").length, "active"], ["Disabled", templates.filter((t) => t.status !== "active").length, "disabled"],
+    ["Failing", templates.filter((t) => t.failures > 0).length, "failing"], ["Trusted", templates.filter((t) => t.trusted).length, "trusted"]]
+    : [["Registered", artifacts.length, "all"], ["In use", artifacts.filter((a) => usedBy[a.id]).length, "used"], ["Unused", artifacts.filter((a) => !usedBy[a.id]).length, "unused"]];
+  return `<h2>${tpl ? "Templates" : "Artifacts"}</h2>
+    <div class="stats" style="margin-top:1.25rem">${cells.map(([name, n, f]) => `<button class="stat ${f === "failing" && n ? "alert" : ""}" data-cfilter="${f}"><span class="label">${name}</span><span class="fig">${n.toLocaleString()}</span></button>`).join("")}</div>
+    <section class="panel"><div class="ph"><h3>Register a document ${tip("The same public endpoints developers use, POST /v1/template and POST /v1/artifact, served on this port.")}</h3></div>
+      <form class="register"><textarea name="document" placeholder='{"format": "..."}' aria-label="Document"></textarea>
+        <div class="actions"><button class="${tpl ? "primary" : ""}" value="template">Register template</button><button class="${tpl ? "" : "primary"}" value="artifact">Register artifact</button></div></form></section>`;
+}
+
+function templateView(t, doc) {
+  const n = num(t.delegations), on = t.status === "active", params = t.params || [], arts = t.artifactIds || [];
+  return `<div class="title"><div><h2>Template <span class="hash" style="font-size:.8em">${esc(short(t.id, 6))}</span>
+        <span class="badge ${!on ? "off" : t.failures ? "bad" : "ok"}">${on ? (t.failures ? "failing" : "active") : "disabled"}</span>${t.trusted ? `<span class="badge accent">trusted</span>` : ""}</h2>
+      <div class="hash">${esc(t.id)}</div></div>
+    <div class="actions"><button data-copy="${esc(t.id)}">Copy id</button>
+      <button data-template-trusted="${!t.trusted}" data-id="${esc(t.id)}">${t.trusted ? "Distrust" : "Trust"}</button>
+      <button class="${on ? "danger" : "primary"}" data-template-status="${on ? "disabled" : "active"}" data-id="${esc(t.id)}">${on ? "Disable" : "Enable"}</button>
+      ${n ? "" : `<button class="danger" data-template-delete="${esc(t.id)}">Delete</button>`}</div></div>
+    <dl class="facts">
+      <div><dt>Delegations</dt><dd>${n ? `<button class="link" data-go="delegations" data-filter="all" data-search="${esc(t.id)}">${n.toLocaleString()}</button>` : "none"}</dd></div>
+      <div><dt>Failed cycles ${tip(t.trusted ? "Trusted templates are never disabled for failures." : "Consecutive renewal cycles rejected. The daemon disables a template whose intents keep being rejected.")}</dt><dd class="${t.failures ? "state late" : ""}">${t.failures}</dd></div>
+      <div><dt>Trusted ${tip("The daemon signs the delegate-key leaves of a trusted template and never disables it for failures.")}</dt><dd>${t.trusted ? "yes" : "no"}</dd></div>
+      <div><dt>Registered</dt><dd title="${esc(dateOf(t.createdAt))}">${ago(t.createdAt)}</dd></div></dl>
+    ${!on ? `<p class="note">Disabled: it registers and renews nothing.</p>` : ""}
+    <h3>Variables <span class="aside">${params.length}</span></h3>
+    ${params.length ? `<div class="scroll"><table style="max-width:32rem"><thead><tr><th>Name</th><th>Type</th></tr></thead><tbody>${params.map((p) => `<tr><td class="hash">${esc(p.name)}</td><td>${esc(p.type)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="empty">No variable.</p>`}
+    <h3>Artifacts <span class="aside">${arts.length}</span></h3>
+    ${arts.length ? `<ul class="refs">${arts.map((a) => `<li>${artifacts.some((x) => x.id === a) ? `<button data-go="artifacts/${esc(a)}" title="${esc(a)}">${esc(short(a, 8))}</button>` : `<span class="tag" title="${esc(a)}">${esc(short(a, 8))}</span>`}</li>`).join("")}</ul>` : `<p class="empty">References no artifact.</p>`}
+    <h3>Document</h3>${documentView(doc)}`;
+}
+
+function artifactView(a, doc) {
+  let parsed = {};
+  try { parsed = JSON.parse(doc ?? "{}"); } catch { /* shown raw below */ }
+  const users = usedBy[a.id] || [], inputs = parsed.constructorInputs || [], fns = parsed.functions || [];
+  return `<div class="title"><div><h2>${esc(parsed.contractName || "Artifact")} <span class="badge ${users.length ? "ok" : ""}">${users.length ? "in use" : "unused"}</span></h2>
+      <div class="hash">${esc(a.id)}</div></div>
+    <div class="actions"><button data-copy="${esc(a.id)}">Copy id</button>
+      ${users.length ? "" : `<button class="danger" data-artifact-delete="${esc(a.id)}">Delete</button>`}</div></div>
+    <dl class="facts"><div><dt>Used by</dt><dd>${plural(users.length, "template")}</dd></div>
+      <div><dt>Functions</dt><dd>${doc === undefined ? "…" : fns.length}</dd></div>
+      <div><dt>Registered</dt><dd title="${esc(dateOf(a.createdAt))}">${ago(a.createdAt)}</dd></div></dl>
+    ${doc !== undefined && inputs.length ? `<h3>Constructor inputs <span class="aside">${inputs.length}</span></h3>
+      <div class="scroll"><table style="max-width:32rem"><thead><tr><th>Name</th><th>Type</th></tr></thead><tbody>${inputs.map((p) => `<tr><td class="hash">${esc(p.name)}</td><td>${esc(p.type)}</td></tr>`).join("")}</tbody></table></div>` : ""}
+    ${fns.length ? `<h3>Functions</h3><ul class="refs">${fns.map((f) => `<li><span class="tag">${esc(f.name)}</span></li>`).join("")}</ul>` : ""}
+    <h3>Used by <span class="aside">${users.length}</span></h3>
+    ${users.length ? `<ul class="refs">${users.slice(0, 100).map((id) => `<li><button data-go="templates/${esc(id)}" title="${esc(id)}">${esc(short(id, 8))}</button></li>`).join("")}</ul>
+      ${users.length > 100 ? `<p class="more">and ${(users.length - 100).toLocaleString()} more</p>` : ""}` : `<p class="empty">No template references it.</p>`}
+    <h3>Document</h3>${documentView(doc)}`;
+}
 
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.filter) { filter = b.dataset.filter; renderList(); }
+  if (b.dataset.filter) filter = b.dataset.filter;
+  if (b.dataset.search !== undefined) { $("search").value = b.dataset.search; kindFilter = "all"; }
+  if (b.dataset.go !== undefined) {
+    const same = location.hash.slice(1) === b.dataset.go;
+    go(b.dataset.go);
+    if (same) render();
+  }
+  else if (b.dataset.filter) renderList();
   else if (b.dataset.kind) { kindFilter = b.dataset.kind; renderList(); }
-  else if (b.dataset.address) go(b.dataset.address);
+  else if (b.dataset.cfilter) { cstate[ctab].filter = b.dataset.cfilter; renderCatalog(); }
   else if (b.dataset.open) window.open(b.dataset.open, "_blank", "noopener");
   else if (b.dataset.copy) navigator.clipboard.writeText(b.dataset.copy).then(() => toast("Copied"), () => toast("Copy failed, select the text instead", true));
-  else if (b.id === "home" || b.id === "home2" || b.id === "see-fees") go("");
   else if (b.id === "all-vtxos") { allVtxos = true; renderDetail(); }
+  else if (b.id === "all-batches") { allBatches = !allBatches; renderOverview(); }
   else if (b.id === "stop") askStop();
-  else if (b.id === "confirm-yes") { $("confirm").close(); setRenewing(false); }
-  else if (b.value === "no") $("confirm").close();
   else if (b.id === "resume") setRenewing(true);
   else if (b.id === "load-more") { loadLimit += 5000; refresh(); }
-  else if (b.dataset.hide) { delete shown[b.dataset.hide]; renderOverview(); }
-  else if (b.dataset.template) showDocument("template", b.dataset.template);
-  else if (b.dataset.artifact) showDocument("artifact", b.dataset.artifact);
   else if (b.dataset.templateStatus) act(send("PUT", "/v1/admin/template/" + encodeURIComponent(b.dataset.id) + "/status", { status: b.dataset.templateStatus }),
-    "Template " + b.dataset.templateStatus, "Could not change the template: ");
-  else if (b.dataset.templateTrusted) act(send("PUT", "/v1/admin/template/" + encodeURIComponent(b.dataset.id) + "/trusted", { trusted: b.dataset.templateTrusted === "true" }),
-    b.dataset.templateTrusted === "true" ? "Template trusted" : "Template no longer trusted", "Could not change the template: ");
-  else if (b.dataset.templateDelete) act(api("/v1/admin/template/" + encodeURIComponent(b.dataset.templateDelete), { method: "DELETE" }), "Template deleted", "Could not delete the template: ");
-  else if (b.dataset.artifactDelete) act(api("/v1/admin/artifact/" + encodeURIComponent(b.dataset.artifactDelete), { method: "DELETE" }), "Artifact deleted", "Could not delete the artifact: ");
+    b.dataset.templateStatus === "active" ? "Template enabled" : "Template disabled", "Could not change the template: ");
+  else if (b.dataset.templateTrusted) {
+    const trust = b.dataset.templateTrusted === "true", id = b.dataset.id;
+    (trust ? ask("Trust this template?", "The daemon will sign its delegate-key leaves and never disable it for failures.", "Trust") : Promise.resolve(true))
+      .then((yes) => yes && act(send("PUT", "/v1/admin/template/" + encodeURIComponent(id) + "/trusted", { trusted: trust }),
+        trust ? "Template trusted" : "Template no longer trusted", "Could not change the template: "));
+  }
+  else if (b.dataset.templateDelete) {
+    const id = b.dataset.templateDelete;
+    ask("Delete this template?", "Wallets can no longer register delegations with it. Registering the same document again restores it.", "Delete")
+      .then((yes) => yes && act(api("/v1/admin/template/" + encodeURIComponent(id), { method: "DELETE" }), "Template deleted", "Could not delete the template: ").then((ok) => ok && go("templates")));
+  }
+  else if (b.dataset.artifactDelete) {
+    const id = b.dataset.artifactDelete;
+    ask("Delete this artifact?", "Templates registered later can no longer reference it. Registering the same document again restores it.", "Delete")
+      .then((yes) => yes && act(api("/v1/admin/artifact/" + encodeURIComponent(id), { method: "DELETE" }), "Artifact deleted", "Could not delete the artifact: ").then((ok) => ok && go("artifacts")));
+  }
 });
 document.addEventListener("submit", (e) => {
-  if (e.target.id !== "register") return;
+  if (!e.target.classList.contains("register")) return;
   e.preventDefault();
   const kind = e.submitter?.value === "artifact" ? "artifact" : "template", document_ = e.target.document.value.trim();
   if (!document_) return toast("Paste a document first", true);
   e.target.setAttribute("aria-busy", "true");
   send("POST", "/v1/" + kind, { document: document_ })
-    .then((r) => { const id = (kind === "artifact" ? r.artifact : r.template).id; toast(`Registered ${kind} ${short(id, 8)}`); e.target.reset(); refresh(); }, (err) => toast(`Could not register the ${kind}: ${err.message}`, true))
+    .then((r) => { const id = (r.artifact || r.template).id; toast(`Registered ${kind} ${short(id, 8)}`); e.target.reset(); refresh(); go(`${kind}s/${id}`); }, (err) => toast(`Could not register the ${kind}: ${err.message}`, true))
     .finally(() => e.target.removeAttribute("aria-busy"));
 });
 document.addEventListener("keydown", (e) => {
   if ($("confirm").open || e.metaKey || e.ctrlKey || e.altKey) return;
-  const typing = e.target.matches("input, textarea");
-  if (e.key === "/" && !typing) { e.preventDefault(); $("search").focus(); }
-  else if (e.key === "Escape") { typing ? e.target.blur() : go(""); }
-  else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !typing) {
-    const rows = visibleRows().slice(0, MAX_ROWS); if (!rows.length) return;
+  const typing = e.target.matches("input, textarea"), catalog = page === "catalog";
+  if (e.key === "/" && !typing) {
     e.preventDefault();
-    const i = rows.findIndex((d) => "id/" + d.delegation.id === selected), step = e.key === "ArrowDown" ? 1 : -1;
-    go("id/" + rows[Math.min(rows.length - 1, Math.max(0, i < 0 ? 0 : i + step))].delegation.id);
+    if (page === "overview") go("delegations");
+    $(catalog ? "csearch" : "search").focus();
+  }
+  else if (e.key === "Escape") typing ? e.target.blur() : go(selected ? "delegations" : csel ? ctab : "");
+  else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !typing && page !== "overview") {
+    const ids = catalog ? catalogRows().slice(0, MAX_ROWS).map((x) => `${ctab}/${x.id}`) : visibleRows().slice(0, MAX_ROWS).map((d) => "id/" + d.delegation.id);
+    if (!ids.length) return;
+    e.preventDefault();
+    const i = ids.indexOf(catalog ? `${ctab}/${csel}` : selected), step = e.key === "ArrowDown" ? 1 : -1;
+    go(ids[Math.min(ids.length - 1, Math.max(0, i < 0 ? 0 : i + step))]);
   }
 });
 $("search").addEventListener("input", renderList);
 $("sort").addEventListener("change", renderList);
-addEventListener("hashchange", () => { selected = location.hash.slice(1); renderList(); loadDetail(); });
+$("csearch").addEventListener("input", () => { cstate[ctab].q = $("csearch").value; renderCatalog(); });
+$("csort").addEventListener("change", () => { cstate[ctab].sort = $("csort").value; renderCatalog(); });
+// tooltips float above everything, kept inside the viewport
+function showTip(e) {
+  const t = e.target.closest?.("[data-tip]"), el = $("tooltip");
+  if (!t) return;
+  el.textContent = t.dataset.tip; el.hidden = false;
+  const r = t.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
+  el.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8) + "px";
+  el.style.top = (r.top - h - 8 < 8 ? r.bottom + 8 : r.top - h - 8) + "px";
+}
+const hideTip = (e) => e.target.closest?.("[data-tip]") && ($("tooltip").hidden = true);
+document.addEventListener("mouseover", showTip); document.addEventListener("focusin", showTip);
+document.addEventListener("mouseout", hideTip); document.addEventListener("focusout", hideTip);
+addEventListener("scroll", () => ($("tooltip").hidden = true), true);
+addEventListener("hashchange", () => { parseRoute(); render(); });
 
-function refresh() { loadHealth(); loadList().then(loadDetail); }
-loadMeta(); refresh();
+function refresh() { loadHealth(); return loadList().then(render); }
+parseRoute(); render(); loadMeta(); refresh();
 setInterval(() => { if (!document.hidden && !$("confirm").open) refresh(); }, 15000);
 </script>
 </body>
