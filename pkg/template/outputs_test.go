@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"maps"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -77,6 +78,40 @@ func TestAllocateTwoInputs(t *testing.T) {
 	require.ErrorIs(t, err, ErrIneligible)
 	_, err = inst.allocate(d, src, 49_700, 330)
 	require.ErrorIs(t, err, ErrIneligible, "fee above the cap")
+}
+
+func TestAllocatePooled(t *testing.T) {
+	inst, d, src := instanceOf(t, pooled(t), coin(t, 10_000, Asset{ID: assetID(1), Amount: 3}), coin(t, 20_000))
+	got, err := inst.allocate(d, src, 700, 330)
+	require.NoError(t, err)
+	require.Equal(t, []uint64{4_300, 25_000}, got.sats, "neither input alone pays 25,000")
+	require.Equal(t, map[string]uint64{hex.EncodeToString(assetID(1)): 3}, got.assets[0])
+	requireBalanced(t, inst, got, src)
+
+	inst, d, src = instanceOf(t, pooled(t), coin(t, 10_000), coin(t, 15_000))
+	_, err = inst.allocate(d, src, 0, 330)
+	require.ErrorIs(t, err, ErrIneligible, "the pool cannot pay 25,000 and leave dust")
+}
+
+func TestParsePoolRejects(t *testing.T) {
+	out := func(m map[string]any, i int) map[string]any { return m["outputs"].([]any)[i].(map[string]any) }
+	for name, edit := range map[string]func(map[string]any){
+		"input twice":    func(m map[string]any) { out(m, 0)["value"] = map[string]any{"from": []any{"funds", "funds"}} },
+		"unknown input":  func(m map[string]any) { out(m, 0)["value"] = map[string]any{"from": []any{"funds", "nope"}} },
+		"empty pool":     func(m map[string]any) { out(m, 0)["value"] = map[string]any{"from": []any{}} },
+		"not a name":     func(m map[string]any) { out(m, 0)["value"] = map[string]any{"from": []any{"funds", 1}} },
+		"two pools":      func(m map[string]any) { out(m, 1)["value"] = map[string]any{"from": "extra", "amount": 25000} },
+		"two remainders": func(m map[string]any) { out(m, 1)["value"] = map[string]any{"from": []any{"extra", "funds"}} },
+		"input in no pool": func(m map[string]any) {
+			out(m, 0)["value"] = map[string]any{"from": "funds"}
+			out(m, 1)["value"] = map[string]any{"from": "funds", "amount": 25000}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := Parse(t.Context(), edited(t, pooled(t), edit), nil)
+			require.ErrorIs(t, err, ErrInvalidTemplate)
+		})
+	}
 }
 
 func TestAllocateAssetOverflowAcrossInputs(t *testing.T) {
@@ -159,16 +194,22 @@ func requireBalanced(t *testing.T, inst *Instance, a *allocation, src []*Source)
 	t.Helper()
 	in, out := map[string]uint64{}, map[string]uint64{}
 	for slot, s := range src {
-		drawn := uint64(0)
-		if f := inst.tmpl.fee; f != nil && f.from == slot {
-			drawn = a.fee
-		}
-		for k, o := range inst.tmpl.outputs {
-			if o.from == slot {
-				drawn += a.sats[k]
+		pool := inst.tmpl.poolOf(slot)
+		if pool[0] == slot {
+			held, drawn := uint64(0), uint64(0)
+			for _, i := range pool {
+				held += src[i].Amount
 			}
+			if f := inst.tmpl.fee; f != nil && slices.Contains(pool, f.from) {
+				drawn = a.fee
+			}
+			for k, o := range inst.tmpl.outputs {
+				if slices.Equal(o.pool, pool) {
+					drawn += a.sats[k]
+				}
+			}
+			require.Equal(t, held, drawn, "pool %v", pool)
 		}
-		require.Equal(t, s.Amount, drawn, "input %d", slot)
 		for _, as := range s.Assets {
 			in[hex.EncodeToString(as.ID)] += as.Amount
 		}
@@ -242,6 +283,23 @@ func twoFunds(t *testing.T) []byte {
 			},
 		}, outs[1]}
 		m["packets"] = map[string]any{"output_index": 2}
+		m["fees"] = map[string]any{"from": "extra", "max": 1000}
+	})
+}
+
+// pooled: funds and extra pay 25,000 on chain together; extra pays the fee.
+func pooled(t *testing.T) []byte {
+	t.Helper()
+	return edited(t, mixedPaymentDoc(t, false), func(m map[string]any) {
+		ins := m["inputs"].([]any)
+		extra := maps.Clone(ins[0].(map[string]any))
+		extra["name"] = "extra"
+		m["inputs"] = append(ins, extra)
+		outs := m["outputs"].([]any)
+		change, payment := outs[0].(map[string]any), outs[1].(map[string]any)
+		change["value"] = map[string]any{"from": []any{"funds", "extra"}}
+		change["assets"] = []any{map[string]any{"from": "funds"}, map[string]any{"from": "extra"}}
+		payment["value"] = map[string]any{"from": []any{"extra", "funds"}, "amount": 25000}
 		m["fees"] = map[string]any{"from": "extra", "max": 1000}
 	})
 }

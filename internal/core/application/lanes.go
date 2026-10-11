@@ -17,7 +17,10 @@ type lane struct {
 	wasBusy bool         // as the scan began; the scan's alone
 	// lost on restart: the failure is then reported again
 	lastFailure map[string]string
+	queued      map[string]*pendingIntent
 }
+
+func queuedKey(p *pendingIntent) string { return p.inputs[0].coin.Outpoint.String() }
 
 // laneOf: intents share a batch session, anything else is a transaction of its own.
 func (s *service) laneOf(in renewalInput) *lane {

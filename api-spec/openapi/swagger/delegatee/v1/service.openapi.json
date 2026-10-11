@@ -199,6 +199,88 @@
         }
       }
     },
+    "/v1/spend": {
+      "post": {
+        "tags": [
+          "DelegateeService"
+        ],
+        "description": "RegisterSpend spends outpoints once through a template, signed by their owner.",
+        "operationId": "DelegateeService_RegisterSpend",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterSpendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterSpendResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/spend/{id}": {
+      "get": {
+        "tags": [
+          "DelegateeService"
+        ],
+        "description": "GetSpend returns a spend with its coins and attempts.",
+        "operationId": "DelegateeService_GetSpend",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetSpendResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/template": {
       "get": {
         "tags": [
@@ -480,6 +562,36 @@
           }
         }
       },
+      "GetSpendRequest": {
+        "title": "GetSpendRequest",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "GetSpendResponse": {
+        "title": "GetSpendResponse",
+        "type": "object",
+        "properties": {
+          "delegation": {
+            "$ref": "#/components/schemas/Delegation"
+          },
+          "renewals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Renewal"
+            }
+          },
+          "vtxos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Vtxo"
+            }
+          }
+        }
+      },
       "GetTemplateRequest": {
         "title": "GetTemplateRequest",
         "type": "object",
@@ -571,6 +683,50 @@
         "properties": {
           "delegation": {
             "$ref": "#/components/schemas/Delegation"
+          }
+        }
+      },
+      "RegisterSpendRequest": {
+        "title": "RegisterSpendRequest",
+        "type": "object",
+        "properties": {
+          "expiresAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "outpoints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pubkey": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "templateId": {
+            "type": "string"
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RegisterSpendResponse": {
+        "title": "RegisterSpendResponse",
+        "type": "object",
+        "properties": {
+          "delegation": {
+            "$ref": "#/components/schemas/Delegation"
+          },
+          "id": {
+            "type": "string",
+            "description": "id is the spend's fingerprint."
           }
         }
       },

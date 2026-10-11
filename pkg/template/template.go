@@ -93,7 +93,8 @@ type output struct {
 	name    string
 	index   uint16
 	onchain bool
-	from    int
+	from    int          // pool[0]
+	pool    []int        // inputs it draws from, sorted
 	amount  byteTemplate // nil: the remainder
 	locking locking
 	assets  []assetRoute

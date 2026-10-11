@@ -108,6 +108,12 @@ type Service interface {
 	ResumeDelegation(ctx context.Context, id int64) error
 	GetDelegation(ctx context.Context, address string) (*domain.Delegation, error)
 	GetDelegationByID(ctx context.Context, id int64) (*domain.Delegation, error)
+	// RegisterSpend spends outpoints once, signed by their owner.
+	RegisterSpend(
+		ctx context.Context, templateID string, variables map[string]string, outpoints []string, expiresAt time.Time, pubkey, signature string,
+	) (*domain.Delegation, error)
+	// GetSpend finds a spend by its fingerprint.
+	GetSpend(ctx context.Context, id string) (*domain.Delegation, error)
 	// ListDelegations lists up to limit delegations of a non-empty status, newest first, with ids below a non-zero cursor.
 	ListDelegations(ctx context.Context, status string, cursor int64, limit int) ([]domain.Delegation, error)
 	ListRenewals(ctx context.Context, d *domain.Delegation) ([]domain.Renewal, error)
@@ -353,6 +359,7 @@ func NewServiceWithKeys(
 		consumed:            consumed,
 		inFlight:            map[int64]bool{},
 		quarantined:         map[string]time.Time{},
+		batch:               lane{queued: map[string]*pendingIntent{}},
 		plan:                &plan{},
 		onchainCache:        map[string]onchainSnapshot{},
 		refusedSince:        map[string]time.Time{},
@@ -957,7 +964,7 @@ func (s *service) countLate(holdings map[int64]Holdings, p *plan, now time.Time)
 func (s *service) prune(ctx context.Context, now time.Time) {
 	if s.lastPrune.IsZero() || now.Sub(s.lastPrune) >= renewalsPruneInterval {
 		if err := s.repo.PruneRenewals(ctx, now.Add(-renewalsRetention)); err != nil {
-			log.WithError(err).Warn("prune renewals")
+			log.WithError(err).Warn("prune attempts")
 		} else {
 			s.lastPrune = now
 		}
@@ -984,7 +991,7 @@ func (s *service) activeTemplates(ctx context.Context) (map[string]struct{}, err
 }
 
 func (s *service) renewAndRecord(ctx context.Context, inputs []renewalInput) {
-	log.WithField("count", len(inputs)).Info("renewing vtxos")
+	log.WithField("coins", len(inputs)).Info("running delegations")
 	renewCtx, cancel := context.WithTimeout(ctx, s.renewalTimeout)
 	defer cancel()
 	results := s.renew(renewCtx, inputs)
@@ -1018,6 +1025,7 @@ func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, res
 		err        string
 	}
 	byDelegation := map[key]*domain.Renewal{}
+	delegations := map[int64]domain.Delegation{}
 	var order []key
 	for _, res := range results {
 		errMsg := ""
@@ -1032,6 +1040,7 @@ func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, res
 			if delete(l.lastFailure, outpoint); errMsg != "" {
 				l.lastFailure[outpoint] = errMsg
 			}
+			delegations[in.watched.delegation.ID] = in.watched.delegation
 			k := key{in.watched.delegation.ID, res.commitmentTxid, errMsg}
 			ren, ok := byDelegation[k]
 			if !ok {
@@ -1048,18 +1057,30 @@ func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, res
 	for _, k := range order {
 		ren := byDelegation[k]
 		logger := log.WithFields(log.Fields{"delegation": ren.DelegationID, "vtxos": ren.Outpoints})
+		done, failed := outcomes(delegations[ren.DelegationID])
 		if ren.Success {
 			s.consume(ren.Outpoints...)
 			s.renewed.Add(uint64(len(ren.Outpoints)))
-			logger.WithField("commitment_txid", ren.CommitmentTxid).Info("vtxos renewed")
+			logger.WithField("commitment_txid", ren.CommitmentTxid).Info(done)
 		} else {
 			s.failed.Add(uint64(len(ren.Outpoints)))
-			logger.WithField("error", ren.Error).Error("renewal failed")
+			logger.WithField("error", ren.Error).Error(failed)
 		}
 		if err := s.repo.RecordRenewal(ctx, *ren); err != nil {
-			logger.WithError(err).Error("record renewal")
+			logger.WithError(err).Error("record attempt")
 		}
 	}
+}
+
+// outcomes words an attempt by what the delegation does
+func outcomes(d domain.Delegation) (done, failed string) {
+	switch {
+	case d.IsSpend():
+		return "coins spent", "spend failed"
+	case slices.ContainsFunc(d.Slots, func(s domain.SlotBinding) bool { return s.Onchain }):
+		return "deposit boarded", "boarding failed"
+	}
+	return "vtxos renewed", "renewal failed"
 }
 
 // a template whose intents keep being rejected must not spam arkd
@@ -1096,6 +1117,10 @@ func templateOutcomes(results []renewalResult) map[string]tally {
 	out := map[string]tally{}
 	for _, res := range results {
 		for _, in := range res.inputs {
+			// spends do not count against their template
+			if in.watched.delegation.IsSpend() {
+				continue
+			}
 			id := in.watched.delegation.TemplateID
 			t := out[id]
 			switch {

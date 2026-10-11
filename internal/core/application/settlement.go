@@ -306,7 +306,7 @@ func (s *service) finalize(ctx context.Context, st settlement) {
 	log.WithFields(log.Fields{"delegation": st.delegation.ID, "txid": txid}).Info("offchain tx finalized")
 	ren := domain.Renewal{DelegationID: st.delegation.ID, Outpoints: st.coins, CommitmentTxid: txid, Success: true}
 	if err := s.repo.RecordRenewal(ctx, ren); err != nil {
-		log.WithError(err).WithField("delegation", st.delegation.ID).Error("record renewal")
+		log.WithError(err).WithField("delegation", st.delegation.ID).Error("record attempt")
 	}
 	s.settle(ctx, st)
 }

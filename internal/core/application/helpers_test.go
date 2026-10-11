@@ -540,21 +540,27 @@ func (r *fakeRepo) Close() error {
 // fakeArk panics on any arkd method it does not implement.
 type fakeArk struct {
 	clientlib.Client
-	mu           sync.Mutex
-	info         *clientlib.Info
-	infoErr      error
-	registerErr  error
-	streamErr    error
-	registered   []string // proofs
-	confirmed    []string
-	nonces       tree.TreeNonces
-	sigs         tree.TreePartialSigs
-	forfeits     []string
-	submitTx     func(ark string, checkpoints []string) (string, string, []string, error)
-	finalized    []string // checkpoints
-	finalizes    int      // FinalizeTx calls
-	finalizeErrs []error  // returned by the next calls, in order
-	batch        *fakeBatch
+	mu               sync.Mutex
+	info             *clientlib.Info
+	infoErr          error
+	registerErr      error
+	streamErr        error
+	registered       []string // proofs
+	confirmed        []string
+	confirmErr       map[string]error
+	confirmDelay     time.Duration
+	confirming       int
+	maxConfirming    int
+	holdRegistration int
+	firstConfirm     chan struct{}
+	nonces           tree.TreeNonces
+	sigs             tree.TreePartialSigs
+	forfeits         []string
+	submitTx         func(ark string, checkpoints []string) (string, string, []string, error)
+	finalized        []string // checkpoints
+	finalizes        int      // FinalizeTx calls
+	finalizeErrs     []error  // returned by the next calls, in order
+	batch            *fakeBatch
 	// pending answers GetPendingTx for a proof signed for its coins
 	pending       []clientlib.AcceptedOffchainTx
 	pendingProofs int
@@ -616,6 +622,16 @@ func (a *fakeArk) GetInfo(context.Context) (*clientlib.Info, error) { return a.i
 func (a *fakeArk) RegisterIntent(_ context.Context, proof, _ string) (string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.holdRegistration > 0 && len(a.registered) == a.holdRegistration {
+		a.mu.Unlock()
+		select {
+		case <-a.firstConfirm:
+		case <-time.After(2 * time.Second):
+			a.mu.Lock()
+			return "", status.Error(codes.DeadlineExceeded, "context deadline exceeded")
+		}
+		a.mu.Lock()
+	}
 	if a.registerErr != nil {
 		return "", a.registerErr
 	}
@@ -623,13 +639,30 @@ func (a *fakeArk) RegisterIntent(_ context.Context, proof, _ string) (string, er
 	return "intent-" + string(rune('a'+len(a.registered)-1)), nil
 }
 func (a *fakeArk) ConfirmRegistration(_ context.Context, id string) error {
-	a.confirmed = append(a.confirmed, id)
-	if a.batch != nil && len(a.confirmed) == 1 {
-		a.mu.Lock()
-		proofs := slices.Clone(a.registered)
-		a.mu.Unlock()
-		a.batch.start(proofs)
+	a.mu.Lock()
+	a.confirming++
+	a.maxConfirming = max(a.maxConfirming, a.confirming)
+	a.mu.Unlock()
+	time.Sleep(a.confirmDelay)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.confirming--
+	if err := a.confirmErr[id]; err != nil {
+		return err
 	}
+	a.confirmed = append(a.confirmed, id)
+	if a.firstConfirm != nil && len(a.confirmed) == 1 {
+		close(a.firstConfirm)
+	}
+	if a.batch == nil || a.batch.started {
+		return nil
+	}
+	if a.batch.failConfirmationOnce {
+		a.batch.failConfirmationOnce = false
+		return nil
+	}
+	a.batch.started = true
+	a.batch.start(slices.Clone(a.registered))
 	return nil
 }
 
@@ -996,8 +1029,11 @@ const cosignerHex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b1
 
 func document(t testing.TB, file string) []byte {
 	t.Helper()
-	if file == ownedRenewal {
+	switch file {
+	case ownedRenewal:
 		return []byte(ownedRenewalDoc)
+	case pooledSpend:
+		return []byte(pooledSpendDoc)
 	}
 	doc, err := os.ReadFile(filepath.Join("..", "..", "..", "pkg", "template", "testdata", file))
 	if errors.Is(err, fs.ErrNotExist) {
@@ -1255,16 +1291,19 @@ func claimVars(t testing.TB, secrets *btcec.PublicKey) map[string]string {
 
 // fakeBatch is arkd running one batch that pays every registered intent's outputs with their packets.
 type fakeBatch struct {
-	t                  *testing.T
-	env                *testEnv
-	events             chan clientlib.BatchEventChannel
-	batch              testBatch
-	txid               string
-	finalized          sync.Once
-	closeAfterForfeits bool // the stream closes before the batch is reported finalized
-	hangAfterForfeits  bool // the batch is never reported finalized
-	failAfterForfeits  bool // arkd reports the batch failed
-	crashAtForfeits    bool // the forfeits never reach arkd and the stream closes
+	t                    *testing.T
+	env                  *testEnv
+	events               chan clientlib.BatchEventChannel
+	batch                testBatch
+	txid                 string
+	finalized            sync.Once
+	closeAfterForfeits   bool // the stream closes before the batch is reported finalized
+	hangAfterForfeits    bool // the batch is never reported finalized
+	failAfterForfeits    bool // arkd reports the batch failed
+	crashAtForfeits      bool // the forfeits never reach arkd and the stream closes
+	failConfirmationOnce bool
+	startedEvent         clientlib.BatchStartedEvent
+	started              bool
 }
 
 func (e *testEnv) playBatch(t *testing.T) *fakeBatch {
@@ -1275,9 +1314,47 @@ func (e *testEnv) playBatch(t *testing.T) *fakeBatch {
 		sum := sha256.Sum256([]byte("intent-" + string(c)))
 		hashes = append(hashes, hex.EncodeToString(sum[:]))
 	}
-	b.send(clientlib.BatchStartedEvent{Id: "b1", HashedIntentIds: hashes, BatchExpiry: int64(testExpiry.Value)})
+	b.startedEvent = clientlib.BatchStartedEvent{Id: "b1", HashedIntentIds: hashes, BatchExpiry: int64(testExpiry.Value)}
 	e.ark.batch = b
+	done := make(chan struct{})
+	t.Cleanup(func() { close(done) })
+	go b.rounds(done)
 	return b
+}
+
+func (b *fakeBatch) rounds(done <-chan struct{}) {
+	a := b.env.ark
+	state := func() (int, bool) {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return len(a.registered), b.started
+	}
+	for last := -1; ; {
+		select {
+		case <-done:
+			return
+		case <-time.After(20 * time.Millisecond):
+		}
+		n, started := state()
+		if started {
+			return
+		}
+		if n == 0 || n != last {
+			last = n
+			continue
+		}
+		b.send(b.startedEvent)
+		select {
+		case <-done:
+			return
+		case <-time.After(200 * time.Millisecond):
+		}
+		if _, started := state(); started {
+			return
+		}
+		b.send(clientlib.BatchFailedEvent{Id: "b1", Reason: "not enough intent confirmations received"})
+		last = -1
+	}
 }
 
 func (b *fakeBatch) send(event any) { b.events <- clientlib.BatchEventChannel{Event: event} }
@@ -1417,3 +1494,35 @@ const ownedRenewalDoc = `{
     "advertise": [{"template": "self", "outputs": ["renewed"]}]
   }
 }`
+
+const pooledSpend = "pooled_spend.json"
+
+// pooledSpendDoc pays <amount> on chain from two coins, the rest back.
+var pooledSpendDoc = strings.ReplaceAll(`{
+  "format": "delegateed-template/v1",
+  "type": "intent",
+  "variables": {"owner": "pubkey", "amount": "int"},
+  "inputs": [
+    {"name": "a", "contract": {"definition": {"artifact": "SPENDABLE"}, "arguments": {"owner": "<owner>"}}, "spend": {"function": "pay", "leaf": "pay"}},
+    {"name": "b", "contract": {"definition": {"artifact": "SPENDABLE"}, "arguments": {"owner": "<owner>"}}, "spend": {"function": "pay", "leaf": "pay"}}
+  ],
+  "outputs": [
+    {"name": "change", "index": 0, "value": {"from": ["a", "b"]}, "locking": {"from": "a"}},
+    {"name": "payment", "type": "onchain", "index": 2, "value": {"from": ["a", "b"], "amount": "<amount>"},
+      "locking": "5120f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"}
+  ],
+  "fees": {"from": "a", "max": 1000},
+  "packets": {"output_index": 1}
+}`, `{"artifact": "SPENDABLE"}`, `{
+  "contractName": "Spendable",
+  "constructorInputs": [{"name": "owner", "type": "pubkey"}],
+  "structs": [],
+  "functions": [
+    {"name": "exit", "leaves": [{"name": "exit", "asm": ["144", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<owner>", "OP_CHECKSIG"],
+      "witness": [{"name": "ownerSig", "type": "signature", "encoding": "schnorr-64"}]}]},
+    {"name": "pay", "arkade": {"inputs": [], "asm": ["OP_1"]},
+      "leaves": [{"name": "pay", "asm": ["<SERVER_KEY>", "OP_CHECKSIGVERIFY", "<EMULATOR_KEY:pay>", "OP_CHECKSIG"],
+      "witness": [{"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
+                  {"name": "emulatorSig", "type": "signature", "encoding": "schnorr-64", "injected": true}]}]}
+  ]
+}`)
