@@ -185,6 +185,23 @@ nav .count { min-width: 1.15rem; padding: 0 .35rem; border-radius: 99px; backgro
 .legend i.b { position: static; display: inline-block; margin: 0 .35rem 0 .2rem; vertical-align: middle; }
 .state { font-size: .82rem; color: var(--muted); }
 .state.in, .state.renewing { color: var(--window); font-weight: 600; } .state.late { color: var(--bad); font-weight: 600; }
+.life-info { font-size: .78rem; font-variant-numeric: tabular-nums; }
+.life-info summary { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: .35rem .85rem; padding: .15rem 1.25rem .15rem 0; cursor: pointer; list-style: none; border-radius: 4px; }
+.life-info summary::-webkit-details-marker { display: none; }
+.life-info summary::after { content: ""; position: absolute; right: .3rem; top: .6rem; width: .35rem; height: .35rem; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.life-info[open] summary::after { transform: rotate(225deg); top: .8rem; }
+.life-info summary:hover { background: var(--hover); }
+.life-status { padding: .1rem .45rem; border-radius: 4px; background: var(--track); color: var(--muted); font-weight: 500; }
+.life-status.in, .life-status.renewing { background: var(--window-a); color: var(--window); }
+.life-status.late { background: var(--bad-soft); color: var(--bad); }
+.life-batch { color: var(--accent); font-weight: 500; }
+.life-expiry.late { color: var(--bad); }
+.life-peers, .life-expiry, .life-pending { color: var(--muted); }
+.life-expiry { margin-left: auto; }
+.life-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .65rem 1.25rem; margin: .6rem 0 0; padding: .75rem; background: var(--hover); border-radius: var(--r); }
+.life-meta dt { color: var(--muted); font-size: .72rem; }
+.life-meta dd { margin: .1rem 0 0; overflow-wrap: anywhere; }
+.life-meta small { display: block; color: var(--muted); }
 
 /* every address on one time axis */
 .horizon { display: grid; grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr) minmax(0, 22rem); gap: .55rem 1.25rem; align-items: center; font-size: .84rem; }
@@ -456,12 +473,12 @@ function stateOf(d) {
     return { key: "bad", dot: "bad", skipped: true, text: d.unmanagedReason, why: "The scanner skips it: " + d.unmanagedReason + "." };
   if (d.renewing) return { key: "ok", dot: "renewing", text: "in a batch now", why: "A batch session holds its coins; the result shows up when it ends." };
   if (r && !r.success) return { key: "bad", dot: "bad", text: "failed " + ago(r.attemptedAt), why: r.error };
-  // overdue: its planned batch time passed and it is still here
-  const left = num(d.nextExpiry) - nowSecs(), at = num(d.nextBatchAt), overdue = at ? nowSecs() - at : 0;
+  // A planned batch time is a scheduling target, not a failure deadline.
+  const left = num(d.nextExpiry) - nowSecs(), at = num(d.nextBatchAt);
   if (num(d.nextExpiry) && left <= 0)
     return { key: "late", dot: "late", text: "expired " + ago(d.nextExpiry), why: "A VTXO expired without being renewed." };
-  if (overdue > 0)
-    return { key: "late", dot: "late", text: "overdue by " + span(overdue), why: "Past its deadline and not renewed: check that arkd rounds are running." };
+  if (at && at <= nowSecs())
+    return { key: "ok", dot: "ok", text: "waiting for batch" };
   if (!r) return { key: "ok", dot: "", text: "not " + done + " yet" };
   return { key: "ok", dot: "ok", text: done + " " + ago(r.attemptedAt) };
 }
@@ -635,7 +652,7 @@ function renderOverview() {
   const stats = `<div class="stats">
     <div class="stat"><span class="label">Under watch</span><span class="fig" title="${(total / 1e8).toFixed(8)} BTC">${total.toLocaleString()}<small>sats</small></span><span class="sub">${plural(vtxos, "VTXO")}</span></div>
     <button class="stat" data-go="delegations" data-filter="active"><span class="label">Active delegations</span><span class="fig">${active.length.toLocaleString()}</span><span class="sub">${kinds.map(([k, n]) => `${n.toLocaleString()} ${k}`).join(", ") || "none yet"}</span></button>
-    <button class="stat ${attention.length ? "alert" : ""}" data-go="delegations" data-filter="attention"><span class="label">Needs attention</span><span class="fig">${attention.length.toLocaleString()}</span><span class="sub">${attention.length ? `${failing.toLocaleString()} failing, ${(attention.length - failing).toLocaleString()} late` : "everything on time"}</span></button>
+    <button class="stat ${attention.length ? "alert" : ""}" data-go="delegations" data-filter="attention"><span class="label">Needs attention</span><span class="fig">${attention.length.toLocaleString()}</span><span class="sub">${attention.length ? `${failing.toLocaleString()} failing, ${(attention.length - failing).toLocaleString()} expired` : "no issues"}</span></button>
     <div class="stat"><span class="label">Served, last 24 h</span><span class="fig">${served.toLocaleString()}</span><span class="sub">${recent.length - served ? `${(recent.length - served).toLocaleString()} failed their last attempt` : "no failure"}</span></div>
     <button class="stat" data-go="templates"><span class="label">Templates</span><span class="fig">${enabled.toLocaleString()}<small>active</small></span><span class="sub">${(templates.length - enabled).toLocaleString()} disabled${broken ? `, ${broken.toLocaleString()} failing` : ""}</span></button>
   </div>`;
@@ -727,7 +744,7 @@ function horizonPanel(managed, now) {
     const text = left <= 0 ? "expired " + ago(d.nextExpiry) : st.key === "bad" ? "not renewing, " + span(left) + " left"
       : st.dot === "renewing" ? "in the batch now" : st.key === "late" ? st.text
       : joins === null ? (left <= win ? "renewable now, not planned yet" : "renewable " + ago(d.nextRenewalAt))
-      : `${left <= win ? "renewable now" : "renewable " + ago(d.nextRenewalAt)}, joins the batch ${joins ? ago(at) : "now"}${deadline - joins > 60 ? `, ${span(deadline - joins)} before its deadline` : ""}`;
+      : `${left <= win ? "renewable now" : "renewable " + ago(d.nextRenewalAt)}, ${joins ? "joins the batch " + ago(at) : "waiting for batch"}${deadline - joins > 60 ? `, ${span(deadline - joins)} before its deadline` : ""}`;
     const forced = at && forcing(Math.max(at, Math.floor(now)))?.forcedByOutpoint;
     return `<button data-go="${esc("id/" + d.delegation.id)}" title="${esc(d.delegation.address)}">${esc(label(d, 12))}</button>
       <div class="lane ${left <= 0 ? "late" : ""}" role="img" aria-label="${esc(text)}, expires ${ago(d.nextExpiry)}" title="${forced ? esc("batch forced by " + short(forced, 8)) : ""}">
@@ -778,7 +795,7 @@ function visibleRows() {
 function nextOf(d, st) {
   const k = kindOf(d.delegation), at = num(d.nextBatchAt), due = num(d.nextRenewalAt);
   if (st.key !== "ok" || st.dot === "renewing" || d.delegation.status !== "active") return st.why || st.text;
-  if (at) return (at <= nowSecs() ? "joins a batch now" : "joins a batch " + ago(at));
+  if (at) return (at <= nowSecs() ? "waiting for batch" : "joins a batch " + ago(at));
   if (due && k === KINDS.renewal) return (due <= nowSecs() ? "renewable now" : "renews " + ago(due));
   return st.text;
 }
@@ -798,7 +815,7 @@ function renderList() {
   $("shown").textContent = `${rows.length.toLocaleString()} shown, ${sats(rows.reduce((a, d) => a + num(d.totalAmount), 0))}`;
   if (!rows.length) {
     $("rows").innerHTML = `<li class="empty">${$("search").value.trim() ? "Nothing matches your search."
-      : filter === "attention" ? "Nothing needs attention: every active delegation runs on time."
+      : filter === "attention" ? "No active delegation needs attention."
       : delegations.length ? "No delegations here."
       : "No delegations yet. Wallets register them on the public port."}</li>`;
     return;
@@ -841,26 +858,52 @@ async function loadDetail() {
 }
 
 // batchAt is the planned batch time, 0 without one; renewing when a session holds the delegation
-function lifeBar(v, batchAt, renewing, company) {
+const openLifetimes = new Set();
+document.addEventListener("toggle", (e) => {
+  const key = e.target.dataset?.lifetime;
+  if (key && e.target.isConnected) e.target.open ? openLifetimes.add(key) : openLifetimes.delete(key);
+}, true);
+function lifeBar(v, batchAt, renewing, company = { here: 0, elsewhere: 0 }) {
   const now = nowSecs(), at = num(batchAt);
-  const joins = renewing ? "in the batch now" : !at ? "" : at <= now ? `overdue by ${span(now - at)}` : `joins the batch ${ago(at)}${company}`;
-  if (!num(v.expiresAt)) return `<div class="state ${renewing ? "renewing" : at && at <= now ? "late" : ""}">onchain, ${joins || `boarded at the next batch${num(v.renewableAt) ? " from " + ago(v.renewableAt) : ""}`}</div>`;
+  const joins = renewing ? "in the batch now" : !at ? "" : at <= now ? "waiting for batch" : `joins the batch ${ago(at)}`;
   const born = num(v.createdAt), dies = num(v.expiresAt), windowSecs = dies - num(v.renewableAt), reserve = num(status?.renewalReserve);
   const life = Math.max(dies - born, 1), pct = (x) => Math.min(100, Math.max(0, (x / life) * 100)), left = dies - now;
   const deadline = Math.max(num(v.renewableAt), dies - reserve);
   const [cls, text] = left <= 0 ? ["late", `expired ${ago(dies)}`]
     : renewing ? ["renewing", joins]
-    : at && at <= now ? ["late", joins]
     : num(v.renewableAt) >= dies ? ["late", "cannot be renewed before it expires"]
     : left <= windowSecs ? ["in", `renewable since ${span(now - num(v.renewableAt))}, ${joins || "not planned yet: waiting for a locktime or confirmations"}`]
     : ["", `renewable ${ago(v.renewableAt)}, ${joins || "not planned yet"}`];
-  return `<div class="life" role="img" aria-label="${esc(text)}, expires ${ago(dies)}">
+  const onchain = !dies, due = num(v.renewableAt), waiting = at && at <= now && !renewing;
+  const label = !onchain && left <= 0 ? "Expired" : renewing ? "In batch"
+    : onchain ? "Onchain" : due >= dies ? "Cannot renew" : now >= due ? "Renewable" : "Waiting";
+  const tone = onchain ? (renewing ? "renewing" : "") : cls;
+  const batch = renewing ? "" : at ? (waiting ? "Waiting for batch" : `Batch ${ago(at)}`) : "Batch unplanned";
+  const peers = company.here + company.elsewhere;
+  const fact = (name, value, date) => `<div><dt>${name}</dt><dd>${esc(value)}${date ? `<small>${esc(dateOf(date))}</small>` : ""}</dd></div>`;
+  const eligibility = due ? (due <= now ? `For ${span(now - due)}` : ago(due)) : "Not available";
+  return `${onchain ? "" : `<div class="life" role="img" aria-label="${esc(text)}, expires ${ago(dies)}">
       <div class="elapsed" style="width:${pct(now - born)}%"></div>
       <div class="window" style="width:${pct(windowSecs)}%"></div>
       <div class="reserve" style="width:${pct(dies - deadline)}%"></div>
       <div class="now" style="left:${pct(now - born)}%"></div>
       ${at && !renewing ? `<i class="batch" style="left:${pct(Math.max(at, now) - born)}%"></i>` : ""}
-    </div><div class="state ${cls}">${text}, expires ${ago(dies)}${v.preconfirmed ? ", not in a batch yet" : ""}</div>`;
+    </div>`}<details class="life-info" data-lifetime="${esc(v.outpoint)}"${openLifetimes.has(v.outpoint) ? " open" : ""}>
+      <summary title="Expand timing and batch details">
+        <span class="life-status ${tone}">${label}</span>
+        ${batch ? `<span class="${at && !waiting ? "life-batch" : "life-pending"}">${batch}</span>` : ""}
+        ${at && peers ? `<span class="life-peers">+${plural(peers, "other")}${company.elsewhere === null ? " here" : ""}</span>` : ""}
+        ${v.preconfirmed ? `<span class="life-pending">Preconfirmed</span>` : ""}
+        ${!onchain ? `<span class="life-expiry ${left <= 0 ? "late" : ""}">${left <= 0 ? "Expired" : "Expires"} ${ago(dies)}</span>` : ""}
+      </summary>
+      <dl class="life-meta">
+        ${fact(onchain ? "Boarding eligible" : "Renewable", !onchain && due >= dies ? "Not before expiry" : eligibility, due)}
+        ${fact("Batch", renewing ? "In progress" : at ? (waiting ? `Waiting · target was ${ago(at)}` : ago(at)) : "Unplanned — waiting for a locktime or confirmations", at)}
+        ${at ? fact("Other VTXOs in this batch", `${company.here} in this delegation · ${company.elsewhere === null ? "unknown" : company.elsewhere} elsewhere`) : ""}
+        ${!onchain ? fact("Expiry", ago(dies), dies) : ""}
+        ${v.preconfirmed ? fact("Confirmation", "Not in a batch yet") : ""}
+      </dl>
+    </details>`;
 }
 
 function renderDetail() {
@@ -876,12 +919,12 @@ function renderDetail() {
   const company = (v) => {
     const at = num(batchAt[v.outpoint]), here = vtxos.filter((x) => num(batchAt[x.outpoint]) === at).length - 1;
     const b = (status?.batches || []).find((x) => num(x.at) === Math.max(at, Math.floor(nowSecs())));
-    const elsewhere = b ? num(b.vtxoCount) - here - 1 : 0;
-    return !at || (!here && !elsewhere) ? "" : ` with ${here ? `${here} other${here > 1 ? "s" : ""} here` : ""}${here && elsewhere ? " and " : ""}${elsewhere ? `${elsewhere} elsewhere` : ""}`;
+    const elsewhere = b ? Math.max(0, num(b.vtxoCount) - here - 1) : null;
+    return { here: at ? here : 0, elsewhere };
   };
   $("detail").innerHTML = `
     <div class="title">
-      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : st?.dot === "renewing" ? "renewing" : "ok"}">${!active ? (d.status === "cancelled" ? "stopped by an operator" : d.status === "done" ? done : esc(d.status)) : st?.skipped ? esc(st.text) : st?.key === "bad" ? (spend ? "failing" : "not renewing") : st?.key === "late" ? "overdue" : st?.dot === "renewing" ? "in a batch now" : kind.doing}</span></h2>
+      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : st?.dot === "renewing" ? "renewing" : "ok"}">${!active ? (d.status === "cancelled" ? "stopped by an operator" : d.status === "done" ? done : esc(d.status)) : st?.skipped ? esc(st.text) : st?.key === "bad" ? (spend ? "failing" : "not renewing") : st?.key === "late" ? "expired" : st?.dot === "renewing" ? "in a batch now" : kind.doing}</span></h2>
         ${d.address ? `<div class="hash">${esc(d.address)}</div>` : ""}</div>
       <div class="actions">${d.address ? `<button data-copy="${esc(d.address)}">Copy address</button>` : ""}
         ${explorer() && /^t?ark1/.test(d.address) ? `<button data-open="${esc(explorer() + "/address/" + d.address)}">View in explorer</button>` : ""}
