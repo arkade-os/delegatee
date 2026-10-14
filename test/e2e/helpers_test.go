@@ -26,6 +26,7 @@ import (
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
+	"github.com/arkade-os/arkd/pkg/ark-lib/txutils"
 	"github.com/arkade-os/arkd/pkg/client-lib/explorer"
 	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
 	offchaintx "github.com/arkade-os/arkd/pkg/client-lib/offchain-tx"
@@ -80,8 +81,8 @@ func baseConfig(t *testing.T) *config.Config {
 		PollInterval: 2 * time.Second, OnchainPollInterval: time.Second, RenewalTimeout: 2 * time.Minute,
 		// above the 1024-second renewal window: a coin's deadline is then its due, and it renews at the next scan
 		RenewalReserve: 20 * time.Minute, BoardingMaxWait: 10 * time.Minute,
-		MaxDelegations: 50_000,
-		MaxTemplates:   1000, MaxArtifacts: 1000, MaxDocumentBytes: 65536, TemplateMaxFailures: 10,
+		MaxDelegations: 50_000, MaxStreamChildren: 10_000,
+		MaxTemplates: 1000, MaxArtifacts: 1000, MaxDocumentBytes: 65536, TemplateMaxFailures: 10,
 		DefaultTemplates: true,
 	}
 }
@@ -514,6 +515,7 @@ func counterPrograms(t *testing.T, d delegatee) map[string]string {
 type swap struct {
 	variables      map[string]string
 	receiverScript []byte
+	preimage       []byte
 }
 
 func newSwap(t *testing.T, d delegatee) swap {
@@ -543,6 +545,7 @@ func newSwap(t *testing.T, d delegatee) swap {
 			"ciphertext":                               hex.EncodeToString(ciphertext),
 		},
 		receiverScript: append([]byte{0x51, 0x20}, program...),
+		preimage:       preimage,
 	}
 }
 
@@ -858,3 +861,72 @@ const (
 	// releaseRecipient is the script onchain_release.json pays.
 	releaseRecipient = "5120f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"
 )
+
+// streamActive waits for the stream delegation of templateID, resuming it when an earlier run left it cancelled.
+func streamActive(t *testing.T, d delegatee, templateID string) {
+	t.Helper()
+	stream := func(x *delegateev1.Delegation) bool { return x.TemplateId == templateID && x.Address == "" }
+	require.Eventually(t, func() bool {
+		cancelled, err := d.admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{Status: "cancelled", PageSize: 1000})
+		if err != nil {
+			return false
+		}
+		for _, r := range cancelled.GetDelegations() {
+			if stream(r.Delegation) {
+				_, _ = d.admin.ResumeDelegation(t.Context(), &delegateev1.ResumeDelegationRequest{Id: r.Delegation.Id})
+			}
+		}
+		all, err := listDelegations(t.Context(), d)
+		return err == nil && slices.ContainsFunc(all, func(r *delegateev1.DelegationSummary) bool {
+			return stream(r.Delegation) && r.Delegation.Status == "active"
+		})
+	}, 30*time.Second, time.Second, "the default stream delegation is active")
+}
+
+// swapOutput is the ScriptV2 address of swap, its script and its BIP-371 tree, derived as a funder does.
+func swapOutput(t *testing.T, d delegatee, swap swap) (string, []byte, []byte) {
+	t.Helper()
+	docs := artifacts(t)
+	resolve := func(_ context.Context, id string) ([]byte, error) { return docs[id], nil }
+	vhtlc, err := jsontemplate.Parse(t.Context(), fixture(t, "vhtlc_claim.json"), resolve)
+	require.NoError(t, err)
+	vars := map[string][]byte{}
+	for n, v := range swap.variables {
+		vars[n], err = hex.DecodeString(v)
+		require.NoError(t, err)
+	}
+	keys := fixtureKeys(t, d)
+	inst, err := vhtlc.Instantiate(t.Context(), jsontemplate.Context{
+		Keys: keys, Variables: vars, Decrypt: func([]byte) ([]byte, error) { return swap.preimage, nil },
+	})
+	require.NoError(t, err)
+	tree, err := txutils.TapTree(inst.Tapscripts(0)).Encode()
+	require.NoError(t, err)
+	tapKey, err := schnorr.ParsePubKey(inst.PkScript(0)[2:])
+	require.NoError(t, err)
+	addr, err := (&arklib.Address{HRP: arklib.BitcoinRegTest.Addr, Signer: keys.Server, VtxoTapKey: tapKey}).EncodeV0()
+	require.NoError(t, err)
+	return addr, inst.PkScript(0), tree
+}
+
+// claimPacket is covclaimd's ClaimPacket body: ciphertext, arkade script, key.
+func claimPacket(ciphertext, script, key []byte) []byte {
+	var b []byte
+	for i, v := range [][]byte{ciphertext, script, key} {
+		b = append(b, byte(i+1))
+		b = binary.BigEndian.AppendUint16(b, uint16(len(v)))
+		b = append(b, v...)
+	}
+	return b
+}
+
+func enforcePayTo(t *testing.T, program []byte) []byte {
+	t.Helper()
+	s, err := txscript.NewScriptBuilder().
+		AddOp(arkade.OP_PUSHCURRENTINPUTINDEX).AddOp(arkade.OP_DUP).AddOp(arkade.OP_INSPECTOUTPUTSCRIPTPUBKEY).
+		AddOp(arkade.OP_1).AddOp(arkade.OP_EQUALVERIFY).AddData(program).AddOp(arkade.OP_EQUALVERIFY).
+		AddOp(arkade.OP_INSPECTOUTPUTVALUE).AddOp(arkade.OP_PUSHCURRENTINPUTINDEX).AddOp(arkade.OP_INSPECTINPUTVALUE).
+		AddOp(arkade.OP_GREATERTHANOREQUAL).Script()
+	require.NoError(t, err)
+	return s
+}

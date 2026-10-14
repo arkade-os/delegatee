@@ -67,6 +67,11 @@ func TestRegisterSpendRefusals(t *testing.T) {
 			r.expiresAt = time.Now().Add(25 * time.Hour)
 			r.sign(t, e.userKey)
 		}},
+		"trigger template": {edit: func(t *testing.T, e *testEnv, r *spendRequest) {
+			e.svc.encryptionKeys = []*btcec.PrivateKey{stranger}
+			r.template = e.trust(t, e.fixture(t, "noninteractiveclaim.json"))
+			r.sign(t, e.userKey)
+		}, err: errStreamOnly},
 		"outpoint bound by another spend": {edit: func(t *testing.T, e *testEnv, r *spendRequest) {
 			other := *r
 			other.variables = map[string]string{"owner": r.variables["owner"], "amount": hex.EncodeToString(scriptNum(12_000))}

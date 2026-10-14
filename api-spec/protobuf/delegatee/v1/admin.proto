@@ -41,6 +41,11 @@ service AdminService {
     option (meshapi.gateway.http) = { post: "/v1/admin/delegation/{id}/resume" body: "*" };
   }
 
+  // RegisterStreamDelegation spawns a watch of the template for every streamed transaction its trigger matches.
+  rpc RegisterStreamDelegation(RegisterStreamDelegationRequest) returns (RegisterStreamDelegationResponse) {
+    option (meshapi.gateway.http) = { post: "/v1/admin/stream-delegation" body: "*" };
+  }
+
   rpc ListAllTemplates(ListAllTemplatesRequest) returns (ListAllTemplatesResponse) {
     option (meshapi.gateway.http) = { get: "/v1/admin/template" };
   }
@@ -144,6 +149,13 @@ message CancelDelegationResponse {}
 
 message ResumeDelegationRequest { int64 id = 1; }
 message ResumeDelegationResponse {}
+
+message RegisterStreamDelegationRequest {
+  string template_id = 1;
+  // the variables the trigger does not bind, hex
+  map<string, string> variables = 2;
+}
+message RegisterStreamDelegationResponse { Delegation delegation = 1; }
 
 // TemplateSummary is a template with what only the operator sees.
 message TemplateSummary {

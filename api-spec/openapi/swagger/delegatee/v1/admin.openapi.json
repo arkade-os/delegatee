@@ -358,6 +358,47 @@
         }
       }
     },
+    "/v1/admin/stream-delegation": {
+      "post": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "RegisterStreamDelegation spawns a watch of the template for every streamed transaction its trigger matches.",
+        "operationId": "AdminService_RegisterStreamDelegation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterStreamDelegationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterStreamDelegationResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/template": {
       "get": {
         "tags": [
@@ -635,7 +676,7 @@
           },
           "parentId": {
             "type": "integer",
-            "description": "parent_id is the delegation whose settled transaction advertised this one, 0 for a watch.",
+            "description": "parent_id is the delegation whose settled transaction advertised this one, or the stream delegation that spawned it; 0 otherwise.",
             "format": "int64"
           },
           "slots": {
@@ -948,6 +989,31 @@
           "vtxoCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "RegisterStreamDelegationRequest": {
+        "title": "RegisterStreamDelegationRequest",
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string"
+          },
+          "variables": {
+            "type": "object",
+            "description": "the variables the trigger does not bind, hex",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RegisterStreamDelegationResponse": {
+        "title": "RegisterStreamDelegationResponse",
+        "type": "object",
+        "properties": {
+          "delegation": {
+            "$ref": "#/components/schemas/Delegation"
           }
         }
       },

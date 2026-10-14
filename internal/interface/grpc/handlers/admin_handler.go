@@ -160,6 +160,20 @@ func (h *adminHandler) ResumeDelegation(
 	return &delegateev1.ResumeDelegationResponse{}, nil
 }
 
+func (h *adminHandler) RegisterStreamDelegation(
+	ctx context.Context, req *delegateev1.RegisterStreamDelegationRequest,
+) (*delegateev1.RegisterStreamDelegationResponse, error) {
+	if req.GetTemplateId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing template_id")
+	}
+	d, err := h.svc.RegisterStreamDelegation(ctx, req.GetTemplateId(), req.GetVariables())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	audit(ctx, "register stream delegation", req.GetTemplateId(), "", idString(d.ID))
+	return &delegateev1.RegisterStreamDelegationResponse{Delegation: toDelegation(d)}, nil
+}
+
 func (h *adminHandler) ListAllTemplates(ctx context.Context, req *delegateev1.ListAllTemplatesRequest) (*delegateev1.ListAllTemplatesResponse, error) {
 	ts, err := h.svc.ListTemplates(ctx, req.GetStatus())
 	if err != nil {

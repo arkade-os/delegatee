@@ -19,6 +19,7 @@ import (
 	"github.com/arkade-os/arkd/pkg/ark-lib/extension"
 	"github.com/arkade-os/arkd/pkg/ark-lib/intent"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
+	"github.com/arkade-os/arkd/pkg/ark-lib/txutils"
 	"github.com/arkade-os/delegatee/pkg/template/packets"
 	"github.com/arkade-os/emulator/pkg/arkade"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -32,7 +33,7 @@ func TestFixtures(t *testing.T) {
 	var ids map[string]string
 	require.NoError(t, json.Unmarshal(fixture(t, "ids.json"), &ids))
 	resolve := artifacts(t)
-	for _, name := range []string{"renewal.json", "boarding.json", "counter.json", "vhtlc_claim.json", "vhtlc_refund.json", "onchain_release.json", "counter_seed.json", "minimal.json"} {
+	for _, name := range []string{"renewal.json", "boarding.json", "counter.json", "vhtlc_claim.json", "vhtlc_refund.json", "noninteractiveclaim.json", "onchain_release.json", "counter_seed.json", "minimal.json"} {
 		t.Run(name, func(t *testing.T) {
 			tmpl, err := Parse(t.Context(), fixture(t, name), resolve)
 			require.NoError(t, err)
@@ -220,12 +221,7 @@ func TestCounterIncrements(t *testing.T) {
 }
 
 func TestVHTLCAddress(t *testing.T) {
-	var v struct {
-		Server, PkScript string
-		Tapscripts       []string
-		Vars             map[string]string
-	}
-	require.NoError(t, json.Unmarshal(fixture(t, "vhtlc_vector.json"), &v))
+	v := vhtlcVector(t)
 	// the address the ts-sdk derives for the same keys, delays and preimage hash
 	inst := instantiateVHTLC(t, v.Server, v.Vars)
 	require.Equal(t, v.Tapscripts, inst.Tapscripts(0))
@@ -253,11 +249,7 @@ func TestCounterCovenant(t *testing.T) {
 }
 
 func TestVHTLCClaimCovenant(t *testing.T) {
-	var v struct {
-		Server string
-		Vars   map[string]string
-	}
-	require.NoError(t, json.Unmarshal(fixture(t, "vhtlc_vector.json"), &v))
+	v := vhtlcVector(t)
 	htlc := sourceWith(t, 100_000)
 	lockTo(htlc, instantiateVHTLC(t, v.Server, v.Vars).PkScript(0))
 	inst := instantiateVHTLC(t, v.Server, v.Vars, htlc)
@@ -280,6 +272,90 @@ func TestVHTLCClaimCovenant(t *testing.T) {
 	require.NoError(t, claim(nil))
 	require.Error(t, claim(func(o *wire.TxOut) { o.PkScript = otherScript }), "another program")
 	require.Error(t, claim(func(o *wire.TxOut) { o.Value-- }), "one satoshi less")
+}
+
+func TestNonInteractiveClaimAddress(t *testing.T) {
+	v := vhtlcVector(t)
+	inst, err := instantiateNonInteractiveClaim(t, v, v.Tapscripts)
+	require.NoError(t, err)
+	require.Equal(t, v.PkScript, hex.EncodeToString(inst.PkScript(0)), "the ts-sdk ScriptV2 address")
+	require.Equal(t, v.Tapscripts, inst.Tapscripts(0))
+
+	// the pre-timelocked-refund tree: ScriptV2 without nonInteractiveRefundWithoutReceiver, its last leaf
+	legacy := v.Tapscripts[:8]
+	inst, err = instantiateNonInteractiveClaim(t, v, legacy)
+	require.NoError(t, err)
+	require.Equal(t, arkdScript(t, legacy), inst.PkScript(0), "the key arkd derives for the eight leaves")
+}
+
+func TestNonInteractiveClaimNeedsTheClaimLeaf(t *testing.T) {
+	v := vhtlcVector(t)
+	// nonInteractiveClaim is the seventh leaf of vhtlc_claim.json
+	without := append(slices.Clone(v.Tapscripts[:6]), v.Tapscripts[7:]...)
+	_, err := instantiateNonInteractiveClaim(t, v, without)
+	require.ErrorIs(t, err, ErrIneligible)
+
+	other := v
+	other.Preimage = strings.Repeat("08", 32)
+	_, err = instantiateNonInteractiveClaim(t, other, v.Tapscripts)
+	require.ErrorIs(t, err, ErrIneligible, "another preimage hashes to a leaf the tree lacks")
+}
+
+func TestNonInteractiveClaimCovenant(t *testing.T) {
+	v := vhtlcVector(t)
+	htlc := sourceWith(t, 100_000)
+	watch, err := instantiateNonInteractiveClaim(t, v, v.Tapscripts)
+	require.NoError(t, err)
+	lockTo(htlc, watch.PkScript(0))
+	inst, err := instantiateNonInteractiveClaim(t, v, v.Tapscripts, htlc)
+	require.NoError(t, err)
+	act, err := inst.Build(t.Context(), []*Source{htlc}, Fee{Dust: 330})
+	require.NoError(t, err)
+
+	claim := func(edit func(*wire.TxOut)) error {
+		tx := act.Tx.UnsignedTx.Copy()
+		if edit != nil {
+			edit(tx.TxOut[0])
+		}
+		ptx := *act.Tx
+		ptx.UnsignedTx = tx
+		f := prevouts{
+			outs: map[wire.OutPoint]*wire.TxOut{htlc.Outpoint: act.Tx.Inputs[0].WitnessUtxo},
+			txs:  map[wire.OutPoint]*wire.MsgTx{htlc.Outpoint: htlc.Tx},
+		}
+		return execute(t, &ptx, f, 0)
+	}
+	require.NoError(t, claim(nil))
+	require.Equal(t, "5120"+v.ReceiverProgram, hex.EncodeToString(act.Tx.UnsignedTx.TxOut[0].PkScript))
+	require.Error(t, claim(func(o *wire.TxOut) { o.PkScript = otherScript }), "another program")
+	require.Error(t, claim(func(o *wire.TxOut) { o.Value-- }), "less than the input")
+}
+
+func TestNonInteractiveClaimTrigger(t *testing.T) {
+	v := vhtlcVector(t)
+	enc, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	program, err := hex.DecodeString(v.ReceiverProgram)
+	require.NoError(t, err)
+	cov, err := assemble(nonInteractiveClaimCovenant, func(string) (value, error) { return value{"bytes32", program}, nil })
+	require.NoError(t, err)
+	tree, err := txutils.TapTree(v.Tapscripts).Encode()
+	require.NoError(t, err)
+	pkScript, err := hex.DecodeString(v.PkScript)
+	require.NoError(t, err)
+
+	ptx, _ := streamed(t, tlv(1, []byte{1, 2, 3}, 2, cov, 3, enc.PubKey().SerializeCompressed()))
+	ptx.UnsignedTx.TxOut[0].PkScript = pkScript
+	ptx.Outputs[0].TaprootTapTree = tree
+	got, err := parseFixture(t, "noninteractiveclaim.json").Trigger().Match(ptx, TriggerKeys{Encryption: []*btcec.PublicKey{enc.PubKey()}})
+	require.NoError(t, err)
+	require.Equal(t, []Binding{{Output: 0, Variables: map[string]string{
+		"ciphertext": "010203", "receiver_program": v.ReceiverProgram, "taptree": hex.EncodeToString(tree),
+	}}}, got)
+
+	ptx.UnsignedTx.TxOut[0].Value = 999
+	_, err = parseFixture(t, "noninteractiveclaim.json").Trigger().Match(ptx, TriggerKeys{Encryption: []*btcec.PublicKey{enc.PubKey()}})
+	require.ErrorIs(t, err, ErrNoMatch, "a coin below 1000 sats is not claimed")
 }
 
 func TestCounterSeedCovenant(t *testing.T) {
@@ -687,4 +763,43 @@ func (p prevouts) FetchVtxoPrevOutPkScript(op wire.OutPoint) []byte {
 		return tx.TxOut[op.Index].PkScript
 	}
 	return nil
+}
+
+type vhtlcVec struct {
+	Server, Preimage, ReceiverProgram, PkScript string
+	Tapscripts                                  []string
+	Vars                                        map[string]string
+}
+
+func vhtlcVector(t *testing.T) vhtlcVec {
+	t.Helper()
+	var v vhtlcVec
+	require.NoError(t, json.Unmarshal(fixture(t, "vhtlc_vector.json"), &v))
+	return v
+}
+
+// instantiateNonInteractiveClaim builds noninteractiveclaim.json for a funding output whose tree is leaves; the ciphertext is the preimage itself.
+func instantiateNonInteractiveClaim(t *testing.T, v vhtlcVec, leaves []string, sources ...*Source) (*Instance, error) {
+	t.Helper()
+	tree, err := txutils.TapTree(leaves).Encode()
+	require.NoError(t, err)
+	unhex := func(s string) []byte {
+		b, err := hex.DecodeString(s)
+		require.NoError(t, err)
+		return b
+	}
+	server, err := btcec.ParsePubKey(unhex(v.Server))
+	require.NoError(t, err)
+	return parseFixture(t, "noninteractiveclaim.json").Instantiate(t.Context(), Context{
+		Keys:      Keys{Server: server, Emulator: testKey(t, 3)},
+		Variables: map[string][]byte{"taptree": tree, "receiver_program": unhex(v.ReceiverProgram), "ciphertext": unhex(v.Preimage)},
+		Decrypt:   func(ciphertext []byte) ([]byte, error) { return ciphertext, nil },
+		Sources:   sources,
+	})
+}
+
+// nonInteractiveClaimCovenant is covclaimd's EnforcePayTo with the program as a placeholder.
+var nonInteractiveClaimCovenant = []string{
+	"OP_PUSHCURRENTINPUTINDEX", "OP_DUP", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "1", "OP_EQUALVERIFY", "<p>",
+	"OP_EQUALVERIFY", "OP_INSPECTOUTPUTVALUE", "OP_PUSHCURRENTINPUTINDEX", "OP_INSPECTINPUTVALUE", "OP_GREATERTHANOREQUAL",
 }

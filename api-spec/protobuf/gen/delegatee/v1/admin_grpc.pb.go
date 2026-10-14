@@ -19,17 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AdminService_ListDelegations_FullMethodName    = "/delegatee.v1.AdminService/ListDelegations"
-	AdminService_GetDelegationById_FullMethodName  = "/delegatee.v1.AdminService/GetDelegationById"
-	AdminService_GetStatus_FullMethodName          = "/delegatee.v1.AdminService/GetStatus"
-	AdminService_CancelDelegation_FullMethodName   = "/delegatee.v1.AdminService/CancelDelegation"
-	AdminService_ResumeDelegation_FullMethodName   = "/delegatee.v1.AdminService/ResumeDelegation"
-	AdminService_ListAllTemplates_FullMethodName   = "/delegatee.v1.AdminService/ListAllTemplates"
-	AdminService_SetTemplateStatus_FullMethodName  = "/delegatee.v1.AdminService/SetTemplateStatus"
-	AdminService_SetTemplateTrusted_FullMethodName = "/delegatee.v1.AdminService/SetTemplateTrusted"
-	AdminService_DeleteTemplate_FullMethodName     = "/delegatee.v1.AdminService/DeleteTemplate"
-	AdminService_DeleteArtifact_FullMethodName     = "/delegatee.v1.AdminService/DeleteArtifact"
-	AdminService_ListArtifacts_FullMethodName      = "/delegatee.v1.AdminService/ListArtifacts"
+	AdminService_ListDelegations_FullMethodName          = "/delegatee.v1.AdminService/ListDelegations"
+	AdminService_GetDelegationById_FullMethodName        = "/delegatee.v1.AdminService/GetDelegationById"
+	AdminService_GetStatus_FullMethodName                = "/delegatee.v1.AdminService/GetStatus"
+	AdminService_CancelDelegation_FullMethodName         = "/delegatee.v1.AdminService/CancelDelegation"
+	AdminService_ResumeDelegation_FullMethodName         = "/delegatee.v1.AdminService/ResumeDelegation"
+	AdminService_RegisterStreamDelegation_FullMethodName = "/delegatee.v1.AdminService/RegisterStreamDelegation"
+	AdminService_ListAllTemplates_FullMethodName         = "/delegatee.v1.AdminService/ListAllTemplates"
+	AdminService_SetTemplateStatus_FullMethodName        = "/delegatee.v1.AdminService/SetTemplateStatus"
+	AdminService_SetTemplateTrusted_FullMethodName       = "/delegatee.v1.AdminService/SetTemplateTrusted"
+	AdminService_DeleteTemplate_FullMethodName           = "/delegatee.v1.AdminService/DeleteTemplate"
+	AdminService_DeleteArtifact_FullMethodName           = "/delegatee.v1.AdminService/DeleteArtifact"
+	AdminService_ListArtifacts_FullMethodName            = "/delegatee.v1.AdminService/ListArtifacts"
 )
 
 // AdminServiceClient is the client API for AdminService service.
@@ -47,6 +48,8 @@ type AdminServiceClient interface {
 	CancelDelegation(ctx context.Context, in *CancelDelegationRequest, opts ...grpc.CallOption) (*CancelDelegationResponse, error)
 	// ResumeDelegation sets a cancelled delegation active again.
 	ResumeDelegation(ctx context.Context, in *ResumeDelegationRequest, opts ...grpc.CallOption) (*ResumeDelegationResponse, error)
+	// RegisterStreamDelegation spawns a watch of the template for every streamed transaction its trigger matches.
+	RegisterStreamDelegation(ctx context.Context, in *RegisterStreamDelegationRequest, opts ...grpc.CallOption) (*RegisterStreamDelegationResponse, error)
 	ListAllTemplates(ctx context.Context, in *ListAllTemplatesRequest, opts ...grpc.CallOption) (*ListAllTemplatesResponse, error)
 	SetTemplateStatus(ctx context.Context, in *SetTemplateStatusRequest, opts ...grpc.CallOption) (*SetTemplateStatusResponse, error)
 	// SetTemplateTrusted marks a template the operator vouches for.
@@ -109,6 +112,16 @@ func (c *adminServiceClient) ResumeDelegation(ctx context.Context, in *ResumeDel
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ResumeDelegationResponse)
 	err := c.cc.Invoke(ctx, AdminService_ResumeDelegation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) RegisterStreamDelegation(ctx context.Context, in *RegisterStreamDelegationRequest, opts ...grpc.CallOption) (*RegisterStreamDelegationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegisterStreamDelegationResponse)
+	err := c.cc.Invoke(ctx, AdminService_RegisterStreamDelegation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -190,6 +203,8 @@ type AdminServiceServer interface {
 	CancelDelegation(context.Context, *CancelDelegationRequest) (*CancelDelegationResponse, error)
 	// ResumeDelegation sets a cancelled delegation active again.
 	ResumeDelegation(context.Context, *ResumeDelegationRequest) (*ResumeDelegationResponse, error)
+	// RegisterStreamDelegation spawns a watch of the template for every streamed transaction its trigger matches.
+	RegisterStreamDelegation(context.Context, *RegisterStreamDelegationRequest) (*RegisterStreamDelegationResponse, error)
 	ListAllTemplates(context.Context, *ListAllTemplatesRequest) (*ListAllTemplatesResponse, error)
 	SetTemplateStatus(context.Context, *SetTemplateStatusRequest) (*SetTemplateStatusResponse, error)
 	// SetTemplateTrusted marks a template the operator vouches for.
@@ -221,6 +236,9 @@ func (UnimplementedAdminServiceServer) CancelDelegation(context.Context, *Cancel
 }
 func (UnimplementedAdminServiceServer) ResumeDelegation(context.Context, *ResumeDelegationRequest) (*ResumeDelegationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResumeDelegation not implemented")
+}
+func (UnimplementedAdminServiceServer) RegisterStreamDelegation(context.Context, *RegisterStreamDelegationRequest) (*RegisterStreamDelegationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterStreamDelegation not implemented")
 }
 func (UnimplementedAdminServiceServer) ListAllTemplates(context.Context, *ListAllTemplatesRequest) (*ListAllTemplatesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListAllTemplates not implemented")
@@ -346,6 +364,24 @@ func _AdminService_ResumeDelegation_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AdminServiceServer).ResumeDelegation(ctx, req.(*ResumeDelegationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_RegisterStreamDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterStreamDelegationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).RegisterStreamDelegation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_RegisterStreamDelegation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).RegisterStreamDelegation(ctx, req.(*RegisterStreamDelegationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -484,6 +520,10 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResumeDelegation",
 			Handler:    _AdminService_ResumeDelegation_Handler,
+		},
+		{
+			MethodName: "RegisterStreamDelegation",
+			Handler:    _AdminService_RegisterStreamDelegation_Handler,
 		},
 		{
 			MethodName: "ListAllTemplates",

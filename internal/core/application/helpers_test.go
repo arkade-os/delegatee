@@ -92,7 +92,9 @@ func (r *fakeRepo) Create(_ context.Context, d domain.Delegation, max int) (*dom
 		if existing.Fingerprint == d.Fingerprint {
 			return &existing, nil
 		}
-		active++
+		if existing.IsSpawned() == d.IsSpawned() {
+			active++
+		}
 	}
 	if max > 0 && active >= max {
 		return nil, domain.ErrCapReached
@@ -459,6 +461,20 @@ func (r *fakeRepo) PruneRenewals(_ context.Context, before time.Time) error {
 	return nil
 }
 
+func (r *fakeRepo) PruneSpawned(_ context.Context, before time.Time) (int64, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	parents := map[int64]bool{}
+	for _, d := range r.delegations {
+		parents[d.ParentID] = true
+	}
+	n := len(r.delegations)
+	r.delegations = slices.DeleteFunc(r.delegations, func(d domain.Delegation) bool {
+		return d.Status == domain.DelegationStatusExpired && d.IsSpawned() && d.UpdatedAt.Before(before) && !parents[d.ID]
+	})
+	return int64(n - len(r.delegations)), nil
+}
+
 func (r *fakeRepo) SaveSettlement(_ context.Context, s domain.Settlement) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -564,6 +580,8 @@ type fakeArk struct {
 	// pending answers GetPendingTx for a proof signed for its coins
 	pending       []clientlib.AcceptedOffchainTx
 	pendingProofs int
+	txs           chan clientlib.TransactionEvent // GetTransactionsStream; nil refuses it
+	txStreams     int
 }
 
 func (a *fakeArk) GetPendingTx(_ context.Context, proof, message string) ([]clientlib.AcceptedOffchainTx, error) {
@@ -677,6 +695,30 @@ func (a *fakeArk) GetEventStream(context.Context, []string) (<-chan clientlib.Ba
 	ch := make(chan clientlib.BatchEventChannel)
 	close(ch)
 	return ch, func() {}, nil
+}
+
+func (a *fakeArk) GetTransactionsStream(context.Context) (<-chan clientlib.TransactionEvent, func(), error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.txs == nil {
+		return nil, nil, errors.New("no transaction stream")
+	}
+	a.txStreams++
+	return a.txs, func() {}, nil
+}
+
+func (a *fakeArk) setTxs(txs chan clientlib.TransactionEvent) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.txs = txs
+}
+
+func (a *fakeArk) opened(n int) func() bool {
+	return func() bool {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return a.txStreams == n
+	}
 }
 
 func (a *fakeArk) SubmitTx(_ context.Context, ark string, checkpoints []string) (string, string, []string, error) {
@@ -1002,7 +1044,7 @@ func (e *testEnv) newService(t testing.TB) *service {
 	key, _ := btcec.PrivKeyFromBytes(scalar[:])
 	svc, err := NewServiceWithKeys(t.Context(), e.repo, e.ark, e.indexer, e.emulator, e.explorer, 30*time.Second, 50, nil,
 		[]*btcec.PrivateKey{key}, time.Hour, time.Minute, 2*time.Hour, 10*time.Minute,
-		Limits{MaxDelegations: 100, MaxTemplates: 100, MaxArtifacts: 100, MaxDocumentBytes: 16 << 10, TemplateMaxFailures: 3})
+		Limits{MaxDelegations: 100, MaxStreamChildren: 100, MaxTemplates: 100, MaxArtifacts: 100, MaxDocumentBytes: 16 << 10, TemplateMaxFailures: 3})
 	require.NoError(t, err)
 	return svc.(*service)
 }

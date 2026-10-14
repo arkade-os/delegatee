@@ -432,6 +432,10 @@ func (r *Repository) PruneRenewals(ctx context.Context, before time.Time) error 
 	return r.querier.DeleteRenewalsBefore(ctx, before)
 }
 
+func (r *Repository) PruneSpawned(ctx context.Context, before time.Time) (int64, error) {
+	return r.querier.DeleteSpawnedBefore(ctx, before)
+}
+
 func (r *Repository) ListRenewals(ctx context.Context, delegationID int64, limit int) ([]domain.Renewal, error) {
 	rows, err := r.querier.SelectRenewals(ctx, queries.SelectRenewalsParams{
 		DelegationID: delegationID, MaxRows: int32(limit),

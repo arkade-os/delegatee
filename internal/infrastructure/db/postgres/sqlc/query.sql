@@ -1,10 +1,15 @@
 -- name: InsertDelegation :one
--- no row: max_active (0 = uncapped) active delegations exist and none has the fingerprint
+-- no row: max_active (0 = uncapped) active delegations of its kind exist and none has the fingerprint;
+-- spawned watches (a parent and an address) and the other delegations are counted apart
 WITH inserted AS (
     INSERT INTO delegations (fingerprint, address, template_id, variables, parent_id, expires_at, delegate_pubkey, slots)
     SELECT @fingerprint::text, @address::text, @template_id::text, @variables::jsonb, sqlc.narg(parent_id)::bigint,
         sqlc.narg(expires_at)::timestamptz, @delegate_pubkey::text, @slots::jsonb
-    WHERE @max_active::int = 0 OR (SELECT COUNT(*) FROM delegations WHERE status = 'active') < @max_active::int
+    WHERE @max_active::int = 0 OR (
+        SELECT COUNT(*) FROM delegations
+        WHERE status = 'active'
+            AND (parent_id IS NOT NULL AND address <> '') = (sqlc.narg(parent_id)::bigint IS NOT NULL AND @address::text <> '')
+    ) < @max_active::int
     -- only active rows are unique: a stopped instance registered again is a new row
     ON CONFLICT (fingerprint) WHERE status = 'active' DO UPDATE SET fingerprint = EXCLUDED.fingerprint
     RETURNING *
@@ -76,6 +81,12 @@ DELETE FROM renewals r WHERE r.attempted_at < @before
     -- a failure is stored once: keep it while it is the delegation's latest state
     AND EXISTS (SELECT 1 FROM renewals newer
                 WHERE newer.delegation_id = r.delegation_id AND newer.attempted_at > r.attempted_at);
+
+-- name: DeleteSpawnedBefore :execrows
+-- a cancelled watch is kept: it still blocks its fingerprint
+DELETE FROM delegations d
+WHERE d.status = 'expired' AND d.parent_id IS NOT NULL AND d.address <> '' AND d.updated_at < @before
+    AND NOT EXISTS (SELECT 1 FROM delegations c WHERE c.parent_id = d.id);
 
 -- name: UpsertSettlement :exec
 INSERT INTO settlements (txid, spent_by, delegation_id, tx, outpoints, sources, coins, checkpoints, finals, landed)

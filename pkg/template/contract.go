@@ -2,10 +2,12 @@ package template
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
+	"github.com/arkade-os/arkd/pkg/ark-lib/txutils"
 	"github.com/arkade-os/emulator/pkg/arkade"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -17,13 +19,18 @@ import (
 type Keys struct{ Server, Emulator, Delegate *btcec.PublicKey }
 
 type contract struct {
-	tapscripts []string // hex leaves, function then leaf order
+	tapscripts []string // hex leaves; the given tree's order if any, else function then leaf order
 	pkScript   []byte
 	covenants  map[string][]byte                        // function name -> arkade script
 	proofs     map[[2]string]*psbt.TaprootTapLeafScript // {function, leaf} -> leaf with control block
 }
 
 func build(def *Definition, args map[string]value, keys Keys) (*contract, error) {
+	return buildTree(def, args, keys, nil)
+}
+
+// buildTree checks the declared leaves against taptree when it is given, and takes the tree's leaves and key.
+func buildTree(def *Definition, args map[string]value, keys Keys, taptree []byte) (*contract, error) {
 	field := func(name string) (value, error) {
 		v, ok := args[name]
 		if !ok {
@@ -131,14 +138,23 @@ func build(def *Definition, args map[string]value, keys Keys) (*contract, error)
 		return nil, fmt.Errorf("%w: no leaves", ErrInvalidTemplate)
 	}
 
+	var err error
+	if taptree != nil {
+		if leaves, names, c.tapscripts, err = fromTree(taptree, leaves, names); err != nil {
+			return nil, err
+		}
+	}
+
 	tree := txscript.AssembleTaprootScriptTree(leaves...)
 	root := tree.RootNode.TapHash()
 	internal := script.UnspendableKey()
-	var err error
 	if c.pkScript, err = script.P2TRScript(txscript.ComputeTaprootOutputKey(internal, root[:])); err != nil {
 		return nil, err
 	}
 	for i, l := range leaves {
+		if names[i] == ([2]string{}) {
+			continue
+		}
 		proof := tree.LeafMerkleProofs[tree.LeafProofIndex[l.TapHash()]]
 		control := proof.ToControlBlock(internal)
 		cb, err := control.ToBytes()
@@ -152,4 +168,63 @@ func build(def *Definition, args map[string]value, keys Keys) (*contract, error)
 		}
 	}
 	return c, nil
+}
+
+const maxTaptreeBytes = 8 << 10
+
+// decodeTaptree returns the leaves of a BIP-371 tree whose every leaf is a closure arkd accepts.
+func decodeTaptree(raw []byte) ([]string, error) {
+	if len(raw) > maxTaptreeBytes {
+		return nil, fmt.Errorf("%w: taptree of %d bytes exceeds %d", ErrIneligible, len(raw), maxTaptreeBytes)
+	}
+	scripts, err := txutils.DecodeTapTree(raw)
+	if err == nil && len(scripts) == 0 {
+		err = errors.New("no leaf")
+	}
+	if err == nil {
+		err = (&script.TapscriptsVtxoScript{}).Decode(scripts)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%w: taptree: %v", ErrIneligible, err)
+	}
+	return scripts, nil
+}
+
+func tapLeaves(scripts []string) []txscript.TapLeaf {
+	leaves := make([]txscript.TapLeaf, len(scripts))
+	for i, h := range scripts {
+		s, _ := hex.DecodeString(h) // DecodeTapTree hex-encodes
+		leaves[i] = txscript.NewBaseTapLeaf(s)
+	}
+	return leaves
+}
+
+func taptreeScript(raw []byte) ([]byte, error) {
+	scripts, err := decodeTaptree(raw)
+	if err != nil {
+		return nil, err
+	}
+	root := txscript.AssembleTaprootScriptTree(tapLeaves(scripts)...).RootNode.TapHash()
+	return script.P2TRScript(txscript.ComputeTaprootOutputKey(script.UnspendableKey(), root[:]))
+}
+
+// fromTree swaps the declared leaves for the tree's, which must hold each of them.
+func fromTree(raw []byte, declared []txscript.TapLeaf, names [][2]string) ([]txscript.TapLeaf, [][2]string, []string, error) {
+	scripts, err := decodeTaptree(raw)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	at := make(map[string]int, len(scripts))
+	for i, h := range scripts {
+		at[h] = i
+	}
+	treeNames := make([][2]string, len(scripts))
+	for i, l := range declared {
+		j, ok := at[hex.EncodeToString(l.Script)]
+		if !ok {
+			return nil, nil, nil, fmt.Errorf("%w: leaf %s/%s is not in the taptree", ErrIneligible, names[i][0], names[i][1])
+		}
+		treeNames[j] = names[i]
+	}
+	return tapLeaves(scripts), treeNames, scripts, nil
 }

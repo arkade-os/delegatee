@@ -415,6 +415,72 @@ func TestResume(t *testing.T) {
 	require.Equal(t, newer.ID, latest.ID)
 }
 
+func TestSpawnedWatches(t *testing.T) {
+	repo := testRepo(t)
+	ctx := t.Context()
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	tmpl, err := repo.CreateTemplate(ctx, domain.Template{ID: "spawned" + suffix, Document: []byte(`{}`)}, 0)
+	require.NoError(t, err)
+	stream, err := repo.Create(ctx, domain.Delegation{Fingerprint: "stream" + suffix, TemplateID: tmpl.ID, DelegatePubKey: "02bb"}, 0)
+	require.NoError(t, err)
+	watch := func(name string, parent int64) domain.Delegation {
+		return domain.Delegation{
+			Fingerprint: name + suffix, Address: "tark1" + name + suffix, TemplateID: tmpl.ID, ParentID: parent, DelegatePubKey: "02bb",
+		}
+	}
+	counts := func() (spawned, others int) {
+		active, err := repo.List(ctx, domain.DelegationStatusActive)
+		require.NoError(t, err)
+		for _, d := range active {
+			if d.IsSpawned() {
+				spawned++
+			} else {
+				others++
+			}
+		}
+		return spawned, others
+	}
+
+	// every cap below is reached when both kinds are counted together
+	spawned, _ := counts()
+	child, err := repo.Create(ctx, watch("child", stream.ID), spawned+1)
+	require.NoError(t, err)
+	_, err = repo.Create(ctx, watch("full", stream.ID), spawned+1)
+	require.ErrorIs(t, err, domain.ErrCapReached)
+	_, others := counts()
+	public, err := repo.Create(ctx, watch("public", 0), others+1)
+	require.NoError(t, err)
+	_, err = repo.Create(ctx, watch("other", 0), others+1)
+	require.ErrorIs(t, err, domain.ErrCapReached)
+
+	cancelled, err := repo.Create(ctx, watch("cancelled", stream.ID), 0)
+	require.NoError(t, err)
+	parent, err := repo.Create(ctx, watch("parent", stream.ID), 0)
+	require.NoError(t, err)
+	successor, err := repo.Create(ctx, domain.Delegation{Fingerprint: "successor" + suffix, TemplateID: tmpl.ID, ParentID: parent.ID, DelegatePubKey: "02bb"}, 0)
+	require.NoError(t, err)
+	recent, err := repo.Create(ctx, watch("recent", stream.ID), 0)
+	require.NoError(t, err)
+	require.NoError(t, repo.RecordRenewal(ctx, domain.Renewal{DelegationID: child.ID, Outpoints: []string{"11:0"}, Success: true}))
+	for _, d := range []*domain.Delegation{child, public, parent, recent} {
+		require.NoError(t, repo.SetStatus(ctx, d.ID, domain.DelegationStatusExpired))
+	}
+	require.NoError(t, repo.SetStatus(ctx, cancelled.ID, domain.DelegationStatusCancelled))
+	_, err = repo.db.ExecContext(ctx, `UPDATE delegations SET updated_at = NOW() - INTERVAL '90 days' WHERE id = ANY($1)`,
+		fmt.Sprintf("{%d,%d,%d,%d}", child.ID, public.ID, parent.ID, cancelled.ID))
+	require.NoError(t, err)
+
+	n, err := repo.PruneSpawned(ctx, time.Now().Add(-30*24*time.Hour))
+	require.NoError(t, err)
+	require.Positive(t, n)
+	_, err = repo.GetByID(ctx, child.ID)
+	require.ErrorIs(t, err, domain.ErrDelegationNotFound, "its renewals go with it")
+	for _, d := range []*domain.Delegation{stream, public, cancelled, parent, successor, recent} {
+		_, err := repo.GetByID(ctx, d.ID)
+		require.NoError(t, err, d.Fingerprint)
+	}
+}
+
 func TestOneInstancePerKey(t *testing.T) {
 	first, second := testRepo(t), testRepo(t)
 	key := fmt.Sprintf("02%d", time.Now().UnixNano())

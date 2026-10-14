@@ -224,6 +224,22 @@ func TestAdminHandlers(t *testing.T) {
 	require.Equal(t, int64(7), svc.resumed)
 }
 
+func TestAdminRegisterStreamDelegation(t *testing.T) {
+	svc := &fakeService{}
+	h := NewAdmin(svc)
+	resp, err := h.RegisterStreamDelegation(t.Context(), &delegateev1.RegisterStreamDelegationRequest{TemplateId: "abc"})
+	require.NoError(t, err)
+	require.EqualValues(t, 7, resp.GetDelegation().GetId())
+	require.Equal(t, []string{"abc"}, svc.streamed)
+
+	_, err = h.RegisterStreamDelegation(t.Context(), &delegateev1.RegisterStreamDelegationRequest{})
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+
+	svc.streamErr = application.ErrNotStream
+	_, err = h.RegisterStreamDelegation(t.Context(), &delegateev1.RegisterStreamDelegationRequest{TemplateId: "abc"})
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
 func TestListDelegationsPages(t *testing.T) {
 	ctx := t.Context()
 	svc := newFake()
@@ -363,6 +379,8 @@ type fakeService struct {
 	cancelled    string
 	cancelledID  int64
 	resumed      int64
+	streamed     []string
+	streamErr    error
 	listed       [3]any
 	feesErr      error
 	health       map[string]error
@@ -415,6 +433,13 @@ func (f *fakeService) ListDelegations(_ context.Context, status string, cursor i
 	f.listed = [3]any{status, cursor, limit}
 	all := []domain.Delegation{f.delegation, {ID: 8, Fingerprint: "fp8", Address: "tark1other", Status: "cancelled"}}
 	return all[:min(limit, len(all))], f.err
+}
+func (f *fakeService) RegisterStreamDelegation(_ context.Context, id string, vars map[string]string) (*domain.Delegation, error) {
+	if f.streamErr != nil {
+		return nil, f.streamErr
+	}
+	f.streamed = append(f.streamed, id)
+	return &domain.Delegation{ID: 7, TemplateID: id, Variables: vars}, nil
 }
 func (f *fakeService) ResumeDelegation(_ context.Context, id int64) error {
 	f.resumed = id

@@ -20,6 +20,8 @@ type Ark interface {
 	FinalizeTx(ctx context.Context, arkTxid string, finalCheckpointTxs []string) error
 	// GetPendingTx lists the offchain txs arkd accepted and did not finalize, spending the coins the proof owns.
 	GetPendingTx(ctx context.Context, proof, message string) ([]clientlib.AcceptedOffchainTx, error)
+	// GetTransactionsStream streams the transactions arkd accepts until ctx ends or its stop function runs.
+	GetTransactionsStream(ctx context.Context) (<-chan clientlib.TransactionEvent, func(), error)
 }
 
 // Indexer lists the coins and transactions the server knows.

@@ -455,8 +455,12 @@ function scriptWords(hex) {
 const boards = (delegation) => (delegation.slots || []).some((s) => s.onchain);
 // a spend binds coins until it expires, as RegisterSpend does
 const spends = (delegation) => !delegation.address && num(delegation.expiresAt) > 0;
+// a stream delegation has no address and no slots
+const streams = (delegation) => !delegation.address && !(delegation.slots || []).length;
 const WATCH = { coins: "VTXOs at this address", stop: "Stop renewing", resume: "Resume renewing" };
 const KINDS = {
+  stream: { done: "spawned", doing: "watching", attempts: "Attempts", coins: "Coins", stop: "Stop watching", resume: "Resume watching",
+    noAttempt: "A stream delegation spends nothing: the watches it spawns do.", noCoin: "A stream delegation holds no coin." },
   spend: { done: "spent", doing: "spending", attempts: "Spend attempts", coins: "Coins it spends", stop: "Cancel spend", resume: "Resume spend",
     noAttempt: "No attempt yet. A spend runs at the next scan.", noCoin: "No coin left: the spend ran, or something else spent its coins." },
   boarding: { ...WATCH, done: "boarded", doing: "active", attempts: "Boarding attempts",
@@ -464,7 +468,7 @@ const KINDS = {
   renewal: { ...WATCH, done: "renewed", doing: "renewing", attempts: "Renewal attempts",
     noAttempt: "No attempt yet. A VTXO is first renewed in its renewal window.", noCoin: "No spendable VTXO sits at this address right now." },
 };
-const kindKey = (delegation) => (spends(delegation) ? "spend" : boards(delegation) ? "boarding" : "renewal");
+const kindKey = (delegation) => (streams(delegation) ? "stream" : spends(delegation) ? "spend" : boards(delegation) ? "boarding" : "renewal");
 const kindOf = (delegation) => KINDS[kindKey(delegation)];
 function stateOf(d) {
   const r = d.lastRenewal, done = kindOf(d.delegation).done;
@@ -643,7 +647,7 @@ function renderOverview() {
   const now = nowSecs(), { poll, last, busy, stale } = scanState();
   const active = delegations.filter((d) => d.delegation.status === "active"), managed = active.filter((d) => d.managed);
   const total = managed.reduce((a, d) => a + num(d.totalAmount), 0), vtxos = managed.reduce((a, d) => a + num(d.vtxoCount), 0);
-  const kinds = ["renewal", "boarding", "spend"].map((k) => [k, active.filter((d) => kindKey(d.delegation) === k).length]).filter(([, n]) => n);
+  const kinds = ["renewal", "boarding", "spend", "stream"].map((k) => [k, active.filter((d) => kindKey(d.delegation) === k).length]).filter(([, n]) => n);
   const attention = delegations.filter(needsAttention).sort(SORTS.urgency), failing = attention.filter((d) => stateOf(d).key === "bad").length;
   const recent = delegations.filter((d) => d.lastRenewal && now - num(d.lastRenewal.attemptedAt) < 86400), served = recent.filter((d) => d.lastRenewal.success).length;
   const enabled = templates.filter((t) => t.status === "active").length, broken = templates.filter((t) => t.failures > 0).length;
@@ -806,7 +810,7 @@ function renderList() {
     return `<button data-filter="${id}" aria-pressed="${id === filter}" class="${id === "attention" && n ? "alert" : ""}">${name} <span class="n">${n.toLocaleString()}</span></button>`;
   }).join("");
   const inFilter = delegations.filter(FILTERS.find((f) => f[0] === filter)[2]);
-  $("kinds").innerHTML = [["all", "All"], ["renewal", "Renewal"], ["boarding", "Boarding"], ["spend", "Spend"]].map(([id, name]) => {
+  $("kinds").innerHTML = [["all", "All"], ["renewal", "Renewal"], ["boarding", "Boarding"], ["spend", "Spend"], ["stream", "Stream"]].map(([id, name]) => {
     const n = id === "all" ? inFilter.length : inFilter.filter((d) => kindKey(d.delegation) === id).length;
     return n || id === "all" || id === kindFilter ? `<button data-kind="${id}" aria-pressed="${id === kindFilter}">${name}<span class="n">${n.toLocaleString()}</span></button>` : "";
   }).join("");
@@ -931,7 +935,7 @@ function renderDetail() {
         ${active ? `<button class="danger" id="stop">${kind.stop}</button>` : d.status === "cancelled" ? `<button class="primary" id="resume">${kind.resume}</button>` : ""}</div>
     </div>
     <dl class="facts"><div><dt>Template</dt><dd class="hash" title="${esc(d.templateId)}"><button class="link hash" data-go="templates/${esc(d.templateId)}">${esc(short(d.templateId, 8))}</button><button class="mini" data-copy="${esc(d.templateId)}" title="Copy the template id">copy</button></dd></div>
-      ${num(d.parentId) ? `<div><dt>Successor of</dt><dd><a href="#id/${num(d.parentId)}">#${num(d.parentId)}</a></dd></div>` : ""}
+      ${num(d.parentId) ? `<div><dt>Parent</dt><dd><a href="#id/${num(d.parentId)}">#${num(d.parentId)}</a></dd></div>` : ""}
       ${Object.entries(d.variables || {}).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${variable(k, types[k], v)}</dd></div>`).join("")}
       <div><dt>Registered</dt><dd title="${esc(dateOf(d.createdAt))}">${ago(d.createdAt)}</dd></div>
       <div><dt>Expires</dt><dd>${num(d.expiresAt) ? `<span title="${esc(dateOf(d.expiresAt))}">${ago(d.expiresAt)}</span>` : "never"}</dd></div></dl>
@@ -962,18 +966,18 @@ async function setRenewing(on) {
   try {
     if (on) await send("POST", "/v1/admin/delegation/" + encodeURIComponent(d.id) + "/resume", {});
     else await api("/v1/admin/delegation/" + encodeURIComponent(d.id), { method: "DELETE" });
-    toast(on ? "Resumed" : spends(d) ? "Spend cancelled" : "Renewing stopped");
+    toast(on ? "Resumed" : streams(d) ? "Stream stopped" : spends(d) ? "Spend cancelled" : "Renewing stopped");
   } catch (e) { toast(`Could not ${on ? "resume" : "stop"} it: ${e.message}`, true); }
   refresh();
 }
 
 function askStop() {
-  const held = delegations.find((x) => x.delegation.id === detail.delegation.id), spend = spends(detail.delegation);
-  ask(spend ? "Cancel this spend?" : "Stop renewing this address?",
-    spend ? "The daemon stops trying it: its coins stay with their owner, who can sign a new spend. Nothing is deleted." : (num(held?.vtxoCount)
+  const held = delegations.find((x) => x.delegation.id === detail.delegation.id), spend = spends(detail.delegation), stream = streams(detail.delegation);
+  ask(stream ? "Stop this stream delegation?" : spend ? "Cancel this spend?" : "Stop renewing this address?",
+    stream ? "It spawns no more watches until you resume. Nothing is deleted." : spend ? "The daemon stops trying it: its coins stay with their owner, who can sign a new spend. Nothing is deleted." : (num(held?.vtxoCount)
       ? `${sats(held.totalAmount)} in ${plural(held.vtxoCount, "VTXO")}, the first expiring ${ago(held.nextExpiry)}, will expire`
       : "Coins sent to it later will expire") + " unless the owner exits or you resume. The owner cannot register it again until you resume. Nothing is deleted.",
-    kindOf(detail.delegation).stop, spend ? "Keep the spend" : "Keep renewing").then((yes) => yes && setRenewing(false));
+    kindOf(detail.delegation).stop, stream ? "Keep watching" : spend ? "Keep the spend" : "Keep renewing").then((yes) => yes && setRenewing(false));
 }
 
 // templates and artifacts

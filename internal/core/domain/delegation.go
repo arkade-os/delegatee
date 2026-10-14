@@ -95,7 +95,7 @@ type Delegation struct {
 	Address        string // slot 0 address of a watch; empty otherwise
 	TemplateID     string
 	Variables      map[string]string
-	ParentID       int64      // the delegation whose settled transaction advertised this one; 0 for a watch
+	ParentID       int64      // the delegation whose settled transaction advertised this one, or the stream delegation that spawned it; 0 otherwise
 	ExpiresAt      *time.Time // watches and spends; nil never expires
 	DelegatePubKey string     // the cosigner key it was instantiated with
 	// one per template input; a watch has exactly one
@@ -113,6 +113,16 @@ func (d *Delegation) IsWatch() bool {
 // IsSpend: bound by RegisterSpend.
 func (d *Delegation) IsSpend() bool {
 	return d.Address == "" && d.ExpiresAt != nil
+}
+
+// IsSpawned: a watch a stream delegation spawned.
+func (d *Delegation) IsSpawned() bool {
+	return d.ParentID != 0 && d.Address != ""
+}
+
+// IsStream: an operator's standing rule over streamed transactions, which spawns watches.
+func (d *Delegation) IsStream() bool {
+	return d.Address == "" && len(d.Slots) == 0
 }
 
 type SlotBinding struct {
@@ -172,7 +182,8 @@ type SettlementRepository interface {
 }
 
 type DelegationRepository interface {
-	// Create returns the active delegation of the same fingerprint, else fails with ErrCapReached at max (0: no cap) active ones.
+	// Create returns the active delegation of the same fingerprint, else fails with ErrCapReached at max (0: no cap) active ones
+	// of its kind: spawned watches and the other delegations are counted apart.
 	Create(ctx context.Context, d Delegation, max int) (*Delegation, error)
 	// Get returns the newest delegation watching address, an active one first.
 	Get(ctx context.Context, address string) (*Delegation, error)
@@ -198,4 +209,6 @@ type DelegationRepository interface {
 	LastRenewals(ctx context.Context) (map[int64]Renewal, error)
 	// PruneRenewals keeps each delegation's latest renewal.
 	PruneRenewals(ctx context.Context, before time.Time) error
+	// PruneSpawned deletes expired spawned watches last updated before `before` that are nobody's parent.
+	PruneSpawned(ctx context.Context, before time.Time) (int64, error)
 }
