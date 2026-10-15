@@ -107,6 +107,9 @@ func (p *parser) locking(v any) (locking, error) {
 		l.from, err = p.inputIndex(m["from"], "locking")
 	default:
 		l.contract, err = p.construction(m["contract"])
+		if err == nil && l.contract.taptree != "" {
+			err = bad("a contract checked against a given taptree cannot lock an output")
+		}
 	}
 	return l, err
 }

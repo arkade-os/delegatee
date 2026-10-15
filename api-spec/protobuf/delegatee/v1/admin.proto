@@ -26,6 +26,11 @@ service AdminService {
     };
   }
 
+  // GetHealth checks each dependency, with the error of the failing ones.
+  rpc GetHealth(GetHealthRequest) returns (GetHealthResponse) {
+    option (meshapi.gateway.http) = { get: "/v1/admin/health" };
+  }
+
   // CancelDelegation stops the active watches of an address, or one
   // delegation by id: advertisements have no address. Registering a
   // cancelled delegation again is refused until ResumeDelegation.
@@ -39,6 +44,11 @@ service AdminService {
   // ResumeDelegation sets a cancelled delegation active again.
   rpc ResumeDelegation(ResumeDelegationRequest) returns (ResumeDelegationResponse) {
     option (meshapi.gateway.http) = { post: "/v1/admin/delegation/{id}/resume" body: "*" };
+  }
+
+  // RegisterStreamDelegation spawns a watch of the template for every streamed transaction its trigger matches.
+  rpc RegisterStreamDelegation(RegisterStreamDelegationRequest) returns (RegisterStreamDelegationResponse) {
+    option (meshapi.gateway.http) = { post: "/v1/admin/stream-delegation" body: "*" };
   }
 
   rpc ListAllTemplates(ListAllTemplatesRequest) returns (ListAllTemplatesResponse) {
@@ -92,6 +102,10 @@ message DelegationSummary {
   int64 next_batch_at = 10;
   // renewing is true while a session holds the delegation's coins.
   bool renewing = 11;
+  // failing_since is 0 unless the last attempt of a coin failed; failed_attempts counts the attempts since.
+  int64 failing_since = 12;
+  int64 last_failed_at = 13;
+  int32 failed_attempts = 14;
 }
 
 message GetDelegationByIdRequest {
@@ -103,6 +117,18 @@ message GetDelegationByIdResponse {
   repeated Renewal renewals = 3;
   // batch_at is the planned batch time by outpoint; a coin in a session, or waiting on something unforeseeable, is absent.
   map<string, int64> batch_at = 4;
+  // pending_txs are the daemon's transactions holding the coins until they land.
+  repeated PendingTx pending_txs = 5;
+}
+
+message PendingTx {
+  string txid = 1;
+  // spent_by is what the indexer reports spending the coins: the commitment txid of a batch.
+  string spent_by = 2;
+  repeated string coins = 3;
+  // state is batch, submitted, finalizing or landed.
+  string state = 4;
+  int64 created_at = 5;
 }
 
 message GetStatusRequest {}
@@ -115,6 +141,15 @@ message GetStatusResponse {
   int64 renewal_reserve = 5;
   int64 boarding_max_wait = 6;
   repeated PlannedBatch batches = 7;
+}
+
+message GetHealthRequest {}
+message GetHealthResponse { repeated Dependency dependencies = 1; }
+
+message Dependency {
+  string name = 1;
+  // error is empty when the dependency answers.
+  string error = 2;
 }
 
 message PlannedBatch {
@@ -145,6 +180,13 @@ message CancelDelegationResponse {}
 message ResumeDelegationRequest { int64 id = 1; }
 message ResumeDelegationResponse {}
 
+message RegisterStreamDelegationRequest {
+  string template_id = 1;
+  // the variables the trigger does not bind, hex
+  map<string, string> variables = 2;
+}
+message RegisterStreamDelegationResponse { Delegation delegation = 1; }
+
 // TemplateSummary is a template with what only the operator sees.
 message TemplateSummary {
   Template template = 1; // without its document in list responses
@@ -155,6 +197,8 @@ message TemplateSummary {
   // trusted templates get the daemon's own signature on delegate-key leaves
   // and are exempt from the failure valve; seeded ones are trusted.
   bool trusted = 4;
+  // type is intent, offchain or onchain.
+  string type = 5;
 }
 
 message ListAllTemplatesRequest { string status = 1; }

@@ -608,7 +608,7 @@ type Delegation struct {
 	Slots     []*Slot `protobuf:"bytes,7,rep,name=slots,proto3" json:"slots,omitempty"`
 	CreatedAt int64   `protobuf:"varint,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt int64   `protobuf:"varint,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	// parent_id is the delegation whose settled transaction advertised this one, 0 for a watch.
+	// parent_id is the delegation whose settled transaction advertised this one, or the stream delegation that spawned it; 0 otherwise.
 	ParentId      int64 `protobuf:"varint,10,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

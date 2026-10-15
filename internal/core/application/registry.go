@@ -101,7 +101,7 @@ func (s *service) RegisterTemplate(ctx context.Context, doc []byte) (*domain.Tem
 	s.registerMu.Lock()
 	defer s.registerMu.Unlock()
 	t, err := s.repo.CreateTemplate(ctx, domain.Template{
-		ID: parsed.ID(), Document: doc, ArtifactIDs: parsed.Artifacts(), Params: params,
+		ID: parsed.ID(), Document: doc, ArtifactIDs: parsed.Artifacts(), Params: params, Type: string(parsed.Type()),
 	}, s.limits.MaxTemplates)
 	if errors.Is(err, domain.ErrCapReached) {
 		return nil, fmt.Errorf("%w: template cap reached", ErrFull)
@@ -164,10 +164,17 @@ func (s *service) parseTemplate(ctx context.Context, id string) (*template.Templ
 	if err != nil {
 		return nil, fmt.Errorf("template %s: %w", id, err)
 	}
-	if parsed.Secrets() && (len(s.encryptionKeys) == 0 || !t.Trusted) {
-		return nil, ErrSecretsRequired
+	if err := s.checkSecrets(t, parsed); err != nil {
+		return nil, err
 	}
 	return parsed, nil
+}
+
+func (s *service) checkSecrets(t *domain.Template, parsed *template.Template) error {
+	if parsed.Secrets() && (len(s.encryptionKeys) == 0 || !t.Trusted) {
+		return ErrSecretsRequired
+	}
+	return nil
 }
 
 // Bootstrap disables every stored template the engine cannot parse.

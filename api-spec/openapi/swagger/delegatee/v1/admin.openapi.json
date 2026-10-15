@@ -328,6 +328,37 @@
         }
       }
     },
+    "/v1/admin/health": {
+      "get": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "GetHealth checks each dependency, with the error of the failing ones.",
+        "operationId": "AdminService_GetHealth",
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetHealthResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/status": {
       "get": {
         "tags": [
@@ -341,6 +372,47 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GetStatusResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/stream-delegation": {
+      "post": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "RegisterStreamDelegation spawns a watch of the template for every streamed transaction its trigger matches.",
+        "operationId": "AdminService_RegisterStreamDelegation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterStreamDelegationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterStreamDelegationResponse"
                 }
               }
             }
@@ -635,7 +707,7 @@
           },
           "parentId": {
             "type": "integer",
-            "description": "parent_id is the delegation whose settled transaction advertised this one, 0 for a watch.",
+            "description": "parent_id is the delegation whose settled transaction advertised this one, or the stream delegation that spawned it; 0 otherwise.",
             "format": "int64"
           },
           "slots": {
@@ -669,6 +741,19 @@
         "properties": {
           "delegation": {
             "$ref": "#/components/schemas/Delegation"
+          },
+          "failedAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failingSince": {
+            "type": "integer",
+            "description": "failing_since is 0 unless the last attempt of a coin failed; failed_attempts counts the attempts since.",
+            "format": "int64"
+          },
+          "lastFailedAt": {
+            "type": "integer",
+            "format": "int64"
           },
           "lastRenewal": {
             "$ref": "#/components/schemas/Renewal"
@@ -737,6 +822,19 @@
         "title": "DeleteTemplateResponse",
         "type": "object"
       },
+      "Dependency": {
+        "title": "Dependency",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "error is empty when the dependency answers."
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "GetDelegationByIdRequest": {
         "title": "GetDelegationByIdRequest",
         "type": "object",
@@ -762,6 +860,13 @@
           "delegation": {
             "$ref": "#/components/schemas/Delegation"
           },
+          "pendingTxs": {
+            "type": "array",
+            "description": "pending_txs are the daemon's transactions holding the coins until they land.",
+            "items": {
+              "$ref": "#/components/schemas/PendingTx"
+            }
+          },
           "renewals": {
             "type": "array",
             "items": {
@@ -772,6 +877,22 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Vtxo"
+            }
+          }
+        }
+      },
+      "GetHealthRequest": {
+        "title": "GetHealthRequest",
+        "type": "object"
+      },
+      "GetHealthResponse": {
+        "title": "GetHealthResponse",
+        "type": "object",
+        "properties": {
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Dependency"
             }
           }
         }
@@ -920,6 +1041,33 @@
           }
         }
       },
+      "PendingTx": {
+        "title": "PendingTx",
+        "type": "object",
+        "properties": {
+          "coins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "spentBy": {
+            "type": "string",
+            "description": "spent_by is what the indexer reports spending the coins: the commitment txid of a batch."
+          },
+          "state": {
+            "type": "string",
+            "description": "state is batch, submitted, finalizing or landed."
+          },
+          "txid": {
+            "type": "string"
+          }
+        }
+      },
       "PlannedBatch": {
         "title": "PlannedBatch",
         "type": "object",
@@ -948,6 +1096,31 @@
           "vtxoCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "RegisterStreamDelegationRequest": {
+        "title": "RegisterStreamDelegationRequest",
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string"
+          },
+          "variables": {
+            "type": "object",
+            "description": "the variables the trigger does not bind, hex",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RegisterStreamDelegationResponse": {
+        "title": "RegisterStreamDelegationResponse",
+        "type": "object",
+        "properties": {
+          "delegation": {
+            "$ref": "#/components/schemas/Delegation"
           }
         }
       },
@@ -1129,6 +1302,10 @@
           "trusted": {
             "type": "boolean",
             "description": "trusted templates get the daemon's own signature on delegate-key leaves\nand are exempt from the failure valve; seeded ones are trusted."
+          },
+          "type": {
+            "type": "string",
+            "description": "type is intent, offchain or onchain."
           }
         }
       },

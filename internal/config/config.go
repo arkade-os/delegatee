@@ -62,6 +62,7 @@ type Config struct {
 	MaxOnchainFeeRate float64 // sat/vB cap on the explorer's fee rate for onchain templates
 	// caps on what the public API stores, so flooding it cannot delay renewals
 	MaxDelegations      int
+	MaxStreamChildren   int // active watches spawned by stream delegations
 	MaxTemplates        int
 	MaxArtifacts        int
 	MaxDocumentBytes    int
@@ -126,6 +127,9 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("%sMAX_ONCHAIN_FEE_RATE must be at least 1", envPrefix)
 	}
 	if cfg.MaxDelegations, err = envPositive("MAX_DELEGATIONS", 50_000); err != nil {
+		return nil, err
+	}
+	if cfg.MaxStreamChildren, err = envPositive("MAX_STREAM_CHILDREN", 10_000); err != nil {
 		return nil, err
 	}
 	if cfg.MaxTemplates, err = envPositive("MAX_TEMPLATES", 1000); err != nil {
@@ -226,7 +230,8 @@ func (c *Config) AppService(ctx context.Context) (_ application.Service, err err
 		ctx, repo, ark, indexerSvc, emulatorclient.NewGRPCClient(emuConn), explorerSvc, c.OnchainPollInterval, c.MaxOnchainFeeRate, c.EncryptionKeys,
 		c.DelegateKeys, c.PollInterval, c.RenewalTimeout, c.RenewalReserve, c.BoardingMaxWait,
 		application.Limits{
-			MinWatchExpiry: c.MinWatchExpiry, MaxDelegations: c.MaxDelegations, MaxTemplates: c.MaxTemplates, MaxArtifacts: c.MaxArtifacts,
+			MinWatchExpiry: c.MinWatchExpiry, MaxDelegations: c.MaxDelegations, MaxStreamChildren: c.MaxStreamChildren,
+			MaxTemplates: c.MaxTemplates, MaxArtifacts: c.MaxArtifacts,
 			MaxDocumentBytes: c.MaxDocumentBytes, TemplateMaxFailures: c.TemplateMaxFailures,
 		},
 	)
@@ -271,6 +276,7 @@ func (c *Config) registerDefaults(ctx context.Context, svc application.Service) 
 		log.WithError(err).Error("list templates")
 		return nil
 	}
+	ids := map[string]string{}
 	for name, doc := range templates.Templates {
 		t, err := svc.RegisterTemplate(ctx, doc)
 		if errors.Is(err, application.ErrInvalidDocument) {
@@ -280,11 +286,25 @@ func (c *Config) registerDefaults(ctx context.Context, svc application.Service) 
 			log.WithError(err).Error("register default template " + name)
 			continue
 		}
+		ids[name] = t.ID
 		if slices.ContainsFunc(stored, func(s domain.Template) bool { return s.ID == t.ID }) {
 			continue
 		}
 		if err := svc.SetTemplateTrusted(ctx, t.ID, true); err != nil {
 			log.WithError(err).Error("trust default template " + name)
+		}
+	}
+	// a default with a trigger reacts from startup; an operator's cancel survives restarts
+	for name, id := range ids {
+		_, err := svc.RegisterStreamDelegation(ctx, id, nil)
+		switch {
+		case err == nil, errors.Is(err, application.ErrNotStream), errors.Is(err, domain.ErrBlocked):
+		case errors.Is(err, application.ErrSecretsRequired):
+			log.WithError(err).Info("default stream delegation " + name + " not started")
+		case errors.Is(err, application.ErrInvalidArgs):
+			log.WithError(err).Warn("default stream delegation " + name + " not started")
+		default:
+			log.WithError(err).Warn("start default stream delegation " + name)
 		}
 	}
 	return nil

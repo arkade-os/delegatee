@@ -7,8 +7,7 @@ owner is offline. A wallet registers a watch on its address; every spend is
 co-signed by the [emulator](https://github.com/arkade-os/emulator) only if it
 satisfies the template's covenant.
 
-The default templates in [`templates/`](templates) (renewal and boarding)
-are registered and trusted at startup.
+The default templates in [`templates/`](templates) (renewal, boarding, VHTLC claim and refund, and noninteractiveclaim) are registered and trusted at startup.
 
 ## Run
 
@@ -45,7 +44,10 @@ the delegate key is in every delegate address.
 | `DELEGATEE_RENEWAL_RESERVE` | latest submission, before a vtxo expires | `6h` |
 | `DELEGATEE_BOARDING_MAX_WAIT` | how long a confirmed deposit waits for a renewal batch | `10m` |
 | `DELEGATEE_MAX_DELEGATIONS` | active delegations cap | `50000` |
+| `DELEGATEE_MAX_STREAM_CHILDREN` | active spawned watches cap, apart from `MAX_DELEGATIONS` | `10000` |
 | `DELEGATEE_LOG_LEVEL` | logrus level | `4` |
+
+Stream delegations count toward `MAX_DELEGATIONS`; the watches they spawn count only toward `MAX_STREAM_CHILDREN`.
 
 Renewals are batched: the daemon submits at the latest `RENEWAL_RESERVE`
 before the first renewable vtxo expires, so every vtxo renewable by then
@@ -74,3 +76,8 @@ still does.
 An output may draw from several inputs: `"value": {"from": ["a", "b"]}` pools
 their satoshis, so one payment and one change can spend many coins. An input
 belongs to one pool, and each pool has one output without an `amount`.
+
+## Stream delegations
+
+A template with a `trigger` is not registered by clients: the operator registers it as a stream delegation (admin `RegisterStreamDelegation`; a default with a trigger starts by itself when an encryption key is configured). The daemon reads arkd's transaction stream and, for every transaction whose extension holds the trigger's packet, binds the trigger's variables, checks the template locks the output, and spawns a watch of the template that expires after `expires_after_seconds`.
+

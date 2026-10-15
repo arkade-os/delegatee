@@ -1,11 +1,14 @@
 package e2e
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"testing"
 	"time"
 
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+	offchaintx "github.com/arkade-os/arkd/pkg/client-lib/offchain-tx"
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/config"
 	"github.com/arkade-os/delegatee/pkg/template/packets"
@@ -57,6 +60,38 @@ func TestVHTLCClaimIsPrompt(t *testing.T) {
 	paid, took := swapClaim(t, d, "vhtlc_claim.json")
 	require.EqualValues(t, 10_000, paid.Amount)
 	require.Less(t, took, 30*time.Second)
+}
+
+// covclaimd's flow: the funding transaction carries the sealed preimage and nobody registers anything
+func TestStreamClaim(t *testing.T) {
+	d := startDelegatee(t)
+	streamActive(t, d, fixtureID(t, "noninteractiveclaim.json"))
+
+	swap := newSwap(t, d)
+	addr, pkScript, tree := swapOutput(t, d, swap)
+	info, err := d.client.GetInfo(t.Context(), &delegateev1.GetInfoRequest{})
+	require.NoError(t, err)
+	key, err := hex.DecodeString(info.EncryptionPubkey)
+	require.NoError(t, err)
+	program, err := hex.DecodeString(swap.variables["receiver_program"])
+	require.NoError(t, err)
+	ciphertext, err := hex.DecodeString(swap.variables["ciphertext"])
+	require.NoError(t, err)
+
+	alice := fundedWallet(t)
+	funding, err := alice.SendOffChain(t.Context(), []clientlib.Receiver{{To: addr, Amount: 10_000}},
+		offchaintx.WithExtraPacket(packets.Raw(4, claimPacket(ciphertext, enforcePayTo(t, program), key))),
+		offchaintx.WithTxOutsTaprootTree(map[string][]byte{hex.EncodeToString(pkScript): tree}))
+	require.NoError(t, err)
+	paid := waitForVtxo(t, d, swap.receiverScript, funding)
+	require.EqualValues(t, 10_000, paid.Amount)
+
+	claim, err := d.indexer.GetVirtualTxs(t.Context(), []string{paid.Txid})
+	require.NoError(t, err)
+	require.Len(t, claim.Txs, 1)
+	raw, err := base64.StdEncoding.DecodeString(claim.Txs[0])
+	require.NoError(t, err)
+	require.True(t, bytes.Contains(raw, swap.preimage), "the claim reveals the preimage")
 }
 
 func TestOnchainRelease(t *testing.T) {

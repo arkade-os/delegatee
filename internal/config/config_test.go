@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -87,6 +88,7 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		"DELEGATEE_ONCHAIN_POLL_INTERVAL": "soon",
 		"DELEGATEE_POLL_INTERVAL":         "10", "DELEGATEE_RENEWAL_TIMEOUT": "soon",
 		"DELEGATEE_MAX_DELEGATIONS":      "1e3",
+		"DELEGATEE_MAX_STREAM_CHILDREN":  "1e3",
 		"DELEGATEE_MAX_ONCHAIN_FEE_RATE": "fast",
 		"DELEGATEE_DEFAULT_TEMPLATES":    "maybe",
 		"DELEGATEE_DELEGATE_KEY":         "0000000000000000000000000000000000000000000000000000000000000000",
@@ -107,8 +109,9 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		"DELEGATEE_RENEWAL_RESERVE": "0s", "DELEGATEE_BOARDING_MAX_WAIT": "-1s",
 		"DELEGATEE_ONCHAIN_POLL_INTERVAL": "0s",
 		"DELEGATEE_POLL_INTERVAL":         "0s", "DELEGATEE_RENEWAL_TIMEOUT": "-1s",
-		"DELEGATEE_MAX_DELEGATIONS":   "0",
-		"DELEGATEE_PUBLIC_RATE_LIMIT": "NaN", "DELEGATEE_MAX_ONCHAIN_FEE_RATE": "0.5",
+		"DELEGATEE_MAX_DELEGATIONS":     "0",
+		"DELEGATEE_MAX_STREAM_CHILDREN": "-1",
+		"DELEGATEE_PUBLIC_RATE_LIMIT":   "NaN", "DELEGATEE_MAX_ONCHAIN_FEE_RATE": "0.5",
 		"DELEGATEE_ADMIN_AUTH": "maybe",
 	} {
 		t.Run(name+" semantic", func(t *testing.T) {
@@ -148,6 +151,11 @@ func TestLoadRejectsBadValues(t *testing.T) {
 	require.Equal(t, uint32(7081), cfg.AdminPort)
 	require.Equal(t, 2*time.Hour, cfg.RenewalTimeout)
 	require.Equal(t, 50.0, cfg.MaxOnchainFeeRate)
+	require.Equal(t, 10_000, cfg.MaxStreamChildren)
+	t.Setenv("DELEGATEE_MAX_STREAM_CHILDREN", "7")
+	cfg, err = LoadConfig()
+	require.NoError(t, err)
+	require.Equal(t, 7, cfg.MaxStreamChildren)
 
 	// nothing listens there: wiring fails cleanly instead of hanging or leaking
 	cfg.DatabaseURL = "postgres://nobody@127.0.0.1:1/none?sslmode=disable&connect_timeout=1"
@@ -246,17 +254,23 @@ func TestEncryptionKeyConfiguration(t *testing.T) {
 func TestRegisterDefaults(t *testing.T) {
 	renewal, boarding := "d901cb8554a77524fb55ebfcde8e1c468871de45163abf34e988c47f1fa36896", "02b4e8bdfb52d7450ab75510cfaff36da5b88323291325e38358df10684a8344"
 	claim, refund := "c6e10a94e6b27b1c29dc3c9eae95d1f01ef9e4142f882f9ce9888a416d7ae01d", "978df861b2ae33f1373fd9ead844b074b3575d2341e98f1d50114179a9ed7d6d"
+	noninteractiveclaim := "4493579d4cdb14a5809b55c55b7d228a4d8f7fc479c1424b286d4d5234382eee"
 	on := &Config{DefaultTemplates: true}
 	svc := newDefaultsService()
 	require.NoError(t, on.registerDefaults(t.Context(), svc))
 	require.Len(t, svc.artifacts, 1)
-	require.Equal(t, map[string]bool{renewal: true, boarding: true, claim: true, refund: true}, svc.trusted())
+	require.Equal(t, map[string]bool{renewal: true, boarding: true, claim: true, refund: true, noninteractiveclaim: true}, svc.trusted())
+	require.Equal(t, map[string]bool{noninteractiveclaim: true}, svc.streams, "only the template with a trigger streams")
+
+	noKey := newDefaultsService()
+	noKey.streamErr = application.ErrSecretsRequired
+	require.NoError(t, on.registerDefaults(t.Context(), noKey), "a stream delegation that cannot start does not stop startup")
 
 	require.NoError(t, svc.SetTemplateTrusted(t.Context(), boarding, false))
 	trusts := svc.trusts
 	require.NoError(t, on.registerDefaults(t.Context(), svc))
 	require.Equal(t, trusts, svc.trusts, "a restart changes nothing")
-	require.Equal(t, map[string]bool{renewal: true, boarding: false, claim: true, refund: true}, svc.trusted(), "an untrusted default stays untrusted")
+	require.Equal(t, map[string]bool{renewal: true, boarding: false, claim: true, refund: true, noninteractiveclaim: true}, svc.trusted(), "an untrusted default stays untrusted")
 
 	off := newDefaultsService()
 	require.NoError(t, (&Config{}).registerDefaults(t.Context(), off))
@@ -286,10 +300,12 @@ type defaultsService struct {
 	templates map[string]*domain.Template
 	trusts    int
 	err       error
+	streams   map[string]bool
+	streamErr error
 }
 
 func newDefaultsService() *defaultsService {
-	return &defaultsService{artifacts: map[string][]byte{}, templates: map[string]*domain.Template{}}
+	return &defaultsService{artifacts: map[string][]byte{}, templates: map[string]*domain.Template{}, streams: map[string]bool{}}
 }
 
 func (s *defaultsService) RegisterArtifact(_ context.Context, doc []byte) (*domain.Artifact, error) {
@@ -314,6 +330,21 @@ func (s *defaultsService) RegisterTemplate(ctx context.Context, doc []byte) (*do
 	}
 	s.templates[parsed.ID()] = &domain.Template{ID: parsed.ID(), Document: doc}
 	return s.templates[parsed.ID()], nil
+}
+
+func (s *defaultsService) RegisterStreamDelegation(_ context.Context, id string, _ map[string]string) (*domain.Delegation, error) {
+	t, ok := s.templates[id]
+	if !ok {
+		return nil, domain.ErrTemplateNotFound
+	}
+	if !bytes.Contains(t.Document, []byte(`"trigger"`)) {
+		return nil, application.ErrNotStream
+	}
+	if s.streamErr != nil {
+		return nil, s.streamErr
+	}
+	s.streams[id] = true
+	return &domain.Delegation{TemplateID: id}, nil
 }
 
 func (s *defaultsService) ListTemplates(context.Context, string) ([]domain.Template, error) {

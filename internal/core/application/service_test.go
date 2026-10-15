@@ -29,27 +29,27 @@ import (
 
 func TestNewService(t *testing.T) {
 	for name, tweak := range map[string]func(*testEnv){
-		"arkd down":        func(e *testEnv) { e.ark.infoErr = errBoom },
-		"emulator down":    func(e *testEnv) { e.emulator.infoErr = errBoom },
-		"bad signer key":   func(e *testEnv) { e.ark.info.SignerPubKey = "zz" },
-		"bad forfeit key":  func(e *testEnv) { e.ark.info.ForfeitPubKey = "02" },
-		"bad emulator key": func(e *testEnv) { e.emulator.info.SignerPublicKey = "" },
-		"unknown network":  func(e *testEnv) { e.ark.info.Network = "moon" },
-		"bad forfeit addr": func(e *testEnv) { e.ark.info.ForfeitAddress = "nope" },
+		"arkd info":            func(e *testEnv) { e.ark.infoErr = errBoom },
+		"emulator info":        func(e *testEnv) { e.emulator.infoErr = errBoom },
+		"arkd signer pubkey":   func(e *testEnv) { e.ark.info.SignerPubKey = "zz" },
+		"arkd forfeit pubkey":  func(e *testEnv) { e.ark.info.ForfeitPubKey = "02" },
+		"emulator pubkey":      func(e *testEnv) { e.emulator.info.SignerPublicKey = "" },
+		"unknown network":      func(e *testEnv) { e.ark.info.Network = "moon" },
+		"arkd forfeit address": func(e *testEnv) { e.ark.info.ForfeitAddress = "nope" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			env := newTestEnv(t)
 			tweak(env)
 			_, err := NewServiceWithKeys(t.Context(), env.repo, env.ark, env.indexer, env.emulator, nil, 30*time.Second, 50, nil,
 				[]*btcec.PrivateKey{env.userKey}, time.Hour, time.Minute, 2*time.Hour, 0,
-				Limits{MaxDelegations: 100, MaxTemplates: 100, MaxArtifacts: 100, MaxDocumentBytes: 4096, TemplateMaxFailures: 3})
-			require.Error(t, err)
+				Limits{MaxDelegations: 100, MaxStreamChildren: 100, MaxTemplates: 100, MaxArtifacts: 100, MaxDocumentBytes: 4096, TemplateMaxFailures: 3})
+			require.ErrorContains(t, err, name, "the error the subtest is named after")
 		})
 	}
 	env := newTestEnv(t)
 	_, err := NewServiceWithKeys(t.Context(), env.repo, env.ark, env.indexer, env.emulator, nil, 30*time.Second, 50, nil,
 		[]*btcec.PrivateKey{env.userKey}, time.Hour, time.Minute, 2*time.Hour, 0, Limits{})
-	require.Error(t, err, "zero max delegations")
+	require.ErrorContains(t, err, "must be positive", "zero limits")
 }
 
 func TestInfo(t *testing.T) {
@@ -272,6 +272,39 @@ func TestScanExpiresWatches(t *testing.T) {
 	st := env.svc.Status()
 	require.NotContains(t, st.Holdings, expired.ID)
 	require.Contains(t, st.Holdings, kept.ID)
+}
+
+func TestPruneSpawnedWatches(t *testing.T) {
+	env := newTestEnv(t)
+	old := time.Now().Add(-renewalsRetention - time.Hour)
+	row := func(name string, parent int64, address, status string, updated time.Time) int64 {
+		d, err := env.repo.Create(t.Context(), domain.Delegation{Fingerprint: name, ParentID: parent, Address: address}, 0)
+		require.NoError(t, err)
+		env.repo.mu.Lock()
+		defer env.repo.mu.Unlock()
+		for i := range env.repo.delegations {
+			if env.repo.delegations[i].ID == d.ID {
+				env.repo.delegations[i].Status, env.repo.delegations[i].UpdatedAt = status, updated
+			}
+		}
+		return d.ID
+	}
+	stream := row("stream", 0, "", domain.DelegationStatusActive, old)
+	row("stale", stream, "tark1stale", domain.DelegationStatusExpired, old)
+	recent := row("recent", stream, "tark1recent", domain.DelegationStatusExpired, time.Now())
+	cancelled := row("cancelled", stream, "tark1cancelled", domain.DelegationStatusCancelled, old)
+	public := row("public", 0, "tark1public", domain.DelegationStatusExpired, old)
+	parent := row("parent", stream, "tark1parent", domain.DelegationStatusExpired, old)
+	successor := row("successor", parent, "", domain.DelegationStatusDone, old)
+
+	env.svc.prune(t.Context(), time.Now())
+	rows, err := env.repo.List(t.Context(), "")
+	require.NoError(t, err)
+	var kept []int64
+	for _, d := range rows {
+		kept = append(kept, d.ID)
+	}
+	require.ElementsMatch(t, []int64{stream, recent, cancelled, public, parent, successor}, kept)
 }
 
 // expires_at is at least MinWatchExpiry ahead; no expiry is always allowed
@@ -540,6 +573,10 @@ func TestRenewalFailuresAreRecordedOnce(t *testing.T) {
 	scan(due)
 	require.Len(t, env.repo.recorded(), 1, "same failure, no new row")
 	require.Len(t, env.emulator.submitted, 2, "but it was retried")
+	held := env.svc.Status().Holdings[d.ID]
+	require.Equal(t, 2, held.Failures, "but counted")
+	require.False(t, held.FailingSince.After(held.LastFailure))
+	since := held.FailingSince
 
 	// a different reason is news
 	env.emulator.reject = nil
@@ -548,6 +585,9 @@ func TestRenewalFailuresAreRecordedOnce(t *testing.T) {
 	recorded = env.repo.recorded()
 	require.Len(t, recorded, 2)
 	require.Equal(t, "arkd: boom", recorded[1].Error)
+	held = env.svc.Status().Holdings[d.ID]
+	require.Equal(t, 3, held.Failures)
+	require.Equal(t, since, held.FailingSince, "still failing since the first")
 	tmpl, err := env.svc.GetTemplate(t.Context(), d.TemplateID)
 	require.NoError(t, err)
 	require.Zero(t, tmpl.Failures, "failures to answer never count against the template")
@@ -556,8 +596,8 @@ func TestRenewalFailuresAreRecordedOnce(t *testing.T) {
 	next := env.coin(t, env.userKey.PubKey(), 1000, time.Minute)
 	env.advertised(t, next)
 	scan(next)
-	require.NotContains(t, env.svc.batch.lastFailure, due.Outpoint.String())
-	require.Contains(t, env.svc.batch.lastFailure, next.Outpoint.String())
+	require.NotContains(t, env.svc.failing, due.Outpoint.String())
+	require.Contains(t, env.svc.failing, next.Outpoint.String())
 
 	renewals, err := env.svc.ListRenewals(t.Context(), d)
 	require.NoError(t, err)
@@ -565,6 +605,26 @@ func TestRenewalFailuresAreRecordedOnce(t *testing.T) {
 	last, err := env.svc.LastRenewals(t.Context())
 	require.NoError(t, err)
 	require.Contains(t, last, d.ID)
+}
+
+func TestPendingTxs(t *testing.T) {
+	env := newTestEnv(t)
+	for _, st := range []domain.Settlement{
+		{Txid: "a", SpentBy: "a", DelegationID: 1, Coins: []string{"x:0"}},
+		{Txid: "b", SpentBy: "commitment", DelegationID: 1},
+		{Txid: "c", SpentBy: "c", DelegationID: 1, Finals: []string{"f"}},
+		{Txid: "d", SpentBy: "d", DelegationID: 1, Landed: true},
+		{Txid: "e", SpentBy: "e", DelegationID: 2},
+	} {
+		require.NoError(t, env.repo.SaveSettlement(t.Context(), st))
+	}
+	pending, err := env.svc.PendingTxs(t.Context(), 1)
+	require.NoError(t, err)
+	states := map[string]string{}
+	for _, p := range pending {
+		states[p.Txid] = p.State
+	}
+	require.Equal(t, map[string]string{"a": "submitted", "b": "batch", "c": "finalizing", "d": "landed"}, states)
 }
 
 func TestHealth(t *testing.T) {

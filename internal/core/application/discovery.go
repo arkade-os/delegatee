@@ -246,7 +246,16 @@ func (s *service) discover(ctx context.Context, delegations []domain.Delegation,
 		}
 		return t, err
 	})
-	slices.SortFunc(delegations, func(a, b domain.Delegation) int { return cmp.Compare(a.ID, b.ID) })
+	// a spawned watch comes first: a public watch on its script must not silence it
+	slices.SortFunc(delegations, func(a, b domain.Delegation) int {
+		if a.IsSpawned() != b.IsSpawned() {
+			if a.IsSpawned() {
+				return -1
+			}
+			return 1
+		}
+		return cmp.Compare(a.ID, b.ID)
+	})
 	s.pruneConsumed(now)
 	holdings := map[int64]Holdings{}
 	unwatched := map[int64]string{}
@@ -527,10 +536,14 @@ func (s *service) successor(ctx context.Context, d *domain.Delegation, id string
 			return fmt.Errorf("%w: advertised script differs from target template", errUnusableAdvertisement)
 		}
 	}
+	limit := s.limits.MaxDelegations
+	if own {
+		limit = 0
+	}
 	_, err = s.create(ctx, domain.Delegation{
 		TemplateID: id, ParentID: d.ID, Variables: map[string]string{},
 		Fingerprint: domain.Fingerprint(id, nil, raw), DelegatePubKey: d.DelegatePubKey, Slots: slots,
-	}, own)
+	}, limit)
 	return err
 }
 

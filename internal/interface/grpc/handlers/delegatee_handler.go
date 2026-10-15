@@ -193,7 +193,7 @@ func toStatus(err error) error {
 		errors.Is(err, application.ErrUnsupported), errors.Is(err, application.ErrIneligible):
 		return status.Error(codes.FailedPrecondition, err.Error())
 	case errors.Is(err, application.ErrInvalidDocument), errors.Is(err, application.ErrInvalidStatus),
-		errors.Is(err, application.ErrInvalidArgs):
+		errors.Is(err, application.ErrInvalidArgs), errors.Is(err, application.ErrNotStream):
 		return status.Error(codes.InvalidArgument, err.Error())
 	default:
 		log.WithError(err).Error("request failed")

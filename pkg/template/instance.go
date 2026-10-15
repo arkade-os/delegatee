@@ -79,6 +79,9 @@ func (t *Template) Instantiate(_ context.Context, c Context) (*Instance, error) 
 		if !ok {
 			return nil, fmt.Errorf("%w: missing %q", ErrInvalidVariables, n)
 		}
+		if t.isTaptree(n) {
+			continue
+		}
 		if err := canonicalBytes(typ, v); err != nil {
 			return nil, fmt.Errorf("variable %q: %w", n, err)
 		}
@@ -147,7 +150,11 @@ func (i *Instance) contractOf(c *construction, d *draft, slot int, watch bool) (
 		}
 		args[f.Name] = value{f.Type, raw}
 	}
-	return build(c.def, args, i.keys)
+	var taptree []byte
+	if c.taptree != "" {
+		taptree = append([]byte{}, i.vars[c.taptree]...) // non-nil: a given tree, empty or not
+	}
+	return buildTree(c.def, args, i.keys, taptree)
 }
 
 func isCLTV(tok string) bool { return tok == "OP_CHECKLOCKTIMEVERIFY" || tok == "OP_NOP2" }
@@ -366,4 +373,9 @@ func (i *Instance) lookup(n string, d *draft) (value, error) {
 	}
 	d.secrets[n] = p
 	return value{s.typ, p}, nil
+}
+
+// isTaptree: the variable holds a given tree, decoded and never pushed.
+func (t *Template) isTaptree(name string) bool {
+	return slices.ContainsFunc(t.inputs, func(in input) bool { return in.contract.taptree == name })
 }

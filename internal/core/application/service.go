@@ -39,6 +39,7 @@ var (
 	ErrDelegateKeyLeaf = errors.New("delegate-key leaves require an operator-trusted template")
 	ErrSecretsRequired = errors.New("template needs secrets: it requires an encryption key and an operator-trusted template")
 	ErrInvalidArgs     = errors.New("invalid template arguments")
+	ErrNotStream       = errors.New("template has no trigger")
 	// ErrUnsupported is a template this daemon cannot run.
 	ErrUnsupported = errors.New("unsupported template")
 	// ErrIneligible is an action or an instance that cannot be built from these coins.
@@ -72,9 +73,20 @@ type Holdings struct {
 	NextDeadline time.Time // of the soonest coin; zero without a plan entry
 	NextBatchAt  time.Time // the batch its soonest coin joins; zero without a plan entry
 	Renewing     bool      // a lane holds it
+	// FailingSince is zero unless the last attempt of a coin failed; Failures counts attempts since.
+	FailingSince, LastFailure time.Time
+	Failures                  int
 	// Late counts coins a session's worth of time past their batch time and still here.
 	Late       int
 	LateAmount uint64
+}
+
+// PendingTx is a transaction of the daemon's that spends a delegation's coins; State is batch, submitted, finalizing or landed.
+type PendingTx struct {
+	Txid, SpentBy string
+	Coins         []string
+	State         string
+	CreatedAt     time.Time
 }
 
 // Status never depends on arkd: it must stay visible during an outage.
@@ -100,6 +112,8 @@ type Service interface {
 	Info() Info
 	// RegisterDelegation watches the address of a one-input template.
 	RegisterDelegation(ctx context.Context, templateID string, variables map[string]string, expiresAt *time.Time) (*domain.Delegation, error)
+	// RegisterStreamDelegation is the operator's: the trigger of templateID runs on every streamed transaction.
+	RegisterStreamDelegation(ctx context.Context, templateID string, variables map[string]string) (*domain.Delegation, error)
 	// RenewableAt is when each vtxo is due; an error when d no longer instantiates.
 	RenewableAt(ctx context.Context, d *domain.Delegation, vtxos []clientlib.Vtxo) ([]time.Time, error)
 	// CancelDelegation and CancelDelegationByID are operator cancels: registering the fingerprint again is refused until ResumeDelegation.
@@ -123,6 +137,8 @@ type Service interface {
 	IntentFees(ctx context.Context) (arkfee.Config, error)
 	Vtxos(ctx context.Context, d *domain.Delegation) ([]clientlib.Vtxo, error)
 	Health(ctx context.Context) map[string]error
+	// PendingTxs lists the daemon's transactions holding a delegation's coins until they land.
+	PendingTxs(ctx context.Context, delegationID int64) ([]PendingTx, error)
 
 	Bootstrap(ctx context.Context) error
 	RegisterArtifact(ctx context.Context, document []byte) (*domain.Artifact, error)
@@ -143,6 +159,7 @@ type Limits struct {
 	// MinWatchExpiry is how far ahead expires_at must be; zero only refuses the past.
 	MinWatchExpiry      time.Duration
 	MaxDelegations      int
+	MaxStreamChildren   int // active spawned watches, capped apart from MaxDelegations
 	MaxTemplates        int
 	MaxArtifacts        int
 	MaxDocumentBytes    int
@@ -151,7 +168,7 @@ type Limits struct {
 
 func (l Limits) validate() error {
 	for name, v := range map[string]int{
-		"max delegations": l.MaxDelegations, "max templates": l.MaxTemplates, "max artifacts": l.MaxArtifacts,
+		"max delegations": l.MaxDelegations, "max stream children": l.MaxStreamChildren, "max templates": l.MaxTemplates, "max artifacts": l.MaxArtifacts,
 		"max document bytes": l.MaxDocumentBytes, "template max failures": l.TemplateMaxFailures,
 	} {
 		if v <= 0 {
@@ -210,6 +227,7 @@ type service struct {
 	onchainDrops uint64
 	inFlight     map[int64]bool       // delegations a lane is working on
 	quarantined  map[string]time.Time // coins of an intent that sank a batch, kept out until then
+	failing      map[string]*failure  // coins whose last attempt failed
 
 	// the scan alone
 	held         map[string]bool      // coins of the daemon's settlements that may still land, as of the scan
@@ -226,10 +244,16 @@ type service struct {
 	holdings  map[int64]Holdings
 	unwatched map[int64]string
 
-	wg      sync.WaitGroup
-	stop    context.CancelFunc
-	stopped chan struct{}
-	wake    chan struct{}
+	wg          sync.WaitGroup
+	stop        context.CancelFunc
+	stopped     chan struct{}
+	streamsDone chan struct{}
+	wake        chan struct{}
+
+	// the scan publishes the active stream delegations; the watcher reads them
+	streamsMu      sync.Mutex
+	streams        []stream
+	streamsChanged chan struct{}
 }
 
 type cosigner struct {
@@ -359,12 +383,14 @@ func NewServiceWithKeys(
 		consumed:            consumed,
 		inFlight:            map[int64]bool{},
 		quarantined:         map[string]time.Time{},
+		failing:             map[string]*failure{},
 		batch:               lane{queued: map[string]*pendingIntent{}},
 		plan:                &plan{},
 		onchainCache:        map[string]onchainSnapshot{},
 		refusedSince:        map[string]time.Time{},
 		started:             time.Now(),
 		wake:                make(chan struct{}, 1),
+		streamsChanged:      make(chan struct{}, 1),
 	}, nil
 }
 
@@ -409,6 +435,11 @@ func (s *service) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.stop = cancel
 	s.stopped = make(chan struct{})
+	s.streamsDone = make(chan struct{})
+	go func() {
+		defer close(s.streamsDone)
+		s.watchStreams(ctx)
+	}()
 	go func() {
 		defer close(s.stopped)
 		timer := time.NewTimer(s.pollInterval)
@@ -438,6 +469,7 @@ func (s *service) Stop() {
 	if s.stop != nil {
 		s.stop()
 		<-s.stopped
+		<-s.streamsDone
 	}
 	if err := s.repo.Close(); err != nil {
 		log.WithError(err).Error("close repository")
@@ -447,15 +479,43 @@ func (s *service) Stop() {
 func (s *service) RegisterDelegation(
 	ctx context.Context, templateID string, variables map[string]string, expiresAt *time.Time,
 ) (*domain.Delegation, error) {
+	return s.registerWatch(ctx, templateID, variables, expiresAt, nil)
+}
+
+// spawn is the stream delegation a watch comes from and the streamed output it must lock.
+type spawn struct {
+	parent int64
+	script []byte
+}
+
+var errStreamOnly = fmt.Errorf("%w: the operator registers a trigger template as a stream delegation", ErrInvalidArgs)
+
+// registerWatch: a trigger template is watched only when spawned; a spawned watch skips the expiry floor and has a cap of its own.
+func (s *service) registerWatch(
+	ctx context.Context, templateID string, variables map[string]string, expiresAt *time.Time, from *spawn,
+) (*domain.Delegation, error) {
 	fingerprint := domain.Fingerprint(templateID, variables, nil)
 	// an active watch wins: its stored expiry is kept
 	if found, err := s.existing(ctx, fingerprint); err != nil || found != nil {
+		if found != nil && from == nil && (found.IsStream() || found.ParentID != 0) {
+			return nil, errStreamOnly
+		}
 		return found, err
 	}
-	if now := time.Now(); expiresAt != nil && (!expiresAt.After(now) || expiresAt.Before(now.Add(s.limits.MinWatchExpiry))) {
+	if now := time.Now(); from == nil && expiresAt != nil && (!expiresAt.After(now) || expiresAt.Before(now.Add(s.limits.MinWatchExpiry))) {
 		return nil, fmt.Errorf("%w: expires_at must be at least %s ahead", ErrInvalidArgs, s.limits.MinWatchExpiry)
 	}
-	tmpl, inst, err := s.prepare(ctx, templateID, variables)
+	tmpl, err := s.parseTemplate(ctx, templateID)
+	if err != nil {
+		return nil, err
+	}
+	if tmpl.Trigger() != nil && from == nil {
+		return nil, errStreamOnly
+	}
+	if len(tmpl.Inputs()) != 1 {
+		return nil, fmt.Errorf("%w: a watch binds one input", ErrInvalidArgs)
+	}
+	inst, err := s.instanceFor(ctx, tmpl, s.cosigners[0], variables, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -463,16 +523,79 @@ func (s *service) RegisterDelegation(
 	if err != nil {
 		return nil, err
 	}
+	var parent int64
+	if from != nil {
+		if slots[0].Script != hex.EncodeToString(from.script) {
+			return nil, fmt.Errorf("%w: the template locks %s, not the streamed output", ErrIneligible, slots[0].Script)
+		}
+		parent = from.parent
+	}
 	addr, err := s.watchAddress(slots[0].Onchain, tapKeys[0])
 	if err != nil {
 		return nil, err
 	}
+	limit := s.limits.MaxDelegations
+	if from != nil {
+		limit = s.limits.MaxStreamChildren
+	}
 	d, err := s.create(ctx, domain.Delegation{
-		Fingerprint: fingerprint, Address: addr, TemplateID: templateID, Variables: variables,
+		Fingerprint: fingerprint, Address: addr, TemplateID: templateID, Variables: variables, ParentID: parent,
 		ExpiresAt: expiresAt, DelegatePubKey: s.cosigners[0].pubKey, Slots: slots,
-	}, false)
+	}, limit)
 	if err == nil && tmpl.Type() != template.Intent {
 		s.wakeScan() // the coin may be there already
+	}
+	return d, err
+}
+
+func (s *service) RegisterStreamDelegation(ctx context.Context, templateID string, variables map[string]string) (*domain.Delegation, error) {
+	if variables == nil {
+		variables = map[string]string{}
+	}
+	stored, err := s.repo.GetTemplate(ctx, templateID)
+	if err != nil {
+		return nil, err
+	}
+	tmpl, err := s.parse(ctx, stored.Document)
+	if err != nil {
+		return nil, err
+	}
+	tr := tmpl.Trigger()
+	if tr == nil {
+		return nil, ErrNotStream
+	}
+	fingerprint := domain.Fingerprint(templateID, variables, nil)
+	if found, err := s.existing(ctx, fingerprint); err != nil || found != nil {
+		return found, err
+	}
+	if stored.Status != domain.TemplateStatusActive {
+		return nil, domain.ErrTemplateDisabled
+	}
+	if err := s.checkSecrets(stored, tmpl); err != nil {
+		return nil, err
+	}
+	if tr.TTL() < s.limits.MinWatchExpiry {
+		return nil, fmt.Errorf("%w: the trigger's watches expire before %s", ErrInvalidArgs, s.limits.MinWatchExpiry)
+	}
+	declared := map[string]bool{}
+	for _, f := range tmpl.Variables() {
+		declared[f.Name] = true
+		_, given := variables[f.Name]
+		if slices.Contains(tr.Bound(), f.Name) == given {
+			return nil, fmt.Errorf("%w: %q is given or bound by the trigger, exactly one of the two", ErrInvalidArgs, f.Name)
+		}
+	}
+	for n, v := range variables {
+		raw, err := hex.DecodeString(v)
+		if !declared[n] || err != nil || hex.EncodeToString(raw) != v {
+			return nil, fmt.Errorf("%w: %q is undeclared or not lower-case hex", ErrInvalidArgs, n)
+		}
+	}
+	d, err := s.create(ctx, domain.Delegation{
+		Fingerprint: fingerprint, TemplateID: templateID, Variables: variables, DelegatePubKey: s.cosigners[0].pubKey,
+	}, 0)
+	if err == nil {
+		s.wakeScan() // the scan hands it to the watcher
 	}
 	return d, err
 }
@@ -508,7 +631,11 @@ func (s *service) CancelDelegationByID(ctx context.Context, id int64) error {
 	if err != nil || d.Status != domain.DelegationStatusActive {
 		return err
 	}
-	return s.cancel(ctx, d)
+	if err := s.cancel(ctx, d); err != nil {
+		return err
+	}
+	s.wakeScan()
+	return nil
 }
 
 func (s *service) cancel(ctx context.Context, d *domain.Delegation) error {
@@ -519,8 +646,12 @@ func (s *service) cancel(ctx context.Context, d *domain.Delegation) error {
 
 func (s *service) ResumeDelegation(ctx context.Context, id int64) error {
 	s.registerMu.Lock()
-	defer s.registerMu.Unlock()
-	return s.repo.Resume(ctx, id)
+	err := s.repo.Resume(ctx, id)
+	s.registerMu.Unlock()
+	if err == nil {
+		s.wakeScan()
+	}
+	return err
 }
 
 func (s *service) GetDelegation(ctx context.Context, address string) (*domain.Delegation, error) {
@@ -540,15 +671,23 @@ func (s *service) CountActive(ctx context.Context) (int64, error) {
 }
 
 func (s *service) Status() Status {
+	failing := s.failingByDelegation()
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	holdings := maps.Clone(s.holdings)
+	for id, f := range failing {
+		if h, ok := holdings[id]; ok {
+			h.FailingSince, h.LastFailure, h.Failures = f.since, f.last, f.count
+			holdings[id] = h
+		}
+	}
 	return Status{
 		LastScan:        s.lastScan,
 		RenewingVtxos:   int(s.batch.busy.Load() + s.direct.busy.Load()),
 		PollInterval:    s.pollInterval,
 		Renewed:         s.renewed.Load(),
 		Failed:          s.failed.Load(),
-		Holdings:        maps.Clone(s.holdings),
+		Holdings:        holdings,
 		Unwatched:       maps.Clone(s.unwatched),
 		Batches:         s.plan.batches,
 		BatchAt:         s.plan.batchAt,
@@ -633,22 +772,6 @@ func (s *service) scannerHealth(now time.Time) error {
 		return fmt.Errorf("no scan for %s", now.Sub(last).Round(time.Second))
 	}
 	return nil
-}
-
-// prepare instantiates a one-input template for a watch under the current cosigner key.
-func (s *service) prepare(ctx context.Context, templateID string, variables map[string]string) (*template.Template, *template.Instance, error) {
-	tmpl, err := s.parseTemplate(ctx, templateID)
-	if err != nil {
-		return nil, nil, err
-	}
-	if len(tmpl.Inputs()) != 1 {
-		return nil, nil, fmt.Errorf("%w: a watch binds one input", ErrInvalidArgs)
-	}
-	inst, err := s.instanceFor(ctx, tmpl, s.cosigners[0], variables, nil, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	return tmpl, inst, nil
 }
 
 func (s *service) instantiate(ctx context.Context, d *domain.Delegation) (*template.Template, *template.Instance, error) {
@@ -803,8 +926,8 @@ func (s *service) unbound(ctx context.Context, fingerprint, outpoint string) err
 	return fmt.Errorf("%w: %s is bound by delegation %d", domain.ErrDelegationAlreadyExists, outpoint, other.ID)
 }
 
-// create caps registrations, not successors of the daemon's own transactions.
-func (s *service) create(ctx context.Context, d domain.Delegation, own bool) (*domain.Delegation, error) {
+// create fails with ErrFull at limit (0: no cap) active delegations of d's kind.
+func (s *service) create(ctx context.Context, d domain.Delegation, limit int) (*domain.Delegation, error) {
 	s.registerMu.Lock()
 	defer s.registerMu.Unlock()
 	if _, err := s.existing(ctx, d.Fingerprint); err != nil {
@@ -814,10 +937,6 @@ func (s *service) create(ctx context.Context, d domain.Delegation, own bool) (*d
 		if err := s.unbound(ctx, d.Fingerprint, slot.Outpoint); err != nil {
 			return nil, err
 		}
-	}
-	limit := s.limits.MaxDelegations
-	if own {
-		limit = 0
 	}
 	created, err := s.repo.Create(ctx, d, limit)
 	if errors.Is(err, domain.ErrCapReached) {
@@ -888,6 +1007,8 @@ func (s *service) scan(ctx context.Context) {
 		log.WithError(err).Error("list active delegations")
 		return
 	}
+	delegations, streams := splitStreams(delegations)
+	unusable := s.setStreams(ctx, streams)
 	active, err := s.activeTemplates(ctx)
 	if err != nil {
 		log.WithError(err).Error("list active templates")
@@ -898,6 +1019,11 @@ func (s *service) scan(ctx context.Context) {
 		log.WithError(err).Error("discover coins")
 		return
 	}
+	if unwatched == nil {
+		unwatched = map[int64]string{}
+	}
+	maps.Copy(unwatched, unusable)
+	s.forgetMoved(inputs)
 	p := s.planBatches(s.entries, now)
 	s.syncSubscription(ctx, s.wakeScripts())
 	var batch, direct []renewalInput
@@ -968,6 +1094,11 @@ func (s *service) prune(ctx context.Context, now time.Time) {
 		} else {
 			s.lastPrune = now
 		}
+		if pruned, err := s.repo.PruneSpawned(ctx, now.Add(-renewalsRetention)); err != nil {
+			log.WithError(err).Warn("prune spawned watches")
+		} else if pruned > 0 {
+			log.WithField("count", pruned).Info("spawned watches pruned")
+		}
 	}
 	expired, err := s.repo.Expire(ctx, now)
 	if err != nil {
@@ -996,23 +1127,12 @@ func (s *service) renewAndRecord(ctx context.Context, inputs []renewalInput) {
 	defer cancel()
 	results := s.renew(renewCtx, inputs)
 	ctx = context.WithoutCancel(ctx)
-	s.recordRenewals(ctx, inputs, results)
+	s.recordRenewals(ctx, results)
 	s.recordTemplateOutcomes(ctx, results)
 }
 
-// recordRenewals reports a vtxo failing the same way every poll once.
-func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, results []renewalResult) {
-	l := &s.batch
-	if len(inputs) > 0 {
-		l = s.laneOf(inputs[0])
-	}
-	due := make(map[string]string, len(inputs))
-	for _, in := range inputs {
-		if msg, ok := l.lastFailure[in.coin.Outpoint.String()]; ok {
-			due[in.coin.Outpoint.String()] = msg
-		}
-	}
-	l.lastFailure = due
+// recordRenewals records a failure that repeats the last one of its coin once, and counts the repeats.
+func (s *service) recordRenewals(ctx context.Context, results []renewalResult) {
 	for _, res := range results {
 		if res.blamed {
 			s.quarantine(res.inputs)
@@ -1027,6 +1147,7 @@ func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, res
 	byDelegation := map[key]*domain.Renewal{}
 	delegations := map[int64]domain.Delegation{}
 	var order []key
+	now := time.Now()
 	for _, res := range results {
 		errMsg := ""
 		if res.err != nil {
@@ -1034,11 +1155,8 @@ func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, res
 		}
 		for _, in := range res.inputs {
 			outpoint := in.coin.Outpoint.String()
-			if errMsg != "" && l.lastFailure[outpoint] == errMsg {
+			if !s.noteAttempt(in.watched.delegation.ID, outpoint, errMsg, now) {
 				continue
-			}
-			if delete(l.lastFailure, outpoint); errMsg != "" {
-				l.lastFailure[outpoint] = errMsg
 			}
 			delegations[in.watched.delegation.ID] = in.watched.delegation
 			k := key{in.watched.delegation.ID, res.commitmentTxid, errMsg}

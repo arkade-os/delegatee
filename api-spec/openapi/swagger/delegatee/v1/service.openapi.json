@@ -457,7 +457,7 @@
           },
           "parentId": {
             "type": "integer",
-            "description": "parent_id is the delegation whose settled transaction advertised this one, 0 for a watch.",
+            "description": "parent_id is the delegation whose settled transaction advertised this one, or the stream delegation that spawned it; 0 otherwise.",
             "format": "int64"
           },
           "slots": {

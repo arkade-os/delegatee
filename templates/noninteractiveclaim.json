@@ -1,0 +1,91 @@
+{
+  "format": "delegateed-template/v1",
+  "type": "offchain",
+  "variables": {
+    "taptree": "bytes",
+    "receiver_program": "bytes32",
+    "ciphertext": "bytes"
+  },
+  "secrets": {"preimage": {"type": "bytes32", "from": "htlc", "ciphertext": "<ciphertext>"}},
+  "inputs": [
+    {
+      "name": "htlc",
+      "contract": {
+        "definition": {
+          "contractName": "CovenantClaim",
+          "constructorInputs": [
+            {"name": "preimageHash", "type": "bytes20"},
+            {"name": "receiverProgram", "type": "bytes32"}
+          ],
+          "structs": [],
+          "functions": [
+            {
+              "name": "claim",
+              "arkade": {
+                "inputs": [],
+                "asm": [
+                  "OP_PUSHCURRENTINPUTINDEX", "OP_DUP", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "1", "OP_EQUALVERIFY",
+                  "<receiverProgram>", "OP_EQUALVERIFY", "OP_INSPECTOUTPUTVALUE", "OP_PUSHCURRENTINPUTINDEX",
+                  "OP_INSPECTINPUTVALUE", "OP_GREATERTHANOREQUAL"
+                ]
+              },
+              "leaves": [
+                {
+                  "name": "claim",
+                  "asm": [
+                    "OP_SIZE", "32", "OP_EQUALVERIFY", "OP_HASH160", "<preimageHash>", "OP_EQUAL", "OP_VERIFY",
+                    "<SERVER_KEY>", "OP_CHECKSIGVERIFY", "<EMULATOR_KEY:claim>", "OP_CHECKSIG"
+                  ],
+                  "witness": [
+                    {"name": "preimage", "type": "bytes32", "encoding": "raw"},
+                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
+                    {"name": "emulatorSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "arguments": {
+          "preimageHash": "$(<preimage> OP_HASH160)",
+          "receiverProgram": "<receiver_program>"
+        },
+        "taptree": "<taptree>"
+      },
+      "spend": {
+        "function": "claim",
+        "leaf": "claim",
+        "witness": {"preimage": "<preimage>"}
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "payout",
+      "index": 0,
+      "value": {"from": "htlc"},
+      "locking": "5120<receiver_program>",
+      "assets": [{"from": "htlc"}]
+    }
+  ],
+  "packets": {"output_index": 1, "unmatched": "drop"},
+  "trigger": {
+    "packet": 4,
+    "decode": "tlv",
+    "min_value": 1000,
+    "require": {"tlv:3": "<ENCRYPTION_KEY>"},
+    "bind": {
+      "ciphertext": "tlv:1",
+      "receiver_program": {
+        "from": "tlv:2",
+        "asm": [
+          "OP_PUSHCURRENTINPUTINDEX", "OP_DUP", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "1", "OP_EQUALVERIFY",
+          "<receiver_program>", "OP_EQUALVERIFY", "OP_INSPECTOUTPUTVALUE", "OP_PUSHCURRENTINPUTINDEX",
+          "OP_INSPECTINPUTVALUE", "OP_GREATERTHANOREQUAL"
+        ]
+      },
+      "taptree": "output:taptree"
+    },
+    "expires_after_seconds": 86400
+  }
+}

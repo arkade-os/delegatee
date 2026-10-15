@@ -33,6 +33,9 @@ func (s *service) RegisterSpend(
 	if err != nil {
 		return nil, err
 	}
+	if tmpl.Trigger() != nil {
+		return nil, errStreamOnly
+	}
 	if len(outpoints) != len(tmpl.Inputs()) {
 		return nil, fmt.Errorf("%w: %d outpoints for %d inputs", ErrInvalidArgs, len(outpoints), len(tmpl.Inputs()))
 	}
@@ -58,7 +61,7 @@ func (s *service) RegisterSpend(
 	d, err := s.create(ctx, domain.Delegation{
 		Fingerprint: fingerprint, TemplateID: templateID, Variables: variables,
 		ExpiresAt: &expiresAt, DelegatePubKey: s.cosigners[0].pubKey, Slots: slots,
-	}, false)
+	}, s.limits.MaxDelegations)
 	if err == nil {
 		s.wakeScan()
 	}

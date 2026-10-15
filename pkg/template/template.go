@@ -58,12 +58,14 @@ type Template struct {
 	outputs   []output
 	fee       *fee
 	packets   *packetSpec
+	trigger   *Trigger
 	artifacts []string
 }
 
 type construction struct {
-	def  *Definition
-	args map[string]byteTemplate // flattened constructor name → binding
+	def     *Definition
+	args    map[string]byteTemplate // flattened constructor name → binding
+	taptree string                  // bytes variable holding the whole tree; "" builds it from def
 }
 
 type input struct {
@@ -143,7 +145,7 @@ func Parse(ctx context.Context, doc []byte, resolve Resolver) (*Template, error)
 	if err != nil {
 		return nil, err
 	}
-	m, err := object(ErrInvalidTemplate, v, "template", []string{"format", "type", "inputs", "outputs"}, "variables", "secrets", "fees", "packets")
+	m, err := object(ErrInvalidTemplate, v, "template", []string{"format", "type", "inputs", "outputs"}, "variables", "secrets", "fees", "packets", "trigger")
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +156,7 @@ func Parse(ctx context.Context, doc []byte, resolve Resolver) (*Template, error)
 	if !slices.Contains([]Type{Intent, Offchain, Onchain}, Type(typ)) {
 		return nil, bad("unknown type %q", typ)
 	}
-	p := &parser{ctx: ctx, resolve: resolve, t: &Template{
+	p := &parser{ctx: ctx, resolve: resolve, named: map[string]bool{}, t: &Template{
 		typ: Type(typ), variables: map[string]string{}, secrets: map[string]secret{},
 	}}
 	secrets, err := p.declarations(m)
@@ -194,7 +196,13 @@ func Parse(ctx context.Context, doc []byte, resolve Resolver) (*Template, error)
 	if err := p.packets(m); err != nil {
 		return nil, err
 	}
+	if err := p.trigger(m); err != nil {
+		return nil, err
+	}
 	if err := p.t.checkPlacement(); err != nil {
+		return nil, err
+	}
+	if err := p.confineTaptrees(); err != nil {
 		return nil, err
 	}
 	b, err := canonical(m)
@@ -240,6 +248,7 @@ type parser struct {
 	ctx     context.Context
 	resolve Resolver
 	t       *Template
+	named   map[string]bool // names the bindings reference
 }
 
 func (p *parser) declarations(m map[string]any) (map[string]any, error) {
@@ -282,6 +291,16 @@ func (p *parser) declarations(m map[string]any) (map[string]any, error) {
 		return nil, bad("more than %d variables and secrets", maxSlots)
 	}
 	return secrets, nil
+}
+
+// confineTaptrees: a taptree variable escapes the push size cap, so it fills nothing else.
+func (p *parser) confineTaptrees() error {
+	for _, in := range p.t.inputs {
+		if n := in.contract.taptree; p.named[n] {
+			return bad("taptree variable %q is used outside the taptree field", n)
+		}
+	}
+	return nil
 }
 
 func (p *parser) secretBodies(secrets map[string]any) error {
@@ -370,7 +389,7 @@ func (p *parser) intVariable(v any) (string, bool, error) {
 }
 
 func (p *parser) construction(v any) (*construction, error) {
-	m, err := object(ErrInvalidTemplate, v, "contract", []string{"definition"}, "arguments")
+	m, err := object(ErrInvalidTemplate, v, "contract", []string{"definition"}, "arguments", "taptree")
 	if err != nil {
 		return nil, err
 	}
@@ -387,6 +406,14 @@ func (p *parser) construction(v any) (*construction, error) {
 		return nil, err
 	}
 	c := &construction{def: def, args: map[string]byteTemplate{}}
+	if raw, ok := m["taptree"]; ok {
+		s, _ := raw.(string)
+		name := placeholder.FindStringSubmatch(s)
+		if name == nil || p.t.variables[name[1]] != "bytes" {
+			return nil, bad("taptree must name a bytes variable, got %v", raw)
+		}
+		c.taptree = name[1]
+	}
 	for _, f := range flat {
 		raw, ok := args[f.Name]
 		if !ok {
@@ -595,6 +622,7 @@ func (p *parser) bind(v any, typ string, secrets bool) (byteTemplate, error) {
 		return nil, err
 	}
 	for _, n := range b.names() {
+		p.named[n] = true
 		_, isVar := p.t.variables[n]
 		_, isSecret := p.t.secrets[n]
 		if !isVar && (!secrets || !isSecret) {

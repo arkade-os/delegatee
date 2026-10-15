@@ -106,6 +106,21 @@ func (q *Queries) DeleteSettlement(ctx context.Context, arg DeleteSettlementPara
 	return err
 }
 
+const deleteSpawnedBefore = `-- name: DeleteSpawnedBefore :execrows
+DELETE FROM delegations d
+WHERE d.status = 'expired' AND d.parent_id IS NOT NULL AND d.address <> '' AND d.updated_at < $1
+    AND NOT EXISTS (SELECT 1 FROM delegations c WHERE c.parent_id = d.id)
+`
+
+// a cancelled watch is kept: it still blocks its fingerprint
+func (q *Queries) DeleteSpawnedBefore(ctx context.Context, before time.Time) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteSpawnedBefore, before)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deleteTemplate = `-- name: DeleteTemplate :execrows
 DELETE FROM templates WHERE id = $1
 `
@@ -136,7 +151,11 @@ WITH inserted AS (
     INSERT INTO delegations (fingerprint, address, template_id, variables, parent_id, expires_at, delegate_pubkey, slots)
     SELECT $1::text, $2::text, $3::text, $4::jsonb, $5::bigint,
         $6::timestamptz, $7::text, $8::jsonb
-    WHERE $9::int = 0 OR (SELECT COUNT(*) FROM delegations WHERE status = 'active') < $9::int
+    WHERE $9::int = 0 OR (
+        SELECT COUNT(*) FROM delegations
+        WHERE status = 'active'
+            AND (parent_id IS NOT NULL AND address <> '') = ($5::bigint IS NOT NULL AND $2::text <> '')
+    ) < $9::int
     -- only active rows are unique: a stopped instance registered again is a new row
     ON CONFLICT (fingerprint) WHERE status = 'active' DO UPDATE SET fingerprint = EXCLUDED.fingerprint
     RETURNING id, fingerprint, address, template_id, variables, parent_id, expires_at, delegate_pubkey, slots, status, created_at, updated_at
@@ -173,7 +192,8 @@ type InsertDelegationRow struct {
 	UpdatedAt      time.Time
 }
 
-// no row: max_active (0 = uncapped) active delegations exist and none has the fingerprint
+// no row: max_active (0 = uncapped) active delegations of its kind exist and none has the fingerprint;
+// spawned watches (a parent and an address) and the other delegations are counted apart
 func (q *Queries) InsertDelegation(ctx context.Context, arg InsertDelegationParams) (InsertDelegationRow, error) {
 	row := q.db.QueryRowContext(ctx, insertDelegation,
 		arg.Fingerprint,
@@ -642,7 +662,9 @@ func (q *Queries) SelectTemplate(ctx context.Context, id string) (Template, erro
 }
 
 const selectTemplateSummaries = `-- name: SelectTemplateSummaries :many
-SELECT id, artifact_ids, params, status, failures, trusted, created_at FROM templates
+SELECT id, artifact_ids, params, status, failures, trusted, created_at,
+    COALESCE(convert_from(document, 'UTF8')::jsonb->>'type', '')::text AS type
+FROM templates
 WHERE $1::text = '' OR status = $1::text
 ORDER BY created_at DESC
 `
@@ -655,6 +677,7 @@ type SelectTemplateSummariesRow struct {
 	Failures    int32
 	Trusted     bool
 	CreatedAt   time.Time
+	Type        string
 }
 
 func (q *Queries) SelectTemplateSummaries(ctx context.Context, status string) ([]SelectTemplateSummariesRow, error) {
@@ -674,6 +697,7 @@ func (q *Queries) SelectTemplateSummaries(ctx context.Context, status string) ([
 			&i.Failures,
 			&i.Trusted,
 			&i.CreatedAt,
+			&i.Type,
 		); err != nil {
 			return nil, err
 		}
