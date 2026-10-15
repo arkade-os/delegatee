@@ -573,6 +573,10 @@ func TestRenewalFailuresAreRecordedOnce(t *testing.T) {
 	scan(due)
 	require.Len(t, env.repo.recorded(), 1, "same failure, no new row")
 	require.Len(t, env.emulator.submitted, 2, "but it was retried")
+	held := env.svc.Status().Holdings[d.ID]
+	require.Equal(t, 2, held.Failures, "but counted")
+	require.False(t, held.FailingSince.After(held.LastFailure))
+	since := held.FailingSince
 
 	// a different reason is news
 	env.emulator.reject = nil
@@ -581,6 +585,9 @@ func TestRenewalFailuresAreRecordedOnce(t *testing.T) {
 	recorded = env.repo.recorded()
 	require.Len(t, recorded, 2)
 	require.Equal(t, "arkd: boom", recorded[1].Error)
+	held = env.svc.Status().Holdings[d.ID]
+	require.Equal(t, 3, held.Failures)
+	require.Equal(t, since, held.FailingSince, "still failing since the first")
 	tmpl, err := env.svc.GetTemplate(t.Context(), d.TemplateID)
 	require.NoError(t, err)
 	require.Zero(t, tmpl.Failures, "failures to answer never count against the template")
@@ -589,8 +596,8 @@ func TestRenewalFailuresAreRecordedOnce(t *testing.T) {
 	next := env.coin(t, env.userKey.PubKey(), 1000, time.Minute)
 	env.advertised(t, next)
 	scan(next)
-	require.NotContains(t, env.svc.batch.lastFailure, due.Outpoint.String())
-	require.Contains(t, env.svc.batch.lastFailure, next.Outpoint.String())
+	require.NotContains(t, env.svc.failing, due.Outpoint.String())
+	require.Contains(t, env.svc.failing, next.Outpoint.String())
 
 	renewals, err := env.svc.ListRenewals(t.Context(), d)
 	require.NoError(t, err)
@@ -598,6 +605,26 @@ func TestRenewalFailuresAreRecordedOnce(t *testing.T) {
 	last, err := env.svc.LastRenewals(t.Context())
 	require.NoError(t, err)
 	require.Contains(t, last, d.ID)
+}
+
+func TestPendingTxs(t *testing.T) {
+	env := newTestEnv(t)
+	for _, st := range []domain.Settlement{
+		{Txid: "a", SpentBy: "a", DelegationID: 1, Coins: []string{"x:0"}},
+		{Txid: "b", SpentBy: "commitment", DelegationID: 1},
+		{Txid: "c", SpentBy: "c", DelegationID: 1, Finals: []string{"f"}},
+		{Txid: "d", SpentBy: "d", DelegationID: 1, Landed: true},
+		{Txid: "e", SpentBy: "e", DelegationID: 2},
+	} {
+		require.NoError(t, env.repo.SaveSettlement(t.Context(), st))
+	}
+	pending, err := env.svc.PendingTxs(t.Context(), 1)
+	require.NoError(t, err)
+	states := map[string]string{}
+	for _, p := range pending {
+		states[p.Txid] = p.State
+	}
+	require.Equal(t, map[string]string{"a": "submitted", "b": "batch", "c": "finalizing", "d": "landed"}, states)
 }
 
 func TestHealth(t *testing.T) {

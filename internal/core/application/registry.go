@@ -101,7 +101,7 @@ func (s *service) RegisterTemplate(ctx context.Context, doc []byte) (*domain.Tem
 	s.registerMu.Lock()
 	defer s.registerMu.Unlock()
 	t, err := s.repo.CreateTemplate(ctx, domain.Template{
-		ID: parsed.ID(), Document: doc, ArtifactIDs: parsed.Artifacts(), Params: params,
+		ID: parsed.ID(), Document: doc, ArtifactIDs: parsed.Artifacts(), Params: params, Type: string(parsed.Type()),
 	}, s.limits.MaxTemplates)
 	if errors.Is(err, domain.ErrCapReached) {
 		return nil, fmt.Errorf("%w: template cap reached", ErrFull)

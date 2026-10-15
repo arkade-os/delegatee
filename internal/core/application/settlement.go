@@ -488,3 +488,30 @@ func (s *service) refusedFor(txid string, refused bool) time.Duration {
 	}
 	return time.Since(s.refusedSince[txid])
 }
+
+func (s *service) PendingTxs(ctx context.Context, delegationID int64) ([]PendingTx, error) {
+	rows, err := s.repo.ListSettlements(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []PendingTx
+	for _, r := range rows {
+		if r.DelegationID == delegationID {
+			out = append(out, PendingTx{Txid: r.Txid, SpentBy: r.SpentBy, Coins: r.Coins, State: pendingState(r), CreatedAt: r.CreatedAt})
+		}
+	}
+	return out, nil
+}
+
+// pendingState: a batch waits for its commitment, an offchain tx for arkd to finalize it or for the indexer to see it.
+func pendingState(r domain.Settlement) string {
+	switch {
+	case r.Landed:
+		return "landed"
+	case len(r.Finals) > 0:
+		return "finalizing"
+	case r.SpentBy != r.Txid:
+		return "batch"
+	}
+	return "submitted"
+}

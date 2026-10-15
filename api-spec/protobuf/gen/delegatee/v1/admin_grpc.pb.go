@@ -22,6 +22,7 @@ const (
 	AdminService_ListDelegations_FullMethodName          = "/delegatee.v1.AdminService/ListDelegations"
 	AdminService_GetDelegationById_FullMethodName        = "/delegatee.v1.AdminService/GetDelegationById"
 	AdminService_GetStatus_FullMethodName                = "/delegatee.v1.AdminService/GetStatus"
+	AdminService_GetHealth_FullMethodName                = "/delegatee.v1.AdminService/GetHealth"
 	AdminService_CancelDelegation_FullMethodName         = "/delegatee.v1.AdminService/CancelDelegation"
 	AdminService_ResumeDelegation_FullMethodName         = "/delegatee.v1.AdminService/ResumeDelegation"
 	AdminService_RegisterStreamDelegation_FullMethodName = "/delegatee.v1.AdminService/RegisterStreamDelegation"
@@ -42,6 +43,8 @@ type AdminServiceClient interface {
 	// GetDelegationById returns any delegation, with its coins and history.
 	GetDelegationById(ctx context.Context, in *GetDelegationByIdRequest, opts ...grpc.CallOption) (*GetDelegationByIdResponse, error)
 	GetStatus(ctx context.Context, in *GetStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error)
+	// GetHealth checks each dependency, with the error of the failing ones.
+	GetHealth(ctx context.Context, in *GetHealthRequest, opts ...grpc.CallOption) (*GetHealthResponse, error)
 	// CancelDelegation stops the active watches of an address, or one
 	// delegation by id: advertisements have no address. Registering a
 	// cancelled delegation again is refused until ResumeDelegation.
@@ -92,6 +95,16 @@ func (c *adminServiceClient) GetStatus(ctx context.Context, in *GetStatusRequest
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetStatusResponse)
 	err := c.cc.Invoke(ctx, AdminService_GetStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) GetHealth(ctx context.Context, in *GetHealthRequest, opts ...grpc.CallOption) (*GetHealthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetHealthResponse)
+	err := c.cc.Invoke(ctx, AdminService_GetHealth_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -197,6 +210,8 @@ type AdminServiceServer interface {
 	// GetDelegationById returns any delegation, with its coins and history.
 	GetDelegationById(context.Context, *GetDelegationByIdRequest) (*GetDelegationByIdResponse, error)
 	GetStatus(context.Context, *GetStatusRequest) (*GetStatusResponse, error)
+	// GetHealth checks each dependency, with the error of the failing ones.
+	GetHealth(context.Context, *GetHealthRequest) (*GetHealthResponse, error)
 	// CancelDelegation stops the active watches of an address, or one
 	// delegation by id: advertisements have no address. Registering a
 	// cancelled delegation again is refused until ResumeDelegation.
@@ -230,6 +245,9 @@ func (UnimplementedAdminServiceServer) GetDelegationById(context.Context, *GetDe
 }
 func (UnimplementedAdminServiceServer) GetStatus(context.Context, *GetStatusRequest) (*GetStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetStatus not implemented")
+}
+func (UnimplementedAdminServiceServer) GetHealth(context.Context, *GetHealthRequest) (*GetHealthResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetHealth not implemented")
 }
 func (UnimplementedAdminServiceServer) CancelDelegation(context.Context, *CancelDelegationRequest) (*CancelDelegationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelDelegation not implemented")
@@ -328,6 +346,24 @@ func _AdminService_GetStatus_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AdminServiceServer).GetStatus(ctx, req.(*GetStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_GetHealth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetHealthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).GetHealth(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_GetHealth_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).GetHealth(ctx, req.(*GetHealthRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -512,6 +548,10 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetStatus",
 			Handler:    _AdminService_GetStatus_Handler,
+		},
+		{
+			MethodName: "GetHealth",
+			Handler:    _AdminService_GetHealth_Handler,
 		},
 		{
 			MethodName: "CancelDelegation",

@@ -73,9 +73,20 @@ type Holdings struct {
 	NextDeadline time.Time // of the soonest coin; zero without a plan entry
 	NextBatchAt  time.Time // the batch its soonest coin joins; zero without a plan entry
 	Renewing     bool      // a lane holds it
+	// FailingSince is zero unless the last attempt of a coin failed; Failures counts attempts since.
+	FailingSince, LastFailure time.Time
+	Failures                  int
 	// Late counts coins a session's worth of time past their batch time and still here.
 	Late       int
 	LateAmount uint64
+}
+
+// PendingTx is a transaction of the daemon's that spends a delegation's coins; State is batch, submitted, finalizing or landed.
+type PendingTx struct {
+	Txid, SpentBy string
+	Coins         []string
+	State         string
+	CreatedAt     time.Time
 }
 
 // Status never depends on arkd: it must stay visible during an outage.
@@ -126,6 +137,8 @@ type Service interface {
 	IntentFees(ctx context.Context) (arkfee.Config, error)
 	Vtxos(ctx context.Context, d *domain.Delegation) ([]clientlib.Vtxo, error)
 	Health(ctx context.Context) map[string]error
+	// PendingTxs lists the daemon's transactions holding a delegation's coins until they land.
+	PendingTxs(ctx context.Context, delegationID int64) ([]PendingTx, error)
 
 	Bootstrap(ctx context.Context) error
 	RegisterArtifact(ctx context.Context, document []byte) (*domain.Artifact, error)
@@ -214,6 +227,7 @@ type service struct {
 	onchainDrops uint64
 	inFlight     map[int64]bool       // delegations a lane is working on
 	quarantined  map[string]time.Time // coins of an intent that sank a batch, kept out until then
+	failing      map[string]*failure  // coins whose last attempt failed
 
 	// the scan alone
 	held         map[string]bool      // coins of the daemon's settlements that may still land, as of the scan
@@ -369,6 +383,7 @@ func NewServiceWithKeys(
 		consumed:            consumed,
 		inFlight:            map[int64]bool{},
 		quarantined:         map[string]time.Time{},
+		failing:             map[string]*failure{},
 		batch:               lane{queued: map[string]*pendingIntent{}},
 		plan:                &plan{},
 		onchainCache:        map[string]onchainSnapshot{},
@@ -656,15 +671,23 @@ func (s *service) CountActive(ctx context.Context) (int64, error) {
 }
 
 func (s *service) Status() Status {
+	failing := s.failingByDelegation()
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	holdings := maps.Clone(s.holdings)
+	for id, f := range failing {
+		if h, ok := holdings[id]; ok {
+			h.FailingSince, h.LastFailure, h.Failures = f.since, f.last, f.count
+			holdings[id] = h
+		}
+	}
 	return Status{
 		LastScan:        s.lastScan,
 		RenewingVtxos:   int(s.batch.busy.Load() + s.direct.busy.Load()),
 		PollInterval:    s.pollInterval,
 		Renewed:         s.renewed.Load(),
 		Failed:          s.failed.Load(),
-		Holdings:        maps.Clone(s.holdings),
+		Holdings:        holdings,
 		Unwatched:       maps.Clone(s.unwatched),
 		Batches:         s.plan.batches,
 		BatchAt:         s.plan.batchAt,
@@ -1000,6 +1023,7 @@ func (s *service) scan(ctx context.Context) {
 		unwatched = map[int64]string{}
 	}
 	maps.Copy(unwatched, unusable)
+	s.forgetMoved(inputs)
 	p := s.planBatches(s.entries, now)
 	s.syncSubscription(ctx, s.wakeScripts())
 	var batch, direct []renewalInput
@@ -1103,23 +1127,12 @@ func (s *service) renewAndRecord(ctx context.Context, inputs []renewalInput) {
 	defer cancel()
 	results := s.renew(renewCtx, inputs)
 	ctx = context.WithoutCancel(ctx)
-	s.recordRenewals(ctx, inputs, results)
+	s.recordRenewals(ctx, results)
 	s.recordTemplateOutcomes(ctx, results)
 }
 
-// recordRenewals reports a vtxo failing the same way every poll once.
-func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, results []renewalResult) {
-	l := &s.batch
-	if len(inputs) > 0 {
-		l = s.laneOf(inputs[0])
-	}
-	due := make(map[string]string, len(inputs))
-	for _, in := range inputs {
-		if msg, ok := l.lastFailure[in.coin.Outpoint.String()]; ok {
-			due[in.coin.Outpoint.String()] = msg
-		}
-	}
-	l.lastFailure = due
+// recordRenewals records a failure that repeats the last one of its coin once, and counts the repeats.
+func (s *service) recordRenewals(ctx context.Context, results []renewalResult) {
 	for _, res := range results {
 		if res.blamed {
 			s.quarantine(res.inputs)
@@ -1134,6 +1147,7 @@ func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, res
 	byDelegation := map[key]*domain.Renewal{}
 	delegations := map[int64]domain.Delegation{}
 	var order []key
+	now := time.Now()
 	for _, res := range results {
 		errMsg := ""
 		if res.err != nil {
@@ -1141,11 +1155,8 @@ func (s *service) recordRenewals(ctx context.Context, inputs []renewalInput, res
 		}
 		for _, in := range res.inputs {
 			outpoint := in.coin.Outpoint.String()
-			if errMsg != "" && l.lastFailure[outpoint] == errMsg {
+			if !s.noteAttempt(in.watched.delegation.ID, outpoint, errMsg, now) {
 				continue
-			}
-			if delete(l.lastFailure, outpoint); errMsg != "" {
-				l.lastFailure[outpoint] = errMsg
 			}
 			delegations[in.watched.delegation.ID] = in.watched.delegation
 			k := key{in.watched.delegation.ID, res.commitmentTxid, errMsg}

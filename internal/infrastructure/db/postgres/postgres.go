@@ -380,6 +380,7 @@ func (r *Repository) ListTemplates(ctx context.Context, status string) ([]domain
 		if err != nil {
 			return nil, err
 		}
+		t.Type = row.Type
 		out[i] = *t
 	}
 	return out, nil
@@ -524,8 +525,10 @@ func toTemplate(row queries.Template) (*domain.Template, error) {
 	if err := json.Unmarshal(row.Params, &params); err != nil {
 		return nil, fmt.Errorf("template %s params: %w", row.ID, err)
 	}
+	var doc struct{ Type string }
+	_ = json.Unmarshal(row.Document, &doc) // a summary row has no document
 	return &domain.Template{
-		ID: row.ID, Document: row.Document, ArtifactIDs: row.ArtifactIds, Params: params,
+		ID: row.ID, Document: row.Document, ArtifactIDs: row.ArtifactIds, Params: params, Type: doc.Type,
 		Status: row.Status, Failures: int(row.Failures), Trusted: row.Trusted, CreatedAt: row.CreatedAt,
 	}, nil
 }

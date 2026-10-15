@@ -137,7 +137,9 @@ SELECT * FROM inserted UNION ALL (SELECT * FROM templates WHERE id = @id) LIMIT 
 SELECT * FROM templates WHERE id = @id;
 
 -- name: SelectTemplateSummaries :many
-SELECT id, artifact_ids, params, status, failures, trusted, created_at FROM templates
+SELECT id, artifact_ids, params, status, failures, trusted, created_at,
+    COALESCE(convert_from(document, 'UTF8')::jsonb->>'type', '')::text AS type
+FROM templates
 WHERE sqlc.arg(status)::text = '' OR status = sqlc.arg(status)::text
 ORDER BY created_at DESC;
 

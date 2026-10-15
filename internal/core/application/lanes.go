@@ -15,9 +15,15 @@ type lane struct {
 	busy    atomic.Int64 // vtxos in flight
 	waiting atomic.Bool  // a scan left it inputs while busy
 	wasBusy bool         // as the scan began; the scan's alone
-	// lost on restart: the failure is then reported again
-	lastFailure map[string]string
-	queued      map[string]*pendingIntent
+	queued  map[string]*pendingIntent
+}
+
+// failure is how a coin keeps failing; lost on restart, when it is recorded again.
+type failure struct {
+	delegation  int64
+	err         string
+	since, last time.Time
+	count       int
 }
 
 func queuedKey(p *pendingIntent) string { return p.inputs[0].coin.Outpoint.String() }
@@ -168,4 +174,47 @@ func (s *service) isQuarantined(op string, now time.Time) bool {
 	maps.DeleteFunc(s.quarantined, func(_ string, until time.Time) bool { return !now.Before(until) })
 	_, ok := s.quarantined[op]
 	return ok
+}
+
+// noteAttempt tracks the coins that keep failing, and reports whether the attempt is worth a record: a repeated failure is not.
+func (s *service) noteAttempt(delegation int64, op, err string, now time.Time) bool {
+	s.shared.Lock()
+	defer s.shared.Unlock()
+	f := s.failing[op]
+	if err == "" {
+		delete(s.failing, op)
+		return true
+	}
+	if f == nil {
+		f = &failure{delegation: delegation, since: now}
+		s.failing[op] = f
+	}
+	repeat := f.err == err
+	f.err, f.last = err, now
+	f.count++
+	return !repeat
+}
+
+// forgetMoved drops the failures of coins the scan no longer finds, nor a lane holds: they moved, or their delegation ended.
+func (s *service) forgetMoved(inputs []renewalInput) {
+	due := make(map[string]bool, len(inputs))
+	for _, in := range inputs {
+		due[in.coin.Outpoint.String()] = true
+	}
+	s.shared.Lock()
+	defer s.shared.Unlock()
+	maps.DeleteFunc(s.failing, func(op string, f *failure) bool { return !due[op] && !s.held[op] && !s.sampled[f.delegation] })
+}
+
+// failingByDelegation keeps, for each delegation, the coin failing the longest.
+func (s *service) failingByDelegation() map[int64]failure {
+	s.shared.Lock()
+	defer s.shared.Unlock()
+	out := map[int64]failure{}
+	for _, f := range s.failing {
+		if cur, ok := out[f.delegation]; !ok || f.since.Before(cur.since) {
+			out[f.delegation] = *f
+		}
+	}
+	return out
 }

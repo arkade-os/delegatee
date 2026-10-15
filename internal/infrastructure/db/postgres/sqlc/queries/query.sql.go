@@ -662,7 +662,9 @@ func (q *Queries) SelectTemplate(ctx context.Context, id string) (Template, erro
 }
 
 const selectTemplateSummaries = `-- name: SelectTemplateSummaries :many
-SELECT id, artifact_ids, params, status, failures, trusted, created_at FROM templates
+SELECT id, artifact_ids, params, status, failures, trusted, created_at,
+    COALESCE(convert_from(document, 'UTF8')::jsonb->>'type', '')::text AS type
+FROM templates
 WHERE $1::text = '' OR status = $1::text
 ORDER BY created_at DESC
 `
@@ -675,6 +677,7 @@ type SelectTemplateSummariesRow struct {
 	Failures    int32
 	Trusted     bool
 	CreatedAt   time.Time
+	Type        string
 }
 
 func (q *Queries) SelectTemplateSummaries(ctx context.Context, status string) ([]SelectTemplateSummariesRow, error) {
@@ -694,6 +697,7 @@ func (q *Queries) SelectTemplateSummaries(ctx context.Context, status string) ([
 			&i.Failures,
 			&i.Trusted,
 			&i.CreatedAt,
+			&i.Type,
 		); err != nil {
 			return nil, err
 		}

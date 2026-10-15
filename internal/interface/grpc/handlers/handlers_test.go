@@ -111,6 +111,7 @@ func TestTemplateHandlers(t *testing.T) {
 	require.Equal(t, int64(2), adminList.GetTemplates()[0].GetDelegations())
 	require.Equal(t, int32(1), adminList.GetTemplates()[0].GetFailures())
 	require.False(t, adminList.GetTemplates()[0].GetTrusted())
+	require.Equal(t, "intent", adminList.GetTemplates()[0].GetType())
 
 	_, err = admin.SetTemplateTrusted(ctx, &delegateev1.SetTemplateTrustedRequest{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
@@ -177,6 +178,10 @@ func TestAdminHandlers(t *testing.T) {
 	require.Equal(t, t0.Add(30*time.Minute).Unix(), mine.GetNextDeadline())
 	require.Equal(t, t0.Add(20*time.Minute).Unix(), mine.GetNextBatchAt())
 	require.True(t, mine.GetRenewing())
+	require.Equal(t, t0.Add(-time.Hour).Unix(), mine.GetFailingSince())
+	require.Equal(t, t0.Unix(), mine.GetLastFailedAt())
+	require.Equal(t, int32(3), mine.GetFailedAttempts())
+	require.Zero(t, other.GetFailingSince())
 	require.Equal(t, "cc", mine.GetLastRenewal().GetCommitmentTxid())
 	require.False(t, other.GetManaged(), "not seen by the scanner")
 	require.Equal(t, "template disabled", other.GetUnmanagedReason())
@@ -201,6 +206,10 @@ func TestAdminHandlers(t *testing.T) {
 	byID, err := h.GetDelegationById(ctx, &delegateev1.GetDelegationByIdRequest{Id: 7})
 	require.NoError(t, err)
 	require.Equal(t, map[string]int64{"ab:1": t0.Add(20 * time.Minute).Unix()}, byID.GetBatchAt(), "the planned coins of this delegation only")
+	require.Len(t, byID.GetPendingTxs(), 1)
+	require.Equal(t, "finalizing", byID.GetPendingTxs()[0].GetState())
+	require.Equal(t, []string{"ab:1"}, byID.GetPendingTxs()[0].GetCoins())
+	require.Equal(t, t0.Unix(), byID.GetPendingTxs()[0].GetCreatedAt())
 	// arkd down: the status still answers, without fees
 	svc.feesErr = errBoom
 	st, err = h.GetStatus(ctx, &delegateev1.GetStatusRequest{})
@@ -332,6 +341,13 @@ func TestHealth(t *testing.T) {
 	resp, err = h.Check(t.Context(), &grpchealth.HealthCheckRequest{})
 	require.NoError(t, err)
 	require.Equal(t, grpchealth.HealthCheckResponse_NOT_SERVING, resp.GetStatus())
+
+	deps, err := NewAdmin(svc).GetHealth(t.Context(), &delegateev1.GetHealthRequest{})
+	require.NoError(t, err)
+	require.Len(t, deps.GetDependencies(), 2)
+	require.Equal(t, "ark", deps.GetDependencies()[0].GetName(), "sorted by name")
+	require.Equal(t, "boom", deps.GetDependencies()[0].GetError())
+	require.Empty(t, deps.GetDependencies()[1].GetError())
 }
 
 var (
@@ -469,7 +485,8 @@ func (f *fakeService) Status() application.Status {
 	return application.Status{
 		LastScan: t0, RenewingVtxos: 2, PollInterval: time.Minute,
 		Holdings: map[int64]application.Holdings{
-			7: {Vtxos: 2, Amount: 9000, NextExpiry: t0.Add(time.Hour), NextDue: t0, NextDeadline: t0.Add(30 * time.Minute), NextBatchAt: t0.Add(20 * time.Minute), Renewing: true},
+			7: {Vtxos: 2, Amount: 9000, NextExpiry: t0.Add(time.Hour), NextDue: t0, NextDeadline: t0.Add(30 * time.Minute), NextBatchAt: t0.Add(20 * time.Minute), Renewing: true,
+				FailingSince: t0.Add(-time.Hour), LastFailure: t0, Failures: 3},
 			9: {Vtxos: 1, Amount: 100, NextDue: t0, NextBatchAt: t0.Add(5 * time.Minute)}, // boarding: no expiry
 		},
 		Unwatched: map[int64]string{8: "template disabled"},
@@ -486,6 +503,9 @@ func (f *fakeService) IntentFees(context.Context) (arkfee.Config, error) {
 	return arkfee.Config{IntentOffchainInputProgram: "200.0"}, f.feesErr
 }
 func (f *fakeService) Health(context.Context) map[string]error { return f.health }
+func (f *fakeService) PendingTxs(_ context.Context, id int64) ([]application.PendingTx, error) {
+	return []application.PendingTx{{Txid: "tx", SpentBy: "tx", Coins: []string{"ab:1"}, State: "finalizing", CreatedAt: t0}}, f.err
+}
 
 func (f *fakeService) RegisterArtifact(_ context.Context, doc []byte) (*domain.Artifact, error) {
 	if f.full {
@@ -523,7 +543,7 @@ func (f *fakeService) RegisterTemplate(_ context.Context, doc []byte) (*domain.T
 	}
 	t := &domain.Template{
 		ID: "tmpl1", Document: doc, Params: []domain.Param{{Name: "owner", Type: "pubkey"}},
-		Status: "active", Failures: 1,
+		Status: "active", Failures: 1, Type: "intent",
 	}
 	f.templates["tmpl1"] = t
 	return t, nil

@@ -81,7 +81,11 @@ nav .count { min-width: 1.15rem; padding: 0 .35rem; border-radius: 99px; backgro
 #meta button:hover { color: var(--accent); }
 #health { width: .6rem; height: .6rem; border-radius: 50%; background: var(--faint); flex: none; }
 #health.ok { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
-#health.down { background: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }
+#health.down { width: auto; height: auto; padding: .2rem .65rem; border-radius: 99px; background: var(--bad-soft); color: var(--bad); font-size: .78rem; font-weight: 600; white-space: nowrap; }
+.outage { margin: 0 0 1.1rem; padding: .8rem 1rem; border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--line)); border-radius: var(--panel); background: var(--bad-soft); font-size: .88rem; }
+.outage p + p { margin-top: .4rem; }
+.outage b { color: var(--bad); }
+.outage .err { display: block; margin-top: .15rem; color: var(--muted); font: .78rem/1.4 var(--mono); overflow-wrap: anywhere; }
 .pulse { display: inline-block; width: .5rem; height: .5rem; margin-right: .45rem; border-radius: 50%; background: var(--window); animation: pulse 1.4s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .25; } }
 
@@ -120,9 +124,9 @@ nav .count { min-width: 1.15rem; padding: 0 .35rem; border-radius: 99px; backgro
 .rows .count { color: var(--faint); font-size: .76rem; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
 .rows .kind { color: var(--faint); }
 .rows .sub { color: var(--muted); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rows .sub.bad, .rows .sub.late { color: var(--bad); } .rows .sub.renewing { color: var(--window); }
+.rows .sub.bad, .rows .sub.late { color: var(--bad); } .rows .sub.running { color: var(--window); }
 .dot { width: .5rem; height: .5rem; border-radius: 50%; align-self: center; background: var(--line); flex: none; }
-.dot.ok { background: var(--ok); } .dot.bad, .dot.late { background: var(--bad); } .dot.renewing { background: var(--window); } .dot.off { background: none; border: 1px solid var(--faint); }
+.dot.ok { background: var(--ok); } .dot.bad, .dot.late { background: var(--bad); } .dot.running { background: var(--window); } .dot.off { background: none; border: 1px solid var(--faint); }
 .tag { display: inline-block; margin-right: .35rem; padding: 0 .4rem; border-radius: 4px; background: var(--track); color: var(--muted); font-size: .7rem; font-weight: 500; line-height: 1.5; vertical-align: .05em; }
 .tag.bad { background: var(--bad-soft); color: var(--bad); } .tag.ok { background: var(--accent-soft); color: var(--accent); }
 .empty { padding: 1.25rem 1rem; color: var(--muted); max-width: 36rem; line-height: 1.55; }
@@ -157,11 +161,13 @@ nav .count { min-width: 1.15rem; padding: 0 .35rem; border-radius: 99px; backgro
 .facts dd { margin: 0; font-weight: 600; font-size: .96rem; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .45rem; }
 .facts dd .mini { margin-left: 0; flex: none; }
 .facts dd .hash { word-break: normal; }
+.facts.vars { margin-top: .9rem; padding: .85rem 1rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
+.facts.vars dt { font-family: var(--mono); font-size: .72rem; }
 .badge { display: inline-flex; align-items: center; gap: .4rem; border-radius: 99px; padding: .1rem .65rem .1rem .5rem; font-size: .76rem; font-weight: 500; letter-spacing: 0; border: 1px solid var(--line); color: var(--muted); }
 .badge::before { content: ""; width: .45rem; height: .45rem; border-radius: 50%; background: var(--faint); }
 .badge.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; } .badge.ok::before { background: var(--ok); }
 .badge.bad, .badge.late { color: var(--bad); background: var(--bad-soft); border-color: transparent; } .badge.bad::before, .badge.late::before { background: var(--bad); }
-.badge.renewing { color: var(--window); background: var(--window-a); border-color: transparent; } .badge.renewing::before { background: var(--window); }
+.badge.running { color: var(--window); background: var(--window-a); border-color: transparent; } .badge.running::before { background: var(--window); }
 .badge.accent { color: var(--accent); background: var(--accent-soft); border-color: transparent; } .badge.accent::before { background: var(--accent); }
 .note { border-left: 3px solid var(--bad); padding: .55rem .9rem; margin: 1rem 0 0; background: var(--bad-soft); border-radius: 0 var(--r) var(--r) 0; max-width: 46rem; font-size: .88rem; }
 .paths { list-style: none; margin: 0; padding: 0; max-width: 46rem; }
@@ -171,7 +177,7 @@ nav .count { min-width: 1.15rem; padding: 0 .35rem; border-radius: 99px; backgro
 .refs button { font: .8rem var(--mono); min-height: 1.75rem; }
 .refs .tag { font: .78rem var(--mono); padding: .15rem .5rem; }
 
-/* lifetime bar: birth to expiry, renewal window hatched */
+/* lifetime bar: birth to expiry, due window hatched */
 .vtxo { padding: .9rem 0; } .vtxo + .vtxo { border-top: 1px solid var(--line); }
 .vtxo .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; }
 .vtxo .amount { font-weight: 600; }
@@ -184,7 +190,7 @@ nav .count { min-width: 1.15rem; padding: 0 .35rem; border-radius: 99px; backgro
 .life .batch, .horizon .lane .batch, .legend i.b { position: absolute; z-index: 3; top: 50%; width: .7rem; height: .7rem; margin: -.35rem 0 0 -.35rem; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-sizing: border-box; }
 .legend i.b { position: static; display: inline-block; margin: 0 .35rem 0 .2rem; vertical-align: middle; }
 .state { font-size: .82rem; color: var(--muted); }
-.state.in, .state.renewing { color: var(--window); font-weight: 600; } .state.late { color: var(--bad); font-weight: 600; }
+.state.in, .state.running { color: var(--window); font-weight: 600; } .state.late { color: var(--bad); font-weight: 600; }
 .life-info { font-size: .78rem; font-variant-numeric: tabular-nums; }
 .life-info summary { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: .35rem .85rem; padding: .15rem 1.25rem .15rem 0; cursor: pointer; list-style: none; border-radius: 4px; }
 .life-info summary::-webkit-details-marker { display: none; }
@@ -192,7 +198,7 @@ nav .count { min-width: 1.15rem; padding: 0 .35rem; border-radius: 99px; backgro
 .life-info[open] summary::after { transform: rotate(225deg); top: .8rem; }
 .life-info summary:hover { background: var(--hover); }
 .life-status { padding: .1rem .45rem; border-radius: 4px; background: var(--track); color: var(--muted); font-weight: 500; }
-.life-status.in, .life-status.renewing { background: var(--window-a); color: var(--window); }
+.life-status.in, .life-status.running { background: var(--window-a); color: var(--window); }
 .life-status.late { background: var(--bad-soft); color: var(--bad); }
 .life-batch { color: var(--accent); font-weight: 500; }
 .life-expiry.late { color: var(--bad); }
@@ -214,7 +220,7 @@ nav .count { min-width: 1.15rem; padding: 0 .35rem; border-radius: 99px; backgro
 .horizon .lane.late { background: var(--bad-soft); box-shadow: inset 3px 0 0 var(--bad); }
 .horizon .lane .window, .life .window, .horizon .lane .reserve, .life .reserve { min-width: 3px; }
 .horizon .t { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.horizon .t.in, .horizon .t.renewing { color: var(--window); font-weight: 600; } .horizon .t.late { color: var(--bad); font-weight: 600; }
+.horizon .t.in, .horizon .t.running { color: var(--window); font-weight: 600; } .horizon .t.late { color: var(--bad); font-weight: 600; }
 .axis { position: relative; height: 1.4rem; border-top: 1px solid var(--line); font-size: .72rem; color: var(--faint); }
 .axis i { position: absolute; top: 0; padding: .25rem 0 0 .3rem; border-left: 1px solid var(--line); font-style: normal; white-space: nowrap; }
 .legend { display: flex; flex-wrap: wrap; gap: .3rem 1.25rem; margin: 1rem 0 0; color: var(--muted); font-size: .78rem; }
@@ -228,9 +234,9 @@ nav .count { min-width: 1.15rem; padding: 0 .35rem; border-radius: 99px; backgro
 .ov-head p { color: var(--muted); font-size: .84rem; }
 .ov-head .warn { color: var(--bad); font-weight: 500; }
 .overview > .note { margin: 0 0 1.1rem; max-width: none; }
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); margin: 0 0 1.25rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--panel); overflow: hidden; }
-.stat { display: flex; flex-direction: column; gap: .3rem; min-width: 0; padding: 1rem 1.25rem 1.1rem; margin: 0 0 0 -1px; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: none; text-align: left; font-weight: 400; color: var(--ink); }
-button.stat:hover { background: var(--hover); border-color: var(--line); }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0 0 1.25rem; background: var(--line); border: 1px solid var(--line); border-radius: var(--panel); overflow: hidden; }
+.stat { display: flex; flex-direction: column; gap: .3rem; min-width: 0; padding: 1rem 1.25rem 1.1rem; margin: 0; border: 0; border-radius: 0; background: var(--surface); text-align: left; font-weight: 400; color: var(--ink); }
+button.stat:hover { background: var(--hover); }
 .stat .label { color: var(--muted); font-size: .8rem; font-weight: 500; }
 .stat .fig { font-size: clamp(1.3rem, 2.4vw, 1.6rem); font-weight: 600; letter-spacing: -.03em; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat .fig small { margin-left: .3rem; font-size: .78rem; font-weight: 500; letter-spacing: 0; color: var(--muted); }
@@ -286,7 +292,8 @@ td.res { white-space: nowrap; font-weight: 500; } td.res.ok { color: var(--ok); 
 .attn .why { color: var(--bad); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attn .amt { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .calm { display: flex; align-items: center; gap: .6rem; color: var(--muted); padding: .5rem 0; }
-.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem 2rem; margin: 0; }
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 1rem 2rem; margin: 0; }
+.panel .group { display: flex; align-items: center; gap: .4rem; margin: 1.35rem 0 .75rem; padding-top: 1.1rem; border-top: 1px solid var(--line); font-size: .84rem; color: var(--muted); font-weight: 500; }
 .settings div { display: flex; flex-direction: column; gap: .15rem; }
 .settings dt { color: var(--muted); font-size: .78rem; display: flex; align-items: center; gap: .35rem; }
 .settings dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -322,8 +329,10 @@ dialog .actions { justify-content: flex-end; }
   .list .pane { position: static; height: auto; max-height: 50vh; }
   .hint { display: none; }
   .hero { grid-template-columns: minmax(0, 1fr); }
+  .axis i.tight { display: none; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .facts { grid-template-columns: 1fr 1fr; gap: .75rem 1.5rem; }
-  table { display: block; overflow-x: auto; white-space: nowrap; }
+  table { white-space: nowrap; }
   .horizon { grid-template-columns: minmax(5.5rem, 7.5rem) minmax(0, 1fr); gap: .2rem .75rem; }
   .horizon .t { grid-column: 2; white-space: normal; font-size: .76rem; margin-bottom: .45rem; }
   .attn button { grid-template-columns: .5rem minmax(0, 1fr) auto; }
@@ -397,6 +406,7 @@ const charges = (program) => Boolean(program) && Number(program) !== 0; // "0.0"
 const skeleton = (n) => `<div class="sk-detail" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<i class="sk" style="width:${[55, 90, 40, 70, 30][i % 5]}%"></i>`).join("")}</div>`;
 const tip = (text) => `<button type="button" class="tip" data-tip="${esc(text)}" aria-label="${esc(text)}">?</button>`;
 const dateOf = (ts) => new Date(num(ts) * 1000).toLocaleString();
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
 const EXPLORERS = { bitcoin: "https://arkade.space", mutinynet: "https://explorer.mutinynet.arkade.sh" };
 const explorer = () => EXPLORERS[info?.network];
@@ -451,41 +461,59 @@ function scriptWords(hex) {
   return out.join(" ");
 }
 
-// a watch boards an onchain coin, the rest renew VTXOs
+// a watch boards an onchain coin; an intent watch renews VTXOs, any other spends them in a transaction of its own
 const boards = (delegation) => (delegation.slots || []).some((s) => s.onchain);
 // a spend binds coins until it expires, as RegisterSpend does
 const spends = (delegation) => !delegation.address && num(delegation.expiresAt) > 0;
 // a stream delegation has no address and no slots
 const streams = (delegation) => !delegation.address && !(delegation.slots || []).length;
-const WATCH = { coins: "VTXOs at this address", stop: "Stop renewing", resume: "Resume renewing" };
+// a template's type, from its document; intents share a batch session, the rest run alone
+const typeOf = (id) => templates.find((t) => t.id === id)?.type || undefined;
+const batched = (delegation) => (typeOf(delegation.templateId) ?? "intent") === "intent";
+const WATCH = { coins: "Coins at this address", attempts: "Attempts", ready: "due", stop: "Stop watching", resume: "Resume watching",
+  keep: "Keep watching", ask: "Stop watching this address?", stopped: "Watch stopped" };
 const KINDS = {
-  stream: { done: "spawned", doing: "watching", attempts: "Attempts", coins: "Coins", stop: "Stop watching", resume: "Resume watching",
+  stream: { ...WATCH, done: "spawned", doing: "watching", coins: "Coins", ask: "Stop this stream delegation?", stopped: "Stream stopped",
     noAttempt: "A stream delegation spends nothing: the watches it spawns do.", noCoin: "A stream delegation holds no coin." },
-  spend: { done: "spent", doing: "spending", attempts: "Spend attempts", coins: "Coins it spends", stop: "Cancel spend", resume: "Resume spend",
+  spend: { ...WATCH, done: "spent", doing: "spending", attempts: "Spend attempts", coins: "Coins it spends", stop: "Cancel spend", resume: "Resume spend",
+    keep: "Keep the spend", ask: "Cancel this spend?", stopped: "Spend cancelled",
     noAttempt: "No attempt yet. A spend runs at the next scan.", noCoin: "No coin left: the spend ran, or something else spent its coins." },
-  boarding: { ...WATCH, done: "boarded", doing: "active", attempts: "Boarding attempts",
+  boarding: { ...WATCH, done: "boarded", doing: "active", attempts: "Boarding attempts", coins: "Deposits at this address",
     noAttempt: "No attempt yet. A deposit is boarded once it confirms.", noCoin: "No deposit sits at this address right now." },
-  renewal: { ...WATCH, done: "renewed", doing: "renewing", attempts: "Renewal attempts",
+  renewal: { ...WATCH, done: "renewed", doing: "renewing", attempts: "Renewal attempts", coins: "VTXOs at this address", ready: "renewable",
+    stop: "Stop renewing", resume: "Resume renewing", keep: "Keep renewing", ask: "Stop renewing this address?", stopped: "Renewal stopped",
     noAttempt: "No attempt yet. A VTXO is first renewed in its renewal window.", noCoin: "No spendable VTXO sits at this address right now." },
+  watch: { ...WATCH, done: "spent", doing: "watching",
+    noAttempt: "No attempt yet. A coin is spent at the first scan after it is due.", noCoin: "No spendable coin sits at this address right now." },
 };
-const kindKey = (delegation) => (streams(delegation) ? "stream" : spends(delegation) ? "spend" : boards(delegation) ? "boarding" : "renewal");
+const kindKey = (delegation) => (streams(delegation) ? "stream" : spends(delegation) ? "spend" : boards(delegation) ? "boarding" : batched(delegation) ? "renewal" : "watch");
 const kindOf = (delegation) => KINDS[kindKey(delegation)];
 function stateOf(d) {
   const r = d.lastRenewal, done = kindOf(d.delegation).done;
   if (d.delegation.status !== "active") return { key: "off", dot: "off", text: d.delegation.status === "cancelled" ? "stopped" : d.delegation.status === "done" ? done : d.delegation.status };
   if (d.unmanagedReason)
     return { key: "bad", dot: "bad", skipped: true, text: d.unmanagedReason, why: "The scanner skips it: " + d.unmanagedReason + "." };
-  if (d.renewing) return { key: "ok", dot: "renewing", text: "in a batch now", why: "A batch session holds its coins; the result shows up when it ends." };
+  const fails = num(d.failedAttempts), failing = fails && `failing for ${span(nowSecs() - num(d.failingSince))}, ${plural(fails, "attempt")}`;
+  if (d.renewing && fails) return { key: "bad", dot: "running", text: "retrying, " + failing, why: `Trying again now. The last attempt failed: ${r?.error || "see the attempts"}` };
+  if (d.renewing) return batched(d.delegation)
+    ? { key: "ok", dot: "running", text: "in a batch now", why: "A batch session holds its coins; the result shows up when it ends." }
+    : { key: "ok", dot: "running", text: "running now", why: "Its transaction is being submitted; the result shows up when it ends." };
+  if (fails > 1) return { key: "bad", dot: "bad", text: failing, why: `${r?.error || "The last attempt failed."} Last tried ${ago(d.lastFailedAt)}; the daemon keeps retrying.` };
   if (r && !r.success) return { key: "bad", dot: "bad", text: "failed " + ago(r.attemptedAt), why: r.error };
   // A planned batch time is a scheduling target, not a failure deadline.
   const left = num(d.nextExpiry) - nowSecs(), at = num(d.nextBatchAt);
   if (num(d.nextExpiry) && left <= 0)
-    return { key: "late", dot: "late", text: "expired " + ago(d.nextExpiry), why: "A VTXO expired without being renewed." };
+    return { key: "late", dot: "late", text: "expired " + ago(d.nextExpiry), why: "A VTXO expired without being " + done + "." };
   if (at && at <= nowSecs())
     return { key: "ok", dot: "ok", text: "waiting for batch" };
   if (!r) return { key: "ok", dot: "", text: "not " + done + " yet" };
   return { key: "ok", dot: "ok", text: done + " " + ago(r.attemptedAt) };
 }
+const PENDING = {
+  batch: "registered for a batch, waiting for its commitment", submitted: "submitted, waiting to see it land",
+  finalizing: "accepted by arkd, finalization pending", landed: "landed, its successors are being created",
+};
+const TYPES = { intent: "Joins arkd batches", offchain: "An offchain transaction of its own", onchain: "An onchain transaction" };
 const needsAttention = (d) => ["bad", "late"].includes(stateOf(d).key);
 const MAX_ROWS = 300; // the first ones in the chosen order
 const MAX_LANES = 12, MAX_VTXOS = 40, MAX_BATCHES = 8, MAX_ATTENTION = 6, AXIS_UNIT = 600; // ten minutes: the horizon's finest step
@@ -557,7 +585,7 @@ function ticks(far, pct) {
   const out = [];
   for (const t of [600, 3600, 6 * 3600, 86400, 3 * 86400, 7 * 86400, 14 * 86400, 30 * 86400, 90 * 86400])
     if (t < far * 0.9 && pct(t) - (out.length ? pct(out[out.length - 1]) : 0) >= 9) out.push(t);
-  return `<i style="left:0">now</i>${out.map((t) => `<i style="left:${pct(t)}%">${span(t)}</i>`).join("")}`;
+  return `<i style="left:0">now</i>${out.map((t, i) => `<i style="left:${pct(t)}%"${pct(t) - (i ? pct(out[i - 1]) : 0) < 14 ? ' class="tight"' : ""}>${span(t)}</i>`).join("")}`;
 }
 
 async function loadMeta() {
@@ -569,15 +597,29 @@ async function loadMeta() {
   } catch { /* the health dot says why */ }
 }
 
+const DEPENDENCY = {
+  ark: ["arkd", "No batch, offchain transaction or fee can be read or submitted."],
+  emulator: ["The emulator", "Transactions with an Arkade script cannot be cosigned."],
+  database: ["The database", "Nothing can be registered or recorded."],
+  scanner: ["The scanner", "No coin is being looked at: nothing runs."],
+};
+let down = []; // the dependencies that do not answer; null when the daemon itself does not
+const depName = (d) => (DEPENDENCY[d.name] || [d.name])[0];
+function outage() {
+  if (down === null) return `<div class="outage" role="alert"><b>delegateed does not answer.</b> The figures below are from its last answer.</div>`;
+  return down.length ? `<div class="outage" role="alert">${down.map((d) => `<p><b>${esc(depName(d))} is unreachable.</b> ${esc((DEPENDENCY[d.name] || [])[1] || "")} <span class="err">${esc(d.error)}</span></p>`).join("")}</div>` : "";
+}
 async function loadHealth() {
   const h = $("health");
   let ok = false, text = "delegateed is unreachable";
   try {
-    const r = await fetch("/healthz");
-    ok = r.ok && (await r.json()).status === "SERVING";
-    text = ok ? "arkd, emulator and database reachable" : "A dependency is unreachable, check the logs";
-  } catch { /* unreachable */ }
+    const deps = (await api("/v1/admin/health")).dependencies || [];
+    down = deps.filter((d) => d.error);
+    ok = !down.length;
+    text = ok ? "arkd, emulator, database and scanner all answer" : down.map((d) => `${depName(d)} is down: ${d.error}`).join(". ");
+  } catch { down = null; }
   h.className = ok ? "ok" : "down";
+  h.textContent = ok ? "" : down === null ? "unreachable" : down.length > 1 ? `${down.length} services down` : `${depName(down[0]).replace(/^The /, "")} down`;
   h.dataset.tip = text; h.setAttribute("aria-label", text);
 }
 
@@ -634,7 +676,7 @@ function scanState() {
 function renderHeader() {
   const { busy, stale, last } = scanState(), next = (status.batches || [])[0], p = $("pulse");
   p.className = busy ? "busy" : stale ? "warn" : "";
-  p.innerHTML = busy ? `<i class="pulse"></i>Renewing <b>${plural(status.renewingVtxos, "VTXO")}</b>`
+  p.innerHTML = busy ? `<i class="pulse"></i>Running <b>${plural(status.renewingVtxos, "coin")}</b>`
     : stale ? `Scanner stalled, last scan <b>${ago(last)}</b>`
     : next ? `Next batch <b>${num(next.at) <= nowSecs() ? "now" : ago(next.at)}</b>, ${plural(next.vtxoCount, "VTXO")}`
     : !last ? "First scan pending" : "No batch planned";
@@ -644,13 +686,13 @@ function renderHeader() {
 }
 
 function renderOverview() {
-  const now = nowSecs(), { poll, last, busy, stale } = scanState();
+  const now = nowSecs(), { poll, last, stale } = scanState();
   const active = delegations.filter((d) => d.delegation.status === "active"), managed = active.filter((d) => d.managed);
   const total = managed.reduce((a, d) => a + num(d.totalAmount), 0), vtxos = managed.reduce((a, d) => a + num(d.vtxoCount), 0);
-  const kinds = ["renewal", "boarding", "spend", "stream"].map((k) => [k, active.filter((d) => kindKey(d.delegation) === k).length]).filter(([, n]) => n);
+  const kinds = ["renewal", "boarding", "spend", "watch", "stream"].map((k) => [k, active.filter((d) => kindKey(d.delegation) === k).length]).filter(([, n]) => n);
   const attention = delegations.filter(needsAttention).sort(SORTS.urgency), failing = attention.filter((d) => stateOf(d).key === "bad").length;
   const recent = delegations.filter((d) => d.lastRenewal && now - num(d.lastRenewal.attemptedAt) < 86400), served = recent.filter((d) => d.lastRenewal.success).length;
-  const enabled = templates.filter((t) => t.status === "active").length, broken = templates.filter((t) => t.failures > 0).length;
+  const broken = templates.filter((t) => t.status === "active" && t.failures > 0);
   const strangers = delegations.filter((d) => d.unmanagedReason === "registered under another key").length;
 
   const stats = `<div class="stats">
@@ -658,15 +700,15 @@ function renderOverview() {
     <button class="stat" data-go="delegations" data-filter="active"><span class="label">Active delegations</span><span class="fig">${active.length.toLocaleString()}</span><span class="sub">${kinds.map(([k, n]) => `${n.toLocaleString()} ${k}`).join(", ") || "none yet"}</span></button>
     <button class="stat ${attention.length ? "alert" : ""}" data-go="delegations" data-filter="attention"><span class="label">Needs attention</span><span class="fig">${attention.length.toLocaleString()}</span><span class="sub">${attention.length ? `${failing.toLocaleString()} failing, ${(attention.length - failing).toLocaleString()} expired` : "no issues"}</span></button>
     <div class="stat"><span class="label">Served, last 24 h</span><span class="fig">${served.toLocaleString()}</span><span class="sub">${recent.length - served ? `${(recent.length - served).toLocaleString()} failed their last attempt` : "no failure"}</span></div>
-    <button class="stat" data-go="templates"><span class="label">Templates</span><span class="fig">${enabled.toLocaleString()}<small>active</small></span><span class="sub">${(templates.length - enabled).toLocaleString()} disabled${broken ? `, ${broken.toLocaleString()} failing` : ""}</span></button>
   </div>`;
 
   $("overview").innerHTML = `
     <div class="ov-head"><h2>Overview</h2>
       <p class="${stale ? "warn" : ""}">${!last ? "First scan pending" : `Scanned ${ago(last)}, ${stale ? `expected every ${span(poll)}` : `every ${span(poll)}`}`}</p></div>
-    ${strangers ? `<p class="note"><b>${plural(strangers, "active delegation")}</b> registered under another delegate key cannot be renewed by this instance. ${tip("If the key was rotated by mistake, restore the previous key in the configured keyring.")}</p>` : ""}
+    ${outage()}
+    ${strangers ? `<p class="note"><b>${plural(strangers, "active delegation")}</b> registered under another delegate key cannot be run by this instance. ${tip("If the key was rotated by mistake, restore the previous key in the configured keyring.")}</p>` : ""}
     ${stats}
-    ${batchesPanel(now, busy)}
+    ${batchesPanel(now)}
     <div class="cols">
       ${expiryPanel(managed, now)}
       <section class="panel"><div class="ph"><h3>Needs attention</h3>${attention.length ? `<span class="aside">${plural(attention.length, "delegation")}</span>` : ""}</div>
@@ -676,19 +718,20 @@ function renderOverview() {
             <span class="why">${esc(st.text)}</span><span class="amt">${num(d.vtxoCount) ? sats(d.totalAmount) : ""}</span></button></li>`;
         }).join("")}</ul>${attention.length > MAX_ATTENTION ? `<p class="more"><button class="link" data-go="delegations" data-filter="attention">See all ${attention.length.toLocaleString()}</button></p>` : ""}`
         : `<p class="calm"><span class="dot ok"></span>Every active delegation runs on time.</p>`}
+        ${broken.length ? `<p class="more"><button class="link" data-go="templates">${plural(broken.length, "template")} had every intent rejected lately</button> ${tip("The failure valve disables an untrusted template after too many such cycles.")}</p>` : ""}
       </section>
     </div>
     ${horizonPanel(managed, now)}
     ${daemonPanel()}`;
 }
 
-function batchesPanel(now, busy) {
+function batchesPanel(now) {
   const batches = status.batches || [], first = batches[0], byId = Object.fromEntries(delegations.map((d) => [num(d.delegation.id), d]));
-  const amount = batches.reduce((a, b) => a + num(b.totalAmount), 0);
-  const next = busy ? `<div class="next"><span class="label"><i class="pulse"></i>In progress</span><div class="when busy">Renewing now</div><p><b>${plural(status.renewingVtxos, "VTXO")}</b> in a batch session</p></div>`
+  const amount = batches.reduce((a, b) => a + num(b.totalAmount), 0), session = delegations.filter((d) => d.renewing && batched(d.delegation));
+  const next = session.length ? `<div class="next"><span class="label"><i class="pulse"></i>In progress</span><div class="when busy">Batch running</div><p><b>${plural(session.length, "delegation")}</b> in the session</p></div>`
     : first ? `<div class="next"><span class="label">Next batch</span><div class="when">${num(first.at) <= now ? "now" : ago(first.at)}</div>
         <p><b>${plural(first.vtxoCount, "VTXO")}</b> from ${plural(first.delegationCount, "delegation")}</p><p><b>${sats(first.totalAmount)}</b></p></div>`
-    : `<div class="next"><span class="label">Next batch</span><div class="when">None planned</div><p>Nothing renewable is in sight.</p></div>`;
+    : `<div class="next"><span class="label">Next batch</span><div class="when">None planned</div><p>No coin is due for a batch yet.</p></div>`;
   let timeline = "";
   if (batches.length) {
     const far = Math.max(num(batches[batches.length - 1].at) - now, 2 * 3600), pct = logScale(far);
@@ -710,7 +753,7 @@ function batchesPanel(now, busy) {
       <td><button class="link hash" data-go="id/${esc(b.forcedByDelegationId)}" title="${esc(b.forcedByOutpoint)}">${esc(short(b.forcedByOutpoint, 8))}</button></td>
       <td class="r">${expiry > at ? span(expiry - at) : expiry ? "" : "deposit"}</td></tr>`;
   }).join("");
-  return `<section class="panel"><div class="ph"><h3>Planned batches ${tip(`A batch is submitted ${span(num(status.renewalReserve))} before its first VTXO expires at the latest, and takes every VTXO renewable by then. Deposits wait at most ${span(num(status.boardingMaxWait))}.`)}</h3>
+  return `<section class="panel"><div class="ph"><h3>Planned batches ${tip(`A batch is submitted ${span(num(status.renewalReserve))} before its first VTXO expires at the latest, and takes every VTXO due by then. Deposits wait at most ${span(num(status.boardingMaxWait))}.`)}</h3>
       ${batches.length ? `<span class="aside">${plural(batches.length, "batch", "batches")}, ${sats(amount)}</span>` : ""}</div>
     <div class="hero">${next}${timeline}</div>
     ${rows ? `<div class="scroll"><table><thead><tr><th>When</th><th class="r">VTXOs</th><th class="r">Delegations</th><th class="r">Amount</th>
@@ -741,37 +784,40 @@ function horizonPanel(managed, now) {
   const far = Math.max(...shown.map((d) => num(d.nextExpiry) - now), 2 * AXIS_UNIT), pct = logScale(far);
   const batches = status.batches || [], forcing = (at) => batches.find((b) => num(b.at) === at);
   const lanes = shown.map((d) => {
-    const left = num(d.nextExpiry) - now, win = num(d.nextExpiry) - num(d.nextRenewalAt), st = stateOf(d);
+    const left = num(d.nextExpiry) - now, win = num(d.nextExpiry) - num(d.nextRenewalAt), st = stateOf(d), ready = kindOf(d.delegation).ready;
     // the reserve starts at the deadline: the window's end when it is shorter than the reserve
     const deadline = Math.max(num(d.nextDeadline) - now, left - win), at = num(d.nextBatchAt), joins = at ? Math.max(at - now, 0) : null;
-    const cls = left <= 0 || st.key !== "ok" ? "late" : st.dot === "renewing" ? "renewing" : left <= win ? "in" : "";
-    const text = left <= 0 ? "expired " + ago(d.nextExpiry) : st.key === "bad" ? "not renewing, " + span(left) + " left"
-      : st.dot === "renewing" ? "in the batch now" : st.key === "late" ? st.text
-      : joins === null ? (left <= win ? "renewable now, not planned yet" : "renewable " + ago(d.nextRenewalAt))
-      : `${left <= win ? "renewable now" : "renewable " + ago(d.nextRenewalAt)}, ${joins ? "joins the batch " + ago(at) : "waiting for batch"}${deadline - joins > 60 ? `, ${span(deadline - joins)} before its deadline` : ""}`;
+    const cls = left <= 0 || st.key !== "ok" ? "late" : st.dot === "running" ? "running" : left <= win ? "in" : "";
+    const text = left <= 0 ? "expired " + ago(d.nextExpiry) : st.key === "bad" ? "failing, " + span(left) + " left"
+      : st.dot === "running" || st.key === "late" ? st.text
+      : joins === null ? (left <= win ? `${ready} now, ${batched(d.delegation) ? "not planned yet" : "runs at the next scan"}` : ready + " " + ago(d.nextRenewalAt))
+      : `${left <= win ? ready + " now" : ready + " " + ago(d.nextRenewalAt)}, ${joins ? "joins the batch " + ago(at) : "waiting for batch"}${deadline - joins > 60 ? `, ${span(deadline - joins)} before its deadline` : ""}`;
     const forced = at && forcing(Math.max(at, Math.floor(now)))?.forcedByOutpoint;
     return `<button data-go="${esc("id/" + d.delegation.id)}" title="${esc(d.delegation.address)}">${esc(label(d, 12))}</button>
       <div class="lane ${left <= 0 ? "late" : ""}" role="img" aria-label="${esc(text)}, expires ${ago(d.nextExpiry)}" title="${forced ? esc("batch forced by " + short(forced, 8)) : ""}">
         <div class="left" style="width:${pct(left - win)}%"></div><div class="window" style="width:${pct(deadline) - pct(left - win)}%"></div><div class="reserve" style="width:${pct(left) - pct(deadline)}%"></div>
-        ${joins === null || st.dot === "renewing" ? "" : `<i class="batch" style="left:${Math.min(pct(joins), 100)}%"></i>`}</div>
+        ${joins === null || st.dot === "running" ? "" : `<i class="batch" style="left:${Math.min(pct(joins), 100)}%"></i>`}</div>
       <span class="t n ${cls}" title="${esc(text)}">${text}</span>`;
   }).join("");
   return `<section class="panel"><div class="ph"><h3>Next to expire ${tip("Each bar runs from now to the delegation's earliest expiry, on a log scale.")}</h3>
       ${held.length > shown.length ? `<span class="aside">${shown.length} soonest of ${held.length.toLocaleString()}</span>` : ""}</div>
     <div class="horizon">${lanes}<span></span><div class="axis">${ticks(far, pct)}</div><span></span></div>
-    <p class="legend"><span><i></i>waiting</span><span><i class="w"></i>renewable</span><span><i class="r"></i>reserve, never submitted in</span><span><i class="b"></i>planned batch</span></p>
+    <p class="legend"><span><i></i>waiting</span><span><i class="w"></i>due</span><span><i class="r"></i>reserve, never submitted in</span><span><i class="b"></i>planned batch</span></p>
   </section>`;
 }
 
 function daemonPanel() {
-  const f = status.intentFees, fees = f && [["Fee per VTXO renewed", f.offchainInput], ["Fee per output created", f.offchainOutput]];
+  const f = status.intentFees, fees = f && [["Fee per VTXO input", f.offchainInput], ["Fee per VTXO output", f.offchainOutput],
+    ["Fee per boarding input", f.onchainInput], ["Fee per onchain output", f.onchainOutput]];
   return `<section class="panel"><div class="ph"><h3>Daemon</h3></div><dl class="settings">
     <div><dt>Scan interval</dt><dd>${span(num(status.pollInterval))}</dd></div>
-    <div><dt>Renewal reserve ${tip("The daemon never submits a VTXO this close to its expiry.")}</dt><dd>${span(num(status.renewalReserve))}</dd></div>
+    <div><dt>Expiry reserve ${tip("DELEGATEE_RENEWAL_RESERVE: the batch lane never submits a VTXO this close to its expiry.")}</dt><dd>${span(num(status.renewalReserve))}</dd></div>
     <div><dt>Boarding max wait ${tip("The longest a confirmed deposit waits for a batch.")}</dt><dd>${span(num(status.boardingMaxWait))}</dd></div>
-    ${!f ? `<div><dt>arkd intent fees</dt><dd class="state late">unknown, arkd is unreachable</dd></div>`
-      : fees.map(([k, v]) => `<div><dt>${k} ${tip("arkd fee program, in sats. A delegation whose template caps its fee lower is skipped.")}</dt><dd class="${charges(v) ? "hash" : ""}">${charges(v) ? esc(v) : "free"}</dd></div>`).join("")}
-  </dl></section>`;
+  </dl>
+  <h4 class="group">arkd intent fees ${tip("arkd fee programs, in sats. A delegation whose template caps its fee lower is skipped.")}</h4>
+  ${!f ? `<p class="state late">Unknown: arkd is unreachable.</p>`
+    : `<dl class="settings">${fees.map(([k, v]) => `<div><dt>${k}</dt><dd class="${charges(v) ? "hash" : ""}">${charges(v) ? esc(v) : "free"}</dd></div>`).join("")}</dl>`}
+  </section>`;
 }
 
 let kindFilter = "all";
@@ -798,9 +844,9 @@ function visibleRows() {
 // nextOf says what comes next for an active delegation, else what happened last
 function nextOf(d, st) {
   const k = kindOf(d.delegation), at = num(d.nextBatchAt), due = num(d.nextRenewalAt);
-  if (st.key !== "ok" || st.dot === "renewing" || d.delegation.status !== "active") return st.why || st.text;
+  if (st.key !== "ok" || st.dot === "running" || d.delegation.status !== "active") return st.text;
   if (at) return (at <= nowSecs() ? "waiting for batch" : "joins a batch " + ago(at));
-  if (due && k === KINDS.renewal) return (due <= nowSecs() ? "renewable now" : "renews " + ago(due));
+  if (due) return k.ready + " " + (due <= nowSecs() ? "now" : ago(due));
   return st.text;
 }
 
@@ -810,7 +856,7 @@ function renderList() {
     return `<button data-filter="${id}" aria-pressed="${id === filter}" class="${id === "attention" && n ? "alert" : ""}">${name} <span class="n">${n.toLocaleString()}</span></button>`;
   }).join("");
   const inFilter = delegations.filter(FILTERS.find((f) => f[0] === filter)[2]);
-  $("kinds").innerHTML = [["all", "All"], ["renewal", "Renewal"], ["boarding", "Boarding"], ["spend", "Spend"], ["stream", "Stream"]].map(([id, name]) => {
+  $("kinds").innerHTML = [["all", "All"], ["renewal", "Renewal"], ["boarding", "Boarding"], ["spend", "Spend"], ["watch", "Watch"], ["stream", "Stream"]].map(([id, name]) => {
     const n = id === "all" ? inFilter.length : inFilter.filter((d) => kindKey(d.delegation) === id).length;
     return n || id === "all" || id === kindFilter ? `<button data-kind="${id}" aria-pressed="${id === kindFilter}">${name}<span class="n">${n.toLocaleString()}</span></button>` : "";
   }).join("");
@@ -830,7 +876,7 @@ function renderList() {
     const kind = kindKey(d.delegation), coins = num(d.vtxoCount), next = nextOf(d, st);
     return `<li><button data-go="${esc(selection)}" aria-current="${selection === selected}" title="${esc(d.delegation.address || "#" + d.delegation.id)}">
       <span class="dot ${st.dot}"></span><span class="hash">${esc(label(d))}</span><span class="amt">${coins ? sats(d.totalAmount) : ""}</span>
-      <span></span><span class="sub ${st.key !== "ok" ? st.key : st.dot}" title="${esc(next)}"><span class="kind">${kind}</span>, ${esc(next)}</span><span class="count">${coins ? plural(coins, "coin") : ""}</span></button></li>`;
+      <span></span><span class="sub ${st.key !== "ok" ? st.key : st.dot}" title="${esc(st.why || next)}"><span class="kind">${kind}</span>, ${esc(next)}</span><span class="count">${coins ? plural(coins, "coin") : ""}</span></button></li>`;
   }).join("") + (more > 0 ? `<li class="empty">${more.toLocaleString()} more. Search or filter to narrow down.</li>` : "")
     + (moreRows ? `<li class="empty">Only the newest ${delegations.length.toLocaleString()} delegations are loaded. <button class="link" id="load-more">Load more</button></li>` : "");
   $("rows").querySelector("[aria-current=true]")?.scrollIntoView({ block: "nearest" });
@@ -861,28 +907,30 @@ async function loadDetail() {
   renderDetail();
 }
 
-// batchAt is the planned batch time, 0 without one; renewing when a session holds the delegation
+// batchAt is the planned batch time, 0 without one; running when a lane holds the delegation; lane is false for a transaction of its own
 const openLifetimes = new Set();
 document.addEventListener("toggle", (e) => {
   const key = e.target.dataset?.lifetime;
   if (key && e.target.isConnected) e.target.open ? openLifetimes.add(key) : openLifetimes.delete(key);
 }, true);
-function lifeBar(v, batchAt, renewing, company = { here: 0, elsewhere: 0 }) {
+function lifeBar(v, batchAt, running, company, ready, lane) {
   const now = nowSecs(), at = num(batchAt);
-  const joins = renewing ? "in the batch now" : !at ? "" : at <= now ? "waiting for batch" : `joins the batch ${ago(at)}`;
+  const joins = running ? (lane ? "in the batch now" : "running now")
+    : !lane ? (now >= num(v.renewableAt) ? "runs at the next scan" : "runs at the first scan after")
+    : !at ? "" : at <= now ? "waiting for batch" : `joins the batch ${ago(at)}`;
   const born = num(v.createdAt), dies = num(v.expiresAt), windowSecs = dies - num(v.renewableAt), reserve = num(status?.renewalReserve);
   const life = Math.max(dies - born, 1), pct = (x) => Math.min(100, Math.max(0, (x / life) * 100)), left = dies - now;
   const deadline = Math.max(num(v.renewableAt), dies - reserve);
   const [cls, text] = left <= 0 ? ["late", `expired ${ago(dies)}`]
-    : renewing ? ["renewing", joins]
-    : num(v.renewableAt) >= dies ? ["late", "cannot be renewed before it expires"]
-    : left <= windowSecs ? ["in", `renewable since ${span(now - num(v.renewableAt))}, ${joins || "not planned yet: waiting for a locktime or confirmations"}`]
-    : ["", `renewable ${ago(v.renewableAt)}, ${joins || "not planned yet"}`];
-  const onchain = !dies, due = num(v.renewableAt), waiting = at && at <= now && !renewing;
-  const label = !onchain && left <= 0 ? "Expired" : renewing ? "In batch"
-    : onchain ? "Onchain" : due >= dies ? "Cannot renew" : now >= due ? "Renewable" : "Waiting";
-  const tone = onchain ? (renewing ? "renewing" : "") : cls;
-  const batch = renewing ? "" : at ? (waiting ? "Waiting for batch" : `Batch ${ago(at)}`) : "Batch unplanned";
+    : running ? ["running", joins]
+    : num(v.renewableAt) >= dies ? ["late", "due only after it expires"]
+    : left <= windowSecs ? ["in", `${ready} since ${span(now - num(v.renewableAt))}, ${joins || "not planned yet: waiting for a locktime or confirmations"}`]
+    : ["", `${ready} ${ago(v.renewableAt)}, ${joins || "not planned yet"}`];
+  const onchain = !dies, due = num(v.renewableAt), waiting = at && at <= now && !running;
+  const label = !onchain && left <= 0 ? "Expired" : running ? (lane ? "In batch" : "Running")
+    : onchain ? "Onchain" : due >= dies ? "Due after expiry" : now >= due ? cap(ready) : "Waiting";
+  const tone = onchain ? (running ? "running" : "") : cls;
+  const batch = running || !lane ? "" : at ? (waiting ? "Waiting for batch" : `Batch ${ago(at)}`) : "Batch unplanned";
   const peers = company.here + company.elsewhere;
   const fact = (name, value, date) => `<div><dt>${name}</dt><dd>${esc(value)}${date ? `<small>${esc(dateOf(date))}</small>` : ""}</dd></div>`;
   const eligibility = due ? (due <= now ? `For ${span(now - due)}` : ago(due)) : "Not available";
@@ -891,7 +939,7 @@ function lifeBar(v, batchAt, renewing, company = { here: 0, elsewhere: 0 }) {
       <div class="window" style="width:${pct(windowSecs)}%"></div>
       <div class="reserve" style="width:${pct(dies - deadline)}%"></div>
       <div class="now" style="left:${pct(now - born)}%"></div>
-      ${at && !renewing ? `<i class="batch" style="left:${pct(Math.max(at, now) - born)}%"></i>` : ""}
+      ${at && !running ? `<i class="batch" style="left:${pct(Math.max(at, now) - born)}%"></i>` : ""}
     </div>`}<details class="life-info" data-lifetime="${esc(v.outpoint)}"${openLifetimes.has(v.outpoint) ? " open" : ""}>
       <summary title="Expand timing and batch details">
         <span class="life-status ${tone}">${label}</span>
@@ -901,8 +949,8 @@ function lifeBar(v, batchAt, renewing, company = { here: 0, elsewhere: 0 }) {
         ${!onchain ? `<span class="life-expiry ${left <= 0 ? "late" : ""}">${left <= 0 ? "Expired" : "Expires"} ${ago(dies)}</span>` : ""}
       </summary>
       <dl class="life-meta">
-        ${fact(onchain ? "Boarding eligible" : "Renewable", !onchain && due >= dies ? "Not before expiry" : eligibility, due)}
-        ${fact("Batch", renewing ? "In progress" : at ? (waiting ? `Waiting · target was ${ago(at)}` : ago(at)) : "Unplanned — waiting for a locktime or confirmations", at)}
+        ${fact(onchain ? "Boarding eligible" : cap(ready), !onchain && due >= dies ? "Not before expiry" : eligibility, due)}
+        ${lane ? fact("Batch", running ? "In progress" : at ? (waiting ? `Waiting · target was ${ago(at)}` : ago(at)) : "Unplanned — waiting for a locktime or confirmations", at) : ""}
         ${at ? fact("Other VTXOs in this batch", `${company.here} in this delegation · ${company.elsewhere === null ? "unknown" : company.elsewhere} elsewhere`) : ""}
         ${!onchain ? fact("Expiry", ago(dies), dies) : ""}
         ${v.preconfirmed ? fact("Confirmation", "Not in a batch yet") : ""}
@@ -911,14 +959,15 @@ function lifeBar(v, batchAt, renewing, company = { here: 0, elsewhere: 0 }) {
 }
 
 function renderDetail() {
-  const d = detail.delegation, renewals = detail.renewals || [];
+  const d = detail.delegation, attempts = detail.renewals || [];
   const vtxos = (detail.vtxos || []).slice().sort((a, b) => num(a.renewableAt) - num(b.renewableAt));
   const held = vtxos.reduce((a, v) => a + num(v.amount), 0), shownVtxos = allVtxos ? vtxos : vtxos.slice(0, MAX_VTXOS);
   const active = d.status === "active";
   const inList = delegations.find((x) => x.delegation.id === d.id), st = inList && stateOf(inList);
   const slots = d.slots || [], kind = kindOf(d), spend = kind === KINDS.spend, done = kind.done;
   const types = Object.fromEntries((templates.find((t) => t.id === d.templateId)?.params || []).map((p) => [p.name, p.type]));
-  const batchAt = detail.batchAt || {}, renewing = Boolean(inList?.renewing), reserve = num(status?.renewalReserve);
+  const batchAt = detail.batchAt || {}, running = Boolean(inList?.renewing), reserve = num(status?.renewalReserve), lane = batched(d);
+  const children = delegations.filter((x) => x.delegation.parentId === d.id).sort((a, b) => num(b.delegation.createdAt) - num(a.delegation.createdAt));
   // who else is in a vtxo's batch: the others here, and the batch's count when it is among the ones listed
   const company = (v) => {
     const at = num(batchAt[v.outpoint]), here = vtxos.filter((x) => num(batchAt[x.outpoint]) === at).length - 1;
@@ -928,7 +977,7 @@ function renderDetail() {
   };
   $("detail").innerHTML = `
     <div class="title">
-      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : st?.dot === "renewing" ? "renewing" : "ok"}">${!active ? (d.status === "cancelled" ? "stopped by an operator" : d.status === "done" ? done : esc(d.status)) : st?.skipped ? esc(st.text) : st?.key === "bad" ? (spend ? "failing" : "not renewing") : st?.key === "late" ? "expired" : st?.dot === "renewing" ? "in a batch now" : kind.doing}</span></h2>
+      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : st?.dot === "running" ? "running" : "ok"}">${!active ? (d.status === "cancelled" ? "stopped by an operator" : d.status === "done" ? done : esc(d.status)) : st?.skipped ? esc(st.text) : st?.key === "bad" ? "failing" : st?.key === "late" ? "expired" : st?.dot === "running" ? st.text : kind.doing}</span></h2>
         ${d.address ? `<div class="hash">${esc(d.address)}</div>` : ""}</div>
       <div class="actions">${d.address ? `<button data-copy="${esc(d.address)}">Copy address</button>` : ""}
         ${explorer() && /^t?ark1/.test(d.address) ? `<button data-open="${esc(explorer() + "/address/" + d.address)}">View in explorer</button>` : ""}
@@ -936,48 +985,64 @@ function renderDetail() {
     </div>
     <dl class="facts"><div><dt>Template</dt><dd class="hash" title="${esc(d.templateId)}"><button class="link hash" data-go="templates/${esc(d.templateId)}">${esc(short(d.templateId, 8))}</button><button class="mini" data-copy="${esc(d.templateId)}" title="Copy the template id">copy</button></dd></div>
       ${num(d.parentId) ? `<div><dt>Parent</dt><dd><a href="#id/${num(d.parentId)}">#${num(d.parentId)}</a></dd></div>` : ""}
-      ${Object.entries(d.variables || {}).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${variable(k, types[k], v)}</dd></div>`).join("")}
       <div><dt>Registered</dt><dd title="${esc(dateOf(d.createdAt))}">${ago(d.createdAt)}</dd></div>
       <div><dt>Expires</dt><dd>${num(d.expiresAt) ? `<span title="${esc(dateOf(d.expiresAt))}">${ago(d.expiresAt)}</span>` : "never"}</dd></div></dl>
+    ${Object.keys(d.variables || {}).length ? `<dl class="facts vars" aria-label="Template variables">${Object.entries(d.variables).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${variable(k, types[k], v)}</dd></div>`).join("")}</dl>` : ""}
     ${st?.why && active ? `<p class="note">${esc(st.why)}</p>` : ""}
-    <h3>${kind.coins} ${vtxos.length && kind === KINDS.renewal ? tip(`A renewable VTXO waits for the batch of the first one to reach its deadline, ${span(reserve)} before expiry, so that they renew together. The dot is that batch.`) : ""}
+    ${children.length ? `<h3>${streams(d) ? "Spawned watches" : "Successors"} <span class="aside">${children.length}${moreRows ? " among the loaded delegations" : ""}</span></h3>
+    <div class="scroll"><table><thead><tr><th>Delegation</th><th>State</th><th>Coins</th><th>Registered</th></tr></thead><tbody>
+      ${children.slice(0, MAX_ROWS).map((x) => { const cs = stateOf(x); return `<tr><td><a href="#id/${esc(x.delegation.id)}">#${esc(x.delegation.id)}</a></td>
+        <td class="state ${["bad", "late"].includes(cs.key) ? "late" : cs.dot === "running" ? "running" : ""}"><span class="dot ${cs.dot}" style="display:inline-block"></span> ${esc(cs.text)}</td>
+        <td class="n">${num(x.vtxoCount) ? sats(x.totalAmount) : ""}</td>
+        <td title="${esc(dateOf(x.delegation.createdAt))}">${ago(x.delegation.createdAt)}</td></tr>`; }).join("")}
+      </tbody></table></div>${children.length > MAX_ROWS ? `<p class="state">The ${MAX_ROWS} newest are above.</p>` : ""}` : ""}
+    ${(detail.pendingTxs || []).length ? `<h3>In-flight transactions ${tip("The daemon's own transactions spending these coins. Their coins wait until each one lands or is dropped.")}</h3>
+    <div class="scroll"><table><thead><tr><th>Since</th><th>Transaction</th><th>State</th><th>Coins</th></tr></thead><tbody>
+      ${detail.pendingTxs.map((p) => `<tr><td title="${esc(dateOf(p.createdAt))}">${ago(p.createdAt)}</td>
+        <td class="hash">${explore(p.spentBy || p.txid, short(p.spentBy || p.txid, 12))}</td>
+        <td>${esc(PENDING[p.state] || p.state)}</td>
+        <td class="hash">${(p.coins || []).map((o) => explore(o, short(o, 8))).join("<br>")}</td></tr>`).join("")}
+      </tbody></table></div>` : ""}
+    ${streams(d) ? "" : `<h3>${kind.coins} ${vtxos.length && kind === KINDS.renewal ? tip(`A renewable VTXO waits for the batch of the first one to reach its deadline, ${span(reserve)} before expiry, so that they renew together. The dot is that batch.`) : ""}
       ${vtxos.length > 1 ? `<span class="aside">${vtxos.length} VTXOs, ${sats(held)}</span>` : ""}</h3>
     ${vtxos.length ? shownVtxos.map((v) => `<div class="vtxo"><div class="top"><span class="hash">${explore(v.outpoint)}</span>
         <span class="amount n">${sats(v.amount)}${(v.assets || []).map((a) => ` + ${num(a.amount).toLocaleString()} of ${esc(short(a.assetId, 6))}`).join("")}</span></div>
-        ${spend ? `<div class="state">${num(v.expiresAt) ? "expires " + ago(v.expiresAt) : "onchain"}</div>` : lifeBar(v, batchAt[v.outpoint], renewing, company(v))}</div>`).join("") + (vtxos.length > shownVtxos.length ? `<p class="state"><button class="link" id="all-vtxos">Show all ${vtxos.length}</button>, the ${shownVtxos.length} soonest are above.</p>` : "")
+        ${spend ? `<div class="state">${num(v.expiresAt) ? "expires " + ago(v.expiresAt) : "onchain"}</div>` : lifeBar(v, batchAt[v.outpoint], running, company(v), kind.ready, lane)}</div>`).join("") + (vtxos.length > shownVtxos.length ? `<p class="state"><button class="link" id="all-vtxos">Show all ${vtxos.length}</button>, the ${shownVtxos.length} soonest are above.</p>` : "")
       : `<p class="empty">${kind.noCoin}</p>`}
-    <h3>${kind.attempts} ${renewals.length ? tip("A failure that repeats is listed once, at the time it first happened.") : ""}</h3>
-    ${renewals.length ? `<div class="scroll"><table><thead><tr><th>When</th><th>Result</th><th>VTXOs</th><th>Batch or reason</th></tr></thead><tbody>
-      ${renewals.map((r) => `<tr><td title="${esc(dateOf(r.attemptedAt))}">${ago(r.attemptedAt)}</td>
+    <h3>${kind.attempts} ${attempts.length ? tip("A failure that repeats is listed once, at the time it first happened.") : ""}</h3>
+    ${num(inList?.failedAttempts) > 1 ? `<p class="note">The same failure repeated over ${plural(inList.failedAttempts, "attempt")} in ${span(nowSecs() - num(inList.failingSince))}, the last ${ago(inList.lastFailedAt)}. It is listed once below.</p>` : ""}
+    ${attempts.length ? `<div class="scroll"><table><thead><tr><th>When</th><th>Result</th><th>Coins</th><th>Transaction or reason</th></tr></thead><tbody>
+      ${attempts.map((r) => `<tr><td title="${esc(dateOf(r.attemptedAt))}">${ago(r.attemptedAt)}</td>
         <td class="res ${r.success ? "ok" : "bad"}">${r.success ? done : "failed"}</td>
         <td class="hash">${(r.outpoints || []).map((o) => explore(o, short(o, 8))).join("<br>")}</td>
         <td class="${r.success ? "hash" : ""}">${!r.success ? esc(r.error) : explorer() ? explore(r.commitmentTxid, short(r.commitmentTxid, 12)) : `<button class="link hash" data-copy="${esc(r.commitmentTxid)}" title="Copy the txid">${esc(short(r.commitmentTxid, 12))}</button>`}</td></tr>`).join("")}
       </tbody></table></div>`
-      : `<p class="empty">${kind.noAttempt}</p>`}
-    <h3>Inputs ${tip("Each input of the template: what it watches or the output bound to it, and who can spend it, one tapscript each.")}</h3>
+      : `<p class="empty">${kind.noAttempt}</p>`}`}
+    ${slots.length ? `<h3>Inputs ${tip("Each input of the template: what it watches or the output bound to it, and who can spend it, one tapscript each.")}</h3>` : ""}
     ${slots.map((sl) => `<h4>${esc(sl.name)} <span class="badge">${sl.onchain ? "onchain" : "offchain"}</span></h4>
       ${sl.outpoint ? `<p class="hash">${explore(sl.outpoint)} <button class="mini" data-copy="${esc(sl.outpoint)}" title="Copy the outpoint">copy</button></p>` : ""}
       <ul class="paths">${(sl.tapscripts || []).map((t) => `<li><span class="words">${esc(scriptWords(t))}</span><button class="mini" data-copy="${esc(t)}" title="Copy the script hex">hex</button></li>`).join("")}</ul>`).join("")}`;
 }
 
-async function setRenewing(on) {
+async function setActive(on) {
   const d = detail.delegation;
   $("detail").querySelector("#stop, #resume")?.setAttribute("aria-busy", "true");
   try {
     if (on) await send("POST", "/v1/admin/delegation/" + encodeURIComponent(d.id) + "/resume", {});
     else await api("/v1/admin/delegation/" + encodeURIComponent(d.id), { method: "DELETE" });
-    toast(on ? "Resumed" : streams(d) ? "Stream stopped" : spends(d) ? "Spend cancelled" : "Renewing stopped");
+    toast(on ? "Resumed" : kindOf(d).stopped);
   } catch (e) { toast(`Could not ${on ? "resume" : "stop"} it: ${e.message}`, true); }
   refresh();
 }
 
 function askStop() {
-  const held = delegations.find((x) => x.delegation.id === detail.delegation.id), spend = spends(detail.delegation), stream = streams(detail.delegation);
-  ask(stream ? "Stop this stream delegation?" : spend ? "Cancel this spend?" : "Stop renewing this address?",
-    stream ? "It spawns no more watches until you resume. Nothing is deleted." : spend ? "The daemon stops trying it: its coins stay with their owner, who can sign a new spend. Nothing is deleted." : (num(held?.vtxoCount)
+  const d = detail.delegation, k = kindOf(d), held = delegations.find((x) => x.delegation.id === d.id);
+  ask(k.ask,
+    streams(d) ? "It spawns no more watches until you resume. Nothing is deleted." : spends(d) ? "The daemon stops trying it: its coins stay with their owner, who can sign a new spend. Nothing is deleted."
+    : boards(d) ? "Deposits at this address are not boarded until you resume. The owner cannot register it again until you resume. Nothing is deleted." : (num(held?.vtxoCount)
       ? `${sats(held.totalAmount)} in ${plural(held.vtxoCount, "VTXO")}, the first expiring ${ago(held.nextExpiry)}, will expire`
       : "Coins sent to it later will expire") + " unless the owner exits or you resume. The owner cannot register it again until you resume. Nothing is deleted.",
-    kindOf(detail.delegation).stop, stream ? "Keep watching" : spend ? "Keep the spend" : "Keep renewing").then((yes) => yes && setRenewing(false));
+    k.stop, k.keep).then((yes) => yes && setActive(false));
 }
 
 // templates and artifacts
@@ -1029,7 +1094,7 @@ function renderCatalog() {
       return `<li><button data-go="${esc(here)}" ${current} title="${esc(x.id)}"><span class="dot ${n ? "ok" : "off"}"></span><span class="hash">${esc(short(x.id, 10))}</span>
         <span class="amt">${n ? n.toLocaleString() : ""}</span><span></span><span class="sub">registered ${ago(x.createdAt)}</span><span class="count">${n ? (n === 1 ? "template" : "templates") : "unused"}</span></button></li>`;
     }
-    const n = num(x.delegations), tags = (x.status !== "active" ? `<span class="tag">disabled</span>` : "") + (x.trusted ? `<span class="tag ok">trusted</span>` : "")
+    const n = num(x.delegations), tags = (x.type ? `<span class="tag">${esc(x.type)}</span>` : "") + (x.status !== "active" ? `<span class="tag">disabled</span>` : "") + (x.trusted ? `<span class="tag ok">trusted</span>` : "")
       + (x.failures ? `<span class="tag bad">${x.failures} failed</span>` : "");
     return `<li><button data-go="${esc(here)}" ${current} title="${esc(x.id)}"><span class="dot ${x.status !== "active" ? "off" : x.failures ? "bad" : "ok"}"></span><span class="hash">${esc(short(x.id, 10))}</span>
       <span class="amt">${n ? n.toLocaleString() : ""}</span><span></span><span class="sub">${tags}${esc((x.params || []).map((p) => p.name).join(", ") || "no variable")}</span>
@@ -1080,7 +1145,7 @@ function catalogHome() {
 function templateView(t, doc) {
   const n = num(t.delegations), on = t.status === "active", params = t.params || [], arts = t.artifactIds || [];
   return `<div class="title"><div><h2>Template <span class="hash" style="font-size:.8em">${esc(short(t.id, 6))}</span>
-        <span class="badge ${!on ? "off" : t.failures ? "bad" : "ok"}">${on ? (t.failures ? "failing" : "active") : "disabled"}</span>${t.trusted ? `<span class="badge accent">trusted</span>` : ""}</h2>
+        <span class="badge ${!on ? "off" : t.failures ? "bad" : "ok"}">${on ? (t.failures ? "failing" : "active") : "disabled"}</span>${t.trusted ? `<span class="badge accent">trusted</span>` : ""}${t.type ? `<span class="badge" title="${esc(TYPES[t.type] || "")}">${esc(t.type)}</span>` : ""}</h2>
       <div class="hash">${esc(t.id)}</div></div>
     <div class="actions"><button data-copy="${esc(t.id)}">Copy id</button>
       <button data-template-trusted="${!t.trusted}" data-id="${esc(t.id)}">${t.trusted ? "Distrust" : "Trust"}</button>
@@ -1088,10 +1153,10 @@ function templateView(t, doc) {
       ${n ? "" : `<button class="danger" data-template-delete="${esc(t.id)}">Delete</button>`}</div></div>
     <dl class="facts">
       <div><dt>Delegations</dt><dd>${n ? `<button class="link" data-go="delegations" data-filter="all" data-search="${esc(t.id)}">${n.toLocaleString()}</button>` : "none"}</dd></div>
-      <div><dt>Failed cycles ${tip(t.trusted ? "Trusted templates are never disabled for failures." : "Consecutive renewal cycles rejected. The daemon disables a template whose intents keep being rejected.")}</dt><dd class="${t.failures ? "state late" : ""}">${t.failures}</dd></div>
+      <div><dt>Failed cycles ${tip(t.trusted ? "Trusted templates are never disabled for failures." : "Consecutive cycles in which every intent was rejected. The daemon disables a template whose intents keep being rejected.")}</dt><dd class="${t.failures ? "state late" : ""}">${t.failures}</dd></div>
       <div><dt>Trusted ${tip("The daemon signs the delegate-key leaves of a trusted template and never disables it for failures.")}</dt><dd>${t.trusted ? "yes" : "no"}</dd></div>
       <div><dt>Registered</dt><dd title="${esc(dateOf(t.createdAt))}">${ago(t.createdAt)}</dd></div></dl>
-    ${!on ? `<p class="note">Disabled: it registers and renews nothing.</p>` : ""}
+    ${!on ? `<p class="note">Disabled: it registers and runs nothing.</p>` : ""}
     <h3>Variables <span class="aside">${params.length}</span></h3>
     ${params.length ? `<div class="scroll"><table style="max-width:32rem"><thead><tr><th>Name</th><th>Type</th></tr></thead><tbody>${params.map((p) => `<tr><td class="hash">${esc(p.name)}</td><td>${esc(p.type)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="empty">No variable.</p>`}
     <h3>Artifacts <span class="aside">${arts.length}</span></h3>
@@ -1136,7 +1201,7 @@ document.addEventListener("click", (e) => {
   else if (b.id === "all-vtxos") { allVtxos = true; renderDetail(); }
   else if (b.id === "all-batches") { allBatches = !allBatches; renderOverview(); }
   else if (b.id === "stop") askStop();
-  else if (b.id === "resume") setRenewing(true);
+  else if (b.id === "resume") setActive(true);
   else if (b.id === "load-more") { loadLimit += 5000; refresh(); }
   else if (b.dataset.templateStatus) act(send("PUT", "/v1/admin/template/" + encodeURIComponent(b.dataset.id) + "/status", { status: b.dataset.templateStatus }),
     b.dataset.templateStatus === "active" ? "Template enabled" : "Template disabled", "Could not change the template: ");
@@ -1203,7 +1268,7 @@ document.addEventListener("mouseout", hideTip); document.addEventListener("focus
 addEventListener("scroll", () => ($("tooltip").hidden = true), true);
 addEventListener("hashchange", () => { parseRoute(); render(); });
 
-function refresh() { loadHealth(); return loadList().then(render); }
+function refresh() { return Promise.all([loadHealth(), loadList()]).then(render); }
 parseRoute(); render(); loadMeta(); refresh();
 setInterval(() => { if (!document.hidden && !$("confirm").open) refresh(); }, 15000);
 </script>

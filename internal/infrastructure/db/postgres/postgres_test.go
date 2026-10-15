@@ -230,7 +230,7 @@ func TestTemplatesAndArtifacts(t *testing.T) {
 	require.True(t, slices.ContainsFunc(summaries, func(x domain.Artifact) bool { return x.ID == artifactID && len(x.Document) == 0 }))
 
 	tmpl := domain.Template{
-		ID: templateID, Document: []byte(`{"t":1}`), ArtifactIDs: []string{artifactID},
+		ID: templateID, Document: []byte(`{"type":"intent"}`), ArtifactIDs: []string{artifactID},
 		Params: []domain.Param{{Name: "owner", Type: "pubkey"}},
 	}
 	_, err = repo.CreateTemplate(ctx, tmpl, templates)
@@ -240,6 +240,7 @@ func TestTemplatesAndArtifacts(t *testing.T) {
 	require.Equal(t, domain.TemplateStatusActive, created.Status)
 	require.Equal(t, tmpl.Params, created.Params)
 	require.Equal(t, []string{artifactID}, created.ArtifactIDs)
+	require.Equal(t, "intent", created.Type)
 	dup, err := repo.CreateTemplate(ctx, tmpl, templates)
 	require.NoError(t, err)
 	require.Equal(t, created.CreatedAt, dup.CreatedAt, "the stored one, even at the cap")
@@ -249,7 +250,7 @@ func TestTemplatesAndArtifacts(t *testing.T) {
 
 	active, err := repo.ListTemplates(ctx, domain.TemplateStatusActive)
 	require.NoError(t, err)
-	require.True(t, slices.ContainsFunc(active, func(x domain.Template) bool { return x.ID == templateID }))
+	require.True(t, slices.ContainsFunc(active, func(x domain.Template) bool { return x.ID == templateID && x.Type == "intent" }))
 	require.False(t, slices.ContainsFunc(active, func(x domain.Template) bool { return len(x.Document) > 0 }), "listings leave documents out")
 	require.NoError(t, repo.SetTemplateStatus(ctx, templateID, domain.TemplateStatusDisabled))
 	require.ErrorIs(t, repo.SetTemplateStatus(ctx, "nope", domain.TemplateStatusDisabled), domain.ErrTemplateNotFound)

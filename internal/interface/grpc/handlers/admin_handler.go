@@ -3,6 +3,8 @@ package handlers
 import (
 	"cmp"
 	"context"
+	"maps"
+	"slices"
 	"strconv"
 	"time"
 
@@ -36,6 +38,10 @@ func (h *adminHandler) GetDelegationById(
 	if err != nil {
 		return nil, err
 	}
+	pending, err := h.svc.PendingTxs(ctx, d.ID)
+	if err != nil {
+		return nil, toStatus(err)
+	}
 	st := h.svc.Status()
 	batchAt := map[string]int64{}
 	for _, v := range detail.Vtxos {
@@ -43,7 +49,13 @@ func (h *adminHandler) GetDelegationById(
 			batchAt[v.Outpoint] = at.Unix()
 		}
 	}
-	return &delegateev1.GetDelegationByIdResponse{Delegation: detail.Delegation, Vtxos: detail.Vtxos, Renewals: detail.Renewals, BatchAt: batchAt}, nil
+	resp := &delegateev1.GetDelegationByIdResponse{Delegation: detail.Delegation, Vtxos: detail.Vtxos, Renewals: detail.Renewals, BatchAt: batchAt}
+	for _, p := range pending {
+		resp.PendingTxs = append(resp.PendingTxs, &delegateev1.PendingTx{
+			Txid: p.Txid, SpentBy: p.SpentBy, Coins: p.Coins, State: p.State, CreatedAt: p.CreatedAt.Unix(),
+		})
+	}
+	return resp, nil
 }
 
 func (h *adminHandler) ListDelegations(
@@ -88,6 +100,9 @@ func (h *adminHandler) ListDelegations(
 			summary.NextDeadline = unix(held.NextDeadline)
 			summary.NextBatchAt = unix(held.NextBatchAt)
 			summary.Renewing = held.Renewing
+			summary.FailingSince = unix(held.FailingSince)
+			summary.LastFailedAt = unix(held.LastFailure)
+			summary.FailedAttempts = int32(held.Failures)
 		}
 		summary.UnmanagedReason = st.Unwatched[ds[i].ID]
 		out[i] = summary
@@ -124,6 +139,19 @@ func (h *adminHandler) GetStatus(
 	}
 	if !st.LastScan.IsZero() {
 		resp.LastScanAt = st.LastScan.Unix()
+	}
+	return resp, nil
+}
+
+func (h *adminHandler) GetHealth(ctx context.Context, _ *delegateev1.GetHealthRequest) (*delegateev1.GetHealthResponse, error) {
+	health := h.svc.Health(ctx)
+	resp := &delegateev1.GetHealthResponse{}
+	for _, name := range slices.Sorted(maps.Keys(health)) {
+		dep := &delegateev1.Dependency{Name: name}
+		if err := health[name]; err != nil {
+			dep.Error = err.Error()
+		}
+		resp.Dependencies = append(resp.Dependencies, dep)
 	}
 	return resp, nil
 }
@@ -280,7 +308,7 @@ func (h *adminHandler) adminTemplate(ctx context.Context, id string) (*delegatee
 func toAdminTemplate(t *domain.Template, counts map[string]int64) *delegateev1.TemplateSummary {
 	return &delegateev1.TemplateSummary{
 		Template: toTemplate(t, false),
-		Failures: int32(t.Failures), Delegations: counts[t.ID], Trusted: t.Trusted,
+		Failures: int32(t.Failures), Delegations: counts[t.ID], Trusted: t.Trusted, Type: t.Type,
 	}
 }
 

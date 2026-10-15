@@ -58,6 +58,7 @@ type Template struct {
 	Document    []byte
 	ArtifactIDs []string
 	Params      []Param // cached from Parse, for listing and args validation
+	Type        string  // intent, offchain or onchain, from the document
 	Status      string
 	// Failures counts consecutive cycles in which every intent was rejected.
 	Failures int
