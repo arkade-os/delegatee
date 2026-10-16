@@ -697,3 +697,22 @@ const vhtlc = `
   "packets": {"output_index": 1, "unmatched": "drop"}
 }
 `
+
+func TestArrayInputs(t *testing.T) {
+	withInput := func(fn int) []byte {
+		return edited(t, []byte(releaseDoc), func(m map[string]any) {
+			def := m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)["definition"].(map[string]any)
+			f := def["functions"].([]any)[fn].(map[string]any)
+			if f["arkade"] == nil {
+				f["arkade"] = map[string]any{"asm": []any{"1"}}
+			}
+			f["arkade"].(map[string]any)["inputs"] = []any{map[string]any{"name": "sigs", "type": "bytes[3]"}}
+		})
+	}
+	_, err := Parse(t.Context(), withInput(0), nil)
+	require.NoError(t, err, "an array input on a function the template does not spend")
+
+	_, err = Parse(t.Context(), withInput(1), nil)
+	require.ErrorIs(t, err, ErrUnsupported)
+	require.ErrorContains(t, err, `array input "sigs"`)
+}
