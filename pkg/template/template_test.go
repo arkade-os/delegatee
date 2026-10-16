@@ -697,3 +697,27 @@ const vhtlc = `
   "packets": {"output_index": 1, "unmatched": "drop"}
 }
 `
+
+func TestArrayInputs(t *testing.T) {
+	withInput := func(name string) []byte {
+		return edited(t, []byte(releaseDoc), func(m map[string]any) {
+			def := m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)["definition"].(map[string]any)
+			for _, raw := range def["functions"].([]any) {
+				if f := raw.(map[string]any); f["name"] == name {
+					if f["arkade"] == nil {
+						f["arkade"] = map[string]any{"asm": []any{"1"}}
+					}
+					f["arkade"].(map[string]any)["inputs"] = []any{map[string]any{"name": "sigs", "type": "bytes[3]"}}
+					return
+				}
+			}
+			t.Fatalf("releaseDoc has no function %q", name)
+		})
+	}
+	_, err := Parse(t.Context(), withInput("exit"), nil)
+	require.NoError(t, err, "an array input on a function the template does not spend")
+
+	_, err = Parse(t.Context(), withInput("release"), nil)
+	require.ErrorIs(t, err, ErrUnsupported)
+	require.ErrorContains(t, err, `array input "sigs"`)
+}

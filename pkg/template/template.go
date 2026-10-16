@@ -536,6 +536,11 @@ func (p *parser) spend(in *input, v any) error {
 	if f.Arkade != nil {
 		want = f.Arkade.Inputs
 	}
+	for _, w := range want {
+		if arrayType.MatchString(w.Type) {
+			return fmt.Errorf("%w: function %q takes the array input %q, which a template cannot fill", ErrUnsupported, f.Name, w.Name)
+		}
+	}
 	if len(args) != len(want) {
 		return bad("function %q takes %d arguments, got %d", f.Name, len(want), len(args))
 	}

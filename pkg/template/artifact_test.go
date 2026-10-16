@@ -267,3 +267,19 @@ func fnOf(m map[string]any, i int) map[string]any {
 func leafOf(m map[string]any, f int) map[string]any {
 	return fnOf(m, f)["leaves"].([]any)[0].(map[string]any)
 }
+
+func TestParseArtifactArrayInput(t *testing.T) {
+	doc := func(typ string) string {
+		return `{"contractName":"C","constructorInputs":[{"name":"k","type":"pubkey"}],"functions":[{"name":"f",
+		"arkade":{"inputs":[{"name":"sigs","type":"` + typ + `"}],"asm":["<k>","OP_CHECKSIG"]},
+		"leaves":[{"name":"l","witness":[{"name":"s","type":"signature","encoding":"schnorr-64","injected":true}],
+		"asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","<EMULATOR_KEY:f>","OP_CHECKSIG"]}]}]}`
+	}
+	a, err := ParseArtifact([]byte(doc("bytes[3]")))
+	require.NoError(t, err)
+	require.Equal(t, "bytes[3]", a.Definition.Functions[0].Arkade.Inputs[0].Type)
+	for _, typ := range []string{"float[3]", "bytes[0]", "bytes[]", "bytes[3][2]", "signature[3]"} {
+		_, err := ParseArtifact([]byte(doc(typ)))
+		require.ErrorIs(t, err, ErrInvalidArtifact, typ)
+	}
+}

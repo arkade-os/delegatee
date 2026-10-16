@@ -220,7 +220,7 @@ func parseFunction(v any) (*Function, error) {
 			return nil, err
 		}
 		for _, in := range c.Inputs {
-			if !slices.Contains(scalarTypes, in.Type) {
+			if !validType(in.Type, nil) {
 				return nil, invalid("unsupported arkade input type %q", in.Type)
 			}
 		}
