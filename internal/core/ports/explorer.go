@@ -1,6 +1,10 @@
 package ports
 
-import clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+import (
+	"errors"
+
+	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
+)
 
 // Explorer reads and writes the chain for onchain inputs and transactions.
 type Explorer interface {
@@ -18,3 +22,6 @@ type ChainTip struct {
 	Height     int64
 	MedianTime int64 // unix seconds, the median time past
 }
+
+// ErrThrottled is an upstream rate limiting the daemon: the caller backs off instead of retrying.
+var ErrThrottled = errors.New("upstream rate limited")

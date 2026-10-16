@@ -56,10 +56,10 @@ func TestBusyLaneWakesTheScanWhenFree(t *testing.T) {
 		return sign(ark, cps)
 	}
 	e.indexer.serve(coin)
-	e.svc.scan(t.Context())
+	_ = e.svc.scan(t.Context())
 	// this scan finds work the busy lane cannot take
 	e.indexer.serve(coin)
-	e.svc.scan(t.Context())
+	_ = e.svc.scan(t.Context())
 	require.Empty(t, e.svc.wake)
 
 	close(release)
@@ -79,7 +79,7 @@ func TestScanWakesItselfWhenALaneEndsUnderIt(t *testing.T) {
 	e.svc.direct.busy.Store(1)
 	e.repo.afterListSettlements = func() { e.svc.direct.busy.Store(0) }
 	e.indexer.serve(coin)
-	e.svc.scan(t.Context())
+	_ = e.svc.scan(t.Context())
 	e.svc.wg.Wait()
 
 	require.False(t, submitted.Load())

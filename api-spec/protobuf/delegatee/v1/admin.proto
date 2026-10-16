@@ -141,6 +141,9 @@ message GetStatusResponse {
   int64 renewal_reserve = 5;
   int64 boarding_max_wait = 6;
   repeated PlannedBatch batches = 7;
+  // next_scan_at is backed off while throttled: an upstream rate limits the scan.
+  int64 next_scan_at = 8;
+  bool throttled = 9;
 }
 
 message GetHealthRequest {}

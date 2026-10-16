@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,6 +33,8 @@ import (
 	"github.com/btcsuite/btcd/wire/v2"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -92,6 +95,8 @@ type PendingTx struct {
 // Status never depends on arkd: it must stay visible during an outage.
 type Status struct {
 	LastScan      time.Time // zero until the first scan completes
+	NextScan      time.Time // zero until the first scan, failed or not
+	Throttled     bool      // an upstream rate limits the scan: NextScan is backed off
 	RenewingVtxos int
 	PollInterval  time.Duration
 	// since the process started
@@ -114,8 +119,8 @@ type Service interface {
 	RegisterDelegation(ctx context.Context, templateID string, variables map[string]string, expiresAt *time.Time) (*domain.Delegation, error)
 	// RegisterStreamDelegation is the operator's: the trigger of templateID runs on every streamed transaction.
 	RegisterStreamDelegation(ctx context.Context, templateID string, variables map[string]string) (*domain.Delegation, error)
-	// RenewableAt is when each vtxo is due; an error when d no longer instantiates.
-	RenewableAt(ctx context.Context, d *domain.Delegation, vtxos []clientlib.Vtxo) ([]time.Time, error)
+	// RenewableAt is when each vtxo is due, as the last scan found it; zero for a vtxo the scan did not see.
+	RenewableAt(d *domain.Delegation, vtxos []clientlib.Vtxo) []time.Time
 	// CancelDelegation and CancelDelegationByID are operator cancels: registering the fingerprint again is refused until ResumeDelegation.
 	CancelDelegation(ctx context.Context, address string) error
 	CancelDelegationByID(ctx context.Context, id int64) error
@@ -134,8 +139,10 @@ type Service interface {
 	LastRenewals(ctx context.Context) (map[int64]domain.Renewal, error)
 	Status() Status
 	CountActive(ctx context.Context) (int64, error)
-	IntentFees(ctx context.Context) (arkfee.Config, error)
-	Vtxos(ctx context.Context, d *domain.Delegation) ([]clientlib.Vtxo, error)
+	// IntentFees are arkd's, as of the last scan or health check.
+	IntentFees() arkfee.Config
+	// Vtxos are d's coins as the last scan found them: a lookup never reaches the indexer or the explorer.
+	Vtxos(d *domain.Delegation) []clientlib.Vtxo
 	Health(ctx context.Context) map[string]error
 	// PendingTxs lists the daemon's transactions holding a delegation's coins until they land.
 	PendingTxs(ctx context.Context, delegationID int64) ([]PendingTx, error)
@@ -216,6 +223,7 @@ type service struct {
 	batch, direct lane
 	renewed       atomic.Uint64
 	failed        atomic.Uint64
+	info          atomic.Pointer[clientlib.Info] // arkd's, refreshed by the scan and the health check
 	started       time.Time
 	lastPrune     time.Time
 
@@ -230,8 +238,10 @@ type service struct {
 	failing      map[string]*failure  // coins whose last attempt failed
 
 	// the scan alone
-	held         map[string]bool      // coins of the daemon's settlements that may still land, as of the scan
-	entries      []planEntry          // the batch lane's future intents, as the scan found them
+	held         map[string]bool // coins of the daemon's settlements that may still land, as of the scan
+	entries      []planEntry     // the batch lane's future intents, as the scan found them
+	found        map[int64][]scannedCoin
+	backoff      time.Duration        // grows while an upstream throttles the scan
 	plan         *plan                // published under mu
 	refusedSince map[string]time.Time // pending txs arkd refuses, since the first refusal
 	watched      map[int64]*watched   // nil for a delegation of another key
@@ -241,8 +251,11 @@ type service struct {
 	// mu guards what the last completed scan saw
 	mu        sync.Mutex
 	lastScan  time.Time
+	nextScan  time.Time
+	throttled bool
 	holdings  map[int64]Holdings
 	unwatched map[int64]string
+	coins     map[int64][]scannedCoin
 
 	wg          sync.WaitGroup
 	stop        context.CancelFunc
@@ -358,7 +371,7 @@ func NewServiceWithKeys(
 		}
 	}
 
-	return &service{
+	svc := &service{
 		repo:                repo,
 		ark:                 ark,
 		indexer:             indexerSvc,
@@ -391,7 +404,9 @@ func NewServiceWithKeys(
 		started:             time.Now(),
 		wake:                make(chan struct{}, 1),
 		streamsChanged:      make(chan struct{}, 1),
-	}, nil
+	}
+	svc.info.Store(arkInfo)
+	return svc, nil
 }
 
 func newCosigners(keys []*btcec.PrivateKey) ([]*cosigner, error) {
@@ -445,9 +460,10 @@ func (s *service) Start() {
 		timer := time.NewTimer(s.pollInterval)
 		defer timer.Stop()
 		for {
-			s.scan(ctx)
+			err := s.scan(ctx)
 			scanned := time.Now()
-			timer.Reset(s.nextScanDelay(scanned))
+			delay, gap := s.scanDelays(err, scanned)
+			timer.Reset(delay)
 			select {
 			case <-ctx.Done():
 			case <-timer.C:
@@ -455,7 +471,7 @@ func (s *service) Start() {
 			case <-s.wake:
 				select {
 				case <-ctx.Done():
-				case <-time.After(minScanGap - time.Since(scanned)):
+				case <-time.After(gap - time.Since(scanned)):
 					continue
 				}
 			}
@@ -463,6 +479,38 @@ func (s *service) Start() {
 			return
 		}
 	}()
+}
+
+// a throttled scan waits this long at most before trying again
+const maxScanBackoff = 30 * time.Minute
+
+// scanDelays are how long the next scan waits, and how long a woken one does: both back off while an upstream throttles.
+func (s *service) scanDelays(err error, now time.Time) (delay, gap time.Duration) {
+	if throttled(err) {
+		s.backoff = min(max(2*s.backoff, s.pollInterval), maxScanBackoff)
+		log.WithError(err).WithField("backoff", s.backoff).Warn("upstream rate limited: scan backs off")
+	} else {
+		s.backoff = 0
+	}
+	delay, gap = max(s.nextScanDelay(now), s.backoff), max(minScanGap, s.backoff)
+	s.mu.Lock()
+	s.nextScan, s.throttled = now.Add(delay), s.backoff > 0
+	s.mu.Unlock()
+	return delay, gap
+}
+
+// throttled is an upstream refusing the load: more requests make it worse.
+func throttled(err error) bool {
+	if errors.Is(err, ports.ErrThrottled) {
+		return true
+	}
+	switch status.Code(err) {
+	case codes.ResourceExhausted, codes.Unavailable:
+		return true
+	case codes.Internal: // a proxy answered in place of arkd
+		return strings.Contains(err.Error(), "without sending trailers")
+	}
+	return false
 }
 
 func (s *service) Stop() {
@@ -600,17 +648,19 @@ func (s *service) RegisterStreamDelegation(ctx context.Context, templateID strin
 	return d, err
 }
 
-func (s *service) RenewableAt(ctx context.Context, d *domain.Delegation, vtxos []clientlib.Vtxo) ([]time.Time, error) {
-	_, inst, err := s.instantiate(ctx, d)
-	if err != nil {
-		return nil, err
-	}
-	tip := sync.OnceValues(s.explorer.ChainTip)
+func (s *service) RenewableAt(d *domain.Delegation, vtxos []clientlib.Vtxo) []time.Time {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	due := make([]time.Time, len(vtxos))
 	for i, v := range vtxos {
-		due[i] = dueTime(inst, vtxoCoin(0, v), tip)
+		for _, c := range s.coins[d.ID] {
+			if c.vtxo.Outpoint == v.Outpoint {
+				due[i] = c.due
+				break
+			}
+		}
 	}
-	return due, nil
+	return due
 }
 
 // CancelDelegation stops every active watch of address: templates may share one.
@@ -683,6 +733,8 @@ func (s *service) Status() Status {
 	}
 	return Status{
 		LastScan:        s.lastScan,
+		NextScan:        s.nextScan,
+		Throttled:       s.throttled,
 		RenewingVtxos:   int(s.batch.busy.Load() + s.direct.busy.Load()),
 		PollInterval:    s.pollInterval,
 		Renewed:         s.renewed.Load(),
@@ -696,12 +748,15 @@ func (s *service) Status() Status {
 	}
 }
 
-func (s *service) IntentFees(ctx context.Context) (arkfee.Config, error) {
+func (s *service) IntentFees() arkfee.Config { return s.info.Load().Fees.IntentFees }
+
+// refreshInfo keeps the last answer through an outage: every reader has one.
+func (s *service) refreshInfo(ctx context.Context) error {
 	info, err := s.ark.GetInfo(ctx)
-	if err != nil {
-		return arkfee.Config{}, fmt.Errorf("arkd info: %w", err)
+	if err == nil {
+		s.info.Store(info)
 	}
-	return info.Fees.IntentFees, nil
+	return err
 }
 
 func (s *service) LastRenewals(ctx context.Context) (map[int64]domain.Renewal, error) {
@@ -712,45 +767,20 @@ func (s *service) ListRenewals(ctx context.Context, d *domain.Delegation) ([]dom
 	return s.repo.ListRenewals(ctx, d.ID, 50)
 }
 
-func (s *service) Vtxos(ctx context.Context, d *domain.Delegation) ([]clientlib.Vtxo, error) {
-	var scripts []string
-	for _, sl := range d.Slots {
-		if !sl.Onchain && !slices.Contains(scripts, sl.Script) {
-			scripts = append(scripts, sl.Script)
-		}
-	}
-	byScript, err := s.spendableVtxos(ctx, scripts)
-	if err != nil {
-		return nil, err
-	}
+func (s *service) Vtxos(d *domain.Delegation) []clientlib.Vtxo {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	var out []clientlib.Vtxo
-	seen := map[string]bool{}
-	for _, sl := range d.Slots {
-		coins := byScript[sl.Script]
-		if sl.Onchain {
-			utxos, err := s.onchainUtxos(sl)
-			if err != nil {
-				return nil, err
-			}
-			for _, u := range utxos {
-				coins = append(coins, clientlib.Vtxo{Outpoint: clientlib.Outpoint{Txid: u.Txid, VOut: u.Vout}, Amount: u.Amount, Script: u.Script})
-			}
-		}
-		for _, v := range coins {
-			op := v.Outpoint.String()
-			if !seen[op] && !v.Spent && (sl.Outpoint == "" || sl.Outpoint == op) {
-				seen[op] = true
-				out = append(out, v)
-			}
-		}
+	for _, c := range s.coins[d.ID] {
+		out = append(out, c.vtxo)
 	}
-	return out, nil
+	return out
 }
 
 func (s *service) Health(ctx context.Context) map[string]error {
 	healthCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	_, arkErr := s.ark.GetInfo(healthCtx)
+	arkErr := s.refreshInfo(healthCtx)
 	_, emuErr := s.emulator.GetInfo(healthCtx)
 	return map[string]error{
 		"database": s.repo.Ping(healthCtx),
@@ -761,14 +791,19 @@ func (s *service) Health(ctx context.Context) map[string]error {
 }
 
 // scannerHealth fails when scans stopped: a wedged loop looks alive otherwise.
+// scannerHealth: a scan backed off by a throttle is late only once past its schedule
 func (s *service) scannerHealth(now time.Time) error {
 	s.mu.Lock()
-	last := s.lastScan
+	last, next := s.lastScan, s.nextScan
 	s.mu.Unlock()
 	if last.IsZero() {
 		last = s.started
 	}
-	if grace := max(3*s.pollInterval, time.Minute); now.Sub(last) > grace {
+	deadline := last.Add(max(3*s.pollInterval, time.Minute))
+	if planned := next.Add(s.pollInterval); planned.After(deadline) {
+		deadline = planned
+	}
+	if now.After(deadline) {
 		return fmt.Errorf("no scan for %s", now.Sub(last).Round(time.Second))
 	}
 	return nil
@@ -993,31 +1028,34 @@ func (s *service) spendableVtxos(ctx context.Context, scripts []string) (map[str
 	return out, g.Wait()
 }
 
-func (s *service) scan(ctx context.Context) {
+func (s *service) scan(ctx context.Context) error {
 	s.collectUntil = time.Time{}
 	s.sampleLanes()
 	now := time.Now()
+	if err := s.refreshInfo(ctx); err != nil {
+		log.WithError(err).Warn("arkd info: keeping the last")
+	}
 	s.prune(ctx, now)
 	if err := s.finishSettlements(ctx); err != nil {
 		log.WithError(err).Error("finish settlements")
-		return
+		return err
 	}
 	delegations, err := s.repo.List(ctx, domain.DelegationStatusActive)
 	if err != nil {
 		log.WithError(err).Error("list active delegations")
-		return
+		return err
 	}
 	delegations, streams := splitStreams(delegations)
 	unusable := s.setStreams(ctx, streams)
 	active, err := s.activeTemplates(ctx)
 	if err != nil {
 		log.WithError(err).Error("list active templates")
-		return
+		return err
 	}
 	holdings, unwatched, inputs, err := s.discover(ctx, delegations, active, now)
 	if err != nil {
 		log.WithError(err).Error("discover coins")
-		return
+		return err
 	}
 	if unwatched == nil {
 		unwatched = map[int64]string{}
@@ -1048,8 +1086,9 @@ func (s *service) scan(ctx context.Context) {
 		log.WithField("count", lateVtxos).Warn("late vtxos: arkd rounds may be stalled")
 	}
 	s.mu.Lock()
-	s.lastScan, s.holdings, s.unwatched, s.plan = now, holdings, unwatched, p
+	s.lastScan, s.holdings, s.unwatched, s.plan, s.coins = now, holdings, unwatched, p, s.found
 	s.mu.Unlock()
+	return nil
 }
 
 // countLate marks the coins a session's worth of time past their batch time, and returns how many.

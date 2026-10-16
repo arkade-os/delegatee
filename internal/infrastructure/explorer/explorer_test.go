@@ -4,11 +4,48 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/delegatee/internal/core/ports"
+	"github.com/btcsuite/btcd/address/v2"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/stretchr/testify/require"
 )
+
+func TestThrottled(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte("error code: 1015"))
+	}))
+	defer srv.Close()
+	e, err := New(srv.URL, arklib.BitcoinRegTest, 1000)
+	require.NoError(t, err)
+	addr, err := address.NewAddressWitnessPubKeyHash(make([]byte, 20), &chaincfg.RegressionNetParams)
+	require.NoError(t, err)
+	for name, call := range map[string]func() error{
+		"tip":       func() error { _, err := e.ChainTip(); return err },
+		"confirms":  func() error { _, err := e.Confirmations("ab"); return err },
+		"utxos":     func() error { _, err := e.GetUtxos([]string{addr.EncodeAddress()}); return err },
+		"outspends": func() error { _, err := e.GetTxOutspends("ab"); return err },
+	} {
+		require.ErrorIs(t, call(), ports.ErrThrottled, name)
+	}
+}
+
+func TestPacing(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("100")) }))
+	defer srv.Close()
+	e, err := New(srv.URL, arklib.BitcoinRegTest, 20)
+	require.NoError(t, err)
+	start := time.Now()
+	for range 5 {
+		_, _ = e.Confirmations("ab")
+	}
+	require.GreaterOrEqual(t, time.Since(start), 200*time.Millisecond, "one request every 50ms")
+	_, err = New(srv.URL, arklib.BitcoinRegTest, 0)
+	require.Error(t, err)
+}
 
 func TestConfirmations(t *testing.T) {
 	statuses := map[string]string{
@@ -33,7 +70,7 @@ func TestConfirmations(t *testing.T) {
 		http.NotFound(w, r)
 	}))
 	defer srv.Close()
-	e, err := New(srv.URL, arklib.BitcoinRegTest)
+	e, err := New(srv.URL, arklib.BitcoinRegTest, 1000)
 	require.NoError(t, err)
 
 	for txid, want := range map[string]int{"unconfirmed": 0, "tip": 1, "deep": 10} {
@@ -57,7 +94,7 @@ func TestChainTip(t *testing.T) {
 		_, _ = w.Write([]byte(block))
 	}))
 	defer srv.Close()
-	e, err := New(srv.URL, arklib.BitcoinRegTest)
+	e, err := New(srv.URL, arklib.BitcoinRegTest, 1000)
 	require.NoError(t, err)
 
 	tip, err := e.ChainTip()

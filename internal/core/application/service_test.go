@@ -13,7 +13,9 @@ import (
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
+	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
 	"github.com/arkade-os/delegatee/internal/core/domain"
+	"github.com/arkade-os/delegatee/internal/core/ports"
 	"github.com/arkade-os/delegatee/pkg/template"
 	"github.com/arkade-os/delegatee/pkg/template/ecies"
 	emulatorclient "github.com/arkade-os/emulator/pkg/client"
@@ -25,6 +27,8 @@ import (
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestNewService(t *testing.T) {
@@ -508,12 +512,19 @@ func TestScanHoldingsAndStatus(t *testing.T) {
 	require.Empty(t, env.repo.recorded(), "nothing is due")
 	require.WithinDuration(t, time.Now().Add(-renewalsRetention), env.repo.prunedTo, time.Minute)
 
-	vtxos, err := env.svc.Vtxos(ctx, busy)
-	require.NoError(t, err)
-	require.Empty(t, vtxos, "the fake serves them once")
-	coins, err := env.svc.Vtxos(ctx, board)
-	require.NoError(t, err)
+	// a lookup serves the scan: neither the indexer nor the explorer is asked again
+	calls, asked := env.indexer.calls, 0
+	env.explorer.onUtxos = func() { asked++ }
+	vtxos := env.svc.Vtxos(busy)
+	require.Len(t, vtxos, 1)
+	require.Equal(t, soon.Outpoint, vtxos[0].Outpoint)
+	require.Equal(t, []time.Time{due}, env.svc.RenewableAt(busy, vtxos))
+	coins := env.svc.Vtxos(board)
 	require.ElementsMatch(t, []string{first.Txid, second.Txid}, []string{coins[0].Txid, coins[1].Txid})
+	require.Equal(t, calls, env.indexer.calls)
+	require.Zero(t, asked)
+	unseen := env.svc.RenewableAt(busy, []clientlib.Vtxo{{Outpoint: clientlib.Outpoint{Txid: "ff", VOut: 0}}})
+	require.True(t, unseen[0].IsZero(), "a coin the scan did not see")
 	w, err := env.svc.watch(ctx, busy)
 	require.NoError(t, err)
 	require.Equal(t, soon.ExpiresAt.Add(-1024*time.Second), dueTime(w.instance, vtxoCoin(0, soon), noTip))
@@ -526,21 +537,62 @@ func TestScanFailures(t *testing.T) {
 	env.indexer.serve(v)
 
 	env.repo.err = errBoom
-	env.svc.scan(t.Context())
+	_ = env.svc.scan(t.Context())
 	require.True(t, env.svc.Status().LastScan.IsZero(), "a failed scan reports nothing")
 	env.repo.err = nil
 
 	env.indexer.err = errBoom
-	env.svc.scan(t.Context())
+	_ = env.svc.scan(t.Context())
 	require.True(t, env.svc.Status().LastScan.IsZero())
 
 	// scans run beside a batch in flight
 	env.indexer.err = nil
 	env.svc.batch.busy.Store(1)
 	calls := env.indexer.calls
-	env.svc.scan(t.Context())
+	_ = env.svc.scan(t.Context())
 	require.Greater(t, env.indexer.calls, calls)
 	require.Equal(t, 1, env.svc.Status().RenewingVtxos)
+}
+
+func TestScanBackoff(t *testing.T) {
+	env := newTestEnv(t)
+	env.svc.pollInterval = time.Minute
+	env.indexer.serve(env.coin(t, env.userKey.PubKey(), 1000, time.Hour))
+	board := env.boarding(t, env.userKey.PubKey())
+	env.deposit(t, board, 3000)
+	env.explorer.utxoErr = fmt.Errorf("explorer: %w", ports.ErrThrottled)
+	err := env.svc.scan(t.Context())
+	require.ErrorIs(t, err, ports.ErrThrottled)
+	require.True(t, env.svc.Status().LastScan.IsZero(), "a throttled scan publishes nothing")
+
+	now := time.Now()
+	for _, want := range []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute, 8 * time.Minute, 16 * time.Minute, 30 * time.Minute, 30 * time.Minute} {
+		delay, gap := env.svc.scanDelays(err, now)
+		require.Equal(t, want, delay)
+		require.Equal(t, want, gap, "a wake waits as long")
+		st := env.svc.Status()
+		require.True(t, st.Throttled)
+		require.Equal(t, now.Add(want), st.NextScan)
+	}
+	require.NoError(t, env.svc.scannerHealth(now.Add(29*time.Minute)), "backed off, not stalled")
+	require.Error(t, env.svc.scannerHealth(now.Add(32*time.Minute)))
+	delay, gap := env.svc.scanDelays(nil, now)
+	require.Equal(t, time.Minute, delay)
+	require.Equal(t, minScanGap, gap)
+	require.False(t, env.svc.Status().Throttled)
+
+	env.explorer.utxoErr = nil
+	env.indexer.err = status.Error(codes.ResourceExhausted, "slow down")
+	require.True(t, throttled(env.svc.scan(t.Context())), "the indexer throttles too")
+
+	for err, want := range map[error]bool{
+		nil: false, errBoom: false,
+		status.Error(codes.Internal, "server closed the stream without sending trailers"): true,
+		status.Error(codes.Internal, "boom"):                                              false,
+		status.Error(codes.Unavailable, "down"):                                           true,
+	} {
+		require.Equal(t, want, throttled(err), "%v", err)
+	}
 }
 
 func TestSpendableVtxosChunks(t *testing.T) {
@@ -639,8 +691,16 @@ func TestHealth(t *testing.T) {
 		require.ErrorIs(t, health[name], errBoom, name)
 	}
 	require.NoError(t, health["scanner"])
-	_, err := env.svc.IntentFees(t.Context())
-	require.ErrorIs(t, err, errBoom)
+	// the last answer outlives the outage; the scan and the health check pick up a change
+	require.Equal(t, env.ark.info.Fees.IntentFees, env.svc.IntentFees())
+	env.ark.infoErr = nil
+	env.ark.info = &clientlib.Info{Fees: clientlib.FeeInfo{IntentFees: arkfee.Config{IntentOffchainInputProgram: "7"}}}
+	require.NotEqual(t, "7", env.svc.IntentFees().IntentOffchainInputProgram)
+	env.svc.Health(t.Context())
+	require.Equal(t, "7", env.svc.IntentFees().IntentOffchainInputProgram)
+	env.ark.info = &clientlib.Info{Fees: clientlib.FeeInfo{IntentFees: arkfee.Config{IntentOffchainInputProgram: "9"}}}
+	_ = env.svc.scan(t.Context())
+	require.Equal(t, "9", env.svc.IntentFees().IntentOffchainInputProgram)
 }
 
 func TestStartStop(t *testing.T) {

@@ -261,8 +261,8 @@ func (f *fakeApp) Status() application.Status {
 	return application.Status{LastScan: time.Unix(1_700_000_000, 0), RenewingVtxos: 1, Renewed: 7, Failed: 2,
 		Holdings: map[int64]application.Holdings{1: {Vtxos: 3, Amount: 9000, Late: 1, LateAmount: 4000}}}
 }
-func (f *fakeApp) CountActive(context.Context) (int64, error)        { return 5, nil }
-func (f *fakeApp) IntentFees(context.Context) (arkfee.Config, error) { return arkfee.Config{}, nil }
+func (f *fakeApp) CountActive(context.Context) (int64, error) { return 5, nil }
+func (f *fakeApp) IntentFees() arkfee.Config                  { return arkfee.Config{} }
 func (f *fakeApp) Health(ctx context.Context) map[string]error {
 	select {
 	case <-time.After(f.delay):

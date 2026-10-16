@@ -110,11 +110,7 @@ func uniqueInputs(inputs []renewalInput) []renewalInput {
 }
 
 func (s *service) renewForCosigner(ctx context.Context, cosigner *cosigner, inputs []renewalInput) []renewalResult {
-	// arkd's fee programs can change at any time: read them every cycle
-	fees, err := s.IntentFees(ctx)
-	if err != nil {
-		return []renewalResult{{inputs: inputs, err: err}}
-	}
+	fees := s.IntentFees() // arkd's fee programs can change: the scan read them again
 	var results []renewalResult
 	var intents [][]renewalInput
 	for _, chunk := range spends(inputs) {

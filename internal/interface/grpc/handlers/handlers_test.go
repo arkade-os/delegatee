@@ -192,6 +192,8 @@ func TestAdminHandlers(t *testing.T) {
 	st, err := h.GetStatus(ctx, &delegateev1.GetStatusRequest{})
 	require.NoError(t, err)
 	require.Equal(t, t0.Unix(), st.GetLastScanAt())
+	require.Equal(t, t0.Add(time.Minute).Unix(), st.GetNextScanAt())
+	require.True(t, st.GetThrottled())
 	require.Equal(t, int32(2), st.GetRenewingVtxos())
 	require.Equal(t, int64(60), st.GetPollInterval())
 	require.Equal(t, int64(6*3600), st.GetRenewalReserve())
@@ -210,12 +212,6 @@ func TestAdminHandlers(t *testing.T) {
 	require.Equal(t, "finalizing", byID.GetPendingTxs()[0].GetState())
 	require.Equal(t, []string{"ab:1"}, byID.GetPendingTxs()[0].GetCoins())
 	require.Equal(t, t0.Unix(), byID.GetPendingTxs()[0].GetCreatedAt())
-	// arkd down: the status still answers, without fees
-	svc.feesErr = errBoom
-	st, err = h.GetStatus(ctx, &delegateev1.GetStatusRequest{})
-	require.NoError(t, err)
-	require.Nil(t, st.GetIntentFees())
-
 	_, err = h.CancelDelegation(ctx, &delegateev1.CancelDelegationRequest{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 	_, err = h.CancelDelegation(ctx, &delegateev1.CancelDelegationRequest{Address: "tark1mine"})
@@ -398,7 +394,6 @@ type fakeService struct {
 	streamed     []string
 	streamErr    error
 	listed       [3]any
-	feesErr      error
 	health       map[string]error
 
 	templates    map[string]*domain.Template
@@ -438,12 +433,12 @@ func (f *fakeService) GetDelegationByID(ctx context.Context, _ int64) (*domain.D
 func (f *fakeService) GetDelegation(context.Context, string) (*domain.Delegation, error) {
 	return &f.delegation, f.err
 }
-func (f *fakeService) RenewableAt(_ context.Context, _ *domain.Delegation, vtxos []clientlib.Vtxo) ([]time.Time, error) {
+func (f *fakeService) RenewableAt(_ *domain.Delegation, vtxos []clientlib.Vtxo) []time.Time {
 	due := make([]time.Time, len(vtxos))
 	for i, v := range vtxos {
 		due[i] = v.ExpiresAt.Add(-time.Minute)
 	}
-	return due, nil
+	return due
 }
 func (f *fakeService) ListDelegations(_ context.Context, status string, cursor int64, limit int) ([]domain.Delegation, error) {
 	f.listed = [3]any{status, cursor, limit}
@@ -469,11 +464,11 @@ func (f *fakeService) CancelDelegationByID(_ context.Context, id int64) error {
 	f.cancelledID = id
 	return f.err
 }
-func (f *fakeService) Vtxos(context.Context, *domain.Delegation) ([]clientlib.Vtxo, error) {
+func (f *fakeService) Vtxos(*domain.Delegation) []clientlib.Vtxo {
 	return []clientlib.Vtxo{{
 		Outpoint: clientlib.Outpoint{Txid: "ab", VOut: 1}, Amount: 5000, CreatedAt: t0, ExpiresAt: t0.Add(time.Hour),
 		Preconfirmed: true, Assets: []clientlib.Asset{{AssetId: "gold", Amount: 3}},
-	}}, nil
+	}}
 }
 func (f *fakeService) ListRenewals(context.Context, *domain.Delegation) ([]domain.Renewal, error) {
 	return []domain.Renewal{{Outpoints: []string{"ab:1"}, Error: "nope", AttemptedAt: t0}}, nil
@@ -483,7 +478,7 @@ func (f *fakeService) LastRenewals(context.Context) (map[int64]domain.Renewal, e
 }
 func (f *fakeService) Status() application.Status {
 	return application.Status{
-		LastScan: t0, RenewingVtxos: 2, PollInterval: time.Minute,
+		LastScan: t0, NextScan: t0.Add(time.Minute), Throttled: true, RenewingVtxos: 2, PollInterval: time.Minute,
 		Holdings: map[int64]application.Holdings{
 			7: {Vtxos: 2, Amount: 9000, NextExpiry: t0.Add(time.Hour), NextDue: t0, NextDeadline: t0.Add(30 * time.Minute), NextBatchAt: t0.Add(20 * time.Minute), Renewing: true,
 				FailingSince: t0.Add(-time.Hour), LastFailure: t0, Failures: 3},
@@ -499,8 +494,8 @@ func (f *fakeService) Status() application.Status {
 		BoardingMaxWait: 10 * time.Minute,
 	}
 }
-func (f *fakeService) IntentFees(context.Context) (arkfee.Config, error) {
-	return arkfee.Config{IntentOffchainInputProgram: "200.0"}, f.feesErr
+func (f *fakeService) IntentFees() arkfee.Config {
+	return arkfee.Config{IntentOffchainInputProgram: "200.0"}
 }
 func (f *fakeService) Health(context.Context) map[string]error { return f.health }
 func (f *fakeService) PendingTxs(_ context.Context, id int64) ([]application.PendingTx, error) {

@@ -675,8 +675,9 @@ function scanState() {
 
 function renderHeader() {
   const { busy, stale, last } = scanState(), next = (status.batches || [])[0], p = $("pulse");
-  p.className = busy ? "busy" : stale ? "warn" : "";
+  p.className = busy ? "busy" : stale || status.throttled ? "warn" : "";
   p.innerHTML = busy ? `<i class="pulse"></i>Running <b>${plural(status.renewingVtxos, "coin")}</b>`
+    : status.throttled ? `Upstream rate limited, next scan <b>${ago(status.nextScanAt)}</b>`
     : stale ? `Scanner stalled, last scan <b>${ago(last)}</b>`
     : next ? `Next batch <b>${num(next.at) <= nowSecs() ? "now" : ago(next.at)}</b>, ${plural(next.vtxoCount, "VTXO")}`
     : !last ? "First scan pending" : "No batch planned";
