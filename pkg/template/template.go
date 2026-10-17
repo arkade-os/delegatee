@@ -119,6 +119,7 @@ type secret struct {
 	typ        string
 	from       int
 	ciphertext byteTemplate
+	field      string
 }
 
 type fee struct {
@@ -277,7 +278,7 @@ func (p *parser) declarations(m map[string]any) (map[string]any, error) {
 		if _, dup := p.t.variables[n]; dup {
 			return nil, bad("%q is both a variable and a secret", n)
 		}
-		sm, err := object(ErrInvalidTemplate, v, "secret", []string{"type", "from", "ciphertext"})
+		sm, err := object(ErrInvalidTemplate, v, "secret", []string{"type", "from", "ciphertext"}, "field")
 		if err != nil {
 			return nil, err
 		}
@@ -285,7 +286,15 @@ func (p *parser) declarations(m map[string]any) (map[string]any, error) {
 		if !slices.Contains(scalarTypes, typ) {
 			return nil, bad("secret %q has unsupported type %v", n, sm["type"])
 		}
-		p.t.secrets[n] = secret{typ: typ}
+		field := ""
+		if raw, ok := sm["field"]; ok {
+			var valid bool
+			field, valid = raw.(string)
+			if !valid || ident(field, "secret field") != nil {
+				return nil, bad("secret %q has an invalid field", n)
+			}
+		}
+		p.t.secrets[n] = secret{typ: typ, field: field}
 	}
 	if len(vars)+len(secrets) > maxSlots {
 		return nil, bad("more than %d variables and secrets", maxSlots)

@@ -3,6 +3,8 @@ package template
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math"
 	"slices"
@@ -362,6 +364,20 @@ func (i *Instance) lookup(n string, d *draft) (value, error) {
 		return value{}, fmt.Errorf("secret %q: %w", n, err)
 	}
 	p, err := i.decrypt(ct)
+	if err == nil && s.field != "" {
+		var envelope struct {
+			Format     string            `json:"format"`
+			TemplateID string            `json:"template_id"`
+			Values     map[string]string `json:"values"`
+		}
+		if e := json.Unmarshal(p, &envelope); e != nil || envelope.Format != "delegatee-secrets/v1" || envelope.TemplateID != i.tmpl.id {
+			err = fmt.Errorf("invalid encrypted secret envelope")
+		} else if raw, ok := envelope.Values[s.field]; !ok {
+			err = fmt.Errorf("encrypted secret field is missing")
+		} else if p, err = hex.DecodeString(raw); err != nil || hex.EncodeToString(p) != raw {
+			err = fmt.Errorf("encrypted secret field is not hex")
+		}
+	}
 	if err == nil {
 		err = canonicalBytes(s.typ, p)
 	}
