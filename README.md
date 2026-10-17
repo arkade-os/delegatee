@@ -7,7 +7,7 @@ owner is offline. A wallet registers a watch on its address; every spend is
 co-signed by the [emulator](https://github.com/arkade-os/emulator) only if it
 satisfies the template's covenant.
 
-The default templates in [`templates/`](templates) (renewal, boarding, VHTLC claim and refund, and noninteractiveclaim) are registered and trusted at startup.
+The default templates in [`templates/`](templates) (renewal, boarding, VHTLC claim and refund, noninteractiveclaim, and offline_receive) are registered and trusted at startup.
 
 ## Run
 
