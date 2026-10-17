@@ -255,11 +255,12 @@ func TestRegisterDefaults(t *testing.T) {
 	renewal, boarding := "d901cb8554a77524fb55ebfcde8e1c468871de45163abf34e988c47f1fa36896", "02b4e8bdfb52d7450ab75510cfaff36da5b88323291325e38358df10684a8344"
 	claim, refund := "c6e10a94e6b27b1c29dc3c9eae95d1f01ef9e4142f882f9ce9888a416d7ae01d", "978df861b2ae33f1373fd9ead844b074b3575d2341e98f1d50114179a9ed7d6d"
 	noninteractiveclaim := "4493579d4cdb14a5809b55c55b7d228a4d8f7fc479c1424b286d4d5234382eee"
+	offlineReceive := "ffda43b87b0006575f69364a62b136b5ca74f6c40bd5c3976963dca5eecab87a"
 	on := &Config{DefaultTemplates: true}
 	svc := newDefaultsService()
 	require.NoError(t, on.registerDefaults(t.Context(), svc))
 	require.Len(t, svc.artifacts, 1)
-	require.Equal(t, map[string]bool{renewal: true, boarding: true, claim: true, refund: true, noninteractiveclaim: true}, svc.trusted())
+	require.Equal(t, map[string]bool{renewal: true, boarding: true, claim: true, refund: true, noninteractiveclaim: true, offlineReceive: true}, svc.trusted())
 	require.Equal(t, map[string]bool{noninteractiveclaim: true}, svc.streams, "only the template with a trigger streams")
 
 	noKey := newDefaultsService()
@@ -270,7 +271,7 @@ func TestRegisterDefaults(t *testing.T) {
 	trusts := svc.trusts
 	require.NoError(t, on.registerDefaults(t.Context(), svc))
 	require.Equal(t, trusts, svc.trusts, "a restart changes nothing")
-	require.Equal(t, map[string]bool{renewal: true, boarding: false, claim: true, refund: true, noninteractiveclaim: true}, svc.trusted(), "an untrusted default stays untrusted")
+	require.Equal(t, map[string]bool{renewal: true, boarding: false, claim: true, refund: true, noninteractiveclaim: true, offlineReceive: true}, svc.trusted(), "an untrusted default stays untrusted")
 
 	off := newDefaultsService()
 	require.NoError(t, (&Config{}).registerDefaults(t.Context(), off))

@@ -140,7 +140,11 @@ func delegationsOf(t *testing.T, d delegatee, templateID string) ([]*delegateev1
 // faucet pays sats onchain and mines a block.
 func faucet(t *testing.T, address string, sats int64) {
 	t.Helper()
-	out, err := exec.Command("nigiri", "faucet", address, btc(sats)).CombinedOutput()
+	command := exec.Command("nigiri", "faucet", address, btc(sats))
+	if cli := os.Getenv("DELEGATEE_TEST_REGTEST_CLI"); cli != "" {
+		command = exec.Command("node", cli, "faucet", address, btc(sats), "--confirm")
+	}
+	out, err := command.CombinedOutput()
 	require.NoError(t, err, string(out))
 }
 
@@ -814,17 +818,22 @@ func fundedWallet(t *testing.T) testWallet {
 	t.Cleanup(w.Stop)           // Stop panics on a wallet that never initialised
 	log.SetLevel(log.InfoLevel) // the sdk lowers the global level
 	wallet := testWallet{w}
-	_, _, boarding, err := wallet.Receive(ctx)
-	require.NoError(t, err)
-	faucet(t, boarding.Address, 100_000)
-
-	require.Eventually(t, func() bool {
-		balance, err := wallet.Balance(ctx)
-		return err == nil && onchainTotal(balance) > 0
-	}, 30*time.Second, 500*time.Millisecond, "boarding utxo not detected")
-
-	_, err = wallet.Settle(ctx)
-	require.NoError(t, err)
+	if container := os.Getenv("DELEGATEE_TEST_NOTE_CONTAINER"); container != "" {
+		note, err := exec.Command("docker", "exec", container, "arkd", "note", "--amount", "100000").CombinedOutput()
+		require.NoError(t, err, string(note))
+		_, err = wallet.RedeemNotes(ctx, []string{strings.TrimSpace(string(note))})
+		require.NoError(t, err)
+	} else {
+		_, _, boarding, err := wallet.Receive(ctx)
+		require.NoError(t, err)
+		faucet(t, boarding.Address, 100_000)
+		require.Eventually(t, func() bool {
+			balance, err := wallet.Balance(ctx)
+			return err == nil && onchainTotal(balance) > 0
+		}, 30*time.Second, 500*time.Millisecond, "boarding utxo not detected")
+		_, err = wallet.Settle(ctx)
+		require.NoError(t, err)
+	}
 	require.Eventually(t, func() bool {
 		balance, err := wallet.Balance(ctx)
 		return err == nil && balance.OffchainBalance.Total > 0
@@ -850,10 +859,20 @@ func freePort(t *testing.T) uint32 {
 	return uint32(port)
 }
 
+var (
+	arkURL      = testEndpoint("DELEGATEE_TEST_ARK_URL", "localhost:7070")
+	emulatorURL = testEndpoint("DELEGATEE_TEST_EMULATOR_URL", "localhost:7073")
+	explorerURL = testEndpoint("DELEGATEE_TEST_EXPLORER_URL", "http://localhost:3000")
+)
+
+func testEndpoint(name, fallback string) string {
+	if value := os.Getenv(name); value != "" {
+		return value
+	}
+	return fallback
+}
+
 const (
-	arkURL         = "localhost:7070"
-	emulatorURL    = "localhost:7073"
-	explorerURL    = "http://localhost:3000"
 	delegateAmount = uint64(10_000)
 	assetAmount    = uint64(1_000)
 	password       = "password"

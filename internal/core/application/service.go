@@ -502,9 +502,6 @@ func (s *service) registerWatch(
 		}
 		return found, err
 	}
-	if now := time.Now(); from == nil && expiresAt != nil && (!expiresAt.After(now) || expiresAt.Before(now.Add(s.limits.MinWatchExpiry))) {
-		return nil, fmt.Errorf("%w: expires_at must be at least %s ahead", ErrInvalidArgs, s.limits.MinWatchExpiry)
-	}
 	tmpl, err := s.parseTemplate(ctx, templateID)
 	if err != nil {
 		return nil, err
@@ -518,6 +515,18 @@ func (s *service) registerWatch(
 	inst, err := s.instanceFor(ctx, tmpl, s.cosigners[0], variables, nil, nil)
 	if err != nil {
 		return nil, err
+	}
+	bound := inst.ExpiresAt()
+	if bound != nil && from == nil && bound.After(time.Now().Add(24*time.Hour)) {
+		return nil, fmt.Errorf("%w: template expiry is more than one day ahead", ErrInvalidArgs)
+	}
+	if bound != nil && (expiresAt == nil || bound.Before(*expiresAt)) {
+		expiresAt = bound
+	}
+	if now := time.Now(); expiresAt != nil {
+		if !expiresAt.After(now) || (from == nil && !(bound != nil && tmpl.Secrets()) && expiresAt.Before(now.Add(s.limits.MinWatchExpiry))) {
+			return nil, fmt.Errorf("%w: expires_at is past or below the minimum watch lifetime", ErrInvalidArgs)
+		}
 	}
 	slots, tapKeys, err := bindSlots(tmpl, inst, nil)
 	if err != nil {

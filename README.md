@@ -79,5 +79,22 @@ belongs to one pool, and each pool has one output without an `amount`.
 
 ## Stream delegations
 
+Offline receive clients can register `templates/offline_receive.json` through
+`POST /v1/delegate` before publishing an invoice or funding an HTLC. Supply its content
+ID and hex variables `taptree`, `receiver_program` and `ciphertext`. The ordinary watch
+persists before funding, so its indexer scan also finds transactions missed by the live
+stream. The operator must trust the template and configure an encryption key.
+
+The ciphertext uses the existing ECIES wire format and encrypts JSON:
+`{"format":"delegatee-secrets/v1","template_id":"<id>","values":{...}}`.
+Secret declarations select a named lower-case hex field with `field`. The offline receive
+template expects `preimage` and `lockup_program` (32 bytes), and `minimum_value` and
+`claim_until` (canonical ScriptNums). It checks the exact source program and minimum
+amount before building a claim. Its `expires_at` binding caps the watch and action
+lifetime, including queued attempts. A trusted secret-bearing template can impose a
+shorter lifetime than `MIN_WATCH_EXPIRY`; public registration rejects a bound more than
+24 hours ahead. The deadline stops new submissions; accepted transactions are still
+reconciled after expiry. Raw ECIES plaintext remains supported by templates without `field`.
+
 A template with a `trigger` is not registered by clients: the operator registers it as a stream delegation (admin `RegisterStreamDelegation`; a default with a trigger starts by itself when an encryption key is configured). The daemon reads arkd's transaction stream and, for every transaction whose extension holds the trigger's packet, binds the trigger's variables, checks the template locks the output, and spawns a watch of the template that expires after `expires_after_seconds`.
 

@@ -9,6 +9,7 @@ import (
 	"maps"
 	"math"
 	"slices"
+	"time"
 
 	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
 	"github.com/arkade-os/arkd/pkg/ark-lib/asset"
@@ -49,6 +50,9 @@ type spending struct {
 // Build builds the unsigned transaction spending sources, one per input in slot order.
 func (i *Instance) Build(_ context.Context, sources []*Source, fee Fee) (*Action, error) {
 	t := i.tmpl
+	if i.expiresAt != nil && !time.Now().Before(*i.expiresAt) {
+		return nil, fmt.Errorf("%w: template has expired", ErrIneligible)
+	}
 	if err := checkSources(sources, len(t.inputs)); err != nil {
 		return nil, err
 	}

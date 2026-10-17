@@ -59,6 +59,7 @@ type Template struct {
 	fee       *fee
 	packets   *packetSpec
 	trigger   *Trigger
+	expiresAt byteTemplate
 	artifacts []string
 }
 
@@ -119,6 +120,7 @@ type secret struct {
 	typ        string
 	from       int
 	ciphertext byteTemplate
+	field      string
 }
 
 type fee struct {
@@ -145,7 +147,7 @@ func Parse(ctx context.Context, doc []byte, resolve Resolver) (*Template, error)
 	if err != nil {
 		return nil, err
 	}
-	m, err := object(ErrInvalidTemplate, v, "template", []string{"format", "type", "inputs", "outputs"}, "variables", "secrets", "fees", "packets", "trigger")
+	m, err := object(ErrInvalidTemplate, v, "template", []string{"format", "type", "inputs", "outputs"}, "variables", "secrets", "fees", "packets", "trigger", "expires_at")
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +177,11 @@ func Parse(ctx context.Context, doc []byte, resolve Resolver) (*Template, error)
 	if err := p.secretBodies(secrets); err != nil {
 		return nil, err
 	}
+	if raw, ok := m["expires_at"]; ok {
+		if p.t.expiresAt, err = p.bind(raw, "int", true); err != nil {
+			return nil, err
+		}
+	}
 	outs, err := slots(m, "outputs")
 	if err != nil {
 		return nil, err
@@ -186,6 +193,14 @@ func Parse(ctx context.Context, doc []byte, resolve Resolver) (*Template, error)
 	}
 	if err := p.t.checkPrograms(); err != nil {
 		return nil, err
+	}
+	for _, piece := range p.t.expiresAt {
+		if piece.program != "" {
+			return nil, bad("expires_at cannot reference an output program")
+		}
+	}
+	if !p.t.argsFree(map[string]byteTemplate{"expires_at": p.t.expiresAt}) {
+		return nil, bad("expires_at must be context-free")
 	}
 	if err := p.t.checkBalances(); err != nil {
 		return nil, err
@@ -277,7 +292,7 @@ func (p *parser) declarations(m map[string]any) (map[string]any, error) {
 		if _, dup := p.t.variables[n]; dup {
 			return nil, bad("%q is both a variable and a secret", n)
 		}
-		sm, err := object(ErrInvalidTemplate, v, "secret", []string{"type", "from", "ciphertext"})
+		sm, err := object(ErrInvalidTemplate, v, "secret", []string{"type", "from", "ciphertext"}, "field")
 		if err != nil {
 			return nil, err
 		}
@@ -285,7 +300,15 @@ func (p *parser) declarations(m map[string]any) (map[string]any, error) {
 		if !slices.Contains(scalarTypes, typ) {
 			return nil, bad("secret %q has unsupported type %v", n, sm["type"])
 		}
-		p.t.secrets[n] = secret{typ: typ}
+		field := ""
+		if raw, ok := sm["field"]; ok {
+			var valid bool
+			field, valid = raw.(string)
+			if !valid || ident(field, "secret field") != nil {
+				return nil, bad("secret %q has an invalid field", n)
+			}
+		}
+		p.t.secrets[n] = secret{typ: typ, field: field}
 	}
 	if len(vars)+len(secrets) > maxSlots {
 		return nil, bad("more than %d variables and secrets", maxSlots)
