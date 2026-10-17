@@ -59,7 +59,6 @@ type Template struct {
 	fee       *fee
 	packets   *packetSpec
 	trigger   *Trigger
-	expiresAt byteTemplate
 	artifacts []string
 }
 
@@ -147,7 +146,7 @@ func Parse(ctx context.Context, doc []byte, resolve Resolver) (*Template, error)
 	if err != nil {
 		return nil, err
 	}
-	m, err := object(ErrInvalidTemplate, v, "template", []string{"format", "type", "inputs", "outputs"}, "variables", "secrets", "fees", "packets", "trigger", "expires_at")
+	m, err := object(ErrInvalidTemplate, v, "template", []string{"format", "type", "inputs", "outputs"}, "variables", "secrets", "fees", "packets", "trigger")
 	if err != nil {
 		return nil, err
 	}
@@ -177,11 +176,6 @@ func Parse(ctx context.Context, doc []byte, resolve Resolver) (*Template, error)
 	if err := p.secretBodies(secrets); err != nil {
 		return nil, err
 	}
-	if raw, ok := m["expires_at"]; ok {
-		if p.t.expiresAt, err = p.bind(raw, "int", true); err != nil {
-			return nil, err
-		}
-	}
 	outs, err := slots(m, "outputs")
 	if err != nil {
 		return nil, err
@@ -193,14 +187,6 @@ func Parse(ctx context.Context, doc []byte, resolve Resolver) (*Template, error)
 	}
 	if err := p.t.checkPrograms(); err != nil {
 		return nil, err
-	}
-	for _, piece := range p.t.expiresAt {
-		if piece.program != "" {
-			return nil, bad("expires_at cannot reference an output program")
-		}
-	}
-	if !p.t.argsFree(map[string]byteTemplate{"expires_at": p.t.expiresAt}) {
-		return nil, bad("expires_at must be context-free")
 	}
 	if err := p.t.checkBalances(); err != nil {
 		return nil, err

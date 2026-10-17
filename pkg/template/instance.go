@@ -32,7 +32,6 @@ type Instance struct {
 	decrypt   func([]byte) ([]byte, error)
 	contracts []*contract                // per slot
 	locktimes []*arklib.AbsoluteLocktime // per slot, nil without a CLTV spend leaf
-	expiresAt *time.Time
 }
 
 // ContextFree reports whether the input contracts can be built without sources.
@@ -111,18 +110,6 @@ func (t *Template) Instantiate(_ context.Context, c Context) (*Instance, error) 
 	for n, v := range c.Variables {
 		i.vars[n] = bytes.Clone(v)
 	}
-	if t.expiresAt != nil {
-		raw, err := i.decoded(t.expiresAt, "int", d, 0)
-		if err != nil {
-			return nil, fmt.Errorf("expires_at: %w", err)
-		}
-		n, err := parseScriptNum(raw)
-		if err != nil || n <= 0 {
-			return nil, fmt.Errorf("%w: expires_at must be positive", ErrInvalidTemplate)
-		}
-		at := time.Unix(n, 0)
-		i.expiresAt = &at
-	}
 	for slot, in := range t.inputs {
 		ct, err := i.contractOf(&in.contract, d, slot, watch)
 		if err != nil {
@@ -144,15 +131,6 @@ func (t *Template) Instantiate(_ context.Context, c Context) (*Instance, error) 
 		return nil, fmt.Errorf("%w: locktimes mix block heights and timestamps", ErrUnsupported)
 	}
 	return i, nil
-}
-
-// ExpiresAt bounds a watch independently of the caller's requested lifetime.
-func (i *Instance) ExpiresAt() *time.Time {
-	if i.expiresAt == nil {
-		return nil
-	}
-	at := *i.expiresAt
-	return &at
 }
 
 // a non-canonical value is ineligible, unless watch, where it can only come from the variables

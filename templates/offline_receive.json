@@ -3,24 +3,12 @@
   "type": "offchain",
   "variables": {
     "taptree": "bytes",
-    "receiver_program": "bytes32",
-    "ciphertext": "bytes"
+    "ciphertext": "bytes",
+    "receiver_program": "bytes32"
   },
   "secrets": {
-    "claim_until": {
-      "field": "claim_until",
-      "type": "int",
-      "ciphertext": "<ciphertext>",
-      "from": "htlc"
-    },
     "preimage": {
       "field": "preimage",
-      "type": "bytes32",
-      "ciphertext": "<ciphertext>",
-      "from": "htlc"
-    },
-    "lockup_program": {
-      "field": "lockup_program",
       "type": "bytes32",
       "ciphertext": "<ciphertext>",
       "from": "htlc"
@@ -28,6 +16,12 @@
     "minimum_value": {
       "field": "minimum_value",
       "type": "int",
+      "ciphertext": "<ciphertext>",
+      "from": "htlc"
+    },
+    "receiver_commitment": {
+      "field": "receiver_program",
+      "type": "bytes32",
       "ciphertext": "<ciphertext>",
       "from": "htlc"
     }
@@ -130,7 +124,7 @@
       "value": {
         "from": "htlc"
       },
-      "locking": "5120$(OP_PUSHCURRENTINPUTINDEX OP_INSPECTINPUTSCRIPTPUBKEY 1 OP_EQUALVERIFY <lockup_program> OP_EQUALVERIFY <minimum_value> 0 OP_GREATERTHAN OP_VERIFY <minimum_value> 2100000000000000 OP_LESSTHANOREQUAL OP_VERIFY OP_PUSHCURRENTINPUTINDEX OP_INSPECTINPUTVALUE <minimum_value> OP_GREATERTHANOREQUAL OP_VERIFY <receiver_program>)",
+      "locking": "5120$(<receiver_program> <receiver_commitment> OP_EQUALVERIFY <minimum_value> 0 OP_GREATERTHAN OP_VERIFY <minimum_value> 2100000000000000 OP_LESSTHANOREQUAL OP_VERIFY OP_PUSHCURRENTINPUTINDEX OP_INSPECTINPUTVALUE <minimum_value> OP_GREATERTHANOREQUAL OP_VERIFY <receiver_program>)",
       "assets": [
         {
           "from": "htlc"
@@ -142,5 +136,34 @@
     "output_index": 1,
     "unmatched": "drop"
   },
-  "expires_at": "<claim_until>"
+  "trigger": {
+    "packet": 4,
+    "decode": "tlv",
+    "min_value": 1,
+    "require": {
+      "tlv:3": "<ENCRYPTION_KEY>",
+      "tlv:127": "0x64656c6567617465652d736563726574732f7631"
+    },
+    "bind": {
+      "ciphertext": "tlv:1",
+      "taptree": "output:taptree",
+      "receiver_program": {
+        "from": "tlv:2",
+        "asm": [
+          "OP_PUSHCURRENTINPUTINDEX",
+          "OP_DUP",
+          "OP_INSPECTOUTPUTSCRIPTPUBKEY",
+          "1",
+          "OP_EQUALVERIFY",
+          "<receiver_program>",
+          "OP_EQUALVERIFY",
+          "OP_INSPECTOUTPUTVALUE",
+          "OP_PUSHCURRENTINPUTINDEX",
+          "OP_INSPECTINPUTVALUE",
+          "OP_GREATERTHANOREQUAL"
+        ]
+      }
+    },
+    "expires_after_seconds": 86400
+  }
 }

@@ -52,22 +52,6 @@ type offchainTx struct {
 }
 
 func (s *service) runDirect(ctx context.Context, c *cosigner, inputs []renewalInput, fees arkfee.Config) renewalResult {
-	for _, in := range inputs {
-		// Ordinary watch expiry ends discovery; template deadlines also constrain queued actions.
-		if in.watched.instance == nil {
-			continue
-		}
-		at := in.watched.instance.ExpiresAt()
-		if at == nil {
-			continue
-		}
-		if requested := in.watched.delegation.ExpiresAt; requested != nil && requested.Before(*at) {
-			at = requested
-		}
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithDeadline(ctx, *at)
-		defer cancel()
-	}
 	r := renewalResult{inputs: inputs}
 	var st settlement
 	if inputs[0].watched.tmpl.Type() == template.Offchain {
@@ -152,10 +136,6 @@ func (s *service) runOffchain(ctx context.Context, c *cosigner, inputs []renewal
 		return "", settlement{}, false, err
 	}
 	raw, checkpoints := spend.original, slices.Clone(spend.originalCheckpoints)
-	if err := ctx.Err(); err != nil {
-		s.forget(context.WithoutCancel(ctx), st)
-		return "", settlement{}, false, err
-	}
 	if hasEmulator {
 		if raw, checkpoints, err = s.emulatorSignsOffchain(ctx, spend.ark, coins, checkpoints); err != nil {
 			s.forgetRefused(ctx, st, err)
