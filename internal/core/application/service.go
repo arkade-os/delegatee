@@ -524,7 +524,7 @@ func (s *service) registerWatch(
 		expiresAt = bound
 	}
 	if now := time.Now(); expiresAt != nil {
-		if !expiresAt.After(now) || (from == nil && !(bound != nil && tmpl.Secrets()) && expiresAt.Before(now.Add(s.limits.MinWatchExpiry))) {
+		if !expiresAt.After(now) || (from == nil && (bound == nil || !tmpl.Secrets()) && expiresAt.Before(now.Add(s.limits.MinWatchExpiry))) {
 			return nil, fmt.Errorf("%w: expires_at is past or below the minimum watch lifetime", ErrInvalidArgs)
 		}
 	}
