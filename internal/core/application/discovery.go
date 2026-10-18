@@ -276,7 +276,7 @@ func (s *service) discover(ctx context.Context, delegations []domain.Delegation,
 	unwatched := map[int64]string{}
 	s.found = map[int64][]scannedCoin{}
 	scripts := s.watchAll(ctx, delegations, active, unwatched)
-	byScript, err := s.spendableVtxos(ctx, scripts)
+	byScript, err := s.scanVtxos(ctx, scripts)
 	if err != nil {
 		return nil, nil, nil, err
 	}

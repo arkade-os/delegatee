@@ -1,6 +1,7 @@
 package application
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,6 +10,24 @@ import (
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	"github.com/stretchr/testify/require"
 )
+
+func BenchmarkVtxoCache50000Scripts(b *testing.B) {
+	i := &cacheIndexer{coins: map[string][]clientlib.Vtxo{}}
+	s := &service{indexer: i, wake: make(chan struct{}, 1), incrementalRefresh: true}
+	scripts := make([]string, 50000)
+	for n := range scripts {
+		scripts[n] = fmt.Sprintf("5120%064x", n)
+	}
+	_, err := s.scanVtxos(b.Context(), scripts)
+	require.NoError(b, err)
+	b.ResetTimer()
+	for range b.N {
+		s.invalidateScripts(scripts[0])
+		_, err := s.scanVtxos(b.Context(), scripts)
+		require.NoError(b, err)
+		i.requests = i.requests[:0]
+	}
+}
 
 func BenchmarkScan5000(b *testing.B) {
 	env := newTestEnv(b)

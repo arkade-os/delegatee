@@ -7,7 +7,7 @@ owner is offline. A wallet registers a watch on its address; every spend is
 co-signed by the [emulator](https://github.com/arkade-os/emulator) only if it
 satisfies the template's covenant.
 
-The default templates in [`templates/`](templates) (renewal, boarding, VHTLC claim and refund, and noninteractiveclaim) are registered and trusted at startup.
+The default templates in [`templates/`](templates) (renewal, boarding, VHTLC claim and refund, noninteractiveclaim, and offline_receive) are registered and trusted at startup.
 
 ## Run
 
@@ -79,5 +79,73 @@ belongs to one pool, and each pool has one output without an `amount`.
 
 ## Stream delegations
 
-A template with a `trigger` is not registered by clients: the operator registers it as a stream delegation (admin `RegisterStreamDelegation`; a default with a trigger starts by itself when an encryption key is configured). The daemon reads arkd's transaction stream and, for every transaction whose extension holds the trigger's packet, binds the trigger's variables, checks the template locks the output, and spawns a watch of the template that expires after `expires_after_seconds`.
+Offline receive uses `templates/offline_receive.json` as an operator stream delegation.
+The receiver never registers a watch or sends its preimage to a delegatee API. Before
+requesting an exact-output quote, it seals the preimage, recipient and minimum amount
+to the daemon's advertised encryption public key. The operator can decrypt the preimage
+and must be trusted with it. The funding transaction delivers
+that ciphertext in extension packet type 4. The solver adds its payout script in TLV 2;
+the daemon checks the full funding taptree and output script against the resulting
+covenant claim leaf, and authenticates its recipient against the envelope before claiming.
 
+The packet body starts with TLV 127 containing ASCII `delegatee-secrets/v1`, followed
+by TLV 1 (ciphertext) and TLV 3 (compressed encryption public key). Each record is a
+one-byte tag, two-byte big-endian length and value. The ciphertext uses the existing
+ECIES wire format and `covclaimd/preimage/v1` domain, encrypting JSON:
+`{"format":"delegatee-secrets/v1","template_id":"<content ID>","values":{...}}`.
+The values are `preimage` and `receiver_program` (32-byte lowercase hex) and
+`minimum_value` (canonical ScriptNum hex). Secret declarations select fields with
+`field`. The recipient captured from TLV 2 must equal the authenticated receiver before
+a claim can disclose the preimage. Raw ECIES plaintext remains supported by
+templates without `field`, including the unchanged `noninteractiveclaim` stream.
+
+The authenticated minimum must be positive, at most 2.1e15 satoshis, and satisfied by
+the funded input before a claim can disclose the preimage. The output preserves the
+input's entire value and assets and pays the authenticated recipient. This envelope
+binds an intent before its quote, not a specific later refund deadline or lockup tree.
+There is no encrypted claim deadline; ordinary spawned watches expire after 24 hours.
+
+The receiver can go offline after preparing its invoice. Once the daemon receives the
+funding packet, the spawned watch persists and resumes retries after a daemon restart.
+The filtered indexer subscription does not replay history: funding first seen while the daemon
+is unavailable cannot currently be discovered through this packet-only flow. The
+indexer recovers known watches, not entirely unseen funding packets.
+
+A template with a `trigger` is not registered by clients: the operator registers it as a stream delegation (admin `RegisterStreamDelegation`; a default with a trigger starts by itself when an encryption key is configured). The daemon opens an indexer subscription with CEL filters derived from the active triggers. For offline receive these select packet type 4, the version marker and one of its retained encryption keys. It binds matching packets, checks the template locks the output, and spawns a watch that expires after `expires_after_seconds`. Full local trigger and covenant checks remain authoritative: the CEL filter only reduces traffic. This requires indexer initial-filter support; subscription errors are reported and retried without switching to the global transaction stream.
+
+
+## Capacity
+
+Discovery filter changes update the existing subscription atomically while its
+events continue to be processed. Failed or ambiguous updates are reconciled
+without closing the working stream.
+
+Known offchain direct watches use script subscriptions, split into at most 1,000
+scripts per subscription. Existing shards retain their scripts as registrations
+change. New and spent coin events invalidate only the affected scripts; repeated
+events coalesce. The next scan queries those scripts in chunks of 100 with at
+most four requests in flight. Startup, connection gaps and periodic reconciliation
+refresh all active scripts. Frequent events cannot postpone the periodic refresh.
+Upstream throttle backoff takes precedence over event wakes and reconciliation
+deadlines; failed scans retain their dirty scripts for the next permitted retry.
+
+Packet discovery needs a recipient filter because a new payment's script is not
+known beforehand. It uses one separate filtered subscription, with a one-event
+application buffer and synchronous registration. This bounds memory, but does not
+provide durable event replay or guaranteed admission during overload, a database
+outage or a full registration cap. Watch rows already persisted are recoverable.
+
+The default caps are 50,000 public/stream registrations and 10,000 spawned watches.
+A successful receive watch remains active until its 24-hour expiry so it can handle
+another funding to that script. Consequently 10,000 distinct receives can fill the
+child cap during a day even when claims settle quickly. Raising the cap requires
+capacity testing; it does not increase processing throughput.
+
+All active registrations are still loaded and examined each scan, and direct claims
+run serially within their lane. Registration inserts serialize and count active
+rows. Batch planning uses sorted passes rather than repeatedly copying/scanning
+remaining entries. Unit scale tests cover 50,000 scripts, bounded subscriptions,
+coalesced refreshes, races and failed/reconnected streams; these use mock storage
+and indexer responses and do not establish production throughput. Measure database
+latency, scan duration, claim service time, oldest pending receive and cap usage
+under the deployment's actual traffic before increasing limits.

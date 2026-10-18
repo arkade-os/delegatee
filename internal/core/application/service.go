@@ -238,15 +238,22 @@ type service struct {
 	failing      map[string]*failure  // coins whose last attempt failed
 
 	// the scan alone
-	held         map[string]bool // coins of the daemon's settlements that may still land, as of the scan
-	entries      []planEntry     // the batch lane's future intents, as the scan found them
-	found        map[int64][]scannedCoin
-	backoff      time.Duration        // grows while an upstream throttles the scan
-	plan         *plan                // published under mu
-	refusedSince map[string]time.Time // pending txs arkd refuses, since the first refusal
-	watched      map[int64]*watched   // nil for a delegation of another key
-	sub          *subscription
-	sampled      map[int64]bool // inFlight as the scan began
+	held               map[string]bool // coins of the daemon's settlements that may still land, as of the scan
+	entries            []planEntry     // the batch lane's future intents, as the scan found them
+	found              map[int64][]scannedCoin
+	backoff            time.Duration
+	plan               *plan                // published under mu
+	refusedSince       map[string]time.Time // pending txs arkd refuses, since the first refusal
+	watched            map[int64]*watched   // nil for a delegation of another key
+	subs               []*subscription
+	sampled            map[int64]bool // inFlight as the scan began
+	vtxoCache          map[string][]clientlib.Vtxo
+	lastFullRefresh    time.Time
+	incrementalRefresh bool
+
+	vtxoDirtyMu  sync.Mutex
+	vtxoDirty    map[string]struct{}
+	vtxoDirtyAll bool
 
 	// mu guards what the last completed scan saw
 	mu        sync.Mutex
@@ -459,16 +466,19 @@ func (s *service) Start() {
 		defer close(s.stopped)
 		timer := time.NewTimer(s.pollInterval)
 		defer timer.Stop()
+		full := true
 		for {
-			err := s.scan(ctx)
+			err := s.scanWithRefresh(ctx, full)
 			scanned := time.Now()
 			delay, gap := s.scanDelays(err, scanned)
 			timer.Reset(delay)
 			select {
 			case <-ctx.Done():
 			case <-timer.C:
+				full = true
 				continue
 			case <-s.wake:
+				full = false
 				select {
 				case <-ctx.Done():
 				case <-time.After(gap - time.Since(scanned)):
@@ -493,6 +503,9 @@ func (s *service) scanDelays(err error, now time.Time) (delay, gap time.Duration
 		s.backoff = 0
 	}
 	delay, gap = max(s.nextScanDelay(now), s.backoff), max(minScanGap, s.backoff)
+	if s.backoff == 0 && !s.lastFullRefresh.IsZero() {
+		delay = min(delay, max(minScanGap, s.lastFullRefresh.Add(s.pollInterval).Sub(now)))
+	}
 	s.mu.Lock()
 	s.nextScan, s.throttled = now.Add(delay), s.backoff > 0
 	s.mu.Unlock()
@@ -591,7 +604,7 @@ func (s *service) registerWatch(
 		ExpiresAt: expiresAt, DelegatePubKey: s.cosigners[0].pubKey, Slots: slots,
 	}, limit)
 	if err == nil && tmpl.Type() != template.Intent {
-		s.wakeScan() // the coin may be there already
+		s.invalidateScripts(slots[0].Script)
 	}
 	return d, err
 }
@@ -699,7 +712,7 @@ func (s *service) ResumeDelegation(ctx context.Context, id int64) error {
 	err := s.repo.Resume(ctx, id)
 	s.registerMu.Unlock()
 	if err == nil {
-		s.wakeScan()
+		s.invalidateAllScripts()
 	}
 	return err
 }
@@ -1029,6 +1042,19 @@ func (s *service) spendableVtxos(ctx context.Context, scripts []string) (map[str
 }
 
 func (s *service) scan(ctx context.Context) error {
+	return s.scanWithRefresh(ctx, true)
+}
+
+func (s *service) scanWithRefresh(ctx context.Context, full bool) (err error) {
+	lastFullRefresh := s.lastFullRefresh
+	s.incrementalRefresh = !full
+	defer func() {
+		s.incrementalRefresh = false
+		if err != nil {
+			s.lastFullRefresh = lastFullRefresh
+			s.markScriptsStale()
+		}
+	}()
 	s.collectUntil = time.Time{}
 	s.sampleLanes()
 	now := time.Now()

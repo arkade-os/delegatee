@@ -15,6 +15,8 @@ import (
 // woken scans are at least this far apart
 const minScanGap = time.Second
 
+const maxSubscriptionScripts = 1000
+
 // subscription wakes the scan when a coin reaches a watched script.
 type subscription struct {
 	id      string
@@ -47,73 +49,140 @@ func (s *service) wakeScripts() []string {
 	return scripts
 }
 
-// syncSubscription never fails a scan: without it a claim waits for the poll.
+// syncSubscription keeps each shard within the indexer's 1000-script limit.
 func (s *service) syncSubscription(ctx context.Context, want []string) {
 	wanted := make(map[string]struct{}, len(want))
 	for _, script := range want {
 		wanted[script] = struct{}{}
 	}
-	dead := s.sub != nil && s.sub.dead.Load()
-	if s.sub != nil && (dead || len(wanted) == 0) {
-		s.sub.stop()
-		s.sub = nil
-	}
-	if len(wanted) == 0 {
-		return
-	}
-	if s.sub != nil {
-		var add, remove []string
-		for script := range wanted {
-			if _, ok := s.sub.scripts[script]; !ok {
-				add = append(add, script)
+	var live []*subscription
+	var plans []map[string]struct{}
+	assigned := make(map[string]struct{}, len(wanted))
+	dead := false
+	for _, sub := range s.subs {
+		if sub.dead.Load() {
+			sub.stop()
+			dead = true
+			continue
+		}
+		kept := map[string]struct{}{}
+		for script := range sub.scripts {
+			if _, ok := wanted[script]; ok {
+				kept[script] = struct{}{}
+				assigned[script] = struct{}{}
 			}
 		}
-		for script := range s.sub.scripts {
-			if _, ok := wanted[script]; !ok {
-				remove = append(remove, script)
+		live = append(live, sub)
+		plans = append(plans, kept)
+	}
+	remaining := make([]string, 0, len(wanted)-len(assigned))
+	for script := range wanted {
+		if _, ok := assigned[script]; !ok {
+			remaining = append(remaining, script)
+		}
+	}
+	slices.Sort(remaining)
+	for n := 0; len(remaining) > 0; n++ {
+		if n == len(plans) {
+			plans = append(plans, map[string]struct{}{})
+		}
+		count := min(maxSubscriptionScripts-len(plans[n]), len(remaining))
+		for _, script := range remaining[:count] {
+			plans[n][script] = struct{}{}
+		}
+		remaining = remaining[count:]
+	}
+	var next []*subscription
+	for n, plan := range plans {
+		var sub *subscription
+		if n < len(live) {
+			sub = live[n]
+		}
+		if len(plan) == 0 {
+			if sub != nil {
+				sub.stop()
+			}
+			continue
+		}
+		if sub != nil {
+			var add, remove []string
+			for script := range plan {
+				if _, ok := sub.scripts[script]; !ok {
+					add = append(add, script)
+				}
+			}
+			for script := range sub.scripts {
+				if _, ok := plan[script]; !ok {
+					remove = append(remove, script)
+				}
+			}
+			if len(add)+len(remove) == 0 {
+				next = append(next, sub)
+				continue
+			}
+			if err := s.indexer.UpdateSubscription(ctx, sub.id, add, remove); err == nil {
+				sub.scripts = plan
+				next = append(next, sub)
+				if len(add) > 0 {
+					s.invalidateScripts(add...)
+				}
+				continue
+			} else {
+				log.WithError(err).Warn("update the script subscription")
+				s.invalidateAllScripts()
+				sub.stop()
 			}
 		}
-		if len(add)+len(remove) == 0 {
-			return
+		id, events, stop, err := s.indexer.NewSubscription(ctx, slices.Collect(maps.Keys(plan)))
+		if err != nil {
+			log.WithError(err).Warn("subscribe to watched scripts")
+			continue
 		}
-		err := s.indexer.UpdateSubscription(ctx, s.sub.id, add, remove)
-		if err == nil {
-			s.sub.scripts = wanted
-			if len(add) > 0 {
-				s.wakeScan() // a coin may have reached an added script unseen
-			}
-			return
+		sub = &subscription{id: id, scripts: plan, stop: stop}
+		next = append(next, sub)
+		go s.follow(sub, events)
+		if !dead {
+			s.invalidateScripts(slices.Collect(maps.Keys(plan))...)
 		}
-		log.WithError(err).Warn("update the script subscription")
-		s.sub.stop()
-		s.sub = nil
 	}
-	id, events, stop, err := s.indexer.NewSubscription(ctx, slices.Collect(maps.Keys(wanted)))
-	if err != nil {
-		log.WithError(err).Warn("subscribe to watched scripts")
-		return
-	}
-	s.sub = &subscription{id: id, scripts: wanted, stop: stop}
-	go s.follow(s.sub, events)
-	// a stream that keeps ending would otherwise scan in a loop
-	if !dead {
-		s.wakeScan() // a coin may have arrived before the stream opened
-	}
+	s.subs = next
 }
 
 func (s *service) follow(sub *subscription, events <-chan clientlib.ScriptEvent) {
-	defer sub.dead.Store(true)
+	defer func() {
+		sub.dead.Store(true)
+		s.markScriptsStale()
+	}()
 	for ev := range events {
 		if ev.Err != nil {
 			log.WithError(ev.Err).Warn("script subscription")
 		}
-		if wakes(ev) {
-			s.wakeScan()
+		if ev.Connection != nil || ev.Err != nil {
+			s.invalidateAllScripts()
+			continue
+		}
+		if !wakes(ev) {
+			continue
+		}
+		scripts := slices.Clone(ev.Data.Scripts)
+		for _, v := range ev.Data.NewVtxos {
+			if v.Script != "" {
+				scripts = append(scripts, v.Script)
+			}
+		}
+		for _, v := range ev.Data.SpentVtxos {
+			if v.Script != "" {
+				scripts = append(scripts, v.Script)
+			}
+		}
+		if len(scripts) == 0 {
+			s.invalidateAllScripts()
+		} else {
+			s.invalidateScripts(scripts...)
 		}
 	}
 }
 
-// wakes: a new coin, or a connection change that may have hidden one.
 func wakes(ev clientlib.ScriptEvent) bool {
-	return ev.Connection != nil || (ev.Data != nil && len(ev.Data.NewVtxos) > 0)
+	return ev.Connection != nil || (ev.Data != nil && len(ev.Data.NewVtxos)+len(ev.Data.SpentVtxos) > 0)
 }

@@ -63,6 +63,9 @@ func (s *service) RegisterSpend(
 		ExpiresAt: &expiresAt, DelegatePubKey: s.cosigners[0].pubKey, Slots: slots,
 	}, s.limits.MaxDelegations)
 	if err == nil {
+		for _, slot := range d.Slots {
+			s.markScriptsDirty(slot.Script)
+		}
 		s.wakeScan()
 	}
 	return d, err

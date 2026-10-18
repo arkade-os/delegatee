@@ -2,6 +2,7 @@ package application
 
 import (
 	"encoding/hex"
+	"slices"
 	"testing"
 	"time"
 
@@ -166,4 +167,21 @@ func (e *testEnv) spendRequest(t *testing.T) spendRequest {
 	}
 	r.sign(t, e.userKey)
 	return r
+}
+
+func TestRegisterSpendRefreshesPreviouslyEmptyScript(t *testing.T) {
+	e := newTestEnv(t)
+	req := e.spendRequest(t)
+	coins := slices.Clone(e.indexer.vtxos)
+	script := coins[0].Script
+	e.svc.incrementalRefresh = true
+	e.indexer.serve()
+	_, err := e.svc.scanVtxos(t.Context(), []string{script})
+	require.NoError(t, err)
+	e.indexer.serve(coins...)
+	_, err = req.register(t, e)
+	require.NoError(t, err)
+	got, err := e.svc.scanVtxos(t.Context(), []string{script})
+	require.NoError(t, err)
+	require.Len(t, got[script], 2)
 }

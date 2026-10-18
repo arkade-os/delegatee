@@ -580,8 +580,6 @@ type fakeArk struct {
 	// pending answers GetPendingTx for a proof signed for its coins
 	pending       []clientlib.AcceptedOffchainTx
 	pendingProofs int
-	txs           chan clientlib.TransactionEvent // GetTransactionsStream; nil refuses it
-	txStreams     int
 }
 
 func (a *fakeArk) GetPendingTx(_ context.Context, proof, message string) ([]clientlib.AcceptedOffchainTx, error) {
@@ -697,30 +695,6 @@ func (a *fakeArk) GetEventStream(context.Context, []string) (<-chan clientlib.Ba
 	return ch, func() {}, nil
 }
 
-func (a *fakeArk) GetTransactionsStream(context.Context) (<-chan clientlib.TransactionEvent, func(), error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.txs == nil {
-		return nil, nil, errors.New("no transaction stream")
-	}
-	a.txStreams++
-	return a.txs, func() {}, nil
-}
-
-func (a *fakeArk) setTxs(txs chan clientlib.TransactionEvent) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.txs = txs
-}
-
-func (a *fakeArk) opened(n int) func() bool {
-	return func() bool {
-		a.mu.Lock()
-		defer a.mu.Unlock()
-		return a.txStreams == n
-	}
-}
-
 func (a *fakeArk) SubmitTx(_ context.Context, ark string, checkpoints []string) (string, string, []string, error) {
 	return a.submitTx(ark, checkpoints)
 }
@@ -739,6 +713,12 @@ func (a *fakeArk) FinalizeTx(_ context.Context, _ string, checkpoints []string) 
 }
 
 type fakeIndexer struct {
+	txUpdates          int
+	updateTransactions func() error
+	transactionEvents  chan clientlib.TransactionEvent
+	txStreams          int
+	filters            [][]string
+	subScripts         map[string]map[string]bool
 	clientlib.Indexer
 	mu        sync.Mutex
 	vtxos     []clientlib.Vtxo
@@ -757,6 +737,47 @@ type fakeIndexer struct {
 	subErr        error
 	updateErr     error
 	opened        [][]string // scripts each NewSubscription received
+}
+
+func (a *fakeIndexer) NewTransactionSubscription(_ context.Context, expressions []string) (string, <-chan clientlib.TransactionEvent, func(), error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.transactionEvents == nil {
+		return "", nil, nil, errors.New("no transaction stream")
+	}
+	a.txStreams++
+	a.filters = append(a.filters, slices.Clone(expressions))
+	return "transactions", a.transactionEvents, func() {}, nil
+}
+
+func (a *fakeIndexer) UpdateTransactionSubscription(_ context.Context, id string, expressions []string) error {
+	a.mu.Lock()
+	a.txUpdates++
+	update := a.updateTransactions
+	a.mu.Unlock()
+	if update != nil {
+		if err := update(); err != nil {
+			return err
+		}
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.filters = append(a.filters, slices.Clone(expressions))
+	return nil
+}
+
+func (a *fakeIndexer) setTxs(transactionEvents chan clientlib.TransactionEvent) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.transactionEvents = transactionEvents
+}
+
+func (a *fakeIndexer) transactionsOpened(n int) func() bool {
+	return func() bool {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return a.txStreams == n
+	}
 }
 
 // GetVtxos serves everything to a scan's first request by scripts.
@@ -792,37 +813,62 @@ func (i *fakeIndexer) NewSubscription(_ context.Context, scripts []string) (stri
 	if i.subErr != nil {
 		return "", nil, nil, i.subErr
 	}
-	i.subscriptions++
-	i.opened = append(i.opened, slices.Clone(scripts))
-	i.subscribed = map[string]bool{}
-	for _, script := range scripts {
-		i.subscribed[script] = true
+	if len(scripts) > maxSubscriptionScripts {
+		return "", nil, nil, errors.New("too many scripts")
 	}
+	i.subscriptions++
+	id := fmt.Sprintf("sub-%d", i.subscriptions)
+	i.opened = append(i.opened, slices.Clone(scripts))
+	if i.subScripts == nil {
+		i.subScripts = map[string]map[string]bool{}
+	}
+	i.subScripts[id] = map[string]bool{}
+	for _, script := range scripts {
+		i.subScripts[id][script] = true
+	}
+	i.updateSubscribed()
 	events := make(chan clientlib.ScriptEvent, 8)
-	i.events = events
-	i.endEvents = sync.OnceFunc(func() { close(events) })
-	stop := i.endEvents
-	return fmt.Sprintf("sub-%d", i.subscriptions), events, func() {
-		stop()
+	stop := sync.OnceFunc(func() {
 		i.mu.Lock()
 		defer i.mu.Unlock()
-		i.subscribed = nil
-	}, nil
+		close(events)
+		delete(i.subScripts, id)
+		i.updateSubscribed()
+	})
+	i.events, i.endEvents = events, stop
+	return id, events, stop, nil
 }
 
-func (i *fakeIndexer) UpdateSubscription(_ context.Context, _ string, add, remove []string) error {
+func (i *fakeIndexer) UpdateSubscription(_ context.Context, id string, add, remove []string) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	if i.updateErr != nil {
 		return i.updateErr
 	}
+	scripts, ok := i.subScripts[id]
+	if !ok {
+		return errors.New("subscription missing")
+	}
+	next := maps.Clone(scripts)
 	for _, script := range add {
-		i.subscribed[script] = true
+		next[script] = true
 	}
 	for _, script := range remove {
-		delete(i.subscribed, script)
+		delete(next, script)
 	}
+	if len(next) > maxSubscriptionScripts {
+		return errors.New("too many scripts")
+	}
+	i.subScripts[id] = next
+	i.updateSubscribed()
 	return nil
+}
+
+func (i *fakeIndexer) updateSubscribed() {
+	i.subscribed = map[string]bool{}
+	for _, scripts := range i.subScripts {
+		maps.Copy(i.subscribed, scripts)
+	}
 }
 
 func (i *fakeIndexer) subscribedScripts() []string {
@@ -834,8 +880,9 @@ func (i *fakeIndexer) subscribedScripts() []string {
 // closeSubscription ends the stream as arkd going away for good does.
 func (i *fakeIndexer) closeSubscription() {
 	i.mu.Lock()
-	defer i.mu.Unlock()
-	i.endEvents()
+	stop := i.endEvents
+	i.mu.Unlock()
+	stop()
 }
 
 func (i *fakeIndexer) GetVirtualTxs(_ context.Context, txids []string, _ ...clientlib.PageOption) (*clientlib.VirtualTxsResponse, error) {
@@ -1496,7 +1543,7 @@ func (e *testEnv) openSubscription(t *testing.T) {
 	t.Helper()
 	e.indexer.serve()
 	e.scan(t)
-	require.NotNil(t, e.svc.sub)
+	require.NotEmpty(t, e.svc.subs)
 	for len(e.svc.wake) > 0 {
 		<-e.svc.wake
 	}

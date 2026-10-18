@@ -7,6 +7,7 @@ replace github.com/arkade-os/delegatee/api-spec => ./api-spec
 replace github.com/arkade-os/delegatee/pkg/template => ./pkg/template
 
 require (
+	github.com/arkade-os/arkd/api-spec v0.0.0-20260901090427-f863e4847193
 	github.com/arkade-os/arkd/pkg/ark-lib v0.8.1-0.20260901090427-f863e4847193
 	github.com/arkade-os/arkd/pkg/client-lib v0.0.0-20260901090427-f863e4847193
 	github.com/arkade-os/arkd/pkg/client-wallet v0.0.0-20260901090427-f863e4847193
@@ -40,7 +41,6 @@ require (
 	cel.dev/expr v0.25.2 // indirect
 	github.com/aead/siphash v1.0.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
-	github.com/arkade-os/arkd/api-spec v0.0.0-20260901090427-f863e4847193 // indirect
 	github.com/arkade-os/arkd/pkg/errors v0.0.0-20260901090427-f863e4847193 // indirect
 	github.com/arkade-os/emulator/api-spec v0.1.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

@@ -33,7 +33,7 @@ func TestFixtures(t *testing.T) {
 	var ids map[string]string
 	require.NoError(t, json.Unmarshal(fixture(t, "ids.json"), &ids))
 	resolve := artifacts(t)
-	for _, name := range []string{"renewal.json", "boarding.json", "counter.json", "vhtlc_claim.json", "vhtlc_refund.json", "noninteractiveclaim.json", "onchain_release.json", "counter_seed.json", "minimal.json"} {
+	for _, name := range []string{"renewal.json", "boarding.json", "counter.json", "vhtlc_claim.json", "vhtlc_refund.json", "noninteractiveclaim.json", "offline_receive.json", "onchain_release.json", "counter_seed.json", "minimal.json"} {
 		t.Run(name, func(t *testing.T) {
 			tmpl, err := Parse(t.Context(), fixture(t, name), resolve)
 			require.NoError(t, err)
