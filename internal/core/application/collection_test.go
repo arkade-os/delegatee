@@ -1,7 +1,11 @@
 package application
 
 import (
+	"cmp"
 	"errors"
+	"fmt"
+	"math/rand/v2"
+	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -233,4 +237,55 @@ func TestReserveMustCoverARetry(t *testing.T) {
 	_, err := NewServiceWithKeys(t.Context(), env.repo, env.ark, env.indexer, env.emulator, env.explorer, 30*time.Second, 50, nil,
 		[]*btcec.PrivateKey{key}, time.Hour, time.Minute, 2*time.Minute, 0, env.svc.limits)
 	require.NoError(t, err)
+}
+
+func BenchmarkPlanScatteredDeadlines(b *testing.B) {
+	now := time.Now()
+	entries := make([]planEntry, 5000)
+	for n := range entries {
+		at := now.Add(time.Duration(n+1) * time.Second)
+		entries[n] = planEntry{outpoints: []string{fmt.Sprintf("coin-%d", n)}, delegation: int64(n), amount: 1000, due: at, deadline: at}
+	}
+	svc := &service{}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		plan := svc.planBatches(entries, now)
+		if len(plan.batches) != len(entries) {
+			b.Fatal("scattered deadlines lost")
+		}
+	}
+}
+
+func TestPlanBatchSweepPreservesAssignments(t *testing.T) {
+	rng := rand.New(rand.NewPCG(1, 2))
+	now := time.Now()
+	svc := &service{boardingMaxWait: 10 * time.Minute}
+	for range 100 {
+		entries := make([]planEntry, 100)
+		for i := range entries {
+			due := now.Add(time.Duration(rng.IntN(100)-20) * time.Minute)
+			entries[i] = planEntry{outpoints: []string{fmt.Sprintf("coin-%d", i)}, delegation: int64(i), amount: uint64(i + 1), due: due, deadline: due.Add(time.Duration(rng.IntN(20)) * time.Minute)}
+		}
+		remaining := slices.Clone(entries)
+		slices.SortStableFunc(remaining, func(a, b planEntry) int { return cmp.Or(a.deadline.Compare(b.deadline), a.due.Compare(b.due)) })
+		expected := &plan{batchAt: map[string]time.Time{}}
+		for len(remaining) > 0 {
+			first := remaining[0]
+			at := first.deadline
+			batch := PlannedBatch{At: at, ForcedBy: first.outpoints[0], ForcedByDelegation: first.delegation}
+			var later []planEntry
+			for _, e := range remaining {
+				if e.due.After(at) {
+					later = append(later, e)
+				} else {
+					expected.join(&batch, e, at)
+				}
+			}
+			batch.At = maxTime(batch.At, now)
+			expected.batches = append(expected.batches, batch)
+			remaining = later
+		}
+		require.Equal(t, expected, svc.planBatches(entries, now))
+	}
 }

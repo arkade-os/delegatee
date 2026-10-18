@@ -20,12 +20,12 @@ type Ark interface {
 	FinalizeTx(ctx context.Context, arkTxid string, finalCheckpointTxs []string) error
 	// GetPendingTx lists the offchain txs arkd accepted and did not finalize, spending the coins the proof owns.
 	GetPendingTx(ctx context.Context, proof, message string) ([]clientlib.AcceptedOffchainTx, error)
-	// GetTransactionsStream streams the transactions arkd accepts until ctx ends or its stop function runs.
-	GetTransactionsStream(ctx context.Context) (<-chan clientlib.TransactionEvent, func(), error)
 }
 
 // Indexer lists the coins and transactions the server knows.
 type Indexer interface {
+	NewTransactionSubscription(ctx context.Context, expressions []string) (string, <-chan clientlib.TransactionEvent, func(), error)
+	UpdateTransactionSubscription(ctx context.Context, subscriptionID string, expressions []string) error
 	GetVtxos(ctx context.Context, opts ...clientlib.GetVtxosOption) (*clientlib.VtxosResponse, error)
 	GetVirtualTxs(ctx context.Context, txids []string, opts ...clientlib.PageOption) (*clientlib.VirtualTxsResponse, error)
 	// NewSubscription streams what happens to scripts until ctx ends or its stop function runs: either closes the channel.

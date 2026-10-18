@@ -1,6 +1,8 @@
 package application
 
 import (
+	"fmt"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -109,13 +111,13 @@ func TestSubscriptionFollowsDirectWatches(t *testing.T) {
 	e.indexer.serve()
 	e.scan(t)
 	require.Empty(t, e.indexer.subscribedScripts())
-	require.Nil(t, e.svc.sub, "no swap watch, no subscription")
+	require.Empty(t, e.svc.subs, "no swap watch, no subscription")
 }
 
 func TestScriptEventWakesTheScan(t *testing.T) {
 	require.True(t, wakes(clientlib.ScriptEvent{Data: &clientlib.ScriptEventData{NewVtxos: []clientlib.Vtxo{{}}}}))
 	require.True(t, wakes(clientlib.ScriptEvent{Connection: &clientlib.StreamConnectionEvent{}}), "events may have been missed")
-	require.False(t, wakes(clientlib.ScriptEvent{Data: &clientlib.ScriptEventData{SpentVtxos: []clientlib.Vtxo{{}}}}), "the daemon's own claim")
+	require.True(t, wakes(clientlib.ScriptEvent{Data: &clientlib.ScriptEventData{SpentVtxos: []clientlib.Vtxo{{}}}}))
 	require.False(t, wakes(clientlib.ScriptEvent{Err: errBoom}))
 
 	e, _, _ := claimEnv(t)
@@ -127,14 +129,14 @@ func TestScriptEventWakesTheScan(t *testing.T) {
 func TestSubscriptionReopensAfterItsStreamEnds(t *testing.T) {
 	e, _, _ := claimEnv(t)
 	e.openSubscription(t)
-	sub := e.svc.sub
+	sub := e.svc.subs[0]
 	e.indexer.closeSubscription()
 	require.Eventually(t, sub.dead.Load, time.Second, time.Millisecond)
 
 	e.indexer.serve()
 	e.scan(t)
 	require.Equal(t, 2, e.indexer.subscriptions)
-	require.NotSame(t, sub, e.svc.sub)
+	require.NotSame(t, sub, e.svc.subs[0])
 	require.Empty(t, e.svc.wake, "a stream that keeps ending must not scan in a loop")
 }
 
@@ -144,12 +146,12 @@ func TestSubscribeFailureKeepsScanning(t *testing.T) {
 	e.indexer.serve()
 	e.scan(t)
 	require.False(t, e.svc.Status().LastScan.IsZero())
-	require.Nil(t, e.svc.sub)
+	require.Empty(t, e.svc.subs)
 
 	e.indexer.subErr = nil
 	e.indexer.serve()
 	e.scan(t)
-	require.NotNil(t, e.svc.sub)
+	require.NotEmpty(t, e.svc.subs)
 }
 
 func TestOpeningASubscriptionWakesTheScan(t *testing.T) {
@@ -157,7 +159,7 @@ func TestOpeningASubscriptionWakesTheScan(t *testing.T) {
 	<-e.svc.wake // the registration's
 	e.indexer.serve()
 	e.scan(t)
-	require.NotNil(t, e.svc.sub)
+	require.NotEmpty(t, e.svc.subs)
 	require.Len(t, e.svc.wake, 1, "a coin may have arrived before the stream opened")
 }
 
@@ -179,15 +181,15 @@ func TestGrowingASubscriptionWakesTheScan(t *testing.T) {
 func TestFailedUpdateReopensInTheSameScan(t *testing.T) {
 	e := newTestEnv(t)
 	e.svc.syncSubscription(t.Context(), []string{"a"})
-	old := e.svc.sub
+	old := e.svc.subs[0]
 	e.indexer.updateErr = errBoom
 
 	e.svc.syncSubscription(t.Context(), []string{"a", "b"})
 	require.Equal(t, 2, e.indexer.subscriptions)
-	require.NotNil(t, e.svc.sub)
-	require.NotSame(t, old, e.svc.sub)
+	require.NotEmpty(t, e.svc.subs)
+	require.NotSame(t, old, e.svc.subs[0])
 	require.Equal(t, []string{"a", "b"}, e.indexer.subscribedScripts())
-	require.Len(t, e.svc.sub.scripts, 2)
+	require.Len(t, e.svc.subs[0].scripts, 2)
 }
 
 func TestSubscriptionOpensEachScriptOnce(t *testing.T) {
@@ -195,4 +197,49 @@ func TestSubscriptionOpensEachScriptOnce(t *testing.T) {
 	e.svc.syncSubscription(t.Context(), []string{"a", "b", "a"})
 	require.Len(t, e.indexer.opened, 1)
 	require.ElementsMatch(t, []string{"a", "b"}, e.indexer.opened[0])
+}
+
+func TestSubscriptionShardsAtServerLimit(t *testing.T) {
+	e := newTestEnv(t)
+	scripts := make([]string, 50000)
+	for n := range scripts {
+		scripts[n] = fmt.Sprintf("script-%05d", n)
+	}
+	e.svc.syncSubscription(t.Context(), scripts)
+	require.Len(t, e.svc.subs, 50)
+	require.Len(t, e.indexer.subscribedScripts(), len(scripts))
+	ids := make([]string, len(e.svc.subs))
+	for n, sub := range e.svc.subs {
+		require.Len(t, sub.scripts, maxSubscriptionScripts)
+		ids[n] = sub.id
+	}
+	e.svc.syncSubscription(t.Context(), scripts)
+	require.Equal(t, 50, e.indexer.subscriptions)
+	e.svc.syncSubscription(t.Context(), append(slices.Clone(scripts), "new-script"))
+	require.Len(t, e.svc.subs, 51)
+	for n, id := range ids {
+		require.Equal(t, id, e.svc.subs[n].id)
+	}
+	e.svc.syncSubscription(t.Context(), scripts[:999])
+	require.Len(t, e.svc.subs, 1)
+	require.ElementsMatch(t, scripts[:999], e.indexer.subscribedScripts())
+	e.svc.syncSubscription(t.Context(), nil)
+	require.Empty(t, e.svc.subs)
+	require.Empty(t, e.indexer.subscribedScripts())
+}
+
+func TestDeadSubscriptionReopensOnlyItsShard(t *testing.T) {
+	e := newTestEnv(t)
+	scripts := make([]string, 2000)
+	for n := range scripts {
+		scripts[n] = fmt.Sprintf("script-%05d", n)
+	}
+	e.svc.syncSubscription(t.Context(), scripts)
+	first, second := e.svc.subs[0], e.svc.subs[1]
+	first.stop()
+	require.Eventually(t, first.dead.Load, time.Second, time.Millisecond)
+	e.svc.syncSubscription(t.Context(), scripts)
+	require.Equal(t, 3, e.indexer.subscriptions)
+	require.Same(t, second, e.svc.subs[0])
+	require.ElementsMatch(t, scripts, e.indexer.subscribedScripts())
 }

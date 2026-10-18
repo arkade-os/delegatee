@@ -14,11 +14,11 @@ import (
 
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 	"github.com/arkade-os/arkd/pkg/client-lib/client"
-	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
 	"github.com/arkade-os/delegatee/internal/core/application"
 	"github.com/arkade-os/delegatee/internal/core/domain"
 	"github.com/arkade-os/delegatee/internal/infrastructure/db/postgres"
 	"github.com/arkade-os/delegatee/internal/infrastructure/explorer"
+	"github.com/arkade-os/delegatee/internal/infrastructure/indexer"
 	"github.com/arkade-os/delegatee/templates"
 	emulatorclient "github.com/arkade-os/emulator/pkg/client"
 	"github.com/btcsuite/btcd/btcec/v2"

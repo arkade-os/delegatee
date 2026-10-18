@@ -68,6 +68,9 @@ func (s *service) dispatch(l *lane, inputs []renewalInput) {
 		s.renewAndRecord(context.Background(), inputs)
 		s.setInFlight(inputs, false)
 		l.busy.Store(0)
+		for _, in := range inputs {
+			s.markScriptsDirty(in.watched.delegation.Slots[in.coin.Slot].Script)
+		}
 		if l.waiting.Swap(false) {
 			s.wakeScan()
 		}

@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -153,7 +155,7 @@ func TestWatchStreamsReopens(t *testing.T) {
 	e, secrets, d := streamEnv(t)
 	e.scan(t)
 	first := make(chan clientlib.TransactionEvent)
-	e.ark.setTxs(first)
+	e.indexer.setTxs(first)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
@@ -165,9 +167,9 @@ func TestWatchStreamsReopens(t *testing.T) {
 	first <- clientlib.TransactionEvent{ArkTx: &clientlib.TxNotification{TxData: clientlib.TxData{Tx: b64(t, ptx)}}}
 	require.Eventually(t, func() bool { return len(children(t, e, d.ID)) == 1 }, 5*time.Second, 10*time.Millisecond)
 
-	e.ark.setTxs(make(chan clientlib.TransactionEvent))
+	e.indexer.setTxs(make(chan clientlib.TransactionEvent))
 	close(first)
-	require.Eventually(t, e.ark.opened(2), 5*time.Second, 10*time.Millisecond, "reopened after the stream ended")
+	require.Eventually(t, e.indexer.transactionsOpened(2), 5*time.Second, 10*time.Millisecond, "reopened after the stream ended")
 
 	cancel()
 	select {
@@ -179,9 +181,9 @@ func TestWatchStreamsReopens(t *testing.T) {
 
 func TestStopEndsTheWatcher(t *testing.T) {
 	e, _, _ := streamEnv(t)
-	e.ark.setTxs(make(chan clientlib.TransactionEvent))
+	e.indexer.setTxs(make(chan clientlib.TransactionEvent))
 	e.svc.Start()
-	require.Eventually(t, e.ark.opened(1), 5*time.Second, 10*time.Millisecond, "the first scan opens the stream")
+	require.Eventually(t, e.indexer.transactionsOpened(1), 5*time.Second, 10*time.Millisecond, "the first scan opens the stream")
 	stopped := make(chan struct{})
 	go func() {
 		e.svc.Stop()
@@ -342,4 +344,113 @@ func children(t *testing.T, e *testEnv, parent int64) []domain.Delegation {
 		}
 	}
 	return out
+}
+
+func TestStreamSubscriptionUsesRecipientFilter(t *testing.T) {
+	e, key, d := offlineStream(t)
+	events := make(chan clientlib.TransactionEvent)
+	e.indexer.setTxs(events)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { defer close(done); e.svc.watchStreams(ctx) }()
+	require.Eventually(t, e.indexer.transactionsOpened(1), 5*time.Second, time.Millisecond)
+	e.indexer.mu.Lock()
+	filters := slices.Clone(e.indexer.filters[0])
+	e.indexer.mu.Unlock()
+	require.Len(t, filters, 1)
+	require.Contains(t, filters[0], "hasPacket(tx.extension, 4)")
+	require.Contains(t, filters[0], hex.EncodeToString(key.PubKey().SerializeCompressed()))
+	require.Contains(t, filters[0], hex.EncodeToString([]byte("delegatee-secrets/v1")))
+	require.NoError(t, e.svc.CancelDelegationByID(t.Context(), d.ID))
+	e.scan(t)
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("filtered stream did not stop")
+	}
+}
+
+func TestStreamFilterUpdateKeepsReceiving(t *testing.T) {
+	e, key, d := offlineStream(t)
+	events := make(chan clientlib.TransactionEvent)
+	e.indexer.setTxs(events)
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	e.indexer.updateTransactions = func() error { once.Do(func() { close(entered); <-release }); return nil }
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { defer close(done); e.svc.watchStreams(ctx) }()
+	require.Eventually(t, e.indexer.transactionsOpened(1), time.Second, time.Millisecond)
+	_, err := e.svc.RegisterStreamDelegation(t.Context(), e.trust(t, e.fixture(t, "noninteractiveclaim.json")), nil)
+	require.NoError(t, err)
+	e.scan(t)
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("filter update did not start")
+	}
+	ptx, _ := offlineFunding(t, e, key, d.TemplateID, nil)
+	events <- clientlib.TransactionEvent{ArkTx: &clientlib.TxNotification{TxData: clientlib.TxData{Tx: b64(t, ptx)}}}
+	require.Eventually(t, func() bool { return len(children(t, e, d.ID)) == 1 }, time.Second, time.Millisecond)
+	close(release)
+	require.Eventually(t, func() bool { e.indexer.mu.Lock(); defer e.indexer.mu.Unlock(); return len(e.indexer.filters) == 2 }, time.Second, time.Millisecond)
+	require.True(t, e.indexer.transactionsOpened(1)(), "filter updates keep the original subscription")
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("watcher did not stop")
+	}
+}
+
+func TestStreamFilterReconcilesAmbiguousUpdate(t *testing.T) {
+	e, key, d := offlineStream(t)
+	events := make(chan clientlib.TransactionEvent)
+	e.indexer.setTxs(events)
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	attempt := 0
+	e.indexer.updateTransactions = func() error {
+		attempt++
+		once.Do(func() { close(entered); <-release })
+		if attempt == 1 {
+			return errBoom
+		}
+		return nil
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { defer close(done); e.svc.watchStreams(ctx) }()
+	require.Eventually(t, e.indexer.transactionsOpened(1), time.Second, time.Millisecond)
+	other, err := e.svc.RegisterStreamDelegation(t.Context(), e.trust(t, e.fixture(t, "noninteractiveclaim.json")), nil)
+	require.NoError(t, err)
+	e.scan(t)
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("filter update did not start")
+	}
+	ptx, _ := offlineFunding(t, e, key, d.TemplateID, nil)
+	events <- clientlib.TransactionEvent{ArkTx: &clientlib.TxNotification{TxData: clientlib.TxData{Tx: b64(t, ptx)}}}
+	require.Eventually(t, func() bool { return len(children(t, e, d.ID)) == 1 }, time.Second, time.Millisecond)
+	require.NoError(t, e.svc.CancelDelegationByID(t.Context(), other.ID))
+	e.scan(t)
+	require.Eventually(t, func() bool { return len(e.svc.streamsChanged) == 0 }, time.Second, time.Millisecond)
+	close(release)
+	require.Eventually(t, func() bool { e.indexer.mu.Lock(); defer e.indexer.mu.Unlock(); return len(e.indexer.filters) == 2 }, time.Second, time.Millisecond)
+	e.indexer.mu.Lock()
+	updates := e.indexer.txUpdates
+	e.indexer.mu.Unlock()
+	require.Equal(t, 2, updates)
+	require.True(t, e.indexer.transactionsOpened(1)(), "filter updates keep the original subscription")
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("watcher did not stop")
+	}
 }

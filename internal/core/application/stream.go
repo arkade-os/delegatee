@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"errors"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -69,7 +70,7 @@ func (s *service) streamSet() []stream {
 
 const streamRetry = time.Second
 
-// watchStreams follows arkd's transactions while a stream delegation is active.
+// watchStreams follows matching packets while a stream delegation is active.
 func (s *service) watchStreams(ctx context.Context) {
 	failing := false
 	for {
@@ -103,32 +104,106 @@ func (s *service) watchStreams(ctx context.Context) {
 func (s *service) readTransactions(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	events, stop, err := s.ark.GetTransactionsStream(ctx)
+	select {
+	case <-s.streamsChanged:
+	default:
+	}
+	filters, err := s.streamFilters()
+	if err != nil {
+		return err
+	}
+	if len(filters) == 0 {
+		return nil
+	}
+	id, events, stop, err := s.indexer.NewTransactionSubscription(ctx, filters)
 	if err != nil {
 		return err
 	}
 	defer stop()
+	type filterUpdate struct {
+		filters []string
+		err     error
+	}
+	var updating <-chan filterUpdate
+	pending, retryUpdate := false, false
+	retry := time.NewTicker(streamRetry)
+	defer retry.Stop()
 	for {
+		if pending && updating == nil {
+			pending = false
+			next, err := s.streamFilters()
+			switch {
+			case err != nil:
+				log.WithError(err).Warn("prepare transaction filters")
+				retryUpdate = true
+			case len(next) == 0:
+				return nil
+			case slices.Equal(filters, next) && !retryUpdate:
+				retryUpdate = false
+			default:
+				result := make(chan filterUpdate, 1)
+				updating = result
+				go func() {
+					updateCtx, cancelUpdate := context.WithTimeout(ctx, 10*time.Second)
+					defer cancelUpdate()
+					err := s.indexer.UpdateTransactionSubscription(updateCtx, id, next)
+					result <- filterUpdate{filters: next, err: err}
+				}()
+			}
+		}
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-s.streamsChanged:
-			if len(s.streamSet()) == 0 {
-				return nil
+			pending = true
+		case <-retry.C:
+			pending = pending || retryUpdate
+		case update := <-updating:
+			updating = nil
+			retryUpdate = update.err != nil
+			if update.err != nil {
+				log.WithError(update.err).Warn("update transaction filters")
+			} else {
+				filters = update.filters
 			}
 		case ev, ok := <-events:
 			if !ok {
 				return nil
 			}
 			if ev.Err != nil {
-				log.WithError(ev.Err).Debug("transaction stream")
-				continue
+				return ev.Err
 			}
 			if ev.ArkTx != nil {
 				s.react(ctx, ev.ArkTx.Tx)
 			}
 		}
 	}
+}
+
+func (s *service) streamFilters() ([]string, error) {
+	unique := map[string]struct{}{}
+	for _, st := range s.streamSet() {
+		unique[st.trigger.Filter(s.triggerKeys())] = struct{}{}
+	}
+	var filters []string
+	expression := ""
+	for _, filter := range slices.Sorted(maps.Keys(unique)) {
+		if len(expression)+len(filter)+6 > 64<<10 {
+			filters = append(filters, expression)
+			expression = ""
+		}
+		if expression != "" {
+			expression += " || "
+		}
+		expression += "(" + filter + ")"
+	}
+	if expression != "" {
+		filters = append(filters, expression)
+	}
+	if len(filters) > 64 {
+		return nil, fmt.Errorf("stream templates exceed the indexer's 64 filter limit")
+	}
+	return filters, nil
 }
 
 // react spawns a watch for every output of a streamed transaction that a trigger binds and its template locks.

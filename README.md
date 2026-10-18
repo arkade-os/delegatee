@@ -107,9 +107,43 @@ There is no encrypted claim deadline; ordinary spawned watches expire after 24 h
 
 The receiver can go offline after preparing its invoice. Once the daemon receives the
 funding packet, the spawned watch persists and resumes retries after a daemon restart.
-The transaction stream does not replay history: funding first seen while the daemon
+The filtered indexer subscription does not replay history: funding first seen while the daemon
 is unavailable cannot currently be discovered through this packet-only flow. The
 indexer recovers known watches, not entirely unseen funding packets.
 
-A template with a `trigger` is not registered by clients: the operator registers it as a stream delegation (admin `RegisterStreamDelegation`; a default with a trigger starts by itself when an encryption key is configured). The daemon reads arkd's transaction stream and, for every transaction whose extension holds the trigger's packet, binds the trigger's variables, checks the template locks the output, and spawns a watch of the template that expires after `expires_after_seconds`.
+A template with a `trigger` is not registered by clients: the operator registers it as a stream delegation (admin `RegisterStreamDelegation`; a default with a trigger starts by itself when an encryption key is configured). The daemon opens an indexer subscription with CEL filters derived from the active triggers. For offline receive these select packet type 4, the version marker and one of its retained encryption keys. It binds matching packets, checks the template locks the output, and spawns a watch that expires after `expires_after_seconds`. Full local trigger and covenant checks remain authoritative: the CEL filter only reduces traffic. This requires indexer initial-filter support; subscription errors are reported and retried without switching to the global transaction stream.
 
+
+## Capacity
+
+Discovery filter changes update the existing subscription atomically while its
+events continue to be processed. Failed or ambiguous updates are reconciled
+without closing the working stream.
+
+Known offchain direct watches use script subscriptions, split into at most 1,000
+scripts per subscription. Existing shards retain their scripts as registrations
+change. New and spent coin events invalidate only the affected scripts; repeated
+events coalesce. The next scan queries those scripts in chunks of 100 with at
+most four requests in flight. Startup, connection gaps and periodic reconciliation
+refresh all active scripts. Frequent events cannot postpone the periodic refresh.
+
+Packet discovery needs a recipient filter because a new payment's script is not
+known beforehand. It uses one separate filtered subscription, with a one-event
+application buffer and synchronous registration. This bounds memory, but does not
+provide durable event replay or guaranteed admission during overload, a database
+outage or a full registration cap. Watch rows already persisted are recoverable.
+
+The default caps are 50,000 public/stream registrations and 10,000 spawned watches.
+A successful receive watch remains active until its 24-hour expiry so it can handle
+another funding to that script. Consequently 10,000 distinct receives can fill the
+child cap during a day even when claims settle quickly. Raising the cap requires
+capacity testing; it does not increase processing throughput.
+
+All active registrations are still loaded and examined each scan, and direct claims
+run serially within their lane. Registration inserts serialize and count active
+rows. Batch planning uses sorted passes rather than repeatedly copying/scanning
+remaining entries. Unit scale tests cover 50,000 scripts, bounded subscriptions,
+coalesced refreshes, races and failed/reconnected streams; these use mock storage
+and indexer responses and do not establish production throughput. Measure database
+latency, scan duration, claim service time, oldest pending receive and cap usage
+under the deployment's actual traffic before increasing limits.

@@ -78,7 +78,7 @@ func TestOfflineReceivePacketPersistsAndRetriesAfterRestart(t *testing.T) {
 	e, key, d := offlineStream(t)
 	ptx, _ := offlineFunding(t, e, key, d.TemplateID, nil)
 	events := make(chan clientlib.TransactionEvent)
-	e.ark.setTxs(events)
+	e.indexer.setTxs(events)
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
 	go func() { defer close(done); e.svc.watchStreams(ctx) }()

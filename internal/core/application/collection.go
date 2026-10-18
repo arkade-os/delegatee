@@ -60,19 +60,29 @@ func (s *service) planBatches(entries []planEntry, now time.Time) *plan {
 	slices.SortStableFunc(vtxos, func(a, b planEntry) int {
 		return cmp.Or(a.deadline.Compare(b.deadline), a.due.Compare(b.due))
 	})
-	// deadline >= due: the entry with the earliest deadline is always in its batch, so this ends
-	for len(vtxos) > 0 {
-		at := vtxos[0].deadline
-		b := PlannedBatch{At: at, ForcedBy: vtxos[0].outpoints[0], ForcedByDelegation: vtxos[0].delegation}
-		var rest []planEntry
-		for _, e := range vtxos {
+	dueOrder := make([]int, len(vtxos))
+	for i := range dueOrder {
+		dueOrder[i] = i
+	}
+	slices.SortFunc(dueOrder, func(a, b int) int { return vtxos[a].due.Compare(vtxos[b].due) })
+	taken := make([]bool, len(vtxos))
+	nextDue := 0
+	for i, first := range vtxos {
+		if taken[i] {
+			continue
+		}
+		at := first.deadline
+		b := PlannedBatch{At: at, ForcedBy: first.outpoints[0], ForcedByDelegation: first.delegation}
+		for nextDue < len(dueOrder) {
+			index := dueOrder[nextDue]
+			e := vtxos[index]
 			if e.due.After(at) {
-				rest = append(rest, e)
-				continue
+				break
 			}
 			p.join(&b, e, at)
+			taken[index] = true
+			nextDue++
 		}
-		vtxos = rest
 		p.batches = append(p.batches, b)
 	}
 	for _, e := range deposits {
