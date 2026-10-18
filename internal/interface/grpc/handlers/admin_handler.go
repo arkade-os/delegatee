@@ -6,7 +6,6 @@ import (
 	"maps"
 	"slices"
 	"strconv"
-	"time"
 
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/core/application"
@@ -126,19 +125,18 @@ func (h *adminHandler) GetStatus(
 			ForcedByOutpoint: b.ForcedBy, ForcedByDelegationId: b.ForcedByDelegation,
 		})
 	}
-	// bounded and optional: the UI polls this, also while arkd is down
-	feesCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-	if f, err := h.svc.IntentFees(feesCtx); err == nil {
-		resp.IntentFees = &delegateev1.IntentFees{
-			OffchainInput:  f.IntentOffchainInputProgram,
-			OnchainInput:   f.IntentOnchainInputProgram,
-			OffchainOutput: f.IntentOffchainOutputProgram,
-			OnchainOutput:  f.IntentOnchainOutputProgram,
-		}
+	f := h.svc.IntentFees()
+	resp.IntentFees = &delegateev1.IntentFees{
+		OffchainInput:  f.IntentOffchainInputProgram,
+		OnchainInput:   f.IntentOnchainInputProgram,
+		OffchainOutput: f.IntentOffchainOutputProgram,
+		OnchainOutput:  f.IntentOnchainOutputProgram,
 	}
 	if !st.LastScan.IsZero() {
 		resp.LastScanAt = st.LastScan.Unix()
+	}
+	if !st.NextScan.IsZero() {
+		resp.NextScanAt, resp.Throttled = st.NextScan.Unix(), st.Throttled
 	}
 	return resp, nil
 }

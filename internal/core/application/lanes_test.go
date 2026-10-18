@@ -29,7 +29,7 @@ func TestBatchInputsWaitForTheBatchInFlight(t *testing.T) {
 	env.advertised(t, v)
 	env.svc.batch.busy.Store(1)
 	env.indexer.serve(v)
-	env.svc.scan(t.Context())
+	_ = env.svc.scan(t.Context())
 	require.Empty(t, env.emulator.submitted, "one batch session at a time")
 	require.True(t, env.svc.batch.waiting.Load(), "the batch wakes the scan when it ends")
 	require.Empty(t, env.svc.wake)
@@ -58,11 +58,11 @@ func TestScansBesideALaneInFlight(t *testing.T) {
 		return sign(ark, cps)
 	}
 	e.indexer.serve(coin)
-	e.svc.scan(t.Context())
+	_ = e.svc.scan(t.Context())
 	<-submitting
 	for range 5 {
 		e.indexer.serve(coin)
-		e.svc.scan(t.Context())
+		_ = e.svc.scan(t.Context())
 	}
 
 	// a scan between the lane forgetting its row and consuming its coin
@@ -74,14 +74,14 @@ func TestScansBesideALaneInFlight(t *testing.T) {
 	close(release)
 	<-forgotten
 	e.indexer.serve(coin)
-	e.svc.scan(t.Context())
+	_ = e.svc.scan(t.Context())
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		for range 20 {
 			e.indexer.serve(coin)
-			e.svc.scan(t.Context())
+			_ = e.svc.scan(t.Context())
 		}
 	}()
 	close(resume)

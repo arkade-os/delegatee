@@ -184,9 +184,69 @@ func TestWakeScansCannotPostponeFullReconciliation(t *testing.T) {
 		}
 		require.Len(t, i.requests, 2)
 		require.Equal(t, 5*time.Second, e.svc.lastFullRefresh.Sub(first))
+		require.Equal(t, e.svc.lastFullRefresh.Add(e.svc.pollInterval), e.svc.Status().NextScan)
 		for _, holding := range e.svc.Status().Holdings {
 			require.Zero(t, holding.Vtxos)
 		}
 		e.svc.Stop()
 	})
+}
+
+func TestCacheInvalidationsRespectScanBackoff(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		e := newTestEnv(t)
+		manyDelegations(t, e, 1)
+		i := &cacheIndexer{Indexer: e.indexer, coins: map[string][]clientlib.Vtxo{}}
+		script := e.indexer.vtxos[0].Script
+		i.coins[script] = e.indexer.vtxos
+		e.svc.indexer = i
+		e.svc.pollInterval = 5 * time.Second
+		e.svc.Start()
+		synctest.Wait()
+		first := e.svc.lastFullRefresh
+		i.mu.Lock()
+		i.err = ports.ErrThrottled
+		i.mu.Unlock()
+		wake := func() {
+			time.Sleep(time.Second)
+			e.svc.invalidateScripts(script)
+			synctest.Wait()
+		}
+		wake()
+		require.Len(t, i.requests, 2)
+		require.Equal(t, first.Add(6*time.Second), e.svc.Status().NextScan)
+		for range 4 {
+			wake()
+		}
+		require.Len(t, i.requests, 2)
+		wake()
+		require.Len(t, i.requests, 3)
+		require.Equal(t, first.Add(16*time.Second), e.svc.Status().NextScan)
+		require.True(t, e.svc.Status().Throttled)
+		require.Equal(t, first, e.svc.lastFullRefresh)
+		i.mu.Lock()
+		i.err = nil
+		i.mu.Unlock()
+		for range 9 {
+			wake()
+		}
+		require.Len(t, i.requests, 3)
+		wake()
+		require.Len(t, i.requests, 4)
+		require.False(t, e.svc.Status().Throttled)
+		require.Equal(t, first.Add(16*time.Second), e.svc.lastFullRefresh)
+		e.svc.Stop()
+	})
+}
+
+func TestFailedDiscoveryDoesNotAdvanceFullReconciliation(t *testing.T) {
+	e := newTestEnv(t)
+	board := e.boarding(t, e.userKey.PubKey())
+	e.deposit(t, board, 3000)
+	e.explorer.utxoErr = ports.ErrThrottled
+	previous := time.Now().Add(-time.Hour)
+	e.svc.lastFullRefresh = previous
+	require.ErrorIs(t, e.svc.scan(t.Context()), ports.ErrThrottled)
+	require.Equal(t, previous, e.svc.lastFullRefresh)
+	require.True(t, e.svc.vtxoDirtyAll)
 }

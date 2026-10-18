@@ -536,8 +536,11 @@ type GetStatusResponse struct {
 	RenewalReserve  int64           `protobuf:"varint,5,opt,name=renewal_reserve,json=renewalReserve,proto3" json:"renewal_reserve,omitempty"`
 	BoardingMaxWait int64           `protobuf:"varint,6,opt,name=boarding_max_wait,json=boardingMaxWait,proto3" json:"boarding_max_wait,omitempty"`
 	Batches         []*PlannedBatch `protobuf:"bytes,7,rep,name=batches,proto3" json:"batches,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// next_scan_at is backed off while throttled: an upstream rate limits the scan.
+	NextScanAt    int64 `protobuf:"varint,8,opt,name=next_scan_at,json=nextScanAt,proto3" json:"next_scan_at,omitempty"`
+	Throttled     bool  `protobuf:"varint,9,opt,name=throttled,proto3" json:"throttled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetStatusResponse) Reset() {
@@ -617,6 +620,20 @@ func (x *GetStatusResponse) GetBatches() []*PlannedBatch {
 		return x.Batches
 	}
 	return nil
+}
+
+func (x *GetStatusResponse) GetNextScanAt() int64 {
+	if x != nil {
+		return x.NextScanAt
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetThrottled() bool {
+	if x != nil {
+		return x.Throttled
+	}
+	return false
 }
 
 type GetHealthRequest struct {
@@ -1828,7 +1845,7 @@ const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"\x05state\x18\x04 \x01(\tR\x05state\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\x05 \x01(\x03R\tcreatedAt\"\x12\n" +
-	"\x10GetStatusRequest\"\xc7\x02\n" +
+	"\x10GetStatusRequest\"\x87\x03\n" +
 	"\x11GetStatusResponse\x12 \n" +
 	"\flast_scan_at\x18\x01 \x01(\x03R\n" +
 	"lastScanAt\x12%\n" +
@@ -1838,7 +1855,10 @@ const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"intentFees\x12'\n" +
 	"\x0frenewal_reserve\x18\x05 \x01(\x03R\x0erenewalReserve\x12*\n" +
 	"\x11boarding_max_wait\x18\x06 \x01(\x03R\x0fboardingMaxWait\x124\n" +
-	"\abatches\x18\a \x03(\v2\x1a.delegatee.v1.PlannedBatchR\abatches\"\x12\n" +
+	"\abatches\x18\a \x03(\v2\x1a.delegatee.v1.PlannedBatchR\abatches\x12 \n" +
+	"\fnext_scan_at\x18\b \x01(\x03R\n" +
+	"nextScanAt\x12\x1c\n" +
+	"\tthrottled\x18\t \x01(\bR\tthrottled\"\x12\n" +
 	"\x10GetHealthRequest\"Q\n" +
 	"\x11GetHealthResponse\x12<\n" +
 	"\fdependencies\x18\x01 \x03(\v2\x18.delegatee.v1.DependencyR\fdependencies\"6\n" +

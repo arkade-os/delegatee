@@ -68,6 +68,7 @@ type Config struct {
 	MaxDocumentBytes    int
 	TemplateMaxFailures int     // consecutive fully rejected renewal cycles that disable a template
 	PublicRateLimit     float64 // requests per second per client IP on the public port, burst ten times that; 0 disables
+	ExplorerRateLimit   float64 // requests per second to the explorer, one at a time: a shared explorer rate limits bursts
 
 	AdminUsers []AdminUser // empty leaves the admin port without authentication
 
@@ -142,6 +143,9 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 	if cfg.TemplateMaxFailures, err = envPositive("TEMPLATE_MAX_FAILURES", 10); err != nil {
+		return nil, err
+	}
+	if cfg.ExplorerRateLimit, err = envFloat("EXPLORER_RATE_LIMIT", 4); err != nil {
 		return nil, err
 	}
 	if cfg.PublicRateLimit, err = envFloat("PUBLIC_RATE_LIMIT", 5); err != nil {
@@ -222,7 +226,7 @@ func (c *Config) AppService(ctx context.Context) (_ application.Service, err err
 	if err != nil {
 		return nil, fmt.Errorf("arkd info: %w", err)
 	}
-	explorerSvc, err := explorer.New(c.ExplorerURL, clientlib.NetworkFromString(info.Network))
+	explorerSvc, err := explorer.New(c.ExplorerURL, clientlib.NetworkFromString(info.Network), c.ExplorerRateLimit)
 	if err != nil {
 		return nil, fmt.Errorf("configure explorer: %w", err)
 	}

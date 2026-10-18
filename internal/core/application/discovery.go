@@ -25,23 +25,38 @@ import (
 
 // coin is a bound vtxo or onchain utxo, tagged with its slot and source transaction.
 type coin struct {
-	Slot      int
-	Outpoint  wire.OutPoint
-	Amount    uint64
-	Script    []byte
-	Assets    []clientlib.Asset
-	CreatedAt time.Time
-	Expiry    time.Time // zero for onchain
-	Swept     bool      // offchain only: arkd prices a swept vtxo as recoverable
-	Confirms  int       // onchain only
-	Source    *wire.MsgTx
+	Slot         int
+	Outpoint     wire.OutPoint
+	Amount       uint64
+	Script       []byte
+	Assets       []clientlib.Asset
+	CreatedAt    time.Time
+	Expiry       time.Time // zero for onchain
+	Swept        bool      // offchain only: arkd prices a swept vtxo as recoverable
+	Confirms     int       // onchain only
+	Source       *wire.MsgTx
+	Preconfirmed bool
+}
+
+// scannedCoin is a coin the last scan found, with when it is due: a lookup never asks upstream again.
+type scannedCoin struct {
+	vtxo clientlib.Vtxo
+	due  time.Time
+}
+
+func (c coin) vtxo() clientlib.Vtxo {
+	return clientlib.Vtxo{
+		Outpoint: clientlib.Outpoint{Txid: c.Outpoint.Hash.String(), VOut: c.Outpoint.Index},
+		Script:   hex.EncodeToString(c.Script), Amount: c.Amount, Assets: c.Assets,
+		CreatedAt: c.CreatedAt, ExpiresAt: c.Expiry, Swept: c.Swept, Preconfirmed: c.Preconfirmed,
+	}
 }
 
 // vtxoCoin leaves a malformed txid or script zero: the daemon checks every coin against its source.
 func vtxoCoin(slot int, v clientlib.Vtxo) coin {
 	c := coin{
 		Slot: slot, Amount: v.Amount, Assets: v.Assets,
-		CreatedAt: v.CreatedAt, Expiry: v.ExpiresAt, Swept: v.Swept,
+		CreatedAt: v.CreatedAt, Expiry: v.ExpiresAt, Swept: v.Swept, Preconfirmed: v.Preconfirmed,
 	}
 	c.Outpoint.Index = v.VOut
 	if h, err := chainhash.NewHashFromStr(v.Txid); err == nil {
@@ -259,6 +274,7 @@ func (s *service) discover(ctx context.Context, delegations []domain.Delegation,
 	s.pruneConsumed(now)
 	holdings := map[int64]Holdings{}
 	unwatched := map[int64]string{}
+	s.found = map[int64][]scannedCoin{}
 	scripts := s.watchAll(ctx, delegations, active, unwatched)
 	byScript, err := s.scanVtxos(ctx, scripts)
 	if err != nil {
@@ -302,6 +318,9 @@ next:
 			}
 			coins, err := s.slotCoins(sl, slot, byScript, now)
 			if err != nil {
+				if throttled(err) {
+					return nil, nil, nil, err
+				}
 				unwatched[d.ID] = err.Error()
 				continue next
 			}
@@ -311,6 +330,8 @@ next:
 			}
 			for _, c := range coins {
 				op := c.Outpoint.String()
+				due := dueTime(w.instance, c, tip)
+				s.found[d.ID] = append(s.found[d.ID], scannedCoin{vtxo: c.vtxo(), due: due})
 				if s.isConsumed(op) || s.held[op] {
 					continue
 				}
@@ -321,7 +342,6 @@ next:
 					complete = false
 					continue
 				}
-				due := dueTime(w.instance, c, tip)
 				deadline := s.deadline(c, due)
 				switch {
 				case sl.Onchain:
@@ -355,6 +375,9 @@ next:
 			spent, arkTxid, err := s.spent(ctx, d.Slots)
 			if err == nil && spent {
 				err = s.settleSpent(ctx, d, arkTxid)
+			}
+			if throttled(err) {
+				return nil, nil, nil, err
 			}
 			if err != nil {
 				unwatched[d.ID] = err.Error()

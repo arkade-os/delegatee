@@ -83,7 +83,7 @@ func baseConfig(t *testing.T) *config.Config {
 		RenewalReserve: 20 * time.Minute, BoardingMaxWait: 10 * time.Minute,
 		MaxDelegations: 50_000, MaxStreamChildren: 10_000,
 		MaxTemplates: 1000, MaxArtifacts: 1000, MaxDocumentBytes: 65536, TemplateMaxFailures: 10,
-		DefaultTemplates: true,
+		DefaultTemplates: true, ExplorerRateLimit: 1000,
 	}
 }
 
@@ -570,7 +570,7 @@ func swapClaim(t *testing.T, d delegatee, file string) (clientlib.Vtxo, time.Dur
 
 func medianTime(t *testing.T) int64 {
 	t.Helper()
-	ex, err := delegateeexplorer.New(explorerURL, arklib.BitcoinRegTest)
+	ex, err := delegateeexplorer.New(explorerURL, arklib.BitcoinRegTest, 1000)
 	require.NoError(t, err)
 	tip, err := ex.ChainTip()
 	require.NoError(t, err)

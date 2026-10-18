@@ -922,6 +922,11 @@
             "type": "integer",
             "format": "int64"
           },
+          "nextScanAt": {
+            "type": "integer",
+            "description": "next_scan_at is backed off while throttled: an upstream rate limits the scan.",
+            "format": "int64"
+          },
           "pollInterval": {
             "type": "integer",
             "format": "int64"
@@ -934,6 +939,9 @@
           "renewingVtxos": {
             "type": "integer",
             "format": "int32"
+          },
+          "throttled": {
+            "type": "boolean"
           }
         }
       },

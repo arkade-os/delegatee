@@ -126,6 +126,8 @@ change. New and spent coin events invalidate only the affected scripts; repeated
 events coalesce. The next scan queries those scripts in chunks of 100 with at
 most four requests in flight. Startup, connection gaps and periodic reconciliation
 refresh all active scripts. Frequent events cannot postpone the periodic refresh.
+Upstream throttle backoff takes precedence over event wakes and reconciliation
+deadlines; failed scans retain their dirty scripts for the next permitted retry.
 
 Packet discovery needs a recipient filter because a new payment's script is not
 known beforehand. It uses one separate filtered subscription, with a one-event

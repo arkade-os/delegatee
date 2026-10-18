@@ -97,19 +97,12 @@ func (h *handler) GetSpend(ctx context.Context, req *delegateev1.GetSpendRequest
 }
 
 func delegationDetail(ctx context.Context, svc application.Service, d *domain.Delegation) (*delegateev1.GetDelegationResponse, error) {
-	vtxos, err := svc.Vtxos(ctx, d)
-	if err != nil {
-		return nil, toStatus(err)
-	}
+	vtxos := svc.Vtxos(d)
 	renewals, err := svc.ListRenewals(ctx, d)
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	due, err := svc.RenewableAt(ctx, d, vtxos)
-	if err != nil {
-		log.WithError(err).WithField("address", d.Address).Debug("delegation cannot be instantiated")
-	}
-	converted := toVtxos(vtxos, due)
+	converted := toVtxos(vtxos, svc.RenewableAt(d, vtxos))
 	for i, v := range vtxos {
 		for _, slot := range d.Slots {
 			if slot.Onchain && slot.Script == v.Script {

@@ -121,7 +121,7 @@ func crashAt(t *testing.T, cfg *config.Config, ark *crashingArk) {
 	emuConn, err := grpc.NewClient(emulatorURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = emuConn.Close() })
-	explorerSvc, err := explorer.New(explorerURL, arklib.BitcoinRegTest)
+	explorerSvc, err := explorer.New(explorerURL, arklib.BitcoinRegTest, 1000)
 	require.NoError(t, err)
 	svc, err := application.NewServiceWithKeys(
 		ctx, repo, ark, indexerSvc, emulatorclient.NewGRPCClient(emuConn), explorerSvc, cfg.OnchainPollInterval, cfg.MaxOnchainFeeRate,

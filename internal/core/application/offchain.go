@@ -190,11 +190,7 @@ func (s *service) buildOffchain(ctx context.Context, c *cosigner, inputs []renew
 	if err != nil {
 		return nil, nil, false, err
 	}
-	info, err := s.ark.GetInfo(ctx)
-	if err != nil {
-		return nil, nil, false, err
-	}
-	unroll, err := hex.DecodeString(info.CheckpointTapscript)
+	unroll, err := hex.DecodeString(s.info.Load().CheckpointTapscript)
 	if err != nil {
 		return nil, nil, false, err
 	}

@@ -127,15 +127,9 @@ func TestRenewPricesOutputFeeAtTheActualOutputAmount(t *testing.T) {
 func TestRenewFeeErrors(t *testing.T) {
 	env := newTestEnv(t)
 	in := dueInput(t, env, 0, 1000)
-
-	env.ark.infoErr = errBoom
+	env.setFees("not a program(")
 	results := env.svc.renew(t.Context(), []renewalInput{in})
 	require.Len(t, results, 1)
-	require.ErrorIs(t, results[0].err, errBoom)
-
-	env.ark.infoErr = nil
-	env.setFees("not a program(")
-	results = env.svc.renew(t.Context(), []renewalInput{in})
 	require.ErrorContains(t, results[0].err, "template tx")
 	require.NotErrorIs(t, results[0].err, errIntentRejected, "a template tx error is not a rejection")
 	require.Empty(t, env.emulator.submitted)

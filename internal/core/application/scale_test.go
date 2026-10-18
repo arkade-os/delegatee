@@ -32,11 +32,11 @@ func BenchmarkVtxoCache50000Scripts(b *testing.B) {
 func BenchmarkScan5000(b *testing.B) {
 	env := newTestEnv(b)
 	manyDelegations(b, env, 5000)
-	env.svc.scan(b.Context()) // the first scan derives every covenant and proof, once
+	_ = env.svc.scan(b.Context()) // the first scan derives every covenant and proof, once
 	b.ResetTimer()
 	for range b.N {
 		env.indexer.serve(env.indexer.vtxos...)
-		env.svc.scan(b.Context())
+		_ = env.svc.scan(b.Context())
 	}
 	require.Len(b, env.svc.Status().Holdings, 5000)
 }

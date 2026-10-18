@@ -959,6 +959,7 @@ type fakeExplorer struct {
 	tip       ports.ChainTip
 	tipErr    error
 	onUtxos   func() // runs inside GetUtxos
+	utxoErr   error
 }
 
 func (e *fakeExplorer) GetTxHex(id string) (string, error) {
@@ -991,6 +992,9 @@ func noTip() (ports.ChainTip, error) { return ports.ChainTip{}, errors.New("no e
 func (e *fakeExplorer) GetUtxos(addresses []string) ([]clientlib.ExplorerUtxo, error) {
 	if e.onUtxos != nil {
 		e.onUtxos()
+	}
+	if e.utxoErr != nil {
+		return nil, e.utxoErr
 	}
 	var out []clientlib.ExplorerUtxo
 	for _, a := range addresses {
@@ -1105,7 +1109,7 @@ func (e *testEnv) active(t testing.TB) []domain.Delegation {
 
 // scan runs one scan and waits for its renewal.
 func (e *testEnv) scan(t testing.TB) {
-	e.svc.scan(t.Context())
+	_ = e.svc.scan(t.Context())
 	e.svc.wg.Wait()
 }
 

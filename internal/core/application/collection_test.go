@@ -122,11 +122,11 @@ func TestCollectionRefreshDropsSpentInputs(t *testing.T) {
 	v := env.coin(t, env.userKey.PubKey(), 1000, 15*time.Minute)
 	env.advertised(t, v)
 	env.indexer.serve(v)
-	env.svc.scan(t.Context())
+	_ = env.svc.scan(t.Context())
 	require.False(t, env.svc.collectUntil.IsZero())
 	require.Equal(t, env.svc.collectUntil, env.svc.Status().Batches[0].At)
 	// the coin is gone, as if its owner spent it while it was collected
-	env.svc.scan(t.Context())
+	_ = env.svc.scan(t.Context())
 	require.True(t, env.svc.collectUntil.IsZero())
 	require.Empty(t, env.svc.Status().Batches)
 	require.Empty(t, env.emulator.submitted)
@@ -141,7 +141,7 @@ func TestCollectionDeadlineFlushesWaitingInputs(t *testing.T) {
 	env.advertised(t, later)
 	env.advertised(t, urgent)
 	env.indexer.serve(later)
-	env.svc.scan(t.Context())
+	_ = env.svc.scan(t.Context())
 	require.Empty(t, env.emulator.submitted)
 	env.indexer.serve(later, urgent)
 	env.scan(t)
@@ -156,7 +156,7 @@ func TestCollectionFailedScanRetriesAtNormalInterval(t *testing.T) {
 	env := newTestEnv(t)
 	env.svc.collectUntil = time.Now().Add(-time.Second)
 	env.repo.err = errBoom
-	env.svc.scan(t.Context())
+	_ = env.svc.scan(t.Context())
 	require.True(t, env.svc.collectUntil.IsZero())
 	require.Equal(t, env.svc.pollInterval, env.svc.nextScanDelay(time.Now()), "expired timer must not spin on failure")
 }
@@ -171,7 +171,7 @@ func TestDepositWaitsForANearBatchOnly(t *testing.T) {
 	u := env.deposit(t, d, 10_000) // confirmed an hour ago
 	env.indexer.serve(v)
 	env.svc.boardingMaxWait = 2 * time.Hour
-	env.svc.scan(t.Context())
+	_ = env.svc.scan(t.Context())
 	require.Empty(t, env.emulator.submitted, "the deposit waits for the batch in ten minutes")
 	st := env.svc.Status()
 	require.Len(t, st.Batches, 1)
@@ -193,7 +193,7 @@ func TestInFlightCoinsLeaveThePlan(t *testing.T) {
 	d := env.advertised(t, v)
 	env.indexer.serve(v)
 	env.svc.inFlight[d.ID] = true
-	env.svc.scan(t.Context())
+	_ = env.svc.scan(t.Context())
 	st := env.svc.Status()
 	require.Empty(t, st.Batches)
 	require.True(t, st.Holdings[d.ID].Renewing)

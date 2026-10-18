@@ -249,6 +249,9 @@ func (s *service) finishSettlements(ctx context.Context) error {
 			continue
 		}
 		f, err := s.fateOf(ctx, st)
+		if throttled(err) {
+			return err
+		}
 		if err != nil {
 			log.WithError(err).WithField("txid", row.Txid).Warn("check settlement")
 		}
