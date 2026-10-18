@@ -23,6 +23,12 @@ type cacheIndexer struct {
 	onRequest func()
 }
 
+func (i *cacheIndexer) requestCount() int {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return len(i.requests)
+}
+
 func (i *cacheIndexer) GetVtxos(_ context.Context, opts ...clientlib.GetVtxosOption) (*clientlib.VtxosResponse, error) {
 	o, err := clientlib.ApplyGetVtxosOptions(opts...)
 	if err != nil {
@@ -172,7 +178,7 @@ func TestWakeScansCannotPostponeFullReconciliation(t *testing.T) {
 		e.svc.pollInterval = 5 * time.Second
 		e.svc.Start()
 		synctest.Wait()
-		require.Len(t, i.requests, 1)
+		require.Equal(t, 1, i.requestCount())
 		first := e.svc.lastFullRefresh
 		i.mu.Lock()
 		i.coins = map[string][]clientlib.Vtxo{}
@@ -182,7 +188,7 @@ func TestWakeScansCannotPostponeFullReconciliation(t *testing.T) {
 			e.svc.wakeScan()
 			synctest.Wait()
 		}
-		require.Len(t, i.requests, 2)
+		require.Equal(t, 2, i.requestCount())
 		require.Equal(t, 5*time.Second, e.svc.lastFullRefresh.Sub(first))
 		require.Equal(t, e.svc.lastFullRefresh.Add(e.svc.pollInterval), e.svc.Status().NextScan)
 		for _, holding := range e.svc.Status().Holdings {
@@ -213,14 +219,14 @@ func TestCacheInvalidationsRespectScanBackoff(t *testing.T) {
 			synctest.Wait()
 		}
 		wake()
-		require.Len(t, i.requests, 2)
+		require.Equal(t, 2, i.requestCount())
 		require.Equal(t, first.Add(6*time.Second), e.svc.Status().NextScan)
 		for range 4 {
 			wake()
 		}
-		require.Len(t, i.requests, 2)
+		require.Equal(t, 2, i.requestCount())
 		wake()
-		require.Len(t, i.requests, 3)
+		require.Equal(t, 3, i.requestCount())
 		require.Equal(t, first.Add(16*time.Second), e.svc.Status().NextScan)
 		require.True(t, e.svc.Status().Throttled)
 		require.Equal(t, first, e.svc.lastFullRefresh)
@@ -230,9 +236,9 @@ func TestCacheInvalidationsRespectScanBackoff(t *testing.T) {
 		for range 9 {
 			wake()
 		}
-		require.Len(t, i.requests, 3)
+		require.Equal(t, 3, i.requestCount())
 		wake()
-		require.Len(t, i.requests, 4)
+		require.Equal(t, 4, i.requestCount())
 		require.False(t, e.svc.Status().Throttled)
 		require.Equal(t, first.Add(16*time.Second), e.svc.lastFullRefresh)
 		e.svc.Stop()
