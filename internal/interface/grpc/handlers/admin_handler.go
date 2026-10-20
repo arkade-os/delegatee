@@ -115,7 +115,6 @@ func (h *adminHandler) GetStatus(
 	st := h.svc.Status()
 	resp := &delegateev1.GetStatusResponse{
 		RenewingVtxos:   int32(st.RenewingVtxos),
-		PollInterval:    int64(st.PollInterval.Seconds()),
 		RenewalReserve:  int64(st.Reserve.Seconds()),
 		BoardingMaxWait: int64(st.BoardingMaxWait.Seconds()),
 	}

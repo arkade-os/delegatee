@@ -43,15 +43,15 @@ func TestRestartAndKeys(t *testing.T) {
 }
 
 func TestCancelStopsRenewals(t *testing.T) {
-	// scans far enough apart to cancel a coin before the next one renews it
-	d := startDelegatee(t, func(c *config.Config) { c.PollInterval = 10 * time.Second })
+	d := startDelegatee(t)
 	owner := newOwner(t, d)
 	w, renewal := boardingWatch(t, d, owner)
+	// cancelled before the coin lands: a landed coin is renewed at once
+	_, err := d.admin.CancelDelegation(t.Context(), &delegateev1.CancelDelegationRequest{Id: renewal.Id})
+	require.NoError(t, err)
 	faucet(t, w.Address, 20_000)
 
 	boarded := landed(t, d, w, renewal, 1)[0]
-	_, err := d.admin.CancelDelegation(t.Context(), &delegateev1.CancelDelegationRequest{Id: renewal.Id})
-	require.NoError(t, err)
 	neverSpent(t, d, boarded.Outpoint.String())
 
 	tmpl := fixtureID(t, "renewal.json")

@@ -52,7 +52,6 @@ type Config struct {
 	DelegateKeys   []*btcec.PrivateKey // delegate key of new delegations, then previous keys
 	EncryptionKeys []*btcec.PrivateKey // first key published; retained keys decrypt existing secrets
 
-	PollInterval        time.Duration
 	OnchainPollInterval time.Duration
 	RenewalTimeout      time.Duration // must cover the gap between two arkd sessions
 	RenewalReserve      time.Duration // the batch lane submits at the latest this long before a vtxo expires
@@ -98,9 +97,6 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 	if cfg.LogLevel, err = envInt("LOG_LEVEL", 4); err != nil {
-		return nil, err
-	}
-	if cfg.PollInterval, err = envPositive("POLL_INTERVAL", time.Minute); err != nil {
 		return nil, err
 	}
 	if cfg.RenewalTimeout, err = envPositive("RENEWAL_TIMEOUT", 2*time.Hour); err != nil {
@@ -232,7 +228,7 @@ func (c *Config) AppService(ctx context.Context) (_ application.Service, err err
 	}
 	svc, err := application.NewServiceWithKeys(
 		ctx, repo, ark, indexerSvc, emulatorclient.NewGRPCClient(emuConn), explorerSvc, c.OnchainPollInterval, c.MaxOnchainFeeRate, c.EncryptionKeys,
-		c.DelegateKeys, c.PollInterval, c.RenewalTimeout, c.RenewalReserve, c.BoardingMaxWait,
+		c.DelegateKeys, c.RenewalTimeout, c.RenewalReserve, c.BoardingMaxWait,
 		application.Limits{
 			MinWatchExpiry: c.MinWatchExpiry, MaxDelegations: c.MaxDelegations, MaxStreamChildren: c.MaxStreamChildren,
 			MaxTemplates: c.MaxTemplates, MaxArtifacts: c.MaxArtifacts,

@@ -275,8 +275,9 @@ func (s *service) discover(ctx context.Context, delegations []domain.Delegation,
 	holdings := map[int64]Holdings{}
 	unwatched := map[int64]string{}
 	s.found = map[int64][]scannedCoin{}
-	scripts := s.watchAll(ctx, delegations, active, unwatched)
-	byScript, err := s.spendableVtxos(ctx, scripts)
+	s.nextDue = time.Time{}
+	s.scripts = s.watchAll(ctx, delegations, active, unwatched)
+	byScript, err := s.spendableVtxos(ctx, s.scripts)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -316,6 +317,9 @@ next:
 				}
 				watchScripts[sl.Script] = d.ID
 			}
+			if sl.Onchain {
+				s.dueBy(now.Add(s.onchainPollInterval)) // the explorer pushes nothing
+			}
 			coins, err := s.slotCoins(sl, slot, byScript, now)
 			if err != nil {
 				if throttled(err) {
@@ -331,6 +335,9 @@ next:
 			for _, c := range coins {
 				op := c.Outpoint.String()
 				due := dueTime(w.instance, c, tip)
+				if due.After(now) {
+					s.dueBy(due)
+				}
 				s.found[d.ID] = append(s.found[d.ID], scannedCoin{vtxo: c.vtxo(), due: due})
 				if s.isConsumed(op) || s.held[op] {
 					continue
@@ -394,6 +401,13 @@ next:
 	}
 	s.pruneCaches()
 	return holdings, unwatched, inputs, nil
+}
+
+// dueBy asks for a scan by then.
+func (s *service) dueBy(at time.Time) {
+	if s.nextDue.IsZero() || at.Before(s.nextDue) {
+		s.nextDue = at
+	}
 }
 
 func (s *service) watchAll(ctx context.Context, delegations []domain.Delegation, active map[string]struct{}, unwatched map[int64]string) []string {

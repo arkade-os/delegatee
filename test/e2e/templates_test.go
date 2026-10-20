@@ -10,7 +10,6 @@ import (
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 	offchaintx "github.com/arkade-os/arkd/pkg/client-lib/offchain-tx"
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	"github.com/arkade-os/delegatee/internal/config"
 	"github.com/arkade-os/delegatee/pkg/template/packets"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -54,9 +53,9 @@ func TestVHTLCClaim(t *testing.T) {
 	require.EqualValues(t, 10_000, paid.Amount)
 }
 
-// the poll is an hour: only the subscription can wake the scan
+// nothing is due: only the subscription can wake the scan
 func TestVHTLCClaimIsPrompt(t *testing.T) {
-	d := startDelegatee(t, func(cfg *config.Config) { cfg.PollInterval = time.Hour })
+	d := startDelegatee(t)
 	paid, took := swapClaim(t, d, "vhtlc_claim.json")
 	require.EqualValues(t, 10_000, paid.Amount)
 	require.Less(t, took, 30*time.Second)

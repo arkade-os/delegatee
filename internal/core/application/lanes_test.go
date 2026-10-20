@@ -31,8 +31,6 @@ func TestBatchInputsWaitForTheBatchInFlight(t *testing.T) {
 	env.indexer.serve(v)
 	_ = env.svc.scan(t.Context())
 	require.Empty(t, env.emulator.submitted, "one batch session at a time")
-	require.True(t, env.svc.batch.waiting.Load(), "the batch wakes the scan when it ends")
-	require.Empty(t, env.svc.wake)
 }
 
 func TestClaimBesideABatch(t *testing.T) {

@@ -98,7 +98,6 @@ type Status struct {
 	NextScan      time.Time // zero until the first scan, failed or not
 	Throttled     bool      // an upstream rate limits the scan: NextScan is backed off
 	RenewingVtxos int
-	PollInterval  time.Duration
 	// since the process started
 	Renewed, Failed uint64
 	Holdings        map[int64]Holdings
@@ -161,7 +160,7 @@ type Service interface {
 	DelegationsByTemplate(ctx context.Context) (map[string]int64, error)
 }
 
-// Limits exist because every active delegation costs an indexer lookup per poll.
+// Limits exist because every active delegation costs an indexer lookup per scan.
 type Limits struct {
 	// MinWatchExpiry is how far ahead expires_at must be; zero only refuses the past.
 	MinWatchExpiry      time.Duration
@@ -206,11 +205,11 @@ type service struct {
 	maxOnchainFeeRate   float64 // sat/vB
 	dust                uint64
 	cosigners           []*cosigner
-	pollInterval        time.Duration
 	renewalTimeout      time.Duration
 	renewalReserve      time.Duration
 	boardingMaxWait     time.Duration
-	collectUntil        time.Time
+	collectUntil        time.Time // the batch lane's next submission, zero for none
+	nextDue             time.Time // the soonest a scanned coin or an onchain refresh is due, zero for none
 	limits              Limits
 	registerMu          sync.Mutex
 
@@ -245,6 +244,7 @@ type service struct {
 	plan         *plan                // published under mu
 	refusedSince map[string]time.Time // pending txs arkd refuses, since the first refusal
 	watched      map[int64]*watched   // nil for a delegation of another key
+	scripts      []string             // the offchain scripts watched, as the scan listed them
 	sub          *subscription
 	sampled      map[int64]bool // inFlight as the scan began
 
@@ -301,7 +301,7 @@ func NewServiceWithKeys(
 	maxOnchainFeeRate float64,
 	encryptionKeys []*btcec.PrivateKey,
 	keys []*btcec.PrivateKey,
-	pollInterval, renewalTimeout, renewalReserve, boardingMaxWait time.Duration,
+	renewalTimeout, renewalReserve, boardingMaxWait time.Duration,
 	limits Limits,
 ) (Service, error) {
 	if onchainPollInterval <= 0 {
@@ -311,10 +311,10 @@ func NewServiceWithKeys(
 	if err != nil {
 		return nil, err
 	}
-	if pollInterval <= 0 || renewalTimeout <= 0 {
-		return nil, fmt.Errorf("poll interval and renewal timeout must be positive")
+	if renewalTimeout <= 0 {
+		return nil, fmt.Errorf("renewal timeout must be positive")
 	}
-	// a session that times out and a retry session: a lane that ends wakes the scan, no poll in between
+	// a session that times out and a retry session: a lane that ends wakes the scan
 	if renewalReserve < 2*renewalTimeout {
 		return nil, fmt.Errorf("renewal reserve must be at least twice the renewal timeout (%s)", 2*renewalTimeout)
 	}
@@ -382,7 +382,6 @@ func NewServiceWithKeys(
 		maxOnchainFeeRate:   maxOnchainFeeRate,
 		dust:                arkInfo.Dust,
 		cosigners:           cosigners,
-		pollInterval:        pollInterval,
 		renewalTimeout:      renewalTimeout,
 		renewalReserve:      renewalReserve,
 		boardingMaxWait:     boardingMaxWait,
@@ -457,7 +456,7 @@ func (s *service) Start() {
 	}()
 	go func() {
 		defer close(s.stopped)
-		timer := time.NewTimer(s.pollInterval)
+		timer := time.NewTimer(idleScanInterval)
 		defer timer.Stop()
 		for {
 			err := s.scan(ctx)
@@ -481,18 +480,28 @@ func (s *service) Start() {
 	}()
 }
 
-// a throttled scan waits this long at most before trying again
-const maxScanBackoff = 30 * time.Minute
+// The scan runs when woken: a coin arrives or leaves, a lane ends, a delegation changes. It is
+// also timed, for what nothing pushes: a due time, a batch, an onchain refresh, and a safety net.
+const (
+	idleScanInterval = 10 * time.Minute // with nothing due: templates toggled, arkd info, a missed event
+	retryScanDelay   = time.Minute      // after a failed scan, or while the subscription is down
+	maxScanBackoff   = 30 * time.Minute // a throttled scan waits this long at most
+	scanGrace        = 5 * time.Minute  // a scan this late past its schedule is unhealthy
+)
 
 // scanDelays are how long the next scan waits, and how long a woken one does: both back off while an upstream throttles.
 func (s *service) scanDelays(err error, now time.Time) (delay, gap time.Duration) {
 	if throttled(err) {
-		s.backoff = min(max(2*s.backoff, s.pollInterval), maxScanBackoff)
+		s.backoff = min(max(2*s.backoff, retryScanDelay), maxScanBackoff)
 		log.WithError(err).WithField("backoff", s.backoff).Warn("upstream rate limited: scan backs off")
 	} else {
 		s.backoff = 0
 	}
-	delay, gap = max(s.nextScanDelay(now), s.backoff), max(minScanGap, s.backoff)
+	delay = retryScanDelay
+	if err == nil {
+		delay = s.nextScanDelay(now)
+	}
+	delay, gap = max(delay, s.backoff), max(minScanGap, s.backoff)
 	s.mu.Lock()
 	s.nextScan, s.throttled = now.Add(delay), s.backoff > 0
 	s.mu.Unlock()
@@ -518,6 +527,9 @@ func (s *service) Stop() {
 		s.stop()
 		<-s.stopped
 		<-s.streamsDone
+		if s.sub != nil {
+			s.sub.stop()
+		}
 	}
 	if err := s.repo.Close(); err != nil {
 		log.WithError(err).Error("close repository")
@@ -590,7 +602,7 @@ func (s *service) registerWatch(
 		Fingerprint: fingerprint, Address: addr, TemplateID: templateID, Variables: variables, ParentID: parent,
 		ExpiresAt: expiresAt, DelegatePubKey: s.cosigners[0].pubKey, Slots: slots,
 	}, limit)
-	if err == nil && tmpl.Type() != template.Intent {
+	if err == nil {
 		s.wakeScan() // the coin may be there already
 	}
 	return d, err
@@ -736,7 +748,6 @@ func (s *service) Status() Status {
 		NextScan:        s.nextScan,
 		Throttled:       s.throttled,
 		RenewingVtxos:   int(s.batch.busy.Load() + s.direct.busy.Load()),
-		PollInterval:    s.pollInterval,
 		Renewed:         s.renewed.Load(),
 		Failed:          s.failed.Load(),
 		Holdings:        holdings,
@@ -791,7 +802,6 @@ func (s *service) Health(ctx context.Context) map[string]error {
 }
 
 // scannerHealth fails when scans stopped: a wedged loop looks alive otherwise.
-// scannerHealth: a scan backed off by a throttle is late only once past its schedule
 func (s *service) scannerHealth(now time.Time) error {
 	s.mu.Lock()
 	last, next := s.lastScan, s.nextScan
@@ -799,11 +809,10 @@ func (s *service) scannerHealth(now time.Time) error {
 	if last.IsZero() {
 		last = s.started
 	}
-	deadline := last.Add(max(3*s.pollInterval, time.Minute))
-	if planned := next.Add(s.pollInterval); planned.After(deadline) {
-		deadline = planned
+	if next.IsZero() {
+		next = s.started
 	}
-	if now.After(deadline) {
+	if now.After(next.Add(scanGrace)) {
 		return fmt.Errorf("no scan for %s", now.Sub(last).Round(time.Second))
 	}
 	return nil
@@ -1063,7 +1072,7 @@ func (s *service) scan(ctx context.Context) error {
 	maps.Copy(unwatched, unusable)
 	s.forgetMoved(inputs)
 	p := s.planBatches(s.entries, now)
-	s.syncSubscription(ctx, s.wakeScripts())
+	s.syncSubscription(ctx, s.scripts)
 	var batch, direct []renewalInput
 	for _, in := range inputs {
 		if s.laneOf(in) == &s.direct {

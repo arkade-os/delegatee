@@ -530,7 +530,6 @@ type GetStatusResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	LastScanAt    int64                  `protobuf:"varint,1,opt,name=last_scan_at,json=lastScanAt,proto3" json:"last_scan_at,omitempty"`
 	RenewingVtxos int32                  `protobuf:"varint,2,opt,name=renewing_vtxos,json=renewingVtxos,proto3" json:"renewing_vtxos,omitempty"`
-	PollInterval  int64                  `protobuf:"varint,3,opt,name=poll_interval,json=pollInterval,proto3" json:"poll_interval,omitempty"`
 	IntentFees    *IntentFees            `protobuf:"bytes,4,opt,name=intent_fees,json=intentFees,proto3" json:"intent_fees,omitempty"`
 	// renewal_reserve and boarding_max_wait are seconds; batches are the next planned sessions, soonest first, at most 20.
 	RenewalReserve  int64           `protobuf:"varint,5,opt,name=renewal_reserve,json=renewalReserve,proto3" json:"renewal_reserve,omitempty"`
@@ -583,13 +582,6 @@ func (x *GetStatusResponse) GetLastScanAt() int64 {
 func (x *GetStatusResponse) GetRenewingVtxos() int32 {
 	if x != nil {
 		return x.RenewingVtxos
-	}
-	return 0
-}
-
-func (x *GetStatusResponse) GetPollInterval() int64 {
-	if x != nil {
-		return x.PollInterval
 	}
 	return 0
 }
@@ -1845,12 +1837,11 @@ const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"\x05state\x18\x04 \x01(\tR\x05state\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\x05 \x01(\x03R\tcreatedAt\"\x12\n" +
-	"\x10GetStatusRequest\"\x87\x03\n" +
+	"\x10GetStatusRequest\"\xe8\x02\n" +
 	"\x11GetStatusResponse\x12 \n" +
 	"\flast_scan_at\x18\x01 \x01(\x03R\n" +
 	"lastScanAt\x12%\n" +
-	"\x0erenewing_vtxos\x18\x02 \x01(\x05R\rrenewingVtxos\x12#\n" +
-	"\rpoll_interval\x18\x03 \x01(\x03R\fpollInterval\x129\n" +
+	"\x0erenewing_vtxos\x18\x02 \x01(\x05R\rrenewingVtxos\x129\n" +
 	"\vintent_fees\x18\x04 \x01(\v2\x18.delegatee.v1.IntentFeesR\n" +
 	"intentFees\x12'\n" +
 	"\x0frenewal_reserve\x18\x05 \x01(\x03R\x0erenewalReserve\x12*\n" +
@@ -1858,7 +1849,7 @@ const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"\abatches\x18\a \x03(\v2\x1a.delegatee.v1.PlannedBatchR\abatches\x12 \n" +
 	"\fnext_scan_at\x18\b \x01(\x03R\n" +
 	"nextScanAt\x12\x1c\n" +
-	"\tthrottled\x18\t \x01(\bR\tthrottled\"\x12\n" +
+	"\tthrottled\x18\t \x01(\bR\tthrottledJ\x04\b\x03\x10\x04\"\x12\n" +
 	"\x10GetHealthRequest\"Q\n" +
 	"\x11GetHealthResponse\x12<\n" +
 	"\fdependencies\x18\x01 \x03(\v2\x18.delegatee.v1.DependencyR\fdependencies\"6\n" +

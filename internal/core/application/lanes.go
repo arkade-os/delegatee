@@ -13,7 +13,6 @@ import (
 // lane runs one group of inputs at a time.
 type lane struct {
 	busy    atomic.Int64 // vtxos in flight
-	waiting atomic.Bool  // a scan left it inputs while busy
 	wasBusy bool         // as the scan began; the scan's alone
 	queued  map[string]*pendingIntent
 }
@@ -52,12 +51,7 @@ func (s *service) dispatch(l *lane, inputs []renewalInput) {
 		return
 	}
 	if l.wasBusy {
-		l.waiting.Store(true)
-		// the lane may have ended since the scan began
-		if l.busy.Load() == 0 && l.waiting.Swap(false) {
-			s.wakeScan()
-		}
-		return
+		return // the lane's end wakes the scan
 	}
 	// only the scan dispatches
 	l.busy.Store(int64(len(inputs)))
@@ -68,9 +62,7 @@ func (s *service) dispatch(l *lane, inputs []renewalInput) {
 		s.renewAndRecord(context.Background(), inputs)
 		s.setInFlight(inputs, false)
 		l.busy.Store(0)
-		if l.waiting.Swap(false) {
-			s.wakeScan()
-		}
+		s.wakeScan() // its results and whatever waited for it
 	}()
 }
 
@@ -162,10 +154,25 @@ func (s *service) dropOnchain(script string) {
 func (s *service) quarantine(inputs []renewalInput) {
 	s.shared.Lock()
 	defer s.shared.Unlock()
-	until := time.Now().Add(s.pollInterval)
+	until := time.Now().Add(retryScanDelay)
 	for _, in := range inputs {
 		s.quarantined[in.coin.Outpoint.String()] = until
 	}
+}
+
+// earliestQuarantine is when the next quarantined coin is free again, zero for none.
+func (s *service) earliestQuarantine(now time.Time) time.Time {
+	s.shared.Lock()
+	defer s.shared.Unlock()
+	var at time.Time
+	for op, until := range s.quarantined {
+		if !now.Before(until) {
+			delete(s.quarantined, op)
+		} else if at.IsZero() || until.Before(at) {
+			at = until
+		}
+	}
+	return at
 }
 
 func (s *service) isQuarantined(op string, now time.Time) bool {

@@ -135,7 +135,7 @@ message GetStatusRequest {}
 message GetStatusResponse {
   int64 last_scan_at = 1;
   int32 renewing_vtxos = 2;
-  int64 poll_interval = 3;
+  reserved 3; // poll_interval: the scan is event driven
   IntentFees intent_fees = 4;
   // renewal_reserve and boarding_max_wait are seconds; batches are the next planned sessions, soonest first, at most 20.
   int64 renewal_reserve = 5;

@@ -195,7 +195,6 @@ func TestAdminHandlers(t *testing.T) {
 	require.Equal(t, t0.Add(time.Minute).Unix(), st.GetNextScanAt())
 	require.True(t, st.GetThrottled())
 	require.Equal(t, int32(2), st.GetRenewingVtxos())
-	require.Equal(t, int64(60), st.GetPollInterval())
 	require.Equal(t, int64(6*3600), st.GetRenewalReserve())
 	require.Equal(t, int64(600), st.GetBoardingMaxWait())
 	require.Len(t, st.GetBatches(), 2)
@@ -478,7 +477,7 @@ func (f *fakeService) LastRenewals(context.Context) (map[int64]domain.Renewal, e
 }
 func (f *fakeService) Status() application.Status {
 	return application.Status{
-		LastScan: t0, NextScan: t0.Add(time.Minute), Throttled: true, RenewingVtxos: 2, PollInterval: time.Minute,
+		LastScan: t0, NextScan: t0.Add(time.Minute), Throttled: true, RenewingVtxos: 2,
 		Holdings: map[int64]application.Holdings{
 			7: {Vtxos: 2, Amount: 9000, NextExpiry: t0.Add(time.Hour), NextDue: t0, NextDeadline: t0.Add(30 * time.Minute), NextBatchAt: t0.Add(20 * time.Minute), Renewing: true,
 				FailingSince: t0.Add(-time.Hour), LastFailure: t0, Failures: 3},

@@ -39,7 +39,6 @@ the delegate key is in every delegate address.
 | `DELEGATEE_ENCRYPTION_KEYS_FILE` | ECIES keys for template secrets | unset |
 | `DELEGATEE_DEFAULT_TEMPLATES` | register the default templates at startup | `true` |
 | `DELEGATEE_MIN_WATCH_EXPIRY` | minimum lead of a watch's expiry | `24h` |
-| `DELEGATEE_POLL_INTERVAL` | scan interval | `1m` |
 | `DELEGATEE_RENEWAL_TIMEOUT` | intent to batch finalization limit | `2h` |
 | `DELEGATEE_RENEWAL_RESERVE` | latest submission, before a vtxo expires | `6h` |
 | `DELEGATEE_BOARDING_MAX_WAIT` | how long a confirmed deposit waits for a renewal batch | `10m` |

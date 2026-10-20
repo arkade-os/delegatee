@@ -8,14 +8,13 @@ import (
 	"time"
 
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
-	"github.com/arkade-os/delegatee/pkg/template"
 	log "github.com/sirupsen/logrus"
 )
 
 // woken scans are at least this far apart
 const minScanGap = time.Second
 
-// subscription wakes the scan when a coin reaches a watched script.
+// subscription wakes the scan when a coin reaches or leaves a watched script.
 type subscription struct {
 	id      string
 	scripts map[string]struct{}
@@ -31,23 +30,7 @@ func (s *service) wakeScan() {
 	}
 }
 
-// wakeScripts are the offchain scripts of the watches the direct lane serves.
-func (s *service) wakeScripts() []string {
-	var scripts []string
-	for _, w := range s.watched {
-		if w == nil || !w.delegation.IsWatch() || w.tmpl.Type() == template.Intent {
-			continue
-		}
-		for _, sl := range w.delegation.Slots {
-			if !sl.Onchain {
-				scripts = append(scripts, sl.Script)
-			}
-		}
-	}
-	return scripts
-}
-
-// syncSubscription never fails a scan: without it a claim waits for the poll.
+// syncSubscription never fails a scan: without it a coin waits for the next timed scan.
 func (s *service) syncSubscription(ctx context.Context, want []string) {
 	wanted := make(map[string]struct{}, len(want))
 	for _, script := range want {
@@ -102,6 +85,8 @@ func (s *service) syncSubscription(ctx context.Context, want []string) {
 }
 
 func (s *service) follow(sub *subscription, events <-chan clientlib.ScriptEvent) {
+	// the next scan reopens it; not at once, a stream that keeps ending would scan in a loop
+	defer time.AfterFunc(retryScanDelay, s.wakeScan)
 	defer sub.dead.Store(true)
 	for ev := range events {
 		if ev.Err != nil {
@@ -113,7 +98,7 @@ func (s *service) follow(sub *subscription, events <-chan clientlib.ScriptEvent)
 	}
 }
 
-// wakes: a new coin, or a connection change that may have hidden one.
+// wakes: a coin arrived or left, or a connection change may have hidden one.
 func wakes(ev clientlib.ScriptEvent) bool {
-	return ev.Connection != nil || (ev.Data != nil && len(ev.Data.NewVtxos) > 0)
+	return ev.Connection != nil || (ev.Data != nil && len(ev.Data.NewVtxos)+len(ev.Data.SpentVtxos) > 0)
 }

@@ -927,10 +927,6 @@
             "description": "next_scan_at is backed off while throttled: an upstream rate limits the scan.",
             "format": "int64"
           },
-          "pollInterval": {
-            "type": "integer",
-            "format": "int64"
-          },
           "renewalReserve": {
             "type": "integer",
             "description": "renewal_reserve and boarding_max_wait are seconds; batches are the next planned sessions, soonest first, at most 20.",

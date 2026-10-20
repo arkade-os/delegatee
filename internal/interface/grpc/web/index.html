@@ -669,8 +669,8 @@ function render() {
 }
 
 function scanState() {
-  const poll = num(status.pollInterval), last = num(status.lastScanAt), busy = status.renewingVtxos > 0;
-  return { poll, last, busy, stale: !busy && last > 0 && nowSecs() - last > Math.max(3 * poll, 30) };
+  const last = num(status.lastScanAt), next = num(status.nextScanAt), busy = status.renewingVtxos > 0;
+  return { last, busy, stale: !busy && next > 0 && nowSecs() - next > 300 };
 }
 
 function renderHeader() {
@@ -811,7 +811,6 @@ function daemonPanel() {
   const f = status.intentFees, fees = f && [["Fee per VTXO input", f.offchainInput], ["Fee per VTXO output", f.offchainOutput],
     ["Fee per boarding input", f.onchainInput], ["Fee per onchain output", f.onchainOutput]];
   return `<section class="panel"><div class="ph"><h3>Daemon</h3></div><dl class="settings">
-    <div><dt>Scan interval</dt><dd>${span(num(status.pollInterval))}</dd></div>
     <div><dt>Expiry reserve ${tip("DELEGATEE_RENEWAL_RESERVE: the batch lane never submits a VTXO this close to its expiry.")}</dt><dd>${span(num(status.renewalReserve))}</dd></div>
     <div><dt>Boarding max wait ${tip("The longest a confirmed deposit waits for a batch.")}</dt><dd>${span(num(status.boardingMaxWait))}</dd></div>
   </dl>

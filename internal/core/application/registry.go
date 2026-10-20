@@ -129,6 +129,7 @@ func (s *service) SetTemplateStatus(ctx context.Context, id, status string) erro
 		return err
 	}
 	log.WithFields(log.Fields{"template": id, "status": status}).Info("template status set")
+	s.wakeScan()
 	return nil
 }
 

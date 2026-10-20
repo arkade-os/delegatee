@@ -45,14 +45,14 @@ func TestNewService(t *testing.T) {
 			env := newTestEnv(t)
 			tweak(env)
 			_, err := NewServiceWithKeys(t.Context(), env.repo, env.ark, env.indexer, env.emulator, nil, 30*time.Second, 50, nil,
-				[]*btcec.PrivateKey{env.userKey}, time.Hour, time.Minute, 2*time.Hour, 0,
+				[]*btcec.PrivateKey{env.userKey}, time.Minute, 2*time.Hour, 0,
 				Limits{MaxDelegations: 100, MaxStreamChildren: 100, MaxTemplates: 100, MaxArtifacts: 100, MaxDocumentBytes: 4096, TemplateMaxFailures: 3})
 			require.ErrorContains(t, err, name, "the error the subtest is named after")
 		})
 	}
 	env := newTestEnv(t)
 	_, err := NewServiceWithKeys(t.Context(), env.repo, env.ark, env.indexer, env.emulator, nil, 30*time.Second, 50, nil,
-		[]*btcec.PrivateKey{env.userKey}, time.Hour, time.Minute, 2*time.Hour, 0, Limits{})
+		[]*btcec.PrivateKey{env.userKey}, time.Minute, 2*time.Hour, 0, Limits{})
 	require.ErrorContains(t, err, "must be positive", "zero limits")
 }
 
@@ -371,7 +371,7 @@ func TestWatchSkipsATreeThatMoved(t *testing.T) {
 	// arkd and the emulator rotated their keys since registration
 	other := newTestEnv(t)
 	rotated, err := NewServiceWithKeys(t.Context(), env.repo, other.ark, other.indexer, other.emulator, nil, 30*time.Second, 50, nil,
-		[]*btcec.PrivateKey{env.svc.cosigners[0].key}, time.Hour, time.Minute, 2*time.Hour, 0, env.svc.limits)
+		[]*btcec.PrivateKey{env.svc.cosigners[0].key}, time.Minute, 2*time.Hour, 0, env.svc.limits)
 	require.NoError(t, err)
 	w, err := rotated.(*service).watch(t.Context(), d)
 	require.Nil(t, w)
@@ -424,7 +424,7 @@ func TestKeyRotationWatchesPreviousDelegations(t *testing.T) {
 	require.NoError(t, err)
 	rotated, err := NewServiceWithKeys(
 		t.Context(), env.repo, env.ark, env.indexer, env.emulator, env.explorer, 30*time.Second, 50, nil,
-		[]*btcec.PrivateKey{newKey, oldKey}, time.Hour, time.Minute, 2*time.Hour, 0, env.svc.limits,
+		[]*btcec.PrivateKey{newKey, oldKey}, time.Minute, 2*time.Hour, 0, env.svc.limits,
 	)
 	require.NoError(t, err)
 	rotatedSvc := rotated.(*service)
@@ -494,7 +494,6 @@ func TestScanHoldingsAndStatus(t *testing.T) {
 
 	st := env.svc.Status()
 	require.WithinDuration(t, time.Now(), st.LastScan, time.Minute)
-	require.Equal(t, time.Hour, st.PollInterval)
 	require.Zero(t, st.RenewingVtxos)
 	due := soon.ExpiresAt.Add(-1024 * time.Second)
 	require.Equal(t, Holdings{
@@ -556,7 +555,6 @@ func TestScanFailures(t *testing.T) {
 
 func TestScanBackoff(t *testing.T) {
 	env := newTestEnv(t)
-	env.svc.pollInterval = time.Minute
 	env.indexer.serve(env.coin(t, env.userKey.PubKey(), 1000, time.Hour))
 	board := env.boarding(t, env.userKey.PubKey())
 	env.deposit(t, board, 3000)
@@ -575,9 +573,9 @@ func TestScanBackoff(t *testing.T) {
 		require.Equal(t, now.Add(want), st.NextScan)
 	}
 	require.NoError(t, env.svc.scannerHealth(now.Add(29*time.Minute)), "backed off, not stalled")
-	require.Error(t, env.svc.scannerHealth(now.Add(32*time.Minute)))
+	require.Error(t, env.svc.scannerHealth(now.Add(30*time.Minute+scanGrace+time.Second)))
 	delay, gap := env.svc.scanDelays(nil, now)
-	require.Equal(t, time.Minute, delay)
+	require.InDelta(t, env.svc.onchainPollInterval, delay, float64(time.Second), "the deposit's refresh")
 	require.Equal(t, minScanGap, gap)
 	require.False(t, env.svc.Status().Throttled)
 
@@ -705,7 +703,6 @@ func TestHealth(t *testing.T) {
 
 func TestStartStop(t *testing.T) {
 	env := newTestEnv(t)
-	env.svc.pollInterval = time.Millisecond
 	env.svc.Start()
 	require.Eventually(t, func() bool { return !env.svc.Status().LastScan.IsZero() }, 5*time.Second, time.Millisecond)
 	env.svc.Stop()
@@ -852,7 +849,7 @@ func TestEncryptionKeyRotation(t *testing.T) {
 	require.NoError(t, err)
 	keys := []*btcec.PrivateKey{active, old}
 	svc, err := NewServiceWithKeys(t.Context(), env.repo, env.ark, env.indexer, env.emulator, nil,
-		30*time.Second, 50, keys, []*btcec.PrivateKey{env.svc.cosigners[0].key}, time.Hour, time.Minute, 2*time.Hour, 0, env.svc.limits)
+		30*time.Second, 50, keys, []*btcec.PrivateKey{env.svc.cosigners[0].key}, time.Minute, 2*time.Hour, 0, env.svc.limits)
 	require.NoError(t, err)
 	s := svc.(*service)
 	keys[0] = old // constructor owns its keyring slice

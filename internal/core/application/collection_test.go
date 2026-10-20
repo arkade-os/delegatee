@@ -92,9 +92,12 @@ func TestCollectionTimerBundlesFreshInputs(t *testing.T) {
 		second := env.coin(t, env.userKey.PubKey(), 1000, 16*time.Minute)
 		env.advertised(t, first)
 		env.advertised(t, second)
-		// the poll is an hour: the batch timer submits
 		env.indexer.serve(first, second)
 		env.svc.Start()
+		synctest.Wait()
+		// the subscription it opened wakes a second scan; nothing else before the batch timer
+		env.indexer.serve(first, second)
+		time.Sleep(minScanGap)
 		synctest.Wait()
 		require.Empty(t, env.emulator.submitted)
 		st := env.svc.Status()
@@ -126,7 +129,7 @@ func TestCollectionRefreshDropsSpentInputs(t *testing.T) {
 	require.True(t, env.svc.collectUntil.IsZero())
 	require.Empty(t, env.svc.Status().Batches)
 	require.Empty(t, env.emulator.submitted)
-	require.Equal(t, env.svc.pollInterval, env.svc.nextScanDelay(time.Now()))
+	require.Equal(t, idleScanInterval, env.svc.nextScanDelay(time.Now()))
 }
 
 func TestCollectionDeadlineFlushesWaitingInputs(t *testing.T) {
@@ -154,7 +157,8 @@ func TestCollectionFailedScanRetriesAtNormalInterval(t *testing.T) {
 	env.repo.err = errBoom
 	_ = env.svc.scan(t.Context())
 	require.True(t, env.svc.collectUntil.IsZero())
-	require.Equal(t, env.svc.pollInterval, env.svc.nextScanDelay(time.Now()), "expired timer must not spin on failure")
+	delay, _ := env.svc.scanDelays(errBoom, time.Now())
+	require.Equal(t, retryScanDelay, delay, "expired timer must not spin on failure")
 }
 
 func TestDepositWaitsForANearBatchOnly(t *testing.T) {
@@ -205,7 +209,7 @@ func TestQuarantinedCoinSitsOutOneRetry(t *testing.T) {
 	env.scan(t)
 	require.Empty(t, env.emulator.submitted, "kept out of the retry right after the failure")
 	require.Len(t, env.svc.Status().Batches, 1, "still planned")
-	env.svc.quarantined[v.Outpoint.String()] = time.Now() // the quarantine ends with the poll
+	env.svc.quarantined[v.Outpoint.String()] = time.Now() // the quarantine is over
 	env.indexer.serve(v)
 	env.scan(t)
 	require.Len(t, env.emulator.submitted, 1)
@@ -227,10 +231,47 @@ func TestReserveMustCoverARetry(t *testing.T) {
 	key, _ := btcec.NewPrivateKey()
 	for _, bad := range [][2]time.Duration{{0, 0}, {2*time.Minute - time.Second, 0}, {2 * time.Hour, -time.Second}} {
 		_, err := NewServiceWithKeys(t.Context(), env.repo, env.ark, env.indexer, env.emulator, env.explorer, 30*time.Second, 50, nil,
-			[]*btcec.PrivateKey{key}, time.Hour, time.Minute, bad[0], bad[1], env.svc.limits)
+			[]*btcec.PrivateKey{key}, time.Minute, bad[0], bad[1], env.svc.limits)
 		require.Error(t, err)
 	}
 	_, err := NewServiceWithKeys(t.Context(), env.repo, env.ark, env.indexer, env.emulator, env.explorer, 30*time.Second, 50, nil,
-		[]*btcec.PrivateKey{key}, time.Hour, time.Minute, 2*time.Minute, 0, env.svc.limits)
+		[]*btcec.PrivateKey{key}, time.Minute, 2*time.Minute, 0, env.svc.limits)
 	require.NoError(t, err)
+}
+
+func TestScanWaitsForTheNextDueCoin(t *testing.T) {
+	env := newTestEnv(t)
+	v := env.coin(t, env.userKey.PubKey(), 1000, 1024*time.Second+5*time.Minute) // due in 5m
+	env.renewal(t, env.userKey.PubKey(), 0)
+	env.indexer.serve(v)
+	env.scan(t)
+	due := env.svc.Status().Holdings[1].NextDue
+	require.True(t, due.After(time.Now()))
+	require.InDelta(t, time.Until(due), env.svc.nextScanDelay(time.Now()), float64(time.Second), "the next scan is the due time")
+
+	env.indexer.serve(env.coin(t, env.userKey.PubKey(), 1000, 2*time.Hour))
+	env.scan(t)
+	require.Equal(t, idleScanInterval, env.svc.nextScanDelay(time.Now()), "a far due waits no longer than the safety net")
+
+	env.indexer.serve()
+	env.scan(t)
+	require.Equal(t, idleScanInterval, env.svc.nextScanDelay(time.Now()), "nothing due")
+
+	env.svc.sub = nil
+	require.Equal(t, retryScanDelay, env.svc.nextScanDelay(time.Now()), "a watch without its subscription polls")
+}
+
+func TestOnchainSlotsRefreshAtTheirInterval(t *testing.T) {
+	env := newTestEnv(t)
+	env.boarding(t, env.userKey.PubKey())
+	env.indexer.serve()
+	env.scan(t)
+	require.InDelta(t, env.svc.onchainPollInterval, env.svc.nextScanDelay(time.Now()), float64(time.Second))
+}
+
+func TestExpiredQuarantineDoesNotSpinTheScan(t *testing.T) {
+	env := newTestEnv(t)
+	env.svc.quarantined["gone"] = time.Now().Add(-time.Second)
+	require.Equal(t, idleScanInterval, env.svc.nextScanDelay(time.Now()))
+	require.Empty(t, env.svc.quarantined)
 }

@@ -1,20 +1,18 @@
 package application
 
 import (
-	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
-	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/stretchr/testify/require"
 )
 
 func TestWakeScansAtOnceThenKeepsItsDistance(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		env := newTestEnv(t)
-		env.svc.Start() // the poll is an hour
+		env.svc.Start()
 		synctest.Wait()
 		first := env.svc.Status().LastScan
 
@@ -34,16 +32,10 @@ func TestWakeScansAtOnceThenKeepsItsDistance(t *testing.T) {
 	})
 }
 
-func TestRegistrationWakesDirectTemplatesOnly(t *testing.T) {
+func TestRegistrationWakesTheScan(t *testing.T) {
 	e := newTestEnv(t)
 	e.renewal(t, e.userKey.PubKey(), 0)
-	require.Empty(t, e.svc.wake, "a renewal waits for its window")
-
-	secrets, _ := hexKey(t)
-	e.svc.encryptionKeys = []*btcec.PrivateKey{secrets}
-	_, err := e.svc.RegisterDelegation(t.Context(), e.trust(t, e.fixture(t, "vhtlc_claim.json")), claimVars(t, secrets.PubKey()), nil)
-	require.NoError(t, err)
-	require.Len(t, e.svc.wake, 1, "the lockup may be funded already")
+	require.Len(t, e.svc.wake, 1, "the scan subscribes to the new script")
 }
 
 func TestBusyLaneWakesTheScanWhenFree(t *testing.T) {
@@ -67,33 +59,17 @@ func TestBusyLaneWakesTheScanWhenFree(t *testing.T) {
 	require.Len(t, e.svc.wake, 1)
 }
 
-func TestScanWakesItselfWhenALaneEndsUnderIt(t *testing.T) {
-	e, coin := claimable(t)
-	e.openSubscription(t)
-	var submitted atomic.Bool
-	sign := e.ark.submitTx
-	e.ark.submitTx = func(ark string, cps []string) (string, string, []string, error) {
-		submitted.Store(true)
-		return sign(ark, cps)
-	}
-	e.svc.direct.busy.Store(1)
-	e.repo.afterListSettlements = func() { e.svc.direct.busy.Store(0) }
-	e.indexer.serve(coin)
-	_ = e.svc.scan(t.Context())
-	e.svc.wg.Wait()
-
-	require.False(t, submitted.Load())
-	require.Len(t, e.svc.wake, 1)
-	require.False(t, e.svc.direct.waiting.Load())
-}
-
-func TestSubscriptionFollowsDirectWatches(t *testing.T) {
+func TestSubscriptionFollowsEveryWatch(t *testing.T) {
 	e, _, _ := claimEnv(t)
 	claim := e.active(t)[0]
-	e.renewal(t, e.userKey.PubKey(), 0)
+	renewal := e.renewal(t, e.userKey.PubKey(), 0)
 	e.indexer.serve()
 	e.scan(t)
-	require.Equal(t, []string{claim.Slots[0].Script}, e.indexer.subscribedScripts(), "a renewal watch is not subscribed")
+	require.ElementsMatch(t, []string{claim.Slots[0].Script, renewal.Slots[0].Script}, e.indexer.subscribedScripts())
+	require.NoError(t, e.svc.CancelDelegationByID(t.Context(), renewal.ID))
+	e.indexer.serve()
+	e.scan(t)
+	require.Equal(t, []string{claim.Slots[0].Script}, e.indexer.subscribedScripts())
 
 	vars := claimVars(t, e.svc.encryptionKeys[0].PubKey())
 	vars["unilateral_claim_delay"] = "030040"
@@ -109,13 +85,13 @@ func TestSubscriptionFollowsDirectWatches(t *testing.T) {
 	e.indexer.serve()
 	e.scan(t)
 	require.Empty(t, e.indexer.subscribedScripts())
-	require.Nil(t, e.svc.sub, "no swap watch, no subscription")
+	require.Nil(t, e.svc.sub, "no watch, no subscription")
 }
 
 func TestScriptEventWakesTheScan(t *testing.T) {
 	require.True(t, wakes(clientlib.ScriptEvent{Data: &clientlib.ScriptEventData{NewVtxos: []clientlib.Vtxo{{}}}}))
 	require.True(t, wakes(clientlib.ScriptEvent{Connection: &clientlib.StreamConnectionEvent{}}), "events may have been missed")
-	require.False(t, wakes(clientlib.ScriptEvent{Data: &clientlib.ScriptEventData{SpentVtxos: []clientlib.Vtxo{{}}}}), "the daemon's own claim")
+	require.True(t, wakes(clientlib.ScriptEvent{Data: &clientlib.ScriptEventData{SpentVtxos: []clientlib.Vtxo{{}}}}), "an owner's spend ends a delegation")
 	require.False(t, wakes(clientlib.ScriptEvent{Err: errBoom}))
 
 	e, _, _ := claimEnv(t)

@@ -32,13 +32,11 @@ func TestLoad(t *testing.T) {
 	require.Error(t, err, "short key")
 
 	t.Setenv("DELEGATEE_DELEGATE_KEY", "0101010101010101010101010101010101010101010101010101010101010101")
-	t.Setenv("DELEGATEE_POLL_INTERVAL", "5s")
 	t.Setenv("DELEGATEE_ADMIN_AUTH", "file")
 	t.Setenv("DELEGATEE_ADMIN_USERS_FILE", adminUsersFile(t))
 	cfg, err := LoadConfig()
 	require.NoError(t, err)
 	require.Equal(t, uint32(7080), cfg.Port)
-	require.Equal(t, 5*time.Second, cfg.PollInterval)
 	require.Equal(t, 30*time.Second, cfg.OnchainPollInterval)
 	require.Empty(t, cfg.EncryptionKeys)
 	require.Equal(t, 6*time.Hour, cfg.RenewalReserve)
@@ -86,13 +84,13 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		"DELEGATEE_RENEWAL_RESERVE": "soon", "DELEGATEE_BOARDING_MAX_WAIT": "soon",
 		"DELEGATEE_MIN_WATCH_EXPIRY":      "-1h",
 		"DELEGATEE_ONCHAIN_POLL_INTERVAL": "soon",
-		"DELEGATEE_POLL_INTERVAL":         "10", "DELEGATEE_RENEWAL_TIMEOUT": "soon",
-		"DELEGATEE_MAX_DELEGATIONS":      "1e3",
-		"DELEGATEE_MAX_STREAM_CHILDREN":  "1e3",
-		"DELEGATEE_MAX_ONCHAIN_FEE_RATE": "fast",
-		"DELEGATEE_DEFAULT_TEMPLATES":    "maybe",
-		"DELEGATEE_DELEGATE_KEY":         "0000000000000000000000000000000000000000000000000000000000000000",
-		"DELEGATEE_ARK_URL":              "", "DELEGATEE_EMULATOR_URL": "", "DELEGATEE_DATABASE_URL": "",
+		"DELEGATEE_RENEWAL_TIMEOUT":       "soon",
+		"DELEGATEE_MAX_DELEGATIONS":       "1e3",
+		"DELEGATEE_MAX_STREAM_CHILDREN":   "1e3",
+		"DELEGATEE_MAX_ONCHAIN_FEE_RATE":  "fast",
+		"DELEGATEE_DEFAULT_TEMPLATES":     "maybe",
+		"DELEGATEE_DELEGATE_KEY":          "0000000000000000000000000000000000000000000000000000000000000000",
+		"DELEGATEE_ARK_URL":               "", "DELEGATEE_EMULATOR_URL": "", "DELEGATEE_DATABASE_URL": "",
 		"DELEGATEE_EXPLORER_URL": "",
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -108,10 +106,10 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		"DELEGATEE_PORT": "0", "DELEGATEE_ADMIN_PORT": "65536",
 		"DELEGATEE_RENEWAL_RESERVE": "0s", "DELEGATEE_BOARDING_MAX_WAIT": "-1s",
 		"DELEGATEE_ONCHAIN_POLL_INTERVAL": "0s",
-		"DELEGATEE_POLL_INTERVAL":         "0s", "DELEGATEE_RENEWAL_TIMEOUT": "-1s",
-		"DELEGATEE_MAX_DELEGATIONS":     "0",
-		"DELEGATEE_MAX_STREAM_CHILDREN": "-1",
-		"DELEGATEE_PUBLIC_RATE_LIMIT":   "NaN", "DELEGATEE_MAX_ONCHAIN_FEE_RATE": "0.5",
+		"DELEGATEE_RENEWAL_TIMEOUT":       "-1s",
+		"DELEGATEE_MAX_DELEGATIONS":       "0",
+		"DELEGATEE_MAX_STREAM_CHILDREN":   "-1",
+		"DELEGATEE_PUBLIC_RATE_LIMIT":     "NaN", "DELEGATEE_MAX_ONCHAIN_FEE_RATE": "0.5",
 		"DELEGATEE_ADMIN_AUTH": "maybe",
 	} {
 		t.Run(name+" semantic", func(t *testing.T) {

@@ -111,11 +111,22 @@ func (p *plan) submitAt(now time.Time) time.Time {
 	return p.batches[0].At
 }
 
+// nextScanDelay is how long a successful scan waits: until the next thing it knows of, retrying soon when something is off.
 func (s *service) nextScanDelay(now time.Time) time.Duration {
-	if !s.collectUntil.IsZero() {
-		return min(s.pollInterval, max(0, s.collectUntil.Sub(now)))
+	next := s.nextDue
+	for _, at := range []time.Time{s.collectUntil, s.earliestQuarantine(now)} {
+		if !at.IsZero() && (next.IsZero() || at.Before(next)) {
+			next = at
+		}
 	}
-	return s.pollInterval
+	delay := idleScanInterval
+	if (s.sub == nil && len(s.scripts) > 0) || (s.sub != nil && s.sub.dead.Load()) {
+		delay = retryScanDelay // without the subscription a coin waits for the scan
+	}
+	if !next.IsZero() {
+		delay = min(delay, max(0, next.Sub(now)))
+	}
+	return delay
 }
 
 func maxTime(a, b time.Time) time.Time {
