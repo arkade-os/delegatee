@@ -2,7 +2,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 BINARY = delegateed
 LDFLAGS := -s -w -X 'main.Version=$(VERSION)'
 
-.PHONY: build build-all clean test test-e2e lint fmt deps docker regtest-up regtest-run regtest-down run proto proto-lint pgsqlc pgmigrate
+.PHONY: build build-all clean test test-e2e lint lint-fix fmt deps docker regtest-up regtest-run regtest-down run proto proto-lint pgsqlc pgmigrate
 
 build:
 	go build -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/delegateed
@@ -29,6 +29,10 @@ test-e2e:
 lint:
 	golangci-lint run ./...
 	cd pkg/template && golangci-lint run ./...
+
+lint-fix:
+	golangci-lint run --fix ./...
+	cd pkg/template && golangci-lint run --fix ./...
 
 ## proto: regenerates api-spec/protobuf/gen and the openapi spec with buf (docker)
 proto: proto-lint
