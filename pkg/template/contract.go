@@ -56,7 +56,7 @@ func delegate(keys Keys) (*btcec.PublicKey, error) {
 	return keys.Delegate, nil
 }
 
- func covenantLookup(keys Keys, args map[string]value, name string) (value, error) {
+func covenantLookup(keys Keys, args map[string]value, name string) (value, error) {
 	if name != "DELEGATE_KEY" {
 		return keyField(args, name)
 	}
@@ -79,8 +79,8 @@ func tweak(c *contract, key *btcec.PublicKey, fn string) (value, error) {
 // buildTree checks the declared leaves against taptree when it is given, and takes the tree's leaves and key.
 func buildTree(def *Definition, args map[string]value, keys Keys, taptree []byte) (*contract, error) {
 	c := &contract{
-		covenants: map[string][]byte{}, 
-		proofs: map[[2]string]*psbt.TaprootTapLeafScript{},
+		covenants: map[string][]byte{},
+		proofs:    map[[2]string]*psbt.TaprootTapLeafScript{},
 	}
 
 	for _, fn := range def.Functions {
