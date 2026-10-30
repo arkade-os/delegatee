@@ -1,4 +1,4 @@
-package template
+package asm
 
 import (
 	"bytes"
@@ -12,42 +12,42 @@ import (
 
 func TestAssemble(t *testing.T) {
 	key := bytes.Repeat([]byte{0x11}, 32)
-	lookup := func(name string) (value, error) {
+	lookup := func(name string) (Value, error) {
 		switch name {
 		case "SERVER_KEY":
-			return value{"bytes32", key}, nil
+			return Value{Type: "bytes32", Raw: key}, nil
 		case "delay":
-			return value{"int", scriptNum(4194306)}, nil
+			return Value{Type: "int", Raw: ScriptNum(4194306)}, nil
 		case "zero":
-			return value{"int", nil}, nil
+			return Value{Type: "int", Raw: nil}, nil
 		case "empty":
-			return value{"bytes", nil}, nil
+			return Value{Type: "bytes", Raw: nil}, nil
 		case "one":
-			return value{"bool", []byte{1}}, nil
+			return Value{"bool", []byte{1}}, nil
 		case "nul":
-			return value{"bytes", []byte{0}}, nil
+			return Value{"bytes", []byte{0}}, nil
 		case "big":
-			return value{"bytes", make([]byte, 521)}, nil
+			return Value{Type: "bytes", Raw: make([]byte, 521)}, nil
 		case "badint":
-			return value{"int", []byte{0x80}}, nil
+			return Value{"int", []byte{0x80}}, nil
 		}
-		return value{}, fmt.Errorf("unknown %s", name)
+		return Value{}, fmt.Errorf("unknown %s", name)
 	}
 	want, err := txscript.NewScriptBuilder().
 		AddInt64(4194306).AddOp(txscript.OP_CHECKSEQUENCEVERIFY).AddOp(txscript.OP_DROP).
 		AddData(key).AddOp(txscript.OP_CHECKSIG).Script()
 	require.NoError(t, err)
-	got, err := assemble([]string{"<delay>", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<SERVER_KEY>", "OP_CHECKSIG"}, lookup)
+	got, err := Assemble([]string{"<delay>", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<SERVER_KEY>", "OP_CHECKSIG"}, lookup)
 	require.NoError(t, err)
 	require.Equal(t, want, got)
 
-	got, err = assemble([]string{"4194306", "0x74797065", "OP_INSPECTINTENTMESSAGE", "<zero>", "16", "17", "-1"}, lookup)
+	got, err = Assemble([]string{"4194306", "0x74797065", "OP_INSPECTINTENTMESSAGE", "<zero>", "16", "17", "-1"}, lookup)
 	require.NoError(t, err)
 	want, _ = txscript.NewScriptBuilder().AddInt64(4194306).AddData([]byte("type")).
 		AddOp(arkade.OP_INSPECTINTENTMESSAGE).AddInt64(0).AddInt64(16).AddInt64(17).AddInt64(-1).Script()
 	require.Equal(t, want, got)
 
-	got, err = assemble([]string{"0x05", "0x81", "<empty>", "<one>", "9007199254740991", "-9007199254740991"}, lookup)
+	got, err = Assemble([]string{"0x05", "0x81", "<empty>", "<one>", "9007199254740991", "-9007199254740991"}, lookup)
 	require.NoError(t, err)
 	want, _ = txscript.NewScriptBuilder().AddData([]byte{5}).AddData([]byte{0x81}).AddData(nil).
 		AddData([]byte{1}).AddInt64(1<<53 - 1).AddInt64(1 - 1<<53).Script()
@@ -56,15 +56,15 @@ func TestAssemble(t *testing.T) {
 	require.Equal(t, byte(txscript.OP_1NEGATE), got[1])
 
 	for _, tokens := range [][]string{{"0x00"}, {"<nul>"}} {
-		got, err = assemble(tokens, lookup)
+		got, err = Assemble(tokens, lookup)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0x01, 0x00}, got)
 	}
-	got, err = assemble([]string{"<empty>"}, lookup)
+	got, err = Assemble([]string{"<empty>"}, lookup)
 	require.NoError(t, err)
 	require.Equal(t, []byte{0x00}, got)
 
-	got, err = assemble(nil, lookup)
+	got, err = Assemble(nil, lookup)
 	require.NoError(t, err)
 	require.Empty(t, got)
 
@@ -76,7 +76,7 @@ func TestAssemble(t *testing.T) {
 		"long value": {"<big>"}, "bad int value": {"<badint>"}, "empty placeholder": {"<>"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := assemble(tokens, lookup)
+			_, err := Assemble(tokens, lookup)
 			require.Error(t, err)
 		})
 	}

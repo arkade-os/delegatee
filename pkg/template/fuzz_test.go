@@ -3,10 +3,12 @@ package template
 import (
 	"bytes"
 	"errors"
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/arkade-os/delegatee/pkg/template/internal/jcs"
 	"github.com/arkade-os/delegatee/pkg/template/packets"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
@@ -27,9 +29,9 @@ func FuzzParse(f *testing.F) {
 			requireSentinel(t, err, ErrInvalidTemplate, ErrInvalidArtifact, ErrUnsupported)
 			return
 		}
-		v, err := decodeStrict(doc)
+		v, err := jcs.Decode(doc)
 		require.NoError(t, err)
-		canon, err := canonical(v)
+		canon, err := jcs.Canonical(v)
 		require.NoError(t, err)
 		again, err := Parse(t.Context(), canon, resolve)
 		require.NoError(t, err)
@@ -51,7 +53,7 @@ func FuzzParseArtifact(f *testing.F) {
 			requireSentinel(t, err, ErrInvalidArtifact)
 			return
 		}
-		canon, err := canonical(a.Definition.json())
+		canon, err := jcs.Canonical(a.Definition.Canonical())
 		require.NoError(t, err)
 		again, err := ParseArtifact(canon)
 		require.NoError(t, err)
@@ -75,7 +77,7 @@ func FuzzEval(f *testing.F) {
 		}
 	}
 	f.Fuzz(func(t *testing.T, binding string, rawTx, v []byte) {
-		b, err := parseBinding(binding)
+		b, err := parseByteTemplate(binding)
 		if err != nil {
 			requireSentinel(t, err, ErrInvalidTemplate)
 			return
@@ -85,12 +87,12 @@ func FuzzEval(f *testing.F) {
 			return
 		}
 		for _, pc := range b {
-			if pc.expr == nil || checkExpression(pc.expr) != nil {
+			if pc.expr == nil || asm.CheckExpression(pc.expr) != nil {
 				continue
 			}
 			src := &Source{Outpoint: wire.OutPoint{Hash: tx.TxHash()}, Tx: tx, Amount: uint64(tx.TxOut[0].Value)}
 			d := newDraft(Intent, []*Source{src})
-			lookup := func(string) (value, error) { return value{"bytes", v}, nil }
+			lookup := func(string) (asm.Value, error) { return asm.Value{Type: "bytes", Raw: v}, nil }
 			if _, err := d.eval(pc.expr, 1, lookup); err != nil {
 				requireSentinel(t, err, ErrIneligible)
 			}

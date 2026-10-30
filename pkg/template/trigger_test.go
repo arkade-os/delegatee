@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 	"maps"
 	"testing"
 
@@ -92,12 +94,19 @@ func TestTriggerMinValue(t *testing.T) {
 	_, err = tr.Match(two, keys)
 	require.ErrorIs(t, err, ErrNoMatch)
 
-	for _, v := range []any{-1, 1.5, "1000", maxScriptNum + 1} {
+	for _, v := range []any{-1, "1000"} {
 		trig := baseTrigger()
 		trig["min_value"] = v
 		_, err := Parse(t.Context(), triggerDoc(t, trig), nil)
 		require.ErrorIs(t, err, ErrInvalidTemplate, v)
 		require.ErrorContains(t, err, "min_value", v)
+	}
+	// a fraction or an unsafe integer is refused by the decoder, before any field is read
+	for _, v := range []any{1.5, asm.MaxScriptNum + 1} {
+		trig := baseTrigger()
+		trig["min_value"] = v
+		_, err := Parse(t.Context(), triggerDoc(t, trig), nil)
+		require.ErrorIs(t, err, ErrInvalidTemplate, v)
 	}
 
 	zero := baseTrigger()
@@ -238,7 +247,7 @@ func streamed(t *testing.T, body []byte) (*psbt.Packet, []byte) {
 	t.Helper()
 	tree, err := txutils.TapTree([]string{serverLeaf(t), closureLeaf(t, testKey(t, 2))}).Encode()
 	require.NoError(t, err)
-	pkScript, err := taptreeScript(tree)
+	pkScript, err := contract.TaptreeScript(tree)
 	require.NoError(t, err)
 	tx := wire.NewMsgTx(3)
 	tx.AddTxIn(&wire.TxIn{})
@@ -257,7 +266,7 @@ func streamed(t *testing.T, body []byte) (*psbt.Packet, []byte) {
 
 func pushScript(t *testing.T, to []byte) []byte {
 	t.Helper()
-	s, err := assemble([]string{"OP_DUP", "<to>", "OP_EQUAL"}, func(string) (value, error) { return value{"bytes", to}, nil })
+	s, err := asm.Assemble([]string{"OP_DUP", "<to>", "OP_EQUAL"}, func(string) (asm.Value, error) { return asm.Value{Type: "bytes", Raw: to}, nil })
 	require.NoError(t, err)
 	return s
 }

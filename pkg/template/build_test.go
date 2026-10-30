@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 	"testing"
 	"time"
 
@@ -168,7 +170,7 @@ func TestBuildWitnessAndArguments(t *testing.T) {
 	require.Equal(t, wire.TxWitness{preimage}, w[0])
 	emu, err := arkade.FindEmulatorPacket(act.Tx.UnsignedTx)
 	require.NoError(t, err)
-	require.Equal(t, wire.TxWitness{preimage, scriptNum(7)}, emu[0].Witness, "covenant inputs reversed: the first on top")
+	require.Equal(t, wire.TxWitness{preimage, asm.ScriptNum(7)}, emu[0].Witness, "covenant inputs reversed: the first on top")
 }
 
 func TestBuildConditionWitnessOrder(t *testing.T) {
@@ -255,9 +257,9 @@ func TestBuildOutputScripts(t *testing.T) {
 	inst, _, src := instanceOf(t, doc, coin(t, 100_000))
 	act, err := inst.Build(t.Context(), src, Fee{Dust: 330})
 	require.NoError(t, err)
-	want, err := build(inst.tmpl.inputs[0].contract.def, map[string]value{"owner": {"pubkey", other}}, testKeys(t))
+	want, err := contract.Build(inst.tmpl.inputs[0].contract.def, map[string]asm.Value{"owner": {Type: "pubkey", Raw: other}}, testKeys(t), nil)
 	require.NoError(t, err)
-	require.Equal(t, want.pkScript, act.Tx.UnsignedTx.TxOut[0].PkScript)
+	require.Equal(t, want.PkScript, act.Tx.UnsignedTx.TxOut[0].PkScript)
 
 	for script, wantErr := range map[string]bool{
 		"0014" + hex.EncodeToString(bytes.Repeat([]byte{1}, 20)):            true,
@@ -362,7 +364,7 @@ func TestBuildErrorsHidePlaintext(t *testing.T) {
 		plain []byte
 		edit  func(outs []any)
 	}{
-		"amount": {"int", scriptNum(-123456789), func(outs []any) {
+		"amount": {"int", asm.ScriptNum(-123456789), func(outs []any) {
 			outs[1].(map[string]any)["value"].(map[string]any)["amount"] = "<s>"
 		}},
 		"offchain script": {"bytes", bytes.Repeat([]byte{0xab}, 31), func(outs []any) {
@@ -382,9 +384,9 @@ func TestBuildErrorsHidePlaintext(t *testing.T) {
 			})
 			tmpl := parseDoc(t, doc)
 			src := coin(t, 100_000)
-			ct, err := build(tmpl.inputs[0].contract.def, map[string]value{"owner": {"pubkey", testKey(t, 2).SerializeCompressed()}}, testKeys(t))
+			ct, err := contract.Build(tmpl.inputs[0].contract.def, map[string]asm.Value{"owner": {Type: "pubkey", Raw: testKey(t, 2).SerializeCompressed()}}, testKeys(t), nil)
 			require.NoError(t, err)
-			lockTo(src, ct.pkScript)
+			lockTo(src, ct.PkScript)
 			inst, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t), Sources: []*Source{src},
 				Decrypt: func([]byte) ([]byte, error) { return c.plain, nil }})
 			require.NoError(t, err)

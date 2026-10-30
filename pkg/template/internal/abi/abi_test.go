@@ -1,6 +1,7 @@
-package template
+package abi
 
 import (
+	"encoding/json"
 	"os"
 	"strconv"
 	"strings"
@@ -10,26 +11,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseArtifact(t *testing.T) {
-	doc, err := os.ReadFile("testdata/artifacts/single_sig.compiler.json")
+func TestParse(t *testing.T) {
+	doc, err := os.ReadFile("../../testdata/artifacts/single_sig.compiler.json")
 	require.NoError(t, err)
-	a, err := ParseArtifact(doc)
-	require.ErrorIs(t, err, ErrInvalidArtifact, "a covenant input of type signature cannot be bound")
+	a, err := Parse(doc)
+	require.ErrorIs(t, err, ErrInvalid, "a covenant input of type signature cannot be bound")
 	require.Nil(t, a)
 
 	bare := `{"contractName":"Exit","constructorInputs":[{"name":"user","type":"pubkey"},{"name":"exit","type":"int"}],
 	  "functions":[{"name":"unilateral","leaves":[{"name":"unilateral",
 	  "witness":[{"name":"userSig","type":"signature","encoding":"schnorr-64"}],
 	  "asm":["<exit>","OP_CHECKSEQUENCEVERIFY","OP_DROP","<user>","OP_CHECKSIG"]}]}]}`
-	a, err = ParseArtifact([]byte(bare))
+	a, err = Parse([]byte(bare))
 	require.NoError(t, err)
 	require.Equal(t, "Exit", a.Definition.ContractName)
 	require.Empty(t, a.Definition.Structs)
 
-	withMetadata := strings.Replace(bare, `{"contractName"`, `{"formatVersion":1,"compiler":{"name":"arkade-compiler","version":"0.1.0"},"updatedAt":"2026-07-08T00:00:00Z","structs":[],"contractName"`, 1)
-	b, err := ParseArtifact([]byte(withMetadata))
+	withMetadata := strings.Replace(bare, `{"contractName"`, `{"formatVersion":1.5,"compiler":{"name":"arkade-compiler","version":0.3},"updatedAt":"2026-07-08T00:00:00Z","structs":[],"contractName"`, 1)
+	b, err := Parse([]byte(withMetadata))
 	require.NoError(t, err)
-	require.Equal(t, a.ID, b.ID, "metadata and an explicit empty structs do not change the id")
+	require.Equal(t, a.ID, b.ID, "metadata, whatever it holds, and an explicit empty structs do not change the id")
 	require.Len(t, a.ID, 64)
 }
 
@@ -40,13 +41,13 @@ func TestParseArtifactCovenant(t *testing.T) {
 		"leaves":[{"name":"l","witness":[{"name":"s","type":"signature","encoding":"schnorr-64","injected":true}],
 		"asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","<EMULATOR_KEY:f>","OP_CHECKSIG"]}]}]}`
 	}
-	a, err := ParseArtifact([]byte(doc(`"<k>","OP_CHECKSIG"`)))
+	a, err := Parse([]byte(doc(`"<k>","OP_CHECKSIG"`)))
 	require.NoError(t, err)
 	require.NotNil(t, a.Definition.Functions[0].Arkade)
-	require.Equal(t, "f", a.Definition.json()["functions"].([]any)[0].(map[string]any)["name"])
+	require.Equal(t, "f", a.Definition.Canonical()["functions"].([]any)[0].(map[string]any)["name"])
 
-	_, err = ParseArtifact([]byte(doc(`"<amount>","OP_DROP"`)))
-	require.ErrorIs(t, err, ErrInvalidArtifact, "covenant inputs are never placeholders")
+	_, err = Parse([]byte(doc(`"<amount>","OP_DROP"`)))
+	require.ErrorIs(t, err, ErrInvalid, "covenant inputs are never placeholders")
 }
 
 func TestParseArtifactRejects(t *testing.T) {
@@ -73,8 +74,8 @@ func TestParseArtifactRejects(t *testing.T) {
 		"duplicate witness name":           `{"contractName":"C","constructorInputs":[],"functions":[{"name":"f","leaves":[{"name":"l","witness":[{"name":"w","type":"int","encoding":"raw"},{"name":"w","type":"int","encoding":"raw"}],"asm":["OP_1"]}]}]}`,
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := ParseArtifact([]byte(doc))
-			require.ErrorIs(t, err, ErrInvalidArtifact)
+			_, err := Parse([]byte(doc))
+			require.ErrorIs(t, err, ErrInvalid)
 		})
 	}
 }
@@ -150,8 +151,8 @@ func TestArtifactUnknownFieldAtEachLevel(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			doc := edited(t, []byte(idDoc), func(m map[string]any) { get(m)["extra"] = 1 })
-			_, err := ParseArtifact(doc)
-			require.ErrorIs(t, err, ErrInvalidArtifact)
+			_, err := Parse(doc)
+			require.ErrorIs(t, err, ErrInvalid)
 		})
 	}
 }
@@ -168,21 +169,21 @@ func TestArtifactPlaceholders(t *testing.T) {
 	} {
 		t.Run(tok, func(t *testing.T) {
 			doc := edited(t, []byte(idDoc), func(m map[string]any) { leafOf(m, 1)["asm"] = []any{tok, "OP_CHECKSIG"} })
-			_, err := ParseArtifact(doc)
+			_, err := Parse(doc)
 			if ok {
 				require.NoError(t, err)
 			} else {
-				require.ErrorIs(t, err, ErrInvalidArtifact)
+				require.ErrorIs(t, err, ErrInvalid)
 			}
 		})
 	}
 	doc := edited(t, []byte(idDoc), func(m map[string]any) {
 		leafOf(m, 1)["asm"] = []any{"9007199254740991", "-9007199254740991", "OP_DROP"}
 	})
-	_, err := ParseArtifact(doc)
+	_, err := Parse(doc)
 	require.NoError(t, err)
 	doc = edited(t, []byte(idDoc), func(m map[string]any) { leafOf(m, 1)["asm"] = []any{"0", "OP_DROP"} })
-	_, err = ParseArtifact(doc)
+	_, err = Parse(doc)
 	require.NoError(t, err, "zero is a valid decimal")
 }
 
@@ -202,8 +203,8 @@ func TestArtifactTypes(t *testing.T) {
 				fnOf(m, 1)["leaves"].([]any)[0].(map[string]any)["asm"] = []any{"OP_1"}
 				fnOf(m, 0)["arkade"].(map[string]any)["asm"] = []any{"OP_1"}
 			})
-			_, err := ParseArtifact(doc)
-			require.ErrorIs(t, err, ErrInvalidArtifact)
+			_, err := Parse(doc)
+			require.ErrorIs(t, err, ErrInvalid)
 		})
 	}
 }
@@ -213,7 +214,7 @@ func TestFlatConstructor(t *testing.T) {
 		Structs:           []Struct{{Name: "Policy", Fields: []Field{{"owner", "pubkey"}, {"limit", "int"}}}},
 		ConstructorInputs: []Field{{"owners", "pubkey[2]"}, {"policy", "Policy"}, {"h", "bytes32"}},
 	}
-	got, err := d.flatConstructor()
+	got, err := d.FlatConstructor()
 	require.NoError(t, err)
 	require.Equal(t, []Field{{"owners.0", "pubkey"}, {"owners.1", "pubkey"}, {"policy.owner", "pubkey"}, {"policy.limit", "int"}, {"h", "bytes32"}}, got)
 }
@@ -235,13 +236,13 @@ func TestFlatConstructorCap(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require.Less(t, len(doc), 4096)
 			start := time.Now()
-			_, err := ParseArtifact(doc)
-			require.ErrorIs(t, err, ErrInvalidArtifact)
+			_, err := Parse(doc)
+			require.ErrorIs(t, err, ErrInvalid)
 			require.Less(t, time.Since(start), time.Second)
 		})
 	}
 
-	_, err := ParseArtifact(nested(0, `{"name":"a","type":"bytes[1024]"}`))
+	_, err := Parse(nested(0, `{"name":"a","type":"bytes[1024]"}`))
 	require.NoError(t, err, "one full array fits")
 }
 
@@ -255,7 +256,7 @@ const idDoc = `{"contractName":"C","constructorInputs":[{"name":"k","type":"pubk
 
 func mustID(t *testing.T, doc []byte) string {
 	t.Helper()
-	a, err := ParseArtifact(doc)
+	a, err := Parse(doc)
 	require.NoError(t, err)
 	return a.ID
 }
@@ -275,11 +276,21 @@ func TestParseArtifactArrayInput(t *testing.T) {
 		"leaves":[{"name":"l","witness":[{"name":"s","type":"signature","encoding":"schnorr-64","injected":true}],
 		"asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","<EMULATOR_KEY:f>","OP_CHECKSIG"]}]}]}`
 	}
-	a, err := ParseArtifact([]byte(doc("bytes[3]")))
+	a, err := Parse([]byte(doc("bytes[3]")))
 	require.NoError(t, err)
 	require.Equal(t, "bytes[3]", a.Definition.Functions[0].Arkade.Inputs[0].Type)
 	for _, typ := range []string{"float[3]", "bytes[0]", "bytes[]", "bytes[3][2]", "signature[3]"} {
-		_, err := ParseArtifact([]byte(doc(typ)))
-		require.ErrorIs(t, err, ErrInvalidArtifact, typ)
+		_, err := Parse([]byte(doc(typ)))
+		require.ErrorIs(t, err, ErrInvalid, typ)
 	}
+}
+
+func edited(t *testing.T, doc []byte, edit func(map[string]any)) []byte {
+	t.Helper()
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(doc, &m))
+	edit(m)
+	out, err := json.Marshal(m)
+	require.NoError(t, err)
+	return out
 }

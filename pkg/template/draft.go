@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 	"github.com/arkade-os/emulator/pkg/arkade"
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
@@ -38,18 +38,6 @@ type draft struct {
 	secrets map[string][]byte // plaintexts opened for this draft
 }
 
-var (
-	forbiddenPrefixes = []string{"OP_INSPECTOUTPUT", "OP_INSPECTOUTASSET", "OP_INSPECTASSETGROUP", "OP_INSPECTINPUTARKADE", "OP_INSPECTINASSET"}
-	forbiddenOps      = []string{
-		"OP_INSPECTNUMOUTPUTS", "OP_TUNNEL", "OP_INSPECTPACKET", "OP_INSPECTNUMASSETGROUPS", "OP_FINDASSETGROUPBYASSETID",
-		"OP_INSPECTINTENTMESSAGE", "OP_TXID", "OP_TXWEIGHT", "OP_SIGHASH", "OP_CHECKSIG", "OP_CHECKSIGVERIFY", "OP_CHECKSIGADD",
-	}
-	contextOps = []string{
-		"OP_PUSHCURRENTINPUTINDEX", "OP_PUSHEXPIRY", "OP_CHECKTIME", "OP_INSPECTVERSION", "OP_INSPECTLOCKTIME", "OP_INSPECTNUMINPUTS",
-		"OP_CHECKLOCKTIMEVERIFY", "OP_NOP2", "OP_CHECKSEQUENCEVERIFY", "OP_NOP3",
-	}
-)
-
 func newDraft(typ Type, sources []*Source) *draft {
 	version := int32(2)
 	if typ == Offchain {
@@ -76,8 +64,8 @@ func (d *draft) index(slot int) int {
 	return slot
 }
 
-func (d *draft) eval(tokens []string, input int, lookup func(string) (value, error)) ([]byte, error) {
-	script, err := assemble(tokens, lookup)
+func (d *draft) eval(tokens []string, input int, lookup asm.Lookup) ([]byte, error) {
+	script, err := asm.Assemble(tokens, lookup)
 	if err != nil {
 		return nil, fmt.Errorf("%w: expression: %v", ErrIneligible, err)
 	}
@@ -168,39 +156,4 @@ func pkScript(s *Source) []byte {
 		return nil
 	}
 	return s.Tx.TxOut[s.Outpoint.Index].PkScript
-}
-
-// contextFree reports whether tokens read neither the draft, a source, an expiry, nor the clock.
-func contextFree(tokens []string) bool {
-	return !slices.ContainsFunc(tokens, func(tok string) bool {
-		return forbidden(tok) || strings.HasPrefix(tok, "OP_INSPECTINPUT") || slices.Contains(contextOps, tok)
-	})
-}
-
-// checkExpression refuses opcodes observing the transaction being built or exceeding the emulator's compute limits.
-func checkExpression(tokens []string) error {
-	if i := slices.IndexFunc(tokens, forbidden); i >= 0 {
-		return fmt.Errorf("%w: expression: forbidden opcode %s", ErrInvalidTemplate, tokens[i])
-	}
-	// script has no loops: counting every occurrence bounds execution
-	limits := arkade.DefaultComputeLimits()
-	counts := map[byte]int{}
-	for _, tok := range tokens {
-		if decimalTok.MatchString(tok) || hexTok.MatchString(tok) || placeholder.MatchString(tok) {
-			continue
-		}
-		op, err := opcode(tok)
-		if err != nil {
-			return fmt.Errorf("%w: expression: %v", ErrInvalidTemplate, err)
-		}
-		counts[op]++
-		if limit, ok := limits[op]; ok && counts[op] > limit {
-			return fmt.Errorf("%w: expression: %s exceeds its limit of %d", ErrInvalidTemplate, tok, limit)
-		}
-	}
-	return nil
-}
-
-func forbidden(tok string) bool {
-	return slices.Contains(forbiddenOps, tok) || slices.ContainsFunc(forbiddenPrefixes, func(p string) bool { return strings.HasPrefix(tok, p) })
 }

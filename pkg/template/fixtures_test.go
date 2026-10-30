@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 	"os"
 	"path/filepath"
 	"slices"
@@ -46,13 +48,13 @@ func TestDefaults(t *testing.T) {
 	renewal := parseFixture(t, "renewal.json")
 	require.Equal(t, Intent, renewal.Type())
 	require.Equal(t, []Slot{{Name: "funds"}}, renewal.Inputs())
-	require.Equal(t, []Field{{"exit_delay", "int"}, {"max_fee", "int"}, {"owner", "pubkey"}, {"renewal_window", "int"}}, renewal.Variables())
+	require.Equal(t, []Field{{Name: "exit_delay", Type: "int"}, {Name: "max_fee", Type: "int"}, {Name: "owner", Type: "pubkey"}, {Name: "renewal_window", Type: "int"}}, renewal.Variables())
 	require.True(t, renewal.ContextFree())
 
 	boarding := parseFixture(t, "boarding.json")
 	require.Equal(t, []Slot{{Name: "deposit", Onchain: true, Schedule: Schedule{MinConfirmations: 1}}}, boarding.Inputs())
 	require.Equal(t, []Field{
-		{"boarding_exit_delay", "int"}, {"exit_delay", "int"}, {"max_fee", "int"}, {"owner", "pubkey"}, {"renewal_window", "int"},
+		{Name: "boarding_exit_delay", Type: "int"}, {Name: "exit_delay", Type: "int"}, {Name: "max_fee", Type: "int"}, {Name: "owner", Type: "pubkey"}, {Name: "renewal_window", Type: "int"},
 	}, boarding.Variables())
 	require.True(t, boarding.ContextFree())
 	require.Equal(t, renewal.Artifacts(), boarding.Artifacts(), "one DelegatedVtxo definition")
@@ -121,10 +123,10 @@ func TestRenewalDueAt(t *testing.T) {
 func TestRenewalVariableRanges(t *testing.T) {
 	renewal := parseFixture(t, "renewal.json")
 	for name, edit := range map[string]func(map[string][]byte){
-		"zero window":     func(v map[string][]byte) { v["renewal_window"] = scriptNum(0) },
-		"negative window": func(v map[string][]byte) { v["renewal_window"] = scriptNum(-1) },
-		"huge window":     func(v map[string][]byte) { v["renewal_window"] = scriptNum(1 << 32) },
-		"negative fee":    func(v map[string][]byte) { v["max_fee"] = scriptNum(-1) },
+		"zero window":     func(v map[string][]byte) { v["renewal_window"] = asm.ScriptNum(0) },
+		"negative window": func(v map[string][]byte) { v["renewal_window"] = asm.ScriptNum(-1) },
+		"huge window":     func(v map[string][]byte) { v["renewal_window"] = asm.ScriptNum(1 << 32) },
+		"negative fee":    func(v map[string][]byte) { v["max_fee"] = asm.ScriptNum(-1) },
 	} {
 		vars := defaultParams(t).vars(t)
 		edit(vars)
@@ -337,7 +339,7 @@ func TestNonInteractiveClaimTrigger(t *testing.T) {
 	require.NoError(t, err)
 	program, err := hex.DecodeString(v.ReceiverProgram)
 	require.NoError(t, err)
-	cov, err := assemble(nonInteractiveClaimCovenant, func(string) (value, error) { return value{"bytes32", program}, nil })
+	cov, err := asm.Assemble(nonInteractiveClaimCovenant, func(string) (asm.Value, error) { return asm.Value{Type: "bytes32", Raw: program}, nil })
 	require.NoError(t, err)
 	tree, err := txutils.TapTree(v.Tapscripts).Encode()
 	require.NoError(t, err)
@@ -363,9 +365,9 @@ func TestCounterSeedCovenant(t *testing.T) {
 	counter := parseFixture(t, "counter.json")
 	var programs [][]byte
 	for i := range counter.inputs {
-		c, err := build(counter.inputs[i].contract.def, nil, keys)
+		c, err := contract.Build(counter.inputs[i].contract.def, nil, keys, nil)
 		require.NoError(t, err)
-		programs = append(programs, c.pkScript[2:])
+		programs = append(programs, c.PkScript[2:])
 	}
 	vars := map[string][]byte{"counter_program": programs[0], "reserve_program": programs[1]}
 	seed := parseFixture(t, "counter_seed.json")
@@ -422,8 +424,8 @@ func (p renewalParams) vars(t *testing.T) map[string][]byte {
 	seq, err := arklib.BIP68Sequence(p.exit)
 	require.NoError(t, err)
 	return map[string][]byte{
-		"owner": p.owner.SerializeCompressed(), "exit_delay": scriptNum(int64(seq)),
-		"renewal_window": scriptNum(p.window), "max_fee": scriptNum(p.maxFee),
+		"owner": p.owner.SerializeCompressed(), "exit_delay": asm.ScriptNum(int64(seq)),
+		"renewal_window": asm.ScriptNum(p.window), "max_fee": asm.ScriptNum(p.maxFee),
 	}
 }
 
@@ -506,9 +508,9 @@ func instantiateBound(t *testing.T, tmpl *Template, counter uint64) boundInstanc
 	tx := wire.NewMsgTx(3)
 	tx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Index: 1}})
 	for _, in := range tmpl.inputs {
-		c, err := build(in.contract.def, nil, keys)
+		c, err := contract.Build(in.contract.def, nil, keys, nil)
 		require.NoError(t, err)
-		tx.AddTxOut(wire.NewTxOut(100_000, c.pkScript))
+		tx.AddTxOut(wire.NewTxOut(100_000, c.PkScript))
 	}
 	ext, err := extension.Extension{
 		packets.Raw(packets.TypeState, binary.LittleEndian.AppendUint64(nil, counter)),
@@ -558,7 +560,7 @@ func boarded(t *testing.T) boundInstance {
 	t.Helper()
 	keys := testKeys(t)
 	vars := defaultParams(t).vars(t)
-	vars["boarding_exit_delay"] = scriptNum(1<<22 | 2) // 1024 seconds, in BIP 68
+	vars["boarding_exit_delay"] = asm.ScriptNum(1<<22 | 2) // 1024 seconds, in BIP 68
 	boarding := parseFixture(t, "boarding.json")
 	watch, err := boarding.Instantiate(t.Context(), Context{Keys: keys, Variables: vars})
 	require.NoError(t, err)
@@ -798,7 +800,7 @@ func instantiateNonInteractiveClaim(t *testing.T, v vhtlcVec, leaves []string, s
 	})
 }
 
-// nonInteractiveClaimCovenant is covclaimd's EnforcePayTo with the program as a placeholder.
+// nonInteractiveClaimCovenant is covclaimd's EnforcePayTo with the program as a asm.Placeholder.
 var nonInteractiveClaimCovenant = []string{
 	"OP_PUSHCURRENTINPUTINDEX", "OP_DUP", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "1", "OP_EQUALVERIFY", "<p>",
 	"OP_EQUALVERIFY", "OP_INSPECTOUTPUTVALUE", "OP_PUSHCURRENTINPUTINDEX", "OP_INSPECTINPUTVALUE", "OP_GREATERTHANOREQUAL",

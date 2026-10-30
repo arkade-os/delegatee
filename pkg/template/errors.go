@@ -1,12 +1,17 @@
 package template
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
+	"github.com/arkade-os/delegatee/pkg/template/internal/schema"
+)
 
 var (
 	// ErrInvalidArtifact marks a malformed compiler artifact.
-	ErrInvalidArtifact = errors.New("invalid artifact")
+	ErrInvalidArtifact = abi.ErrInvalid
 	// ErrInvalidTemplate marks a malformed template document.
-	ErrInvalidTemplate = errors.New("invalid template")
+	ErrInvalidTemplate = schema.ErrInvalid
 	// ErrUnsupported marks a valid template that this package cannot run in the requested mode.
 	ErrUnsupported = errors.New("unsupported")
 	// ErrInvalidVariables marks variables missing, extra or not in the canonical encoding of their type.

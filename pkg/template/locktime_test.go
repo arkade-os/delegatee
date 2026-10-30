@@ -1,6 +1,7 @@
 package template
 
 import (
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 	"maps"
 	"testing"
 	"time"
@@ -69,11 +70,11 @@ func TestInstantiateRefusesMixedLocktimes(t *testing.T) {
 		return []*Source{a, b}
 	}
 	c := releaseContext(t, 200)
-	c.Variables["lock2"], c.Sources = scriptNum(300), sources(200, 300)
+	c.Variables["lock2"], c.Sources = asm.ScriptNum(300), sources(200, 300)
 	_, err := tmpl.Instantiate(t.Context(), c)
 	require.NoError(t, err, "two heights")
 
-	c.Variables["lock2"], c.Sources = scriptNum(1_800_000_000), sources(200, 1_800_000_000)
+	c.Variables["lock2"], c.Sources = asm.ScriptNum(1_800_000_000), sources(200, 1_800_000_000)
 	_, err = tmpl.Instantiate(t.Context(), c)
 	require.ErrorIs(t, err, ErrUnsupported)
 	require.ErrorContains(t, err, "mix block heights and timestamps")
@@ -138,7 +139,7 @@ const releaseDoc = `{
 func releaseContext(t *testing.T, lock int64) Context {
 	t.Helper()
 	return Context{Keys: testKeys(t), Variables: map[string][]byte{
-		"owner": testKey(t, 2).SerializeCompressed(), "lock": scriptNum(lock), "dest": schnorr.SerializePubKey(testKey(t, 4)),
+		"owner": testKey(t, 2).SerializeCompressed(), "lock": asm.ScriptNum(lock), "dest": schnorr.SerializePubKey(testKey(t, 4)),
 	}}
 }
 

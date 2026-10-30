@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 	"github.com/arkade-os/delegatee/pkg/template/packets"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/psbt/v2"
@@ -79,107 +81,61 @@ func (tr *Trigger) Bound() []string {
 	return out
 }
 
-func (p *parser) trigger(m map[string]any) error {
-	raw, ok := m["trigger"]
-	if !ok {
+func (c *compiler) trigger() error {
+	s := c.doc.Trigger
+	if s == nil {
 		return nil
 	}
-	tm, err := object(ErrInvalidTemplate, raw, "trigger", []string{"packet", "decode", "bind", "expires_after_seconds"}, "require", "min_value")
-	if err != nil {
-		return err
-	}
-	if len(p.t.inputs) != 1 || p.t.inputs[0].onchain {
+	if len(c.t.inputs) != 1 || c.t.inputs[0].onchain {
 		return bad("a trigger template has one offchain input")
 	}
-	if !p.t.ContextFree() {
+	if !c.t.ContextFree() {
 		return bad("a trigger template is watched: its contract must not depend on a source")
 	}
-	pkt, err := integer(tm["packet"], "trigger packet", 0, math.MaxUint8)
-	if err != nil {
-		return err
-	}
-	tr := &Trigger{packet: uint8(pkt)}
-	switch tm["decode"] {
-	case "raw":
-		tr.raw = true
-	case "tlv":
-	default:
-		return bad("trigger decode must be tlv or raw")
-	}
-	ttl, err := integer(tm["expires_after_seconds"], "expires_after_seconds", 1, math.MaxInt32)
-	if err != nil {
-		return err
-	}
-	tr.ttl = time.Duration(ttl) * time.Second
-	if raw, ok := tm["min_value"]; ok {
-		if tr.minValue, err = integer(raw, "trigger min_value", 0, maxScriptNum); err != nil {
-			return err
-		}
-		if tr.minValue == 0 {
-			delete(tm, "min_value")
-		}
-	}
-	req, err := dict(tm, "require")
-	if err != nil {
-		return err
-	}
-	for _, src := range slices.Sorted(maps.Keys(req)) {
+	tr := &Trigger{packet: uint8(s.Packet), raw: s.Decode == "raw", ttl: time.Duration(s.ExpiresAfter) * time.Second, minValue: s.MinValue}
+	for _, src := range slices.Sorted(maps.Keys(s.Require)) {
 		if err := tr.checkSource(src, false); err != nil {
 			return err
 		}
-		s, _ := req[src].(string)
+		lit := s.Require[src]
 		r := requirement{source: src}
-		key := placeholder.FindStringSubmatch(s)
+		key := asm.Placeholder.FindStringSubmatch(lit)
 		switch {
 		case key != nil && daemonKeys[key[1]] != nil:
 			r.key = key[1]
-		case hexTok.MatchString(s):
-			r.lit, _ = hex.DecodeString(s[2:])
+		case asm.HexTok.MatchString(lit):
+			r.lit, _ = hex.DecodeString(lit[2:])
 		default:
-			return bad("trigger require %q: want a 0x literal or a daemon key, got %v", src, req[src])
+			return bad("trigger require %q: want a 0x literal or a daemon key, got %q", src, lit)
 		}
 		tr.require = append(tr.require, r)
 	}
-	binds, err := dict(tm, "bind")
-	if err != nil {
-		return err
-	}
-	if len(binds) == 0 {
-		return bad("a trigger binds at least one variable")
-	}
-	for _, name := range slices.Sorted(maps.Keys(binds)) {
-		typ, ok := p.t.variables[name]
+	for _, name := range slices.Sorted(maps.Keys(s.Bind)) {
+		typ, ok := c.t.variables[name]
 		if !ok {
 			return bad("trigger binds undeclared variable %q", name)
 		}
-		c := capture{variable: name, typ: typ}
-		switch b := binds[name].(type) {
-		case string:
-			c.source = b
-		case map[string]any:
-			bm, err := object(ErrInvalidTemplate, b, "trigger capture", []string{"from", "asm"})
-			if err != nil {
+		b := s.Bind[name]
+		cp := capture{variable: name, typ: typ, source: b.Source}
+		if b.Asm != nil {
+			cp.source = b.From
+			var err error
+			if cp.asm, err = capturePattern(b.Asm, name); err != nil {
 				return err
 			}
-			c.source, _ = bm["from"].(string)
-			if c.asm, err = capturePattern(bm["asm"], name); err != nil {
-				return err
+			if typ == "bool" || typ == "int" {
+				return bad("trigger capture of %q: a %s is not captured from a data push", name, typ)
 			}
-		default:
-			return bad("trigger bind %q is neither a source nor a capture", name)
 		}
-		if c.asm != nil && (typ == "bool" || typ == "int") {
-			return bad("trigger capture of %q: a %s is not captured from a data push", name, typ)
-		}
-		if err := tr.checkSource(c.source, c.asm == nil); err != nil {
+		if err := tr.checkSource(cp.source, cp.asm == nil); err != nil {
 			return err
 		}
-		if c.source == outputTaptree && typ != "bytes" {
+		if cp.source == outputTaptree && typ != "bytes" {
 			return bad("trigger binds a taptree to %s variable %q", typ, name)
 		}
-		tr.binds = append(tr.binds, c)
+		tr.binds = append(tr.binds, cp)
 	}
-	p.t.trigger = tr
+	c.t.trigger = tr
 	return nil
 }
 
@@ -196,32 +152,26 @@ func (tr *Trigger) checkSource(src string, output bool) error {
 	return bad("trigger source %q does not fit this trigger", src)
 }
 
-func noNames(string) (value, error) {
-	return value{}, errors.New("a pattern names only its own variable")
+func noNames(string) (asm.Value, error) {
+	return asm.Value{}, errors.New("a pattern names only its own variable")
 }
 
-func capturePattern(v any, name string) ([]string, error) {
-	l, ok := v.([]any)
-	if !ok || len(l) == 0 {
-		return nil, bad("trigger capture of %q needs an asm token list", name)
-	}
-	toks := make([]string, len(l))
+// capturePattern checks a pattern assembles token by token and names its variable exactly once.
+func capturePattern(toks []string, name string) ([]string, error) {
 	seen := 0
-	for i, x := range l {
-		s, _ := x.(string)
-		toks[i] = s
+	for _, s := range toks {
 		if s == "<"+name+">" {
 			seen++
 			continue
 		}
-		if _, err := assemble([]string{s}, noNames); err != nil {
+		if _, err := asm.Assemble([]string{s}, noNames); err != nil {
 			return nil, bad("trigger capture of %q: %v", name, err)
 		}
 	}
 	if seen != 1 {
 		return nil, bad("trigger capture of %q names it %d times", name, seen)
 	}
-	return toks, nil
+	return slices.Clone(toks), nil
 }
 
 // Match returns a binding per output of tx that may be the coin; the caller checks the template locks it.
@@ -259,7 +209,7 @@ func (tr *Trigger) Match(tx *psbt.Packet, keys TriggerKeys) ([]Binding, error) {
 			got, err = capturePush(got, c.asm, c.variable)
 		}
 		if err == nil {
-			err = canonicalBytes(c.typ, got)
+			err = asm.CanonicalBytes(c.typ, got)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s: %v", ErrNoMatch, c.variable, err)
@@ -280,7 +230,7 @@ func (tr *Trigger) Match(tx *psbt.Packet, keys TriggerKeys) ([]Binding, error) {
 			if len(raw) == 0 {
 				continue
 			}
-			if s, err := taptreeScript(raw); err != nil || !bytes.Equal(s, o.PkScript) {
+			if s, err := contract.TaptreeScript(raw); err != nil || !bytes.Equal(s, o.PkScript) {
 				continue
 			}
 			v[tree] = hex.EncodeToString(raw)
@@ -345,7 +295,7 @@ func capturePush(script []byte, pattern []string, name string) ([]byte, error) {
 			captured = tok.Data()
 			continue
 		}
-		want, _ := assemble([]string{p}, noNames) // checked when parsed
+		want, _ := asm.Assemble([]string{p}, noNames) // checked when parsed
 		if !bytes.Equal(got, want) {
 			return nil, fmt.Errorf("token %s differs", p)
 		}

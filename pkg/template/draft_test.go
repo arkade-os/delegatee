@@ -3,6 +3,7 @@ package template
 import (
 	"bytes"
 	"encoding/hex"
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 	"strings"
 	"testing"
 
@@ -54,13 +55,13 @@ func TestEvalPlaceholderAndIntrospection(t *testing.T) {
 	src := sourceWith(t, 100_000)
 	d := newDraft(Offchain, []*Source{src})
 	preimage := bytes.Repeat([]byte{7}, 32)
-	got, err := d.eval([]string{"<preimage>", "OP_HASH160"}, 0, func(string) (value, error) { return value{"bytes32", preimage}, nil })
+	got, err := d.eval([]string{"<preimage>", "OP_HASH160"}, 0, func(string) (asm.Value, error) { return asm.Value{Type: "bytes32", Raw: preimage}, nil })
 	require.NoError(t, err)
 	require.Equal(t, address.Hash160(preimage), got)
 
 	got, err = d.eval([]string{"OP_PUSHCURRENTINPUTINDEX", "OP_INSPECTINPUTVALUE"}, 0, nil)
 	require.NoError(t, err)
-	require.Equal(t, scriptNum(100_000), got)
+	require.Equal(t, asm.ScriptNum(100_000), got)
 }
 
 func TestEvalIntentMessageInput(t *testing.T) {
@@ -110,7 +111,7 @@ func TestEvalWithoutTx(t *testing.T) {
 	d := newDraft(Offchain, []*Source{src})
 	got, err := d.eval(strings.Fields("0 OP_INSPECTINPUTVALUE"), 0, nil)
 	require.NoError(t, err)
-	require.Equal(t, scriptNum(100_000), got)
+	require.Equal(t, asm.ScriptNum(100_000), got)
 	_, err = d.eval(strings.Fields("2 0 OP_INSPECTINPUTPACKET"), 0, nil)
 	require.ErrorIs(t, err, ErrIneligible)
 }
@@ -118,35 +119,10 @@ func TestEvalWithoutTx(t *testing.T) {
 func TestEvalErrorHidesValues(t *testing.T) {
 	plain := []byte{0xc3, 0xc3, 0x43, 0x00}
 	d := newDraft(Offchain, []*Source{sourceWith(t, 100_000)})
-	_, err := d.eval([]string{"<s>", "OP_1ADD"}, 0, func(string) (value, error) { return value{"bytes", plain}, nil })
+	_, err := d.eval([]string{"<s>", "OP_1ADD"}, 0, func(string) (asm.Value, error) { return asm.Value{Type: "bytes", Raw: plain}, nil })
 	require.ErrorIs(t, err, ErrIneligible)
 	require.NotContains(t, err.Error(), hex.EncodeToString(plain))
 	require.Contains(t, err.Error(), "ErrMinimalData")
-}
-
-func TestCheckExpressionComputeLimits(t *testing.T) {
-	modexp := func(n int) []string {
-		return strings.Fields(strings.Repeat("2 3 5 OP_MODEXP OP_DROP ", n))
-	}
-	require.NoError(t, checkExpression(modexp(64)))
-	require.ErrorIs(t, checkExpression(modexp(65)), ErrInvalidTemplate)
-}
-
-func TestCheckExpression(t *testing.T) {
-	for _, op := range []string{
-		"OP_INSPECTOUTPUTVALUE", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "OP_INSPECTNUMOUTPUTS", "OP_TUNNEL", "OP_INSPECTPACKET",
-		"OP_INSPECTNUMASSETGROUPS", "OP_FINDASSETGROUPBYASSETID", "OP_INSPECTINPUTARKADESCRIPTHASH", "OP_INSPECTINTENTMESSAGE",
-		"OP_TXID", "OP_TXWEIGHT", "OP_SIGHASH", "OP_CHECKSIG", "OP_CHECKSIGVERIFY", "OP_CHECKSIGADD",
-		"OP_INSPECTINASSETCOUNT", "OP_INSPECTOUTASSETCOUNT",
-	} {
-		require.ErrorIs(t, checkExpression([]string{op}), ErrInvalidTemplate, op)
-	}
-	require.NoError(t, checkExpression(strings.Fields("2 OP_PUSHCURRENTINPUTINDEX OP_INSPECTINPUTPACKET OP_VERIFY")))
-	require.True(t, contextFree([]string{"<preimage>", "OP_HASH160"}))
-	for _, op := range []string{"OP_INSPECTINPUTPACKET", "OP_PUSHCURRENTINPUTINDEX", "OP_INSPECTINPUTVALUE", "OP_PUSHEXPIRY", "OP_CHECKTIME", "OP_INSPECTVERSION", "OP_INSPECTLOCKTIME",
-		"OP_CHECKLOCKTIMEVERIFY", "OP_NOP2", "OP_CHECKSEQUENCEVERIFY", "OP_NOP3"} {
-		require.False(t, contextFree([]string{op}), op)
-	}
 }
 
 // sourceWith returns a source whose output 0 holds amount at a fixed P2TR script.

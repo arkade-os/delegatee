@@ -1,4 +1,4 @@
-package template
+package jcs
 
 import (
 	"strings"
@@ -22,9 +22,9 @@ func TestCanonical(t *testing.T) {
 		{"max depth", strings.Repeat("[", 64) + strings.Repeat("]", 64), strings.Repeat("[", 64) + strings.Repeat("]", 64)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			v, err := decodeStrict([]byte(tc.in))
+			v, err := Decode([]byte(tc.in))
 			require.NoError(t, err)
-			got, err := canonical(v)
+			got, err := Canonical(v)
 			require.NoError(t, err)
 			require.Equal(t, tc.want, string(got))
 		})
@@ -48,11 +48,21 @@ func TestDecodeStrictRejects(t *testing.T) {
 		"too deep":             strings.Repeat("[", 65) + strings.Repeat("]", 65),
 	} {
 		t.Run(name, func(t *testing.T) {
-			v, err := decodeStrict([]byte(in))
+			v, err := Decode([]byte(in))
 			if err == nil {
-				_, err = canonical(v)
+				err = CheckNumbers(v)
 			}
-			require.ErrorIs(t, err, ErrInvalidTemplate)
+			require.ErrorIs(t, err, ErrInvalid)
 		})
 	}
+}
+
+func TestCheckNumbers(t *testing.T) {
+	v, err := Decode([]byte("[0, -1, 9007199254740991]"))
+	require.NoError(t, err)
+	require.NoError(t, CheckNumbers(v))
+
+	v, err = Decode([]byte(`{"a": 1.5}`))
+	require.NoError(t, err, "a fraction decodes; whoever hashes it refuses it")
+	require.ErrorIs(t, CheckNumbers(v), ErrInvalid)
 }

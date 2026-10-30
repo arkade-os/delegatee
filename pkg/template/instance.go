@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"strings"
-	"time"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
-	"github.com/arkade-os/arkd/pkg/ark-lib/script"
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 )
+
+// Keys are the service keys a contract is resolved under; Delegate is the daemon's cosigner.
+type Keys = contract.Keys
 
 // Context is what an instance is resolved under.
 type Context struct {
@@ -28,45 +30,8 @@ type Instance struct {
 	keys      Keys
 	vars      map[string][]byte
 	decrypt   func([]byte) ([]byte, error)
-	contracts []*contract                // per slot
+	contracts []*contract.Contract       // per slot
 	locktimes []*arklib.AbsoluteLocktime // per slot, nil without a CLTV spend leaf
-}
-
-// ContextFree reports whether the input contracts can be built without sources.
-func (t *Template) ContextFree() bool {
-	for _, in := range t.inputs {
-		if !t.argsFree(in.contract.args) {
-			return false
-		}
-	}
-	return true
-}
-
-func (t *Template) argsFree(args map[string]byteTemplate) bool {
-	for _, b := range args {
-		if !exprsFree(b) {
-			return false
-		}
-		for _, n := range b.names() {
-			if s, ok := t.secrets[n]; ok && !exprsFree(s.ciphertext) {
-				return false
-			}
-		}
-		for _, p := range b {
-			if p.program != "" && !t.argsFree(t.outputs[t.output(p.program)].locking.contract.args) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func (t *Template) output(name string) int {
-	return slices.IndexFunc(t.outputs, func(o output) bool { return o.name == name })
-}
-
-func exprsFree(b byteTemplate) bool {
-	return !slices.ContainsFunc(b, func(p piece) bool { return p.expr != nil && !contextFree(p.expr) })
 }
 
 // Instantiate binds the template to c, building the contract of every input.
@@ -82,8 +47,8 @@ func (t *Template) Instantiate(_ context.Context, c Context) (*Instance, error) 
 		if t.isTaptree(n) {
 			continue
 		}
-		if err := canonicalBytes(typ, v); err != nil {
-			return nil, fmt.Errorf("variable %q: %w", n, err)
+		if err := asm.CanonicalBytes(typ, v); err != nil {
+			return nil, fmt.Errorf("%w: variable %q: %v", ErrInvalidVariables, n, err)
 		}
 	}
 	if err := t.checkRanges(c.Variables); err != nil {
@@ -131,89 +96,6 @@ func (t *Template) Instantiate(_ context.Context, c Context) (*Instance, error) 
 	return i, nil
 }
 
-// a non-canonical value is ineligible, unless watch, where it can only come from the variables
-func (i *Instance) contractOf(c *construction, d *draft, slot int, watch bool) (*contract, error) {
-	flat, err := c.def.flatConstructor()
-	if err != nil {
-		return nil, err
-	}
-	args := map[string]value{}
-	for _, f := range flat {
-		raw, err := i.resolve(c.args[f.Name], d, d.index(slot))
-		if err == nil {
-			if err = canonicalBytes(f.Type, raw); err != nil && !watch {
-				err = fmt.Errorf("%w: %v", ErrIneligible, err)
-			}
-		}
-		if err != nil {
-			return nil, fmt.Errorf("argument %q: %w", f.Name, err)
-		}
-		args[f.Name] = value{f.Type, raw}
-	}
-	var taptree []byte
-	if c.taptree != "" {
-		taptree = append([]byte{}, i.vars[c.taptree]...) // non-nil: a given tree, empty or not
-	}
-	return buildTree(c.def, args, i.keys, taptree)
-}
-
-func isCLTV(tok string) bool { return tok == "OP_CHECKLOCKTIMEVERIFY" || tok == "OP_NOP2" }
-
-// checkClosure returns the spend leaf's absolute locktime, nil without one. The emulator accepts
-// only ark-lib closures on a leaf naming its key, and arkd builds a locktime only from a CLTV multisig.
-func checkClosure(in input, ct *contract) (*arklib.AbsoluteLocktime, error) {
-	f, _ := in.contract.def.function(in.function)
-	l, _ := f.leaf(in.leaf)
-	emulated := slices.ContainsFunc(l.Asm, func(tok string) bool {
-		return strings.HasPrefix(tok, "<EMULATOR_KEY:") || strings.HasPrefix(tok, "<TWEAK:")
-	})
-	cltv := slices.ContainsFunc(l.Asm, isCLTV)
-	if !emulated && !cltv {
-		return nil, nil
-	}
-	c, err := script.DecodeClosure(ct.proofs[[2]string{in.function, in.leaf}].Script)
-	lock, isLock := c.(*script.CLTVMultisigClosure)
-	switch {
-	case cltv && !isLock:
-		return nil, fmt.Errorf("%w: input %q: leaf %q is not a CLTV multisig closure", ErrUnsupported, in.name, in.leaf)
-	case err != nil:
-		return nil, fmt.Errorf("%w: input %q: leaf %q is not a closure", ErrUnsupported, in.name, in.leaf)
-	case cltv:
-		return &lock.Locktime, nil
-	}
-	return nil, nil
-}
-
-// offchain.BuildTxs refuses heights and timestamps in one transaction; refusing here names the delegation
-func sameDomain(lts []*arklib.AbsoluteLocktime) bool {
-	var first *arklib.AbsoluteLocktime
-	for _, lt := range lts {
-		if lt == nil {
-			continue
-		}
-		if first != nil && first.IsSeconds() != lt.IsSeconds() {
-			return false
-		}
-		first = lt
-	}
-	return true
-}
-
-// Locktime is the absolute locktime of slot's spend leaf, which arkd compares with its chain tip.
-func (i *Instance) Locktime(slot int) (arklib.AbsoluteLocktime, bool) {
-	if lt := i.locktimes[slot]; lt != nil {
-		return *lt, true
-	}
-	return 0, false
-}
-
-func checkSourceScript(in input, s *Source, ct *contract) error {
-	if !bytes.Equal(pkScript(s), ct.pkScript) {
-		return fmt.Errorf("%w: input %q: source script differs from the contract", ErrIneligible, in.name)
-	}
-	return nil
-}
-
 func checkSources(sources []*Source, n int) error {
 	if len(sources) != n {
 		return fmt.Errorf("%w: %d sources for %d inputs", ErrIneligible, len(sources), n)
@@ -232,16 +114,10 @@ func checkSources(sources []*Source, n int) error {
 	return nil
 }
 
-// Tapscripts lists the hex leaf scripts of the input's contract.
-func (i *Instance) Tapscripts(slot int) []string { return slices.Clone(i.contracts[slot].tapscripts) }
-
-// PkScript is the output script of the input's contract.
-func (i *Instance) PkScript(slot int) []byte { return bytes.Clone(i.contracts[slot].pkScript) }
-
 // checkRanges bounds the variables a schedule or a fee cap reads.
 func (t *Template) checkRanges(vars map[string][]byte) error {
 	check := func(name string, lo, hi int64) error {
-		if n, err := parseScriptNum(vars[name]); err != nil || n < lo || n > hi {
+		if n, err := asm.ParseScriptNum(vars[name]); err != nil || n < lo || n > hi {
 			return fmt.Errorf("%w: %q must be in %d..%d", ErrInvalidVariables, name, lo, hi)
 		}
 		return nil
@@ -254,128 +130,7 @@ func (t *Template) checkRanges(vars map[string][]byte) error {
 		}
 	}
 	if t.fee != nil && t.fee.maxVariable != "" {
-		return check(t.fee.maxVariable, 0, maxScriptNum)
+		return check(t.fee.maxVariable, 0, asm.MaxScriptNum)
 	}
 	return nil
-}
-
-// FeeCap is the most the instance lets one of its transactions pay in fees; false when it pays none.
-func (i *Instance) FeeCap() (uint64, bool) {
-	f := i.tmpl.fee
-	if f == nil {
-		return 0, false
-	}
-	if f.maxVariable == "" {
-		return f.max, true
-	}
-	n, _ := parseScriptNum(i.vars[f.maxVariable])
-	return uint64(n), true
-}
-
-// lead is how long before expiry the input becomes due, zero without an expiry schedule.
-func (i *Instance) lead(slot int) time.Duration {
-	in := i.tmpl.inputs[slot]
-	if in.leadVariable == "" {
-		return in.schedule.BeforeExpiry
-	}
-	n, _ := parseScriptNum(i.vars[in.leadVariable])
-	return time.Duration(n) * time.Second
-}
-
-// DueAt is the schedule's due time, no earlier than a timestamp locktime; a height is the caller's to check.
-func (i *Instance) DueAt(slot int, s *Source, now time.Time) time.Time {
-	due := i.scheduleDue(slot, s, now)
-	if lt := i.locktimes[slot]; lt != nil && lt.IsSeconds() {
-		if at := time.Unix(int64(*lt), 0); at.After(due) {
-			return at
-		}
-	}
-	return due
-}
-
-// scheduleDue is the window start for an expiry lead, else the source's creation, or now when unknown.
-// A fee-paying instance waits at least half the source's life: a longer lead would pay in every round.
-func (i *Instance) scheduleDue(slot int, s *Source, now time.Time) time.Time {
-	sch := i.tmpl.inputs[slot].schedule
-	lead := i.lead(slot)
-	if cap, _ := i.FeeCap(); cap > 0 && !s.CreatedAt.IsZero() {
-		if life := s.Expiry.Sub(s.CreatedAt); life > 0 {
-			lead = min(lead, life/2)
-		}
-	}
-	switch {
-	case lead > 0 && !s.Expiry.IsZero():
-		return s.Expiry.Add(-lead)
-	case lead > 0, s.Confirms < sch.MinConfirmations:
-		return now.Add(time.Hour)
-	case !s.CreatedAt.IsZero():
-		return s.CreatedAt
-	}
-	return now
-}
-
-// secrets open at most once per draft and are kept only by it
-func (i *Instance) resolve(b byteTemplate, d *draft, input int) ([]byte, error) {
-	lookup := func(n string) (value, error) { return i.lookup(n, d) }
-	out := []byte{}
-	for _, p := range b {
-		switch {
-		case p.name != "":
-			v, err := lookup(p.name)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, v.raw...)
-		case p.program != "":
-			o := i.tmpl.outputs[i.tmpl.output(p.program)]
-			ct, err := i.contractOf(o.locking.contract, d, o.from, false)
-			if err != nil {
-				return nil, fmt.Errorf("output %q: %w", o.name, err)
-			}
-			out = append(out, ct.pkScript[2:]...)
-		case p.expr != nil:
-			r, err := d.eval(p.expr, input, lookup)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, r...)
-		default:
-			out = append(out, p.hex...)
-		}
-	}
-	return out, nil
-}
-
-func (i *Instance) lookup(n string, d *draft) (value, error) {
-	if typ, ok := i.tmpl.variables[n]; ok {
-		return value{typ, i.vars[n]}, nil
-	}
-	s, ok := i.tmpl.secrets[n]
-	if !ok {
-		return value{}, fmt.Errorf("%w: unknown name %q", ErrInvalidTemplate, n)
-	}
-	if p, ok := d.secrets[n]; ok {
-		return value{s.typ, p}, nil
-	}
-	ct, err := i.resolve(s.ciphertext, d, d.index(s.from))
-	if err != nil {
-		return value{}, fmt.Errorf("secret %q: %w", n, err)
-	}
-	p, err := i.decrypt(ct)
-	if err == nil {
-		err = canonicalBytes(s.typ, p)
-	}
-	if err != nil {
-		return value{}, fmt.Errorf("%w: secret %q: %v", ErrIneligible, n, err)
-	}
-	if d.secrets == nil {
-		d.secrets = map[string][]byte{}
-	}
-	d.secrets[n] = p
-	return value{s.typ, p}, nil
-}
-
-// isTaptree: the variable holds a given tree, decoded and never pushed.
-func (t *Template) isTaptree(name string) bool {
-	return slices.ContainsFunc(t.inputs, func(in input) bool { return in.contract.taptree == name })
 }

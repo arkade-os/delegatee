@@ -1,8 +1,10 @@
-package template
+// Package jcs decodes JSON strictly and writes it in RFC 8785 canonical form.
+package jcs
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -18,24 +20,60 @@ const (
 	maxDepth   = 64
 )
 
-// decodeStrict parses one JSON value, rejecting invalid UTF-8, duplicate keys and trailing data.
-func decodeStrict(doc []byte) (any, error) {
+// ErrInvalid marks a document this package refuses.
+var ErrInvalid = errors.New("invalid json")
+
+// Decode parses one JSON value, rejecting invalid UTF-8, duplicate keys and trailing data.
+// Numbers are kept as json.Number; CheckNumbers judges them.
+func Decode(doc []byte) (any, error) {
 	if !utf8.Valid(doc) {
-		return nil, fmt.Errorf("%w: invalid utf-8", ErrInvalidTemplate)
+		return nil, fmt.Errorf("%w: invalid utf-8", ErrInvalid)
 	}
 	if err := scan(doc); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidTemplate, err)
+		return nil, fmt.Errorf("%w: %v", ErrInvalid, err)
 	}
 	dec := json.NewDecoder(bytes.NewReader(doc))
 	dec.UseNumber()
 	v, err := decodeValue(dec)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidTemplate, err)
+		return nil, fmt.Errorf("%w: %v", ErrInvalid, err)
 	}
 	if _, err := dec.Token(); err != io.EOF {
-		return nil, fmt.Errorf("%w: trailing data", ErrInvalidTemplate)
+		return nil, fmt.Errorf("%w: trailing data", ErrInvalid)
 	}
 	return v, nil
+}
+
+// CheckNumbers refuses any number in v that Canonical would: a fraction, an exponent, -0 or a
+// magnitude above 2^53-1.
+func CheckNumbers(v any) error {
+	switch x := v.(type) {
+	case json.Number:
+		_, err := safeInt(x)
+		return err
+	case []any:
+		for _, e := range x {
+			if err := CheckNumbers(e); err != nil {
+				return err
+			}
+		}
+	case map[string]any:
+		for _, e := range x {
+			if err := CheckNumbers(e); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func safeInt(x json.Number) (int64, error) {
+	s := x.String()
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil || s == "-0" || strings.ContainsAny(s, ".eE") || n > maxSafeInt || n < -maxSafeInt {
+		return 0, fmt.Errorf("%w: unsupported number %s", ErrInvalid, s)
+	}
+	return n, nil
 }
 
 // scan rejects excessive nesting and unpaired surrogate escapes, which encoding/json would replace silently.
@@ -122,8 +160,8 @@ func decodeValue(dec *json.Decoder) (any, error) {
 	return obj, err
 }
 
-// canonical serializes a decoded value per RFC 8785, restricted to safe integers.
-func canonical(v any) ([]byte, error) {
+// Canonical serializes a decoded value per RFC 8785, restricted to safe integers.
+func Canonical(v any) ([]byte, error) {
 	var b bytes.Buffer
 	if err := writeCanonical(&b, v); err != nil {
 		return nil, err
@@ -140,10 +178,9 @@ func writeCanonical(b *bytes.Buffer, v any) error {
 	case string:
 		writeString(b, x)
 	case json.Number:
-		s := x.String()
-		n, err := strconv.ParseInt(s, 10, 64)
-		if err != nil || s == "-0" || strings.ContainsAny(s, ".eE") || n > maxSafeInt || n < -maxSafeInt {
-			return fmt.Errorf("%w: unsupported number %s", ErrInvalidTemplate, s)
+		n, err := safeInt(x)
+		if err != nil {
+			return err
 		}
 		b.WriteString(strconv.FormatInt(n, 10))
 	case []any:
@@ -175,7 +212,7 @@ func writeCanonical(b *bytes.Buffer, v any) error {
 		}
 		b.WriteByte('}')
 	default:
-		return fmt.Errorf("%w: unsupported type %T", ErrInvalidTemplate, v)
+		return fmt.Errorf("%w: unsupported type %T", ErrInvalid, v)
 	}
 	return nil
 }

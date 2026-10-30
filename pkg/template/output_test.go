@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 	"maps"
 	"slices"
 	"testing"
@@ -256,9 +258,9 @@ func instanceOf(t *testing.T, doc []byte, sources ...*Source) (*Instance, *draft
 	t.Helper()
 	tmpl := parseDoc(t, doc)
 	for slot, src := range sources {
-		c, err := build(tmpl.inputs[slot].contract.def, map[string]value{"owner": {"pubkey", testKey(t, 2).SerializeCompressed()}}, testKeys(t))
+		c, err := contract.Build(tmpl.inputs[slot].contract.def, map[string]asm.Value{"owner": {Type: "pubkey", Raw: testKey(t, 2).SerializeCompressed()}}, testKeys(t), nil)
 		require.NoError(t, err)
-		lockTo(src, c.pkScript)
+		lockTo(src, c.PkScript)
 	}
 	inst, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t), Sources: sources})
 	require.NoError(t, err)

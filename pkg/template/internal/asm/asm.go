@@ -1,4 +1,5 @@
-package template
+// Package asm assembles the script mini-language of templates and types its scalar values.
+package asm
 
 import (
 	"encoding/hex"
@@ -10,16 +11,20 @@ import (
 	"github.com/btcsuite/btcd/txscript/v2"
 )
 
+// maxPushSize is the largest data push a script accepts.
 const maxPushSize = 520
 
-// value is a resolved scalar; int values are pushed as Script numbers.
-type value struct {
-	typ string
-	raw []byte
+// Value is a resolved scalar; int values are pushed as Script numbers.
+type Value struct {
+	Type string
+	Raw  []byte
 }
 
-// lookup receives the text between the <...> brackets
-func assemble(tokens []string, lookup func(name string) (value, error)) ([]byte, error) {
+// Lookup resolves the text between the <...> brackets of a placeholder.
+type Lookup func(name string) (Value, error)
+
+// Assemble turns tokens into a script: opcodes, decimals, 0x hex pushes and <placeholders>.
+func Assemble(tokens []string, lookup Lookup) ([]byte, error) {
 	b := txscript.NewScriptBuilder()
 	for _, tok := range tokens {
 		if err := addToken(b, tok, lookup); err != nil {
@@ -29,32 +34,35 @@ func assemble(tokens []string, lookup func(name string) (value, error)) ([]byte,
 	return b.Script()
 }
 
-func addToken(b *txscript.ScriptBuilder, tok string, lookup func(string) (value, error)) error {
+func addToken(b *txscript.ScriptBuilder, tok string, lookup Lookup) error {
 	switch {
 	case strings.HasPrefix(tok, "OP_"):
-		op, err := opcode(tok)
+		op, err := Opcode(tok)
 		if err != nil {
 			return err
 		}
 		b.AddOp(op)
-	case decimalTok.MatchString(tok):
-		n, err := parseDecimal(tok)
+	case DecimalTok.MatchString(tok):
+		n, err := ParseDecimal(tok)
 		if err != nil {
 			return err
 		}
 		b.AddInt64(n)
-	case hexTok.MatchString(tok):
+	case HexTok.MatchString(tok):
 		raw, _ := hex.DecodeString(tok[2:])
 		return addData(b, tok, raw)
-	case placeholder.MatchString(tok):
+	case Placeholder.MatchString(tok):
+		if lookup == nil {
+			return fmt.Errorf("%s: no lookup", tok)
+		}
 		v, err := lookup(tok[1 : len(tok)-1])
 		if err != nil {
 			return fmt.Errorf("%s: %w", tok, err)
 		}
-		if v.typ != "int" {
-			return addData(b, tok, v.raw)
+		if v.Type != "int" {
+			return addData(b, tok, v.Raw)
 		}
-		n, err := parseScriptNum(v.raw)
+		n, err := ParseScriptNum(v.Raw)
 		if err != nil {
 			return fmt.Errorf("%s: %w", tok, err)
 		}
@@ -65,8 +73,8 @@ func addToken(b *txscript.ScriptBuilder, tok string, lookup func(string) (value,
 	return nil
 }
 
-// push opcodes are refused: they would run the next token's data as code
-func opcode(tok string) (byte, error) {
+// Opcode returns the byte of an OP_ token; push opcodes are refused, they would run the next token's data as code.
+func Opcode(tok string) (byte, error) {
 	op, ok := arkade.OpcodeByName[tok]
 	if !ok {
 		return 0, fmt.Errorf("unknown opcode %q", tok)
@@ -89,10 +97,10 @@ func addData(b *txscript.ScriptBuilder, tok string, raw []byte) error {
 	return nil
 }
 
-// parseDecimal parses a decimal token with magnitude up to 2^53-1.
-func parseDecimal(tok string) (int64, error) {
+// ParseDecimal parses a decimal token with magnitude up to 2^53-1.
+func ParseDecimal(tok string) (int64, error) {
 	n, err := strconv.ParseInt(tok, 10, 64)
-	if err != nil || n > maxScriptNum || n < -maxScriptNum {
+	if err != nil || n > MaxScriptNum || n < -MaxScriptNum {
 		return 0, fmt.Errorf("number %q out of range", tok)
 	}
 	return n, nil

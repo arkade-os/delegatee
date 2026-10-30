@@ -1,9 +1,11 @@
-package template
+package contract
 
 import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 	"strings"
 	"testing"
 
@@ -22,7 +24,7 @@ func TestBuildMatchesArkLib(t *testing.T) {
 	 {"name":"spend","leaves":[{"name":"spend","asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","<owner>","OP_CHECKSIG"],"witness":[]}]},
 	 {"name":"delayed","leaves":[{"name":"delayed","asm":["4194306","OP_CHECKSEQUENCEVERIFY","OP_DROP","<SERVER_KEY>","OP_CHECKSIG"],"witness":[]}]},
 	 {"name":"renew","arkade":{"inputs":[],"asm":["OP_1"]},"leaves":[{"name":"renew","asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","<EMULATOR_KEY:renew>","OP_CHECKSIG"],"witness":[]}]}]}`)
-	c, err := build(def, map[string]value{"owner": {"pubkey", owner.SerializeCompressed()}}, Keys{Server: server, Emulator: emulator})
+	c, err := Build(def, map[string]asm.Value{"owner": {Type: "pubkey", Raw: owner.SerializeCompressed()}}, Keys{Server: server, Emulator: emulator}, nil)
 	require.NoError(t, err)
 
 	tweaked := arkade.ComputeArkadeScriptPublicKey(emulator, arkade.ArkadeScriptHash([]byte{txscript.OP_1}))
@@ -36,30 +38,30 @@ func TestBuildMatchesArkLib(t *testing.T) {
 	}}
 	tapscripts, err := want.Encode()
 	require.NoError(t, err)
-	require.Equal(t, tapscripts, c.tapscripts)
+	require.Equal(t, tapscripts, c.Tapscripts)
 	key, _, err := want.TapTree()
 	require.NoError(t, err)
 	pk, err := script.P2TRScript(key)
 	require.NoError(t, err)
-	require.Equal(t, pk, c.pkScript)
-	require.Equal(t, []byte{txscript.OP_1}, c.covenants["renew"])
+	require.Equal(t, pk, c.PkScript)
+	require.Equal(t, []byte{txscript.OP_1}, c.Covenants["renew"])
 
-	leaf := c.proofs[[2]string{"renew", "renew"}]
+	leaf := c.Proofs[[2]string{"renew", "renew"}]
 	require.NotNil(t, leaf)
 	control, err := txscript.ParseControlBlock(leaf.ControlBlock)
 	require.NoError(t, err)
-	require.NoError(t, txscript.VerifyTaprootLeafCommitment(control, c.pkScript[2:], leaf.Script))
+	require.NoError(t, txscript.VerifyTaprootLeafCommitment(control, c.PkScript[2:], leaf.Script))
 }
 
 func TestBuildTreeShapes(t *testing.T) {
 	// one to nine leaves give the root ark-lib gives
 	for n := 1; n <= 9; n++ {
 		def, closures := nLeaves(t, n)
-		c, err := build(def, nil, Keys{Server: testKey(t, 1), Emulator: testKey(t, 3)})
+		c, err := Build(def, nil, Keys{Server: testKey(t, 1), Emulator: testKey(t, 3)}, nil)
 		require.NoError(t, err)
 		key, _, err := (&script.TapscriptsVtxoScript{Closures: closures}).TapTree()
 		require.NoError(t, err)
-		require.Equal(t, schnorr.SerializePubKey(key), c.pkScript[2:], "%d leaves", n)
+		require.Equal(t, schnorr.SerializePubKey(key), c.PkScript[2:], "%d leaves", n)
 	}
 }
 
@@ -69,13 +71,13 @@ func TestBuildCovenantPushesXOnlyPubkey(t *testing.T) {
 	owner := testKey(t, 2)
 	def := parseDef(t, `{"contractName":"C","constructorInputs":[{"name":"owner","type":"pubkey"}],"functions":[
 	 {"name":"pay","arkade":{"inputs":[],"asm":["<owner>","OP_DROP","OP_1"]},"leaves":[{"name":"pay","asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","<EMULATOR_KEY:pay>","OP_CHECKSIG"],"witness":[]}]}]}`)
-	c, err := build(def, map[string]value{"owner": {"pubkey", owner.SerializeCompressed()}}, Keys{Server: testKey(t, 1), Emulator: testKey(t, 3)})
+	c, err := Build(def, map[string]asm.Value{"owner": {Type: "pubkey", Raw: owner.SerializeCompressed()}}, Keys{Server: testKey(t, 1), Emulator: testKey(t, 3)}, nil)
 	require.NoError(t, err)
 
 	want, err := txscript.NewScriptBuilder().
 		AddData(schnorr.SerializePubKey(owner)).AddOp(txscript.OP_DROP).AddOp(txscript.OP_1).Script()
 	require.NoError(t, err)
-	require.Equal(t, want, c.covenants["pay"])
+	require.Equal(t, want, c.Covenants["pay"])
 }
 
 func TestBuildRejects(t *testing.T) {
@@ -83,22 +85,22 @@ func TestBuildRejects(t *testing.T) {
 	def := parseDef(t, `{"contractName":"C","constructorInputs":[],"functions":[
 	 {"name":"a","leaves":[{"name":"a","asm":["OP_1"],"witness":[]}]},
 	 {"name":"b","leaves":[{"name":"b","asm":["OP_1"],"witness":[]}]}]}`)
-	_, err := build(def, nil, keys)
-	require.ErrorIs(t, err, ErrInvalidTemplate, "duplicate leaves")
+	_, err := Build(def, nil, keys, nil)
+	require.ErrorIs(t, err, ErrBadLeaf, "duplicate leaves")
 
 	def = parseDef(t, `{"contractName":"C","constructorInputs":[{"name":"n","type":"int"}],"functions":[
 	 {"name":"a","leaves":[{"name":"a","asm":["<n>","OP_DROP","OP_1"],"witness":[]}]}]}`)
-	_, err = build(def, nil, keys)
-	require.ErrorIs(t, err, ErrInvalidTemplate, "missing constructor value")
+	_, err = Build(def, nil, keys, nil)
+	require.ErrorIs(t, err, ErrBadLeaf, "missing constructor value")
 }
 
 func TestBuildProofPerLeaf(t *testing.T) {
 	def := parseDef(t, `{"contractName":"C","constructorInputs":[],"functions":[
 	 {"name":"a/b","leaves":[{"name":"c","asm":["OP_1"],"witness":[]}]},
 	 {"name":"a","leaves":[{"name":"b/c","asm":["OP_2"],"witness":[]}]}]}`)
-	c, err := build(def, nil, Keys{Server: testKey(t, 1), Emulator: testKey(t, 3)})
+	c, err := Build(def, nil, Keys{Server: testKey(t, 1), Emulator: testKey(t, 3)}, nil)
 	require.NoError(t, err)
-	require.Len(t, c.proofs, 2)
+	require.Len(t, c.Proofs, 2)
 }
 
 func testKey(t testing.TB, n int) *btcec.PublicKey {
@@ -109,16 +111,16 @@ func testKey(t testing.TB, n int) *btcec.PublicKey {
 	return pub
 }
 
-func parseDef(t *testing.T, doc string) *Definition {
+func parseDef(t *testing.T, doc string) *abi.Definition {
 	t.Helper()
 	var v any
 	require.NoError(t, json.Unmarshal([]byte(doc), &v))
-	def, err := parseDefinition(v)
+	def, err := abi.ParseDefinition(v)
 	require.NoError(t, err)
 	return def
 }
 
-func nLeaves(t *testing.T, n int) (*Definition, []script.Closure) {
+func nLeaves(t *testing.T, n int) (*abi.Definition, []script.Closure) {
 	t.Helper()
 	server := testKey(t, 1)
 	var fns []string

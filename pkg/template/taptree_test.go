@@ -140,7 +140,7 @@ func arkdScript(t *testing.T, leaves []string) []byte {
 // spendProof checks the spend leaf's control block opens the instance's key.
 func spendProof(t *testing.T, inst *Instance) *psbt.TaprootTapLeafScript {
 	t.Helper()
-	proof := inst.contracts[0].proofs[[2]string{"spend", "spend"}]
+	proof := inst.contracts[0].Proofs[[2]string{"spend", "spend"}]
 	require.NotNil(t, proof)
 	cb, err := txscript.ParseControlBlock(proof.ControlBlock)
 	require.NoError(t, err)

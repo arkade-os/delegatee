@@ -2,6 +2,10 @@ package template
 
 import (
 	"bytes"
+	"encoding/json"
+	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -27,10 +31,10 @@ func TestInstantiateDelegateKey(t *testing.T) {
 	keys := testKeys(t)
 	inst, err := parseFixture(t, "minimal.json").Instantiate(t.Context(), Context{Keys: keys})
 	require.NoError(t, err)
-	want, err := build(parseDef(t, `{"contractName":"R","constructorInputs":[],"functions":[
-	 {"name":"release","leaves":[{"name":"release","asm":["<SERVER_KEY>","OP_CHECKSIG"],"witness":[]}]}]}`), nil, keys)
+	want, err := contract.Build(parseDef(t, `{"contractName":"R","constructorInputs":[],"functions":[
+	 {"name":"release","leaves":[{"name":"release","asm":["<SERVER_KEY>","OP_CHECKSIG"],"witness":[]}]}]}`), nil, keys, nil)
 	require.NoError(t, err)
-	require.Equal(t, want.tapscripts, inst.Tapscripts(0), "x-only in a leaf, like the server key it equals here")
+	require.Equal(t, want.Tapscripts, inst.Tapscripts(0), "x-only in a leaf, like the server key it equals here")
 
 	keys.Delegate = nil
 	_, err = parseFixture(t, "minimal.json").Instantiate(t.Context(), Context{Keys: keys})
@@ -212,6 +216,14 @@ func TestInstantiateRefusesNonClosureEmulatorLeaf(t *testing.T) {
 	require.ErrorIs(t, err, ErrUnsupported)
 }
 
+func testKey(t testing.TB, n int) *btcec.PublicKey {
+	t.Helper()
+	var b [32]byte
+	b[31] = byte(n)
+	_, pub := btcec.PrivKeyFromBytes(b[:])
+	return pub
+}
+
 func testKeys(t testing.TB) Keys {
 	t.Helper()
 	return Keys{Server: testKey(t, 1), Emulator: testKey(t, 3), Delegate: testKey(t, 1)}
@@ -235,9 +247,9 @@ func parseFixture(t *testing.T, name string) *Template {
 func ownedSource(t *testing.T, tmpl *Template, packet, owner *btcec.PublicKey) *Source {
 	t.Helper()
 	src := sourceWith(t, 100_000, packets.Raw(packets.TypeState, packet.SerializeCompressed()))
-	c, err := build(tmpl.inputs[0].contract.def, map[string]value{"owner": {"pubkey", owner.SerializeCompressed()}}, testKeys(t))
+	c, err := contract.Build(tmpl.inputs[0].contract.def, map[string]asm.Value{"owner": {Type: "pubkey", Raw: owner.SerializeCompressed()}}, testKeys(t), nil)
 	require.NoError(t, err)
-	lockTo(src, c.pkScript)
+	lockTo(src, c.PkScript)
 	return src
 }
 
@@ -308,4 +320,13 @@ func hashLock(t *testing.T) []byte {
   "outputs": [{"name": "payout", "index": 0, "value": {"from": "htlc"},
     "locking": "5120f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"}]
 }`)
+}
+
+func parseDef(t *testing.T, doc string) *Definition {
+	t.Helper()
+	var v any
+	require.NoError(t, json.Unmarshal([]byte(doc), &v))
+	def, err := abi.ParseDefinition(v)
+	require.NoError(t, err)
+	return def
 }

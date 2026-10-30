@@ -118,6 +118,28 @@ func TestParseRejects(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidTemplate, "duplicate key")
 }
 
+// a program reference is a contract argument and nothing else
+func TestProgramOnlyInContractArguments(t *testing.T) {
+	doc := delegateArgument(t)
+	out := func(m map[string]any) map[string]any { return m["outputs"].([]any)[0].(map[string]any) }
+	for name, edit := range map[string]func(map[string]any){
+		"secret ciphertext": func(m map[string]any) {
+			m["secrets"] = map[string]any{"s": map[string]any{"type": "bytes32", "from": "funds", "ciphertext": map[string]any{"program": "payment"}}}
+		},
+		"output amount": func(m map[string]any) {
+			out(m)["value"] = map[string]any{"from": "funds", "amount": map[string]any{"program": "payment"}}
+		},
+		"rule data": func(m map[string]any) {
+			m["packets"] = map[string]any{"output_index": 1, "rules": []any{map[string]any{"type": 2, "action": "emit", "from": "funds", "data": map[string]any{"program": "payment"}}}}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := Parse(t.Context(), edited(t, doc, edit), nil)
+			require.ErrorIs(t, err, ErrInvalidTemplate)
+		})
+	}
+}
+
 func TestParseIntent(t *testing.T) {
 	doc := edited(t, fixture(t, "minimal.json"), func(m map[string]any) {
 		m["type"] = "intent"
@@ -356,18 +378,6 @@ func TestArtifactReference(t *testing.T) {
 }
 
 func TestPushOpcodesRefused(t *testing.T) {
-	hidden := func(op byte) string { return fmt.Sprintf("0x01%02x", op) }
-	require.ErrorIs(t, checkExpression([]string{"OP_DATA_2", hidden(arkade.OP_INSPECTNUMOUTPUTS), "OP_NIP"}), ErrInvalidTemplate)
-	many := []string{}
-	for range 100 {
-		many = append(many, "OP_DATA_2", hidden(arkade.OP_INSPECTINTENTMESSAGE), "OP_NIP")
-	}
-	require.ErrorIs(t, checkExpression(many), ErrInvalidTemplate)
-	for _, op := range []string{"OP_DATA_1", "OP_DATA_75", "OP_PUSHDATA1", "OP_PUSHDATA2", "OP_PUSHDATA4"} {
-		_, err := assemble([]string{op, "0x01"}, nil)
-		require.Error(t, err, op)
-	}
-
 	doc := fixture(t, "minimal.json")
 	out := func(m map[string]any) map[string]any { return m["outputs"].([]any)[0].(map[string]any) }
 	_, err := Parse(t.Context(), edited(t, doc, func(m map[string]any) {
@@ -720,4 +730,12 @@ func TestArrayInputs(t *testing.T) {
 	_, err = Parse(t.Context(), withInput("release"), nil)
 	require.ErrorIs(t, err, ErrUnsupported)
 	require.ErrorContains(t, err, `array input "sigs"`)
+}
+
+func fnOf(m map[string]any, i int) map[string]any {
+	return m["functions"].([]any)[i].(map[string]any)
+}
+
+func leafOf(m map[string]any, f int) map[string]any {
+	return fnOf(m, f)["leaves"].([]any)[0].(map[string]any)
 }
