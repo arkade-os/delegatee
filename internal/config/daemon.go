@@ -25,8 +25,8 @@ type Daemon struct {
 	closers []func()
 }
 
-func NewDaemon(ctx context.Context, cfg Config) (d *Daemon, err error) {
-	d = &Daemon{}
+func NewDaemon(ctx context.Context, cfg Config) (_ *Daemon, err error) {
+	d := &Daemon{}
 	defer func() {
 		if err != nil {
 			d.Stop()
