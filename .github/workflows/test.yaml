@@ -15,6 +15,21 @@ jobs:
   unit:
     name: unit
     runs-on: ubuntu-latest
+    services:
+      # repository tests dial this; 127.0.0.1 avoids the runner resolving localhost to ::1
+      postgres:
+        image: postgres:17.8
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_USER: postgres
+          POSTGRES_DB: delegatee
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d delegatee -h 127.0.0.1 -p 5432"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 30
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
@@ -22,6 +37,8 @@ jobs:
           go-version-file: go.mod
 
       - name: Run unit tests
+        env:
+          DELEGATEE_DATABASE_URL: postgres://postgres@127.0.0.1:5432/delegatee?sslmode=disable
         run: make test
 
   lint:
@@ -53,8 +70,11 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # liquid's electrs publishes host port 50001, which fulcrum needs
       - name: Run Nigiri
         uses: vulpemventures/nigiri-github-action@7fc63cec40cbfc113589a9ade24ab21c9107ad39 # v1
+        with:
+          use_liquid: false
 
       - name: Run regtest environment
         run: make regtest-up
