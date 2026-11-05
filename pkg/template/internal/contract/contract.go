@@ -18,17 +18,8 @@ import (
 	"github.com/btcsuite/btcd/txscript/v2"
 )
 
-var (
-	// ErrNoDelegate marks a script naming DELEGATE_KEY when no delegate key is given.
-	ErrNoDelegate = errors.New("no delegate key")
-	// ErrBadTree marks a given taptree that does not decode or misses a declared leaf.
-	ErrBadTree = errors.New("bad taptree")
-	// ErrBadLeaf marks a leaf or covenant that does not assemble, is duplicated, or a definition without leaves.
-	ErrBadLeaf = errors.New("bad leaf")
-)
-
-// Keys are the service keys a contract is resolved under; Delegate is the daemon's cosigner.
-type Keys struct{ Server, Emulator, Delegate *btcec.PublicKey }
+// Keys are the service keys a contract is resolved under; Cosigner is the daemon's cosigner.
+type Keys struct{ Server, Emulator, Cosigner *btcec.PublicKey }
 
 // Contract is a built taproot output and the proofs of its leaves.
 type Contract struct {
@@ -58,18 +49,18 @@ func keyField(args map[string]asm.Value, name string) (asm.Value, error) {
 	return asm.Value{Type: "bytes32", Raw: schnorr.SerializePubKey(pk)}, nil
 }
 
-func delegate(keys Keys) (*btcec.PublicKey, error) {
-	if keys.Delegate == nil {
-		return nil, ErrNoDelegate
+func cosigner(keys Keys) (*btcec.PublicKey, error) {
+	if keys.Cosigner == nil {
+		return nil, ErrNoCosigner
 	}
-	return keys.Delegate, nil
+	return keys.Cosigner, nil
 }
 
 func covenantLookup(keys Keys, args map[string]asm.Value, name string) (asm.Value, error) {
-	if name != "DELEGATE_KEY" {
+	if name != "COSIGNER_KEY" {
 		return keyField(args, name)
 	}
-	pk, err := delegate(keys)
+	pk, err := cosigner(keys)
 	if err != nil {
 		return asm.Value{}, err
 	}
@@ -111,8 +102,8 @@ func Build(def *abi.Definition, args map[string]asm.Value, keys Keys, taptree []
 		switch {
 		case name == "SERVER_KEY":
 			return asm.Value{Type: "bytes32", Raw: schnorr.SerializePubKey(keys.Server)}, nil
-		case name == "DELEGATE_KEY":
-			pk, err := delegate(keys)
+		case name == "COSIGNER_KEY":
+			pk, err := cosigner(keys)
 			if err != nil {
 				return asm.Value{}, err
 			}

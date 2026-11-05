@@ -19,48 +19,53 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AdminService_ListDelegations_FullMethodName          = "/delegatee.v1.AdminService/ListDelegations"
-	AdminService_GetDelegationById_FullMethodName        = "/delegatee.v1.AdminService/GetDelegationById"
-	AdminService_GetStatus_FullMethodName                = "/delegatee.v1.AdminService/GetStatus"
-	AdminService_GetHealth_FullMethodName                = "/delegatee.v1.AdminService/GetHealth"
-	AdminService_CancelDelegation_FullMethodName         = "/delegatee.v1.AdminService/CancelDelegation"
-	AdminService_ResumeDelegation_FullMethodName         = "/delegatee.v1.AdminService/ResumeDelegation"
-	AdminService_RegisterStreamDelegation_FullMethodName = "/delegatee.v1.AdminService/RegisterStreamDelegation"
-	AdminService_ListAllTemplates_FullMethodName         = "/delegatee.v1.AdminService/ListAllTemplates"
-	AdminService_SetTemplateStatus_FullMethodName        = "/delegatee.v1.AdminService/SetTemplateStatus"
-	AdminService_SetTemplateTrusted_FullMethodName       = "/delegatee.v1.AdminService/SetTemplateTrusted"
-	AdminService_DeleteTemplate_FullMethodName           = "/delegatee.v1.AdminService/DeleteTemplate"
-	AdminService_DeleteArtifact_FullMethodName           = "/delegatee.v1.AdminService/DeleteArtifact"
-	AdminService_ListArtifacts_FullMethodName            = "/delegatee.v1.AdminService/ListArtifacts"
+	AdminService_UpdateTemplate_FullMethodName   = "/delegatee.v1.AdminService/UpdateTemplate"
+	AdminService_DeleteTemplate_FullMethodName   = "/delegatee.v1.AdminService/DeleteTemplate"
+	AdminService_ListArtifacts_FullMethodName    = "/delegatee.v1.AdminService/ListArtifacts"
+	AdminService_DeleteArtifact_FullMethodName   = "/delegatee.v1.AdminService/DeleteArtifact"
+	AdminService_ListDelegations_FullMethodName  = "/delegatee.v1.AdminService/ListDelegations"
+	AdminService_CancelDelegation_FullMethodName = "/delegatee.v1.AdminService/CancelDelegation"
+	AdminService_ResumeDelegation_FullMethodName = "/delegatee.v1.AdminService/ResumeDelegation"
+	AdminService_ListAttempts_FullMethodName     = "/delegatee.v1.AdminService/ListAttempts"
+	AdminService_RegisterStream_FullMethodName   = "/delegatee.v1.AdminService/RegisterStream"
+	AdminService_ListStreams_FullMethodName      = "/delegatee.v1.AdminService/ListStreams"
+	AdminService_CancelStream_FullMethodName     = "/delegatee.v1.AdminService/CancelStream"
+	AdminService_GetHealth_FullMethodName        = "/delegatee.v1.AdminService/GetHealth"
+	AdminService_GetStatus_FullMethodName        = "/delegatee.v1.AdminService/GetStatus"
 )
 
 // AdminServiceClient is the client API for AdminService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// AdminService is served on the admin port only, next to DelegateeService.
 type AdminServiceClient interface {
-	// ListDelegations lists one page, newest first.
-	ListDelegations(ctx context.Context, in *ListDelegationsRequest, opts ...grpc.CallOption) (*ListDelegationsResponse, error)
-	// GetDelegationById returns any delegation, with its coins and history.
-	GetDelegationById(ctx context.Context, in *GetDelegationByIdRequest, opts ...grpc.CallOption) (*GetDelegationByIdResponse, error)
-	GetStatus(ctx context.Context, in *GetStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error)
-	// GetHealth checks each dependency, with the error of the failing ones.
-	GetHealth(ctx context.Context, in *GetHealthRequest, opts ...grpc.CallOption) (*GetHealthResponse, error)
-	// CancelDelegation stops the active watches of an address, or one
-	// delegation by id: advertisements have no address. Registering a
-	// cancelled delegation again is refused until ResumeDelegation.
-	CancelDelegation(ctx context.Context, in *CancelDelegationRequest, opts ...grpc.CallOption) (*CancelDelegationResponse, error)
-	// ResumeDelegation sets a cancelled delegation active again.
-	ResumeDelegation(ctx context.Context, in *ResumeDelegationRequest, opts ...grpc.CallOption) (*ResumeDelegationResponse, error)
-	// RegisterStreamDelegation spawns a watch of the template for every streamed transaction its trigger matches.
-	RegisterStreamDelegation(ctx context.Context, in *RegisterStreamDelegationRequest, opts ...grpc.CallOption) (*RegisterStreamDelegationResponse, error)
-	ListAllTemplates(ctx context.Context, in *ListAllTemplatesRequest, opts ...grpc.CallOption) (*ListAllTemplatesResponse, error)
-	SetTemplateStatus(ctx context.Context, in *SetTemplateStatusRequest, opts ...grpc.CallOption) (*SetTemplateStatusResponse, error)
-	// SetTemplateTrusted marks a template the operator vouches for.
-	SetTemplateTrusted(ctx context.Context, in *SetTemplateTrustedRequest, opts ...grpc.CallOption) (*SetTemplateTrustedResponse, error)
+	// UpdateTemplate sets a template's status; activating resets its failures.
+	UpdateTemplate(ctx context.Context, in *UpdateTemplateRequest, opts ...grpc.CallOption) (*UpdateTemplateResponse, error)
+	// DeleteTemplate fails with FailedPrecondition while a delegation references the template.
 	DeleteTemplate(ctx context.Context, in *DeleteTemplateRequest, opts ...grpc.CallOption) (*DeleteTemplateResponse, error)
-	DeleteArtifact(ctx context.Context, in *DeleteArtifactRequest, opts ...grpc.CallOption) (*DeleteArtifactResponse, error)
-	// ListArtifacts lists every artifact, newest first, without documents.
+	// ListArtifacts lists artifacts without their documents, newest first.
 	ListArtifacts(ctx context.Context, in *ListArtifactsRequest, opts ...grpc.CallOption) (*ListArtifactsResponse, error)
+	// DeleteArtifact fails with FailedPrecondition while a template references the artifact.
+	DeleteArtifact(ctx context.Context, in *DeleteArtifactRequest, opts ...grpc.CallOption) (*DeleteArtifactResponse, error)
+	// ListDelegations lists delegations by the earliest due of their coins, those without coins last, paged by cursor.
+	ListDelegations(ctx context.Context, in *ListDelegationsRequest, opts ...grpc.CallOption) (*ListDelegationsResponse, error)
+	// CancelDelegation stops an active delegation; its fingerprint cannot be registered again until resumed.
+	CancelDelegation(ctx context.Context, in *CancelDelegationRequest, opts ...grpc.CallOption) (*CancelDelegationResponse, error)
+	// ResumeDelegation puts a cancelled delegation back to active.
+	ResumeDelegation(ctx context.Context, in *ResumeDelegationRequest, opts ...grpc.CallOption) (*ResumeDelegationResponse, error)
+	// ListAttempts lists the attempts of a delegation newest first, paged by cursor.
+	ListAttempts(ctx context.Context, in *ListAttemptsRequest, opts ...grpc.CallOption) (*ListAttemptsResponse, error)
+	// RegisterStream has the daemon run a template's trigger against arkd's transactions, spawning a delegation for each match.
+	RegisterStream(ctx context.Context, in *RegisterStreamRequest, opts ...grpc.CallOption) (*RegisterStreamResponse, error)
+	// ListStreams lists the streams of every status, oldest first.
+	ListStreams(ctx context.Context, in *ListStreamsRequest, opts ...grpc.CallOption) (*ListStreamsResponse, error)
+	// CancelStream stops a stream; registering it again fails while it stays cancelled.
+	CancelStream(ctx context.Context, in *CancelStreamRequest, opts ...grpc.CallOption) (*CancelStreamResponse, error)
+	// GetHealth names each dependency with the error it answers, if any.
+	GetHealth(ctx context.Context, in *GetHealthRequest, opts ...grpc.CallOption) (*GetHealthResponse, error)
+	// GetStatus reports what the loop holds: the queue, what is registered at arkd and the forecast batches.
+	GetStatus(ctx context.Context, in *GetStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error)
 }
 
 type adminServiceClient struct {
@@ -71,40 +76,50 @@ func NewAdminServiceClient(cc grpc.ClientConnInterface) AdminServiceClient {
 	return &adminServiceClient{cc}
 }
 
+func (c *adminServiceClient) UpdateTemplate(ctx context.Context, in *UpdateTemplateRequest, opts ...grpc.CallOption) (*UpdateTemplateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateTemplateResponse)
+	err := c.cc.Invoke(ctx, AdminService_UpdateTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) DeleteTemplate(ctx context.Context, in *DeleteTemplateRequest, opts ...grpc.CallOption) (*DeleteTemplateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteTemplateResponse)
+	err := c.cc.Invoke(ctx, AdminService_DeleteTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) ListArtifacts(ctx context.Context, in *ListArtifactsRequest, opts ...grpc.CallOption) (*ListArtifactsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListArtifactsResponse)
+	err := c.cc.Invoke(ctx, AdminService_ListArtifacts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) DeleteArtifact(ctx context.Context, in *DeleteArtifactRequest, opts ...grpc.CallOption) (*DeleteArtifactResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteArtifactResponse)
+	err := c.cc.Invoke(ctx, AdminService_DeleteArtifact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *adminServiceClient) ListDelegations(ctx context.Context, in *ListDelegationsRequest, opts ...grpc.CallOption) (*ListDelegationsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListDelegationsResponse)
 	err := c.cc.Invoke(ctx, AdminService_ListDelegations_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) GetDelegationById(ctx context.Context, in *GetDelegationByIdRequest, opts ...grpc.CallOption) (*GetDelegationByIdResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetDelegationByIdResponse)
-	err := c.cc.Invoke(ctx, AdminService_GetDelegationById_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) GetStatus(ctx context.Context, in *GetStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetStatusResponse)
-	err := c.cc.Invoke(ctx, AdminService_GetStatus_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) GetHealth(ctx context.Context, in *GetHealthRequest, opts ...grpc.CallOption) (*GetHealthResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetHealthResponse)
-	err := c.cc.Invoke(ctx, AdminService_GetHealth_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -131,70 +146,60 @@ func (c *adminServiceClient) ResumeDelegation(ctx context.Context, in *ResumeDel
 	return out, nil
 }
 
-func (c *adminServiceClient) RegisterStreamDelegation(ctx context.Context, in *RegisterStreamDelegationRequest, opts ...grpc.CallOption) (*RegisterStreamDelegationResponse, error) {
+func (c *adminServiceClient) ListAttempts(ctx context.Context, in *ListAttemptsRequest, opts ...grpc.CallOption) (*ListAttemptsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RegisterStreamDelegationResponse)
-	err := c.cc.Invoke(ctx, AdminService_RegisterStreamDelegation_FullMethodName, in, out, cOpts...)
+	out := new(ListAttemptsResponse)
+	err := c.cc.Invoke(ctx, AdminService_ListAttempts_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *adminServiceClient) ListAllTemplates(ctx context.Context, in *ListAllTemplatesRequest, opts ...grpc.CallOption) (*ListAllTemplatesResponse, error) {
+func (c *adminServiceClient) RegisterStream(ctx context.Context, in *RegisterStreamRequest, opts ...grpc.CallOption) (*RegisterStreamResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListAllTemplatesResponse)
-	err := c.cc.Invoke(ctx, AdminService_ListAllTemplates_FullMethodName, in, out, cOpts...)
+	out := new(RegisterStreamResponse)
+	err := c.cc.Invoke(ctx, AdminService_RegisterStream_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *adminServiceClient) SetTemplateStatus(ctx context.Context, in *SetTemplateStatusRequest, opts ...grpc.CallOption) (*SetTemplateStatusResponse, error) {
+func (c *adminServiceClient) ListStreams(ctx context.Context, in *ListStreamsRequest, opts ...grpc.CallOption) (*ListStreamsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SetTemplateStatusResponse)
-	err := c.cc.Invoke(ctx, AdminService_SetTemplateStatus_FullMethodName, in, out, cOpts...)
+	out := new(ListStreamsResponse)
+	err := c.cc.Invoke(ctx, AdminService_ListStreams_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *adminServiceClient) SetTemplateTrusted(ctx context.Context, in *SetTemplateTrustedRequest, opts ...grpc.CallOption) (*SetTemplateTrustedResponse, error) {
+func (c *adminServiceClient) CancelStream(ctx context.Context, in *CancelStreamRequest, opts ...grpc.CallOption) (*CancelStreamResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SetTemplateTrustedResponse)
-	err := c.cc.Invoke(ctx, AdminService_SetTemplateTrusted_FullMethodName, in, out, cOpts...)
+	out := new(CancelStreamResponse)
+	err := c.cc.Invoke(ctx, AdminService_CancelStream_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *adminServiceClient) DeleteTemplate(ctx context.Context, in *DeleteTemplateRequest, opts ...grpc.CallOption) (*DeleteTemplateResponse, error) {
+func (c *adminServiceClient) GetHealth(ctx context.Context, in *GetHealthRequest, opts ...grpc.CallOption) (*GetHealthResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DeleteTemplateResponse)
-	err := c.cc.Invoke(ctx, AdminService_DeleteTemplate_FullMethodName, in, out, cOpts...)
+	out := new(GetHealthResponse)
+	err := c.cc.Invoke(ctx, AdminService_GetHealth_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *adminServiceClient) DeleteArtifact(ctx context.Context, in *DeleteArtifactRequest, opts ...grpc.CallOption) (*DeleteArtifactResponse, error) {
+func (c *adminServiceClient) GetStatus(ctx context.Context, in *GetStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DeleteArtifactResponse)
-	err := c.cc.Invoke(ctx, AdminService_DeleteArtifact_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) ListArtifacts(ctx context.Context, in *ListArtifactsRequest, opts ...grpc.CallOption) (*ListArtifactsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListArtifactsResponse)
-	err := c.cc.Invoke(ctx, AdminService_ListArtifacts_FullMethodName, in, out, cOpts...)
+	out := new(GetStatusResponse)
+	err := c.cc.Invoke(ctx, AdminService_GetStatus_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -204,30 +209,35 @@ func (c *adminServiceClient) ListArtifacts(ctx context.Context, in *ListArtifact
 // AdminServiceServer is the server API for AdminService service.
 // All implementations should embed UnimplementedAdminServiceServer
 // for forward compatibility.
+//
+// AdminService is served on the admin port only, next to DelegateeService.
 type AdminServiceServer interface {
-	// ListDelegations lists one page, newest first.
-	ListDelegations(context.Context, *ListDelegationsRequest) (*ListDelegationsResponse, error)
-	// GetDelegationById returns any delegation, with its coins and history.
-	GetDelegationById(context.Context, *GetDelegationByIdRequest) (*GetDelegationByIdResponse, error)
-	GetStatus(context.Context, *GetStatusRequest) (*GetStatusResponse, error)
-	// GetHealth checks each dependency, with the error of the failing ones.
-	GetHealth(context.Context, *GetHealthRequest) (*GetHealthResponse, error)
-	// CancelDelegation stops the active watches of an address, or one
-	// delegation by id: advertisements have no address. Registering a
-	// cancelled delegation again is refused until ResumeDelegation.
-	CancelDelegation(context.Context, *CancelDelegationRequest) (*CancelDelegationResponse, error)
-	// ResumeDelegation sets a cancelled delegation active again.
-	ResumeDelegation(context.Context, *ResumeDelegationRequest) (*ResumeDelegationResponse, error)
-	// RegisterStreamDelegation spawns a watch of the template for every streamed transaction its trigger matches.
-	RegisterStreamDelegation(context.Context, *RegisterStreamDelegationRequest) (*RegisterStreamDelegationResponse, error)
-	ListAllTemplates(context.Context, *ListAllTemplatesRequest) (*ListAllTemplatesResponse, error)
-	SetTemplateStatus(context.Context, *SetTemplateStatusRequest) (*SetTemplateStatusResponse, error)
-	// SetTemplateTrusted marks a template the operator vouches for.
-	SetTemplateTrusted(context.Context, *SetTemplateTrustedRequest) (*SetTemplateTrustedResponse, error)
+	// UpdateTemplate sets a template's status; activating resets its failures.
+	UpdateTemplate(context.Context, *UpdateTemplateRequest) (*UpdateTemplateResponse, error)
+	// DeleteTemplate fails with FailedPrecondition while a delegation references the template.
 	DeleteTemplate(context.Context, *DeleteTemplateRequest) (*DeleteTemplateResponse, error)
-	DeleteArtifact(context.Context, *DeleteArtifactRequest) (*DeleteArtifactResponse, error)
-	// ListArtifacts lists every artifact, newest first, without documents.
+	// ListArtifacts lists artifacts without their documents, newest first.
 	ListArtifacts(context.Context, *ListArtifactsRequest) (*ListArtifactsResponse, error)
+	// DeleteArtifact fails with FailedPrecondition while a template references the artifact.
+	DeleteArtifact(context.Context, *DeleteArtifactRequest) (*DeleteArtifactResponse, error)
+	// ListDelegations lists delegations by the earliest due of their coins, those without coins last, paged by cursor.
+	ListDelegations(context.Context, *ListDelegationsRequest) (*ListDelegationsResponse, error)
+	// CancelDelegation stops an active delegation; its fingerprint cannot be registered again until resumed.
+	CancelDelegation(context.Context, *CancelDelegationRequest) (*CancelDelegationResponse, error)
+	// ResumeDelegation puts a cancelled delegation back to active.
+	ResumeDelegation(context.Context, *ResumeDelegationRequest) (*ResumeDelegationResponse, error)
+	// ListAttempts lists the attempts of a delegation newest first, paged by cursor.
+	ListAttempts(context.Context, *ListAttemptsRequest) (*ListAttemptsResponse, error)
+	// RegisterStream has the daemon run a template's trigger against arkd's transactions, spawning a delegation for each match.
+	RegisterStream(context.Context, *RegisterStreamRequest) (*RegisterStreamResponse, error)
+	// ListStreams lists the streams of every status, oldest first.
+	ListStreams(context.Context, *ListStreamsRequest) (*ListStreamsResponse, error)
+	// CancelStream stops a stream; registering it again fails while it stays cancelled.
+	CancelStream(context.Context, *CancelStreamRequest) (*CancelStreamResponse, error)
+	// GetHealth names each dependency with the error it answers, if any.
+	GetHealth(context.Context, *GetHealthRequest) (*GetHealthResponse, error)
+	// GetStatus reports what the loop holds: the queue, what is registered at arkd and the forecast batches.
+	GetStatus(context.Context, *GetStatusRequest) (*GetStatusResponse, error)
 }
 
 // UnimplementedAdminServiceServer should be embedded to have
@@ -237,17 +247,20 @@ type AdminServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAdminServiceServer struct{}
 
+func (UnimplementedAdminServiceServer) UpdateTemplate(context.Context, *UpdateTemplateRequest) (*UpdateTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateTemplate not implemented")
+}
+func (UnimplementedAdminServiceServer) DeleteTemplate(context.Context, *DeleteTemplateRequest) (*DeleteTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteTemplate not implemented")
+}
+func (UnimplementedAdminServiceServer) ListArtifacts(context.Context, *ListArtifactsRequest) (*ListArtifactsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListArtifacts not implemented")
+}
+func (UnimplementedAdminServiceServer) DeleteArtifact(context.Context, *DeleteArtifactRequest) (*DeleteArtifactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteArtifact not implemented")
+}
 func (UnimplementedAdminServiceServer) ListDelegations(context.Context, *ListDelegationsRequest) (*ListDelegationsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListDelegations not implemented")
-}
-func (UnimplementedAdminServiceServer) GetDelegationById(context.Context, *GetDelegationByIdRequest) (*GetDelegationByIdResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetDelegationById not implemented")
-}
-func (UnimplementedAdminServiceServer) GetStatus(context.Context, *GetStatusRequest) (*GetStatusResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetStatus not implemented")
-}
-func (UnimplementedAdminServiceServer) GetHealth(context.Context, *GetHealthRequest) (*GetHealthResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetHealth not implemented")
 }
 func (UnimplementedAdminServiceServer) CancelDelegation(context.Context, *CancelDelegationRequest) (*CancelDelegationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelDelegation not implemented")
@@ -255,26 +268,23 @@ func (UnimplementedAdminServiceServer) CancelDelegation(context.Context, *Cancel
 func (UnimplementedAdminServiceServer) ResumeDelegation(context.Context, *ResumeDelegationRequest) (*ResumeDelegationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResumeDelegation not implemented")
 }
-func (UnimplementedAdminServiceServer) RegisterStreamDelegation(context.Context, *RegisterStreamDelegationRequest) (*RegisterStreamDelegationResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method RegisterStreamDelegation not implemented")
+func (UnimplementedAdminServiceServer) ListAttempts(context.Context, *ListAttemptsRequest) (*ListAttemptsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAttempts not implemented")
 }
-func (UnimplementedAdminServiceServer) ListAllTemplates(context.Context, *ListAllTemplatesRequest) (*ListAllTemplatesResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListAllTemplates not implemented")
+func (UnimplementedAdminServiceServer) RegisterStream(context.Context, *RegisterStreamRequest) (*RegisterStreamResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterStream not implemented")
 }
-func (UnimplementedAdminServiceServer) SetTemplateStatus(context.Context, *SetTemplateStatusRequest) (*SetTemplateStatusResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method SetTemplateStatus not implemented")
+func (UnimplementedAdminServiceServer) ListStreams(context.Context, *ListStreamsRequest) (*ListStreamsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListStreams not implemented")
 }
-func (UnimplementedAdminServiceServer) SetTemplateTrusted(context.Context, *SetTemplateTrustedRequest) (*SetTemplateTrustedResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method SetTemplateTrusted not implemented")
+func (UnimplementedAdminServiceServer) CancelStream(context.Context, *CancelStreamRequest) (*CancelStreamResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelStream not implemented")
 }
-func (UnimplementedAdminServiceServer) DeleteTemplate(context.Context, *DeleteTemplateRequest) (*DeleteTemplateResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method DeleteTemplate not implemented")
+func (UnimplementedAdminServiceServer) GetHealth(context.Context, *GetHealthRequest) (*GetHealthResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetHealth not implemented")
 }
-func (UnimplementedAdminServiceServer) DeleteArtifact(context.Context, *DeleteArtifactRequest) (*DeleteArtifactResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method DeleteArtifact not implemented")
-}
-func (UnimplementedAdminServiceServer) ListArtifacts(context.Context, *ListArtifactsRequest) (*ListArtifactsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListArtifacts not implemented")
+func (UnimplementedAdminServiceServer) GetStatus(context.Context, *GetStatusRequest) (*GetStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetStatus not implemented")
 }
 func (UnimplementedAdminServiceServer) testEmbeddedByValue() {}
 
@@ -296,6 +306,78 @@ func RegisterAdminServiceServer(s grpc.ServiceRegistrar, srv AdminServiceServer)
 	s.RegisterService(&AdminService_ServiceDesc, srv)
 }
 
+func _AdminService_UpdateTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).UpdateTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_UpdateTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).UpdateTemplate(ctx, req.(*UpdateTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_DeleteTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).DeleteTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_DeleteTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).DeleteTemplate(ctx, req.(*DeleteTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_ListArtifacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListArtifactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).ListArtifacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_ListArtifacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).ListArtifacts(ctx, req.(*ListArtifactsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_DeleteArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteArtifactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).DeleteArtifact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_DeleteArtifact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).DeleteArtifact(ctx, req.(*DeleteArtifactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AdminService_ListDelegations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListDelegationsRequest)
 	if err := dec(in); err != nil {
@@ -310,60 +392,6 @@ func _AdminService_ListDelegations_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AdminServiceServer).ListDelegations(ctx, req.(*ListDelegationsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_GetDelegationById_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetDelegationByIdRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).GetDelegationById(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_GetDelegationById_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).GetDelegationById(ctx, req.(*GetDelegationByIdRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetStatusRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).GetStatus(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_GetStatus_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).GetStatus(ctx, req.(*GetStatusRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_GetHealth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetHealthRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).GetHealth(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_GetHealth_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).GetHealth(ctx, req.(*GetHealthRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -404,128 +432,110 @@ func _AdminService_ResumeDelegation_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AdminService_RegisterStreamDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RegisterStreamDelegationRequest)
+func _AdminService_ListAttempts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAttemptsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AdminServiceServer).RegisterStreamDelegation(ctx, in)
+		return srv.(AdminServiceServer).ListAttempts(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AdminService_RegisterStreamDelegation_FullMethodName,
+		FullMethod: AdminService_ListAttempts_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).RegisterStreamDelegation(ctx, req.(*RegisterStreamDelegationRequest))
+		return srv.(AdminServiceServer).ListAttempts(ctx, req.(*ListAttemptsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AdminService_ListAllTemplates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListAllTemplatesRequest)
+func _AdminService_RegisterStream_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterStreamRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AdminServiceServer).ListAllTemplates(ctx, in)
+		return srv.(AdminServiceServer).RegisterStream(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AdminService_ListAllTemplates_FullMethodName,
+		FullMethod: AdminService_RegisterStream_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).ListAllTemplates(ctx, req.(*ListAllTemplatesRequest))
+		return srv.(AdminServiceServer).RegisterStream(ctx, req.(*RegisterStreamRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AdminService_SetTemplateStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetTemplateStatusRequest)
+func _AdminService_ListStreams_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListStreamsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AdminServiceServer).SetTemplateStatus(ctx, in)
+		return srv.(AdminServiceServer).ListStreams(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AdminService_SetTemplateStatus_FullMethodName,
+		FullMethod: AdminService_ListStreams_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).SetTemplateStatus(ctx, req.(*SetTemplateStatusRequest))
+		return srv.(AdminServiceServer).ListStreams(ctx, req.(*ListStreamsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AdminService_SetTemplateTrusted_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetTemplateTrustedRequest)
+func _AdminService_CancelStream_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelStreamRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AdminServiceServer).SetTemplateTrusted(ctx, in)
+		return srv.(AdminServiceServer).CancelStream(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AdminService_SetTemplateTrusted_FullMethodName,
+		FullMethod: AdminService_CancelStream_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).SetTemplateTrusted(ctx, req.(*SetTemplateTrustedRequest))
+		return srv.(AdminServiceServer).CancelStream(ctx, req.(*CancelStreamRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AdminService_DeleteTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteTemplateRequest)
+func _AdminService_GetHealth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetHealthRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AdminServiceServer).DeleteTemplate(ctx, in)
+		return srv.(AdminServiceServer).GetHealth(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AdminService_DeleteTemplate_FullMethodName,
+		FullMethod: AdminService_GetHealth_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).DeleteTemplate(ctx, req.(*DeleteTemplateRequest))
+		return srv.(AdminServiceServer).GetHealth(ctx, req.(*GetHealthRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AdminService_DeleteArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteArtifactRequest)
+func _AdminService_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetStatusRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AdminServiceServer).DeleteArtifact(ctx, in)
+		return srv.(AdminServiceServer).GetStatus(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AdminService_DeleteArtifact_FullMethodName,
+		FullMethod: AdminService_GetStatus_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).DeleteArtifact(ctx, req.(*DeleteArtifactRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_ListArtifacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListArtifactsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).ListArtifacts(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_ListArtifacts_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).ListArtifacts(ctx, req.(*ListArtifactsRequest))
+		return srv.(AdminServiceServer).GetStatus(ctx, req.(*GetStatusRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -538,20 +548,24 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*AdminServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "UpdateTemplate",
+			Handler:    _AdminService_UpdateTemplate_Handler,
+		},
+		{
+			MethodName: "DeleteTemplate",
+			Handler:    _AdminService_DeleteTemplate_Handler,
+		},
+		{
+			MethodName: "ListArtifacts",
+			Handler:    _AdminService_ListArtifacts_Handler,
+		},
+		{
+			MethodName: "DeleteArtifact",
+			Handler:    _AdminService_DeleteArtifact_Handler,
+		},
+		{
 			MethodName: "ListDelegations",
 			Handler:    _AdminService_ListDelegations_Handler,
-		},
-		{
-			MethodName: "GetDelegationById",
-			Handler:    _AdminService_GetDelegationById_Handler,
-		},
-		{
-			MethodName: "GetStatus",
-			Handler:    _AdminService_GetStatus_Handler,
-		},
-		{
-			MethodName: "GetHealth",
-			Handler:    _AdminService_GetHealth_Handler,
 		},
 		{
 			MethodName: "CancelDelegation",
@@ -562,32 +576,28 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AdminService_ResumeDelegation_Handler,
 		},
 		{
-			MethodName: "RegisterStreamDelegation",
-			Handler:    _AdminService_RegisterStreamDelegation_Handler,
+			MethodName: "ListAttempts",
+			Handler:    _AdminService_ListAttempts_Handler,
 		},
 		{
-			MethodName: "ListAllTemplates",
-			Handler:    _AdminService_ListAllTemplates_Handler,
+			MethodName: "RegisterStream",
+			Handler:    _AdminService_RegisterStream_Handler,
 		},
 		{
-			MethodName: "SetTemplateStatus",
-			Handler:    _AdminService_SetTemplateStatus_Handler,
+			MethodName: "ListStreams",
+			Handler:    _AdminService_ListStreams_Handler,
 		},
 		{
-			MethodName: "SetTemplateTrusted",
-			Handler:    _AdminService_SetTemplateTrusted_Handler,
+			MethodName: "CancelStream",
+			Handler:    _AdminService_CancelStream_Handler,
 		},
 		{
-			MethodName: "DeleteTemplate",
-			Handler:    _AdminService_DeleteTemplate_Handler,
+			MethodName: "GetHealth",
+			Handler:    _AdminService_GetHealth_Handler,
 		},
 		{
-			MethodName: "DeleteArtifact",
-			Handler:    _AdminService_DeleteArtifact_Handler,
-		},
-		{
-			MethodName: "ListArtifacts",
-			Handler:    _AdminService_ListArtifacts_Handler,
+			MethodName: "GetStatus",
+			Handler:    _AdminService_GetStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

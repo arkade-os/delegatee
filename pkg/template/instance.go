@@ -2,7 +2,6 @@ package template
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"math"
 	"slices"
@@ -12,7 +11,7 @@ import (
 	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 )
 
-// Keys are the service keys a contract is resolved under; Delegate is the daemon's cosigner.
+// Keys are the service keys a contract is resolved under; Cosigner is the daemon's cosigner.
 type Keys = contract.Keys
 
 // Context is what an instance is resolved under.
@@ -34,8 +33,7 @@ type Instance struct {
 	locktimes []*arklib.AbsoluteLocktime // per slot, nil without a CLTV spend leaf
 }
 
-// Instantiate binds the template to c, building the contract of every input.
-func (t *Template) Instantiate(_ context.Context, c Context) (*Instance, error) {
+func (t *Template) Instantiate(c Context) (*Instance, error) {
 	if len(c.Variables) != len(t.variables) {
 		return nil, fmt.Errorf("%w: %d values for %d variables", ErrInvalidVariables, len(c.Variables), len(t.variables))
 	}

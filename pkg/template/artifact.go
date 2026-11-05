@@ -7,13 +7,11 @@ import (
 // Field is a named, typed value: a constructor input, a struct field or a covenant input.
 type Field = abi.Field
 
-// Struct is a user-defined constructor type.
 type Struct = abi.Struct
 
 // WitnessItem is a stack item a leaf's spender provides; Injected signatures are added by someone else.
 type WitnessItem = abi.WitnessItem
 
-// Leaf is one tapscript of a function.
 type Leaf = abi.Leaf
 
 // Covenant is the emulator script a function runs, with its inputs in declaration order.

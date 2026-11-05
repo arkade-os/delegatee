@@ -21,6 +21,94 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func request_AdminService_UpdateTemplate_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq UpdateTemplateRequest
+	var metadata gateway.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
+		return nil, metadata, gateway.ErrMarshal{Err: err, Inbound: true}
+	}
+
+	var (
+		val string
+		err error
+		_   = err
+	)
+
+	val = pathParams.ByName("id")
+	if val == "" {
+		return nil, metadata, gateway.ErrPathParameterMissing{Name: "id"}
+	}
+
+	protoReq.Id, err = protoconvert.String(val)
+	if err != nil {
+		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "id"}
+	}
+
+	msg, err := client.UpdateTemplate(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
+func request_AdminService_DeleteTemplate_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq DeleteTemplateRequest
+	var metadata gateway.ServerMetadata
+
+	var (
+		val string
+		err error
+		_   = err
+	)
+
+	val = pathParams.ByName("id")
+	if val == "" {
+		return nil, metadata, gateway.ErrPathParameterMissing{Name: "id"}
+	}
+
+	protoReq.Id, err = protoconvert.String(val)
+	if err != nil {
+		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "id"}
+	}
+
+	msg, err := client.DeleteTemplate(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
+func request_AdminService_ListArtifacts_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq ListArtifactsRequest
+	var metadata gateway.ServerMetadata
+
+	msg, err := client.ListArtifacts(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
+func request_AdminService_DeleteArtifact_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq DeleteArtifactRequest
+	var metadata gateway.ServerMetadata
+
+	var (
+		val string
+		err error
+		_   = err
+	)
+
+	val = pathParams.ByName("id")
+	if val == "" {
+		return nil, metadata, gateway.ErrPathParameterMissing{Name: "id"}
+	}
+
+	protoReq.Id, err = protoconvert.String(val)
+	if err != nil {
+		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "id"}
+	}
+
+	msg, err := client.DeleteArtifact(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
 var (
 	query_params_AdminService_ListDelegations_0 = gateway.QueryParameterParseOptions{
 		Filter: trie.New(),
@@ -43,96 +131,13 @@ func request_AdminService_ListDelegations_0(ctx context.Context, marshaler gatew
 
 }
 
-func request_AdminService_GetDelegationById_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq GetDelegationByIdRequest
-	var metadata gateway.ServerMetadata
-
-	var (
-		val string
-		err error
-		_   = err
-	)
-
-	val = pathParams.ByName("id")
-	if val == "" {
-		return nil, metadata, gateway.ErrPathParameterMissing{Name: "id"}
-	}
-
-	protoReq.Id, err = protoconvert.Int64(val)
-	if err != nil {
-		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "id"}
-	}
-
-	msg, err := client.GetDelegationById(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-
-}
-
-func request_AdminService_GetStatus_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq GetStatusRequest
-	var metadata gateway.ServerMetadata
-
-	msg, err := client.GetStatus(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-
-}
-
-func request_AdminService_GetHealth_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq GetHealthRequest
-	var metadata gateway.ServerMetadata
-
-	msg, err := client.GetHealth(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-
-}
-
-var (
-	query_params_AdminService_CancelDelegation_0 = gateway.QueryParameterParseOptions{
-		Filter: trie.New("address"),
-	}
-)
-
 func request_AdminService_CancelDelegation_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
 	var protoReq CancelDelegationRequest
 	var metadata gateway.ServerMetadata
 
-	var (
-		val string
-		err error
-		_   = err
-	)
-
-	val = pathParams.ByName("address")
-	if val == "" {
-		return nil, metadata, gateway.ErrPathParameterMissing{Name: "address"}
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
+		return nil, metadata, gateway.ErrMarshal{Err: err, Inbound: true}
 	}
-
-	protoReq.Address, err = protoconvert.String(val)
-	if err != nil {
-		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "address"}
-	}
-
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, gateway.ErrInvalidQueryParameters{Err: err}
-	}
-	if err := mux.PopulateQueryParameters(&protoReq, req.Form, query_params_AdminService_CancelDelegation_0); err != nil {
-		return nil, metadata, gateway.ErrInvalidQueryParameters{Err: err}
-	}
-
-	msg, err := client.CancelDelegation(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-
-}
-
-var (
-	query_params_AdminService_CancelDelegation_1 = gateway.QueryParameterParseOptions{
-		Filter: trie.New("id"),
-	}
-)
-
-func request_AdminService_CancelDelegation_1(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq CancelDelegationRequest
-	var metadata gateway.ServerMetadata
 
 	var (
 		val string
@@ -148,13 +153,6 @@ func request_AdminService_CancelDelegation_1(ctx context.Context, marshaler gate
 	protoReq.Id, err = protoconvert.Int64(val)
 	if err != nil {
 		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "id"}
-	}
-
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, gateway.ErrInvalidQueryParameters{Err: err}
-	}
-	if err := mux.PopulateQueryParameters(&protoReq, req.Form, query_params_AdminService_CancelDelegation_1); err != nil {
-		return nil, metadata, gateway.ErrInvalidQueryParameters{Err: err}
 	}
 
 	msg, err := client.CancelDelegation(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
@@ -191,43 +189,68 @@ func request_AdminService_ResumeDelegation_0(ctx context.Context, marshaler gate
 
 }
 
-func request_AdminService_RegisterStreamDelegation_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq RegisterStreamDelegationRequest
-	var metadata gateway.ServerMetadata
-
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
-		return nil, metadata, gateway.ErrMarshal{Err: err, Inbound: true}
-	}
-
-	msg, err := client.RegisterStreamDelegation(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-
-}
-
 var (
-	query_params_AdminService_ListAllTemplates_0 = gateway.QueryParameterParseOptions{
-		Filter: trie.New(),
+	query_params_AdminService_ListAttempts_0 = gateway.QueryParameterParseOptions{
+		Filter: trie.New("id"),
 	}
 )
 
-func request_AdminService_ListAllTemplates_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq ListAllTemplatesRequest
+func request_AdminService_ListAttempts_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq ListAttemptsRequest
 	var metadata gateway.ServerMetadata
+
+	var (
+		val string
+		err error
+		_   = err
+	)
+
+	val = pathParams.ByName("id")
+	if val == "" {
+		return nil, metadata, gateway.ErrPathParameterMissing{Name: "id"}
+	}
+
+	protoReq.Id, err = protoconvert.Int64(val)
+	if err != nil {
+		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "id"}
+	}
 
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, gateway.ErrInvalidQueryParameters{Err: err}
 	}
-	if err := mux.PopulateQueryParameters(&protoReq, req.Form, query_params_AdminService_ListAllTemplates_0); err != nil {
+	if err := mux.PopulateQueryParameters(&protoReq, req.Form, query_params_AdminService_ListAttempts_0); err != nil {
 		return nil, metadata, gateway.ErrInvalidQueryParameters{Err: err}
 	}
 
-	msg, err := client.ListAllTemplates(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.ListAttempts(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 
 }
 
-func request_AdminService_SetTemplateStatus_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq SetTemplateStatusRequest
+func request_AdminService_RegisterStream_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq RegisterStreamRequest
+	var metadata gateway.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
+		return nil, metadata, gateway.ErrMarshal{Err: err, Inbound: true}
+	}
+
+	msg, err := client.RegisterStream(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
+func request_AdminService_ListStreams_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq ListStreamsRequest
+	var metadata gateway.ServerMetadata
+
+	msg, err := client.ListStreams(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
+func request_AdminService_CancelStream_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq CancelStreamRequest
 	var metadata gateway.ServerMetadata
 
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
@@ -245,100 +268,30 @@ func request_AdminService_SetTemplateStatus_0(ctx context.Context, marshaler gat
 		return nil, metadata, gateway.ErrPathParameterMissing{Name: "id"}
 	}
 
-	protoReq.Id, err = protoconvert.String(val)
+	protoReq.Id, err = protoconvert.Int64(val)
 	if err != nil {
 		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "id"}
 	}
 
-	msg, err := client.SetTemplateStatus(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.CancelStream(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 
 }
 
-func request_AdminService_SetTemplateTrusted_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq SetTemplateTrustedRequest
+func request_AdminService_GetHealth_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq GetHealthRequest
 	var metadata gateway.ServerMetadata
 
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
-		return nil, metadata, gateway.ErrMarshal{Err: err, Inbound: true}
-	}
-
-	var (
-		val string
-		err error
-		_   = err
-	)
-
-	val = pathParams.ByName("id")
-	if val == "" {
-		return nil, metadata, gateway.ErrPathParameterMissing{Name: "id"}
-	}
-
-	protoReq.Id, err = protoconvert.String(val)
-	if err != nil {
-		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "id"}
-	}
-
-	msg, err := client.SetTemplateTrusted(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.GetHealth(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 
 }
 
-func request_AdminService_DeleteTemplate_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq DeleteTemplateRequest
+func request_AdminService_GetStatus_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
+	var protoReq GetStatusRequest
 	var metadata gateway.ServerMetadata
 
-	var (
-		val string
-		err error
-		_   = err
-	)
-
-	val = pathParams.ByName("id")
-	if val == "" {
-		return nil, metadata, gateway.ErrPathParameterMissing{Name: "id"}
-	}
-
-	protoReq.Id, err = protoconvert.String(val)
-	if err != nil {
-		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "id"}
-	}
-
-	msg, err := client.DeleteTemplate(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-
-}
-
-func request_AdminService_DeleteArtifact_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq DeleteArtifactRequest
-	var metadata gateway.ServerMetadata
-
-	var (
-		val string
-		err error
-		_   = err
-	)
-
-	val = pathParams.ByName("id")
-	if val == "" {
-		return nil, metadata, gateway.ErrPathParameterMissing{Name: "id"}
-	}
-
-	protoReq.Id, err = protoconvert.String(val)
-	if err != nil {
-		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "id"}
-	}
-
-	msg, err := client.DeleteArtifact(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-
-}
-
-func request_AdminService_ListArtifacts_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq ListArtifactsRequest
-	var metadata gateway.ServerMetadata
-
-	msg, err := client.ListArtifacts(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.GetStatus(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 
 }
@@ -382,239 +335,19 @@ func RegisterAdminServiceHandler(ctx context.Context, mux *gateway.ServeMux, con
 // "AdminServiceClient" to call the correct interceptors.
 func RegisterAdminServiceHandlerClient(ctx context.Context, mux *gateway.ServeMux, client AdminServiceClient) {
 
-	mux.HandleWithParams("GET", "/v1/admin/delegate", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+	mux.HandleWithParams("POST", "/v1/admin/template/:id", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/ListDelegations", gateway.WithHTTPPathPattern("/v1/admin/delegate"))
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/UpdateTemplate", gateway.WithHTTPPathPattern("/v1/admin/template/{id}"))
 		if err != nil {
 			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
 			return
 		}
 
-		resp, md, err := request_AdminService_ListDelegations_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
-		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
-			return
-		}
-
-		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
-	})
-
-	mux.HandleWithParams("GET", "/v1/admin/delegation/:id", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/GetDelegationById", gateway.WithHTTPPathPattern("/v1/admin/delegation/{id}"))
-		if err != nil {
-			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
-			return
-		}
-
-		resp, md, err := request_AdminService_GetDelegationById_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
-		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
-			return
-		}
-
-		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
-	})
-
-	mux.HandleWithParams("GET", "/v1/admin/status", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/GetStatus", gateway.WithHTTPPathPattern("/v1/admin/status"))
-		if err != nil {
-			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
-			return
-		}
-
-		resp, md, err := request_AdminService_GetStatus_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
-		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
-			return
-		}
-
-		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
-	})
-
-	mux.HandleWithParams("GET", "/v1/admin/health", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/GetHealth", gateway.WithHTTPPathPattern("/v1/admin/health"))
-		if err != nil {
-			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
-			return
-		}
-
-		resp, md, err := request_AdminService_GetHealth_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
-		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
-			return
-		}
-
-		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
-	})
-
-	mux.HandleWithParams("DELETE", "/v1/admin/delegate/:address", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/CancelDelegation", gateway.WithHTTPPathPattern("/v1/admin/delegate/{address}"))
-		if err != nil {
-			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
-			return
-		}
-
-		resp, md, err := request_AdminService_CancelDelegation_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
-		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
-			return
-		}
-
-		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
-	})
-
-	mux.HandleWithParams("DELETE", "/v1/admin/delegation/:id", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/CancelDelegation", gateway.WithHTTPPathPattern("/v1/admin/delegation/{id}"))
-		if err != nil {
-			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
-			return
-		}
-
-		resp, md, err := request_AdminService_CancelDelegation_1(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
-		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
-			return
-		}
-
-		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
-	})
-
-	mux.HandleWithParams("POST", "/v1/admin/delegation/:id/resume", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/ResumeDelegation", gateway.WithHTTPPathPattern("/v1/admin/delegation/{id}/resume"))
-		if err != nil {
-			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
-			return
-		}
-
-		resp, md, err := request_AdminService_ResumeDelegation_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
-		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
-			return
-		}
-
-		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
-	})
-
-	mux.HandleWithParams("POST", "/v1/admin/stream-delegation", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/RegisterStreamDelegation", gateway.WithHTTPPathPattern("/v1/admin/stream-delegation"))
-		if err != nil {
-			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
-			return
-		}
-
-		resp, md, err := request_AdminService_RegisterStreamDelegation_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
-		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
-			return
-		}
-
-		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
-	})
-
-	mux.HandleWithParams("GET", "/v1/admin/template", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/ListAllTemplates", gateway.WithHTTPPathPattern("/v1/admin/template"))
-		if err != nil {
-			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
-			return
-		}
-
-		resp, md, err := request_AdminService_ListAllTemplates_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
-		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
-			return
-		}
-
-		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
-	})
-
-	mux.HandleWithParams("PUT", "/v1/admin/template/:id/status", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/SetTemplateStatus", gateway.WithHTTPPathPattern("/v1/admin/template/{id}/status"))
-		if err != nil {
-			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
-			return
-		}
-
-		resp, md, err := request_AdminService_SetTemplateStatus_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
-		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
-			return
-		}
-
-		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
-	})
-
-	mux.HandleWithParams("PUT", "/v1/admin/template/:id/trusted", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/SetTemplateTrusted", gateway.WithHTTPPathPattern("/v1/admin/template/{id}/trusted"))
-		if err != nil {
-			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
-			return
-		}
-
-		resp, md, err := request_AdminService_SetTemplateTrusted_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		resp, md, err := request_AdminService_UpdateTemplate_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
 		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
@@ -646,6 +379,28 @@ func RegisterAdminServiceHandlerClient(ctx context.Context, mux *gateway.ServeMu
 		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
 	})
 
+	mux.HandleWithParams("GET", "/v1/admin/artifacts", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/ListArtifacts", gateway.WithHTTPPathPattern("/v1/admin/artifacts"))
+		if err != nil {
+			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
+			return
+		}
+
+		resp, md, err := request_AdminService_ListArtifacts_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
+			return
+		}
+
+		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
+	})
+
 	mux.HandleWithParams("DELETE", "/v1/admin/artifact/:id", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -668,19 +423,195 @@ func RegisterAdminServiceHandlerClient(ctx context.Context, mux *gateway.ServeMu
 		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
 	})
 
-	mux.HandleWithParams("GET", "/v1/admin/artifact", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+	mux.HandleWithParams("GET", "/v1/admin/delegations", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/ListArtifacts", gateway.WithHTTPPathPattern("/v1/admin/artifact"))
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/ListDelegations", gateway.WithHTTPPathPattern("/v1/admin/delegations"))
 		if err != nil {
 			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
 			return
 		}
 
-		resp, md, err := request_AdminService_ListArtifacts_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		resp, md, err := request_AdminService_ListDelegations_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
+			return
+		}
+
+		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
+	})
+
+	mux.HandleWithParams("POST", "/v1/admin/delegation/:id/cancel", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/CancelDelegation", gateway.WithHTTPPathPattern("/v1/admin/delegation/{id}/cancel"))
+		if err != nil {
+			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
+			return
+		}
+
+		resp, md, err := request_AdminService_CancelDelegation_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
+			return
+		}
+
+		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
+	})
+
+	mux.HandleWithParams("POST", "/v1/admin/delegation/:id/resume", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/ResumeDelegation", gateway.WithHTTPPathPattern("/v1/admin/delegation/{id}/resume"))
+		if err != nil {
+			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
+			return
+		}
+
+		resp, md, err := request_AdminService_ResumeDelegation_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
+			return
+		}
+
+		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
+	})
+
+	mux.HandleWithParams("GET", "/v1/admin/delegation/:id/attempts", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/ListAttempts", gateway.WithHTTPPathPattern("/v1/admin/delegation/{id}/attempts"))
+		if err != nil {
+			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
+			return
+		}
+
+		resp, md, err := request_AdminService_ListAttempts_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
+			return
+		}
+
+		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
+	})
+
+	mux.HandleWithParams("POST", "/v1/admin/stream", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/RegisterStream", gateway.WithHTTPPathPattern("/v1/admin/stream"))
+		if err != nil {
+			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
+			return
+		}
+
+		resp, md, err := request_AdminService_RegisterStream_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
+			return
+		}
+
+		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
+	})
+
+	mux.HandleWithParams("GET", "/v1/admin/streams", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/ListStreams", gateway.WithHTTPPathPattern("/v1/admin/streams"))
+		if err != nil {
+			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
+			return
+		}
+
+		resp, md, err := request_AdminService_ListStreams_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
+			return
+		}
+
+		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
+	})
+
+	mux.HandleWithParams("POST", "/v1/admin/stream/:id/cancel", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/CancelStream", gateway.WithHTTPPathPattern("/v1/admin/stream/{id}/cancel"))
+		if err != nil {
+			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
+			return
+		}
+
+		resp, md, err := request_AdminService_CancelStream_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
+			return
+		}
+
+		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
+	})
+
+	mux.HandleWithParams("GET", "/v1/admin/health", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/GetHealth", gateway.WithHTTPPathPattern("/v1/admin/health"))
+		if err != nil {
+			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
+			return
+		}
+
+		resp, md, err := request_AdminService_GetHealth_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
+		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
+			return
+		}
+
+		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
+	})
+
+	mux.HandleWithParams("GET", "/v1/admin/status", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.AdminService/GetStatus", gateway.WithHTTPPathPattern("/v1/admin/status"))
+		if err != nil {
+			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
+			return
+		}
+
+		resp, md, err := request_AdminService_GetStatus_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
 		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)

@@ -102,6 +102,20 @@ services:
     depends_on:
       - arkd
 
+  fulcrum:
+    restart: unless-stopped
+    image: cculianu/fulcrum:v2.1.4
+    container_name: fulcrum
+    command: ["Fulcrum", "/etc/fulcrum.conf"]
+    ports:
+      - "50001:50001"
+    configs:
+      - source: fulcrum
+        target: /etc/fulcrum.conf
+    volumes:
+      - type: tmpfs
+        target: /data
+
   pg:
     restart: unless-stopped
     image: postgres:17.8
@@ -132,6 +146,8 @@ services:
         condition: service_healthy
       emulator:
         condition: service_started
+      fulcrum:
+        condition: service_started
     ports:
       - "7080:7080"
       - "127.0.0.1:7081:7081"
@@ -140,10 +156,22 @@ services:
       - DELEGATEE_DATABASE_URL=postgres://postgres@pg:5432/delegatee?sslmode=disable
       - DELEGATEE_ARK_URL=arkd:7070
       - DELEGATEE_EMULATOR_URL=emulator:7073
-      - DELEGATEE_DELEGATE_KEY=${DELEGATEE_DELEGATE_KEY:-0000000000000000000000000000000000000000000000000000000000000001}
+      - DELEGATEE_ELECTRUM_URL=tcp://fulcrum:50001
+      - DELEGATEE_COSIGNER_KEY=${DELEGATEE_COSIGNER_KEY:-0000000000000000000000000000000000000000000000000000000000000001}
       - DELEGATEE_EXPLORER_URL=http://chopsticks:3000
       - DELEGATEE_ADMIN_AUTH=disabled
-      - DELEGATEE_MIN_WATCH_EXPIRY=0
+      - DELEGATEE_MIN_DELEGATION_EXPIRY=0
+
+configs:
+  fulcrum:
+    content: |
+      bitcoind = bitcoin:18443
+      rpcuser = admin1
+      rpcpassword = 123
+      tcp = 0.0.0.0:50001
+      peering = false
+      announce = false
+      max_subs_per_ip = 1000000
 
 networks:
   default:

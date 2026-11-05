@@ -1,7 +1,6 @@
 package template
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,22 +16,20 @@ import (
 
 func TestParseMinimal(t *testing.T) {
 	doc := fixture(t, "minimal.json")
-	tmpl, err := Parse(t.Context(), doc, nil)
+	tmpl, err := Parse(doc, nil)
 	require.NoError(t, err)
 	require.Equal(t, Onchain, tmpl.Type())
 	require.Equal(t, []Slot{{Name: "funds", Onchain: true}}, tmpl.Inputs())
 	require.Empty(t, tmpl.Variables())
-	inst, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t)})
+	inst, err := tmpl.Instantiate(Context{Keys: testKeys(t)})
 	require.NoError(t, err)
-	max, ok := inst.FeeCap()
-	require.True(t, ok)
-	require.EqualValues(t, 1000, max)
+	require.EqualValues(t, 1000, inst.feeCap())
 	require.Len(t, tmpl.ID(), 64)
 }
 
 func TestIDIgnoresDefaultsAndSpelling(t *testing.T) {
 	doc := fixture(t, "minimal.json")
-	base, err := Parse(t.Context(), doc, nil)
+	base, err := Parse(doc, nil)
 	require.NoError(t, err)
 	for name, edit := range map[string]func(map[string]any){
 		"explicit empty variables": func(m map[string]any) { m["variables"] = map[string]any{} },
@@ -44,12 +41,12 @@ func TestIDIgnoresDefaultsAndSpelling(t *testing.T) {
 		"explicit assets": func(m map[string]any) { m["outputs"].([]any)[0].(map[string]any)["assets"] = []any{} },
 	} {
 		t.Run(name, func(t *testing.T) {
-			got, err := Parse(t.Context(), edited(t, doc, edit), nil)
+			got, err := Parse(edited(t, doc, edit), nil)
 			require.NoError(t, err)
 			require.Equal(t, base.ID(), got.ID())
 		})
 	}
-	changed, err := Parse(t.Context(), edited(t, doc, func(m map[string]any) {
+	changed, err := Parse(edited(t, doc, func(m map[string]any) {
 		m["fees"].(map[string]any)["max"] = 1001
 	}), nil)
 	require.NoError(t, err)
@@ -61,7 +58,7 @@ func TestParseRejects(t *testing.T) {
 	in := func(m map[string]any) map[string]any { return m["inputs"].([]any)[0].(map[string]any) }
 	out := func(m map[string]any) map[string]any { return m["outputs"].([]any)[0].(map[string]any) }
 	for name, edit := range map[string]func(map[string]any){
-		"format":                  func(m map[string]any) { m["format"] = "delegateed-template/v2" },
+		"format":                  func(m map[string]any) { m["format"] = "template/v2" },
 		"type":                    func(m map[string]any) { m["type"] = "batch" },
 		"unknown field":           func(m map[string]any) { m["extra"] = 1 },
 		"field in another case":   func(m map[string]any) { m["Fees"] = m["fees"] },
@@ -109,12 +106,12 @@ func TestParseRejects(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := Parse(t.Context(), edited(t, doc, edit), nil)
+			_, err := Parse(edited(t, doc, edit), nil)
 			require.Error(t, err)
 			require.True(t, errors.Is(err, ErrInvalidTemplate) || errors.Is(err, ErrInvalidArtifact), err)
 		})
 	}
-	_, err := Parse(t.Context(), []byte(strings.Replace(string(fixture(t, "minimal.json")), `"type": "onchain",`, `"type": "onchain", "type": "onchain",`, 1)), nil)
+	_, err := Parse([]byte(strings.Replace(string(fixture(t, "minimal.json")), `"type": "onchain",`, `"type": "onchain", "type": "onchain",`, 1)), nil)
 	require.ErrorIs(t, err, ErrInvalidTemplate, "duplicate key")
 }
 
@@ -134,7 +131,7 @@ func TestProgramOnlyInContractArguments(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := Parse(t.Context(), edited(t, doc, edit), nil)
+			_, err := Parse(edited(t, doc, edit), nil)
 			require.ErrorIs(t, err, ErrInvalidTemplate)
 		})
 	}
@@ -150,7 +147,7 @@ func TestParseIntent(t *testing.T) {
 			"advertise":    []any{map[string]any{"template": "self", "outputs": []any{"payment"}}},
 		}
 	})
-	tmpl, err := Parse(t.Context(), doc, nil)
+	tmpl, err := Parse(doc, nil)
 	require.NoError(t, err)
 	require.Equal(t, Intent, tmpl.Type())
 	require.Equal(t, []Slot{{Name: "funds"}}, tmpl.Inputs())
@@ -217,12 +214,12 @@ func TestParseIntent(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := Parse(t.Context(), edited(t, doc, edit), nil)
+			_, err := Parse(edited(t, doc, edit), nil)
 			require.ErrorIs(t, err, ErrInvalidTemplate)
 		})
 	}
 
-	_, err = Parse(t.Context(), edited(t, doc, func(m map[string]any) {
+	_, err = Parse(edited(t, doc, func(m map[string]any) {
 		twoInputs(t, m)
 		pk(m)["rules"] = []any{rule(3, "drop"), packetRule(3, "drop", "more"), packetRule(3, "emit", "more"), rule(2, "copy")}
 	}), nil)
@@ -258,7 +255,7 @@ func TestBindingTypes(t *testing.T) {
 		"non-minimal int literal":       {covenant("int", "0100", nil), false},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := Parse(t.Context(), edited(t, doc, tc.edit), nil)
+			_, err := Parse(edited(t, doc, tc.edit), nil)
 			if tc.ok {
 				require.NoError(t, err)
 			} else {
@@ -270,7 +267,7 @@ func TestBindingTypes(t *testing.T) {
 
 func TestVHTLC(t *testing.T) {
 	doc := []byte(vhtlc)
-	_, err := Parse(t.Context(), doc, nil)
+	_, err := Parse(doc, nil)
 	require.NoError(t, err)
 
 	args := func(m map[string]any) map[string]any {
@@ -288,7 +285,7 @@ func TestVHTLC(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := Parse(t.Context(), edited(t, doc, edit), nil)
+			_, err := Parse(edited(t, doc, edit), nil)
 			require.ErrorIs(t, err, ErrInvalidTemplate)
 		})
 	}
@@ -330,7 +327,7 @@ func TestSecretsOnlyHashedInScripts(t *testing.T) {
 		"locking script, only in the transaction": {locking("5120<preimage>"), true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := Parse(t.Context(), edited(t, doc, tc.edit), nil)
+			_, err := Parse(edited(t, doc, tc.edit), nil)
 			if tc.ok {
 				require.NoError(t, err)
 			} else {
@@ -354,37 +351,37 @@ func TestArtifactReference(t *testing.T) {
 	referenced := edited(t, doc, func(m map[string]any) {
 		m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)["definition"] = map[string]any{"artifact": artifact.ID}
 	})
-	resolve := func(_ context.Context, id string) ([]byte, error) {
-		require.Equal(t, artifact.ID, id)
-		return raw, nil
-	}
-	tmpl, err := Parse(t.Context(), referenced, resolve)
+	tmpl, err := Parse(referenced, map[string][]byte{artifact.ID: raw})
 	require.NoError(t, err)
 	require.Equal(t, []string{artifact.ID}, tmpl.Artifacts())
-	inline, err := Parse(t.Context(), doc, nil)
+	inline, err := Parse(doc, nil)
 	require.NoError(t, err)
 	require.NotEqual(t, inline.ID(), tmpl.ID(), "the id hashes the template as written")
 
-	_, err = Parse(t.Context(), referenced, nil)
-	require.ErrorIs(t, err, ErrInvalidTemplate, "no resolver")
-	_, err = Parse(t.Context(), referenced, func(context.Context, string) ([]byte, error) {
-		return []byte(strings.Replace(string(raw), "Release", "Other", 1)), nil
-	})
+	_, err = Parse(referenced, nil)
+	require.ErrorIs(t, err, ErrInvalidTemplate, "artifact not provided")
+	other := []byte(strings.Replace(string(raw), "Release", "Other", 1))
+	_, err = Parse(referenced, map[string][]byte{artifact.ID: other})
 	require.ErrorIs(t, err, ErrInvalidTemplate, "the stored document does not hash to the id")
-	down := errors.New("database down")
-	_, err = Parse(t.Context(), referenced, func(context.Context, string) ([]byte, error) { return nil, down })
-	require.ErrorIs(t, err, down)
-	require.NotErrorIs(t, err, ErrInvalidTemplate, "an outage is not a bad document")
+
+	ids, err := ArtifactIDs(referenced)
+	require.NoError(t, err)
+	require.Equal(t, []string{artifact.ID}, ids)
+	ids, err = ArtifactIDs(doc)
+	require.NoError(t, err)
+	require.Empty(t, ids)
+	_, err = ArtifactIDs([]byte("nope"))
+	require.ErrorIs(t, err, ErrInvalidTemplate)
 }
 
 func TestPushOpcodesRefused(t *testing.T) {
 	doc := fixture(t, "minimal.json")
 	out := func(m map[string]any) map[string]any { return m["outputs"].([]any)[0].(map[string]any) }
-	_, err := Parse(t.Context(), edited(t, doc, func(m map[string]any) {
+	_, err := Parse(edited(t, doc, func(m map[string]any) {
 		out(m)["locking"] = fmt.Sprintf("5120$(OP_DATA_2 0x01%02x OP_NIP)", arkade.OP_TXID)
 	}), nil)
 	require.ErrorIs(t, err, ErrInvalidTemplate, "locking expression")
-	_, err = Parse(t.Context(), edited(t, doc, func(m map[string]any) {
+	_, err = Parse(edited(t, doc, func(m map[string]any) {
 		def := m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)["definition"].(map[string]any)
 		leafOf(def, 0)["asm"] = []any{"OP_DATA_1", "<delegate>", "OP_CHECKSIG"}
 	}), nil)
@@ -392,10 +389,10 @@ func TestPushOpcodesRefused(t *testing.T) {
 }
 
 func TestParseRefusesUnbuildable(t *testing.T) {
-	_, err := Parse(t.Context(), edited(t, fixture(t, "renewal.json"), func(m map[string]any) { delete(m, "packets") }), nil)
+	_, err := Parse(edited(t, fixture(t, "renewal.json"), func(m map[string]any) { delete(m, "packets") }), nil)
 	require.ErrorIs(t, err, ErrInvalidTemplate, "a covenant without packets")
 
-	_, err = Parse(t.Context(), edited(t, mixedPaymentDoc(t, false), func(m map[string]any) {
+	_, err = Parse(edited(t, mixedPaymentDoc(t, false), func(m map[string]any) {
 		in := m["inputs"].([]any)[0].(map[string]any)
 		sp := in["spend"].(map[string]any)
 		sp["function"], sp["leaf"] = "spend", "spend"
@@ -419,9 +416,9 @@ func TestParseRefusesUnbuildable(t *testing.T) {
 			m["packets"] = map[string]any{"output_index": n + 1, "advertise": ads}
 		})
 	}
-	_, err = Parse(t.Context(), adverts(14), nil)
+	_, err = Parse(adverts(14), nil)
 	require.NoError(t, err, "14 records fit")
-	_, err = Parse(t.Context(), adverts(15), nil)
+	_, err = Parse(adverts(15), nil)
 	require.ErrorIs(t, err, ErrInvalidTemplate, "15 records do not fit")
 }
 
@@ -485,7 +482,7 @@ func packetRule(typ int, action, from string) map[string]any {
 // vhtlc is the protocol's non-interactive VHTLC claim example.
 const vhtlc = `
 {
-  "format": "delegateed-template/v1",
+  "format": "template/v1",
   "type": "offchain",
   "variables": {
     "sender": "pubkey",
@@ -724,10 +721,10 @@ func TestArrayInputs(t *testing.T) {
 			t.Fatalf("releaseDoc has no function %q", name)
 		})
 	}
-	_, err := Parse(t.Context(), withInput("exit"), nil)
+	_, err := Parse(withInput("exit"), nil)
 	require.NoError(t, err, "an array input on a function the template does not spend")
 
-	_, err = Parse(t.Context(), withInput("release"), nil)
+	_, err = Parse(withInput("release"), nil)
 	require.ErrorIs(t, err, ErrUnsupported)
 	require.ErrorContains(t, err, `array input "sigs"`)
 }

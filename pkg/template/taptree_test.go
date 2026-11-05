@@ -52,13 +52,13 @@ func TestTaptreeParse(t *testing.T) {
 		"undeclared":        func(m map[string]any) { firstContract(m)["taptree"] = "<nope>" },
 		"not bytes":         func(m map[string]any) { firstContract(m)["taptree"] = "<to>" },
 	} {
-		_, err := Parse(t.Context(), edited(t, []byte(treeDoc), edit), nil)
+		_, err := Parse(edited(t, []byte(treeDoc), edit), nil)
 		require.ErrorIs(t, err, ErrInvalidTemplate, name)
 	}
 	onOutput := edited(t, []byte(treeDoc), func(m map[string]any) {
 		m["outputs"].([]any)[0].(map[string]any)["locking"] = map[string]any{"contract": firstContract(m)}
 	})
-	_, err := Parse(t.Context(), onOutput, nil)
+	_, err := Parse(onOutput, nil)
 	require.ErrorIs(t, err, ErrInvalidTemplate)
 	require.ErrorContains(t, err, "taptree")
 
@@ -73,7 +73,7 @@ func TestTaptreeParse(t *testing.T) {
 			m["secrets"] = map[string]any{"s": map[string]any{"type": "bytes32", "from": "coin", "ciphertext": "<tree>"}}
 		},
 	} {
-		_, err := Parse(t.Context(), edited(t, []byte(treeDoc), edit), nil)
+		_, err := Parse(edited(t, []byte(treeDoc), edit), nil)
 		require.ErrorIs(t, err, ErrInvalidTemplate, name)
 		require.ErrorContains(t, err, "outside the taptree field", name)
 	}
@@ -81,7 +81,7 @@ func TestTaptreeParse(t *testing.T) {
 
 // treeDoc watches a coin whose tree is given whole and holds the leaf "<SERVER_KEY> OP_CHECKSIG".
 const treeDoc = `{
-  "format": "delegateed-template/v1",
+  "format": "template/v1",
   "type": "offchain",
   "variables": {"tree": "bytes", "to": "bytes32"},
   "inputs": [{
@@ -120,7 +120,7 @@ func instantiateTree(t *testing.T, leaves []string) (*Instance, error) {
 
 func instantiateRaw(t *testing.T, raw []byte) (*Instance, error) {
 	t.Helper()
-	return parseDoc(t, []byte(treeDoc)).Instantiate(t.Context(), Context{
+	return parseDoc(t, []byte(treeDoc)).Instantiate(Context{
 		Keys:      testKeys(t),
 		Variables: map[string][]byte{"tree": raw, "to": make([]byte, 32)},
 	})

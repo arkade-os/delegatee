@@ -1,11 +1,13 @@
-// Package ecies seals a secret to a public key.
+// Package ecies seals a secret to a public key and to the template that uses it.
 //
-//	ciphertext = ephemeralPub[33 compressed] || nonce[12] || AES-256-GCM(plaintext, key, nonce, aad=ephemeralPub)
+//	ciphertext = ephemeralPub[33 compressed] || nonce[12] || AES-256-GCM(plaintext, key, nonce, aad=ephemeralPub || templateID)
 //	key        = HKDF-SHA256(ikm=sharedX, salt=ephemeralPub, info="covclaimd/preimage/v1", 32 bytes)
+//	templateID = the template id, as UTF-8 bytes
 //	sharedX    = the 32-byte x coordinate of ephemeralPriv*recipientPub (== recipientPriv*ephemeralPub)
 package ecies
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hkdf"
@@ -25,8 +27,8 @@ const (
 	hkdfInfo  = "covclaimd/preimage/v1"
 )
 
-// Encrypt seals plaintext with a random ephemeral key and nonce.
-func Encrypt(to *btcec.PublicKey, plaintext []byte) ([]byte, error) {
+// Encrypt seals plaintext for templateID with a random ephemeral key and nonce.
+func Encrypt(to *btcec.PublicKey, plaintext []byte, templateID string) ([]byte, error) {
 	if to == nil {
 		return nil, fmt.Errorf("ecies: recipient public key is nil")
 	}
@@ -55,12 +57,12 @@ func Encrypt(to *btcec.PublicKey, plaintext []byte) ([]byte, error) {
 	out := make([]byte, 0, pubKeyLen+nonceLen+len(plaintext)+gcmTagLen)
 	out = append(out, ephPub...)
 	out = append(out, nonce...)
-	out = aead.Seal(out, nonce, plaintext, ephPub)
+	out = aead.Seal(out, nonce, plaintext, aad(ephPub, templateID))
 	return out, nil
 }
 
-// Decrypt opens a ciphertext sealed by Encrypt to key's public key.
-func Decrypt(key *btcec.PrivateKey, ciphertext []byte) ([]byte, error) {
+// Decrypt opens a ciphertext sealed by Encrypt to key's public key for templateID.
+func Decrypt(key *btcec.PrivateKey, ciphertext []byte, templateID string) ([]byte, error) {
 	if key == nil {
 		return nil, fmt.Errorf("ecies: private key is nil")
 	}
@@ -87,21 +89,15 @@ func Decrypt(key *btcec.PrivateKey, ciphertext []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	plaintext, err := aead.Open(nil, nonce, ct, ephPubBytes)
+	plaintext, err := aead.Open(nil, nonce, ct, aad(ephPubBytes, templateID))
 	if err != nil {
 		return nil, fmt.Errorf("ecies: decrypt: %w", err)
 	}
 	return plaintext, nil
 }
 
-// DecryptAny tries each key in order, so a ciphertext sealed to a superseded key still opens.
-func DecryptAny(keys []*btcec.PrivateKey, ciphertext []byte) ([]byte, error) {
-	for _, key := range keys {
-		if plaintext, err := Decrypt(key, ciphertext); err == nil {
-			return plaintext, nil
-		}
-	}
-	return nil, fmt.Errorf("ecies: no key opens the ciphertext, tried %d", len(keys))
+func aad(ephPub []byte, templateID string) []byte {
+	return append(bytes.Clone(ephPub), templateID...)
 }
 
 // deriveKey is symmetric: (ephPriv, recipientPub) encrypts, (recipientPriv, ephPub) decrypts.

@@ -1,5 +1,5 @@
 {
-  "format": "delegateed-template/v1",
+  "format": "template/v1",
   "type": "offchain",
   "variables": {
     "taptree": "bytes",
@@ -74,7 +74,7 @@
     "decode": "tlv",
     "min_value": 1000,
     "require": {"tlv:3": "<ENCRYPTION_KEY>"},
-    "bind": {
+    "capture": {
       "ciphertext": "tlv:1",
       "receiver_program": {
         "from": "tlv:2",

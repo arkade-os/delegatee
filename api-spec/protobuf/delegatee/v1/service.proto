@@ -5,65 +5,55 @@ package delegatee.v1;
 import "meshapi/gateway/annotations.proto";
 
 service DelegateeService {
-  // GetInfo returns the keys a wallet instantiates a template with.
+  // GetInfo tells the daemon's version, network and keys.
   rpc GetInfo(GetInfoRequest) returns (GetInfoResponse) {
     option (meshapi.gateway.http) = {
       get: "/v1/info"
     };
   }
-
-  // RegisterDelegation registers a watch: the daemon acts on coins sent to
-  // the address the template derives for variables, until expires_at. The
-  // template must have exactly one input; the wallet compares the address
-  // with its own. Registering an active watch again returns it unchanged.
+  // RegisterDelegation binds a one-input template to variables: the daemon acts on every coin landing at
+  // the derived address until expires_at. Registering an active delegation again returns it unchanged.
   rpc RegisterDelegation(RegisterDelegationRequest) returns (RegisterDelegationResponse) {
     option (meshapi.gateway.http) = {
-      post: "/v1/delegate"
+      post: "/v1/delegation"
       body: "*"
     };
   }
-
-  // GetDelegation returns the watch of an address (an active one first, else
-  // the newest) with its spendable VTXOs (live from the arkd indexer) and its
-  // renewal history.
+  // GetDelegation returns a delegation with its coins, by ?id= or by ?address=.
   rpc GetDelegation(GetDelegationRequest) returns (GetDelegationResponse) {
     option (meshapi.gateway.http) = {
-      get: "/v1/delegate/{address}"
+      get: "/v1/delegation"
     };
   }
-
-  // RegisterSpend spends outpoints once through a template, signed by their owner.
-  rpc RegisterSpend(RegisterSpendRequest) returns (RegisterSpendResponse) {
+  // RegisterArtifact stores a compiler artifact under its content id. Idempotent.
+  rpc RegisterArtifact(RegisterArtifactRequest) returns (RegisterArtifactResponse) {
     option (meshapi.gateway.http) = {
-      post: "/v1/spend"
+      post: "/v1/artifact"
       body: "*"
     };
   }
-
-  // GetSpend returns a spend with its coins and attempts.
-  rpc GetSpend(GetSpendRequest) returns (GetSpendResponse) {
+  rpc GetArtifact(GetArtifactRequest) returns (GetArtifactResponse) {
     option (meshapi.gateway.http) = {
-      get: "/v1/spend/{id}"
+      get: "/v1/artifact/{id}"
     };
   }
-
-  // RegisterArtifact stores a compiler artifact templates may reference. Idempotent on its id.
-  rpc RegisterArtifact(RegisterArtifactRequest) returns (RegisterArtifactResponse) {
-    option (meshapi.gateway.http) = { post: "/v1/artifact" body: "*" };
-  }
-  rpc GetArtifact(GetArtifactRequest) returns (GetArtifactResponse) {
-    option (meshapi.gateway.http) = { get: "/v1/artifact/{id}" };
-  }
-  // RegisterTemplate stores a template the engine accepts. It is active at once. Idempotent on its id.
+  // RegisterTemplate stores a template under its content id once its artifacts are registered. Idempotent.
   rpc RegisterTemplate(RegisterTemplateRequest) returns (RegisterTemplateResponse) {
-    option (meshapi.gateway.http) = { post: "/v1/template" body: "*" };
+    option (meshapi.gateway.http) = {
+      post: "/v1/template"
+      body: "*"
+    };
   }
   rpc GetTemplate(GetTemplateRequest) returns (GetTemplateResponse) {
-    option (meshapi.gateway.http) = { get: "/v1/template/{id}" };
+    option (meshapi.gateway.http) = {
+      get: "/v1/template/{id}"
+    };
   }
-  // ListTemplates lists the active templates, without their documents.
+  // ListTemplates lists templates without their documents, newest first.
   rpc ListTemplates(ListTemplatesRequest) returns (ListTemplatesResponse) {
-    option (meshapi.gateway.http) = { get: "/v1/template" };
+    option (meshapi.gateway.http) = {
+      get: "/v1/templates"
+    };
   }
 }
 
@@ -71,132 +61,134 @@ message GetInfoRequest {}
 message GetInfoResponse {
   string version = 1;
   string network = 2;
-  string delegate_pubkey = 3;
+  // cosigner_pubkey is the compressed key that cosigns arkd's vtxo trees.
+  string cosigner_pubkey = 3;
   string server_pubkey = 4;
-  string emulator_pubkey = 5;
   // encryption_pubkey seals template secrets for this daemon; empty without an encryption key.
-  string encryption_pubkey = 6;
+  string encryption_pubkey = 5;
+  // emulator_pubkey merges into server_pubkey once arkd's signer runs the arkade covenants.
+  string emulator_pubkey = 6;
 }
 
 message RegisterDelegationRequest {
   string template_id = 1;
+  // variables are the template's declared variables, values in lower-case hex.
   map<string, string> variables = 2;
-  // expires_at is a unix time after which the watch stops; 0 never expires.
+  // expires_at is unix seconds; 0 never expires.
   int64 expires_at = 3;
 }
 message RegisterDelegationResponse {
   Delegation delegation = 1;
 }
-
 message GetDelegationRequest {
-  string address = 1;
+  int64 id = 1;
+  string address = 2;
 }
 message GetDelegationResponse {
   Delegation delegation = 1;
-  repeated Vtxo vtxos = 2;
-  repeated Renewal renewals = 3;
+  // coins are the vtxos found at the delegation's inputs, present and spent.
+  repeated Coin coins = 2;
 }
 
-message RegisterSpendRequest {
-  string template_id = 1;
-  map<string, string> variables = 2;
-  repeated string outpoints = 3;
-  int64 expires_at = 4;
-  string pubkey = 5;
-  string signature = 6;
+message RegisterArtifactRequest {
+  // document is the artifact JSON document.
+  string document = 1;
 }
-message RegisterSpendResponse {
-  // id is the spend's fingerprint.
-  string id = 1;
-  Delegation delegation = 2;
+message RegisterArtifactResponse {
+  Artifact artifact = 1;
 }
-
-message GetSpendRequest {
+message GetArtifactRequest {
   string id = 1;
 }
-message GetSpendResponse {
-  Delegation delegation = 1;
-  repeated Vtxo vtxos = 2;
-  repeated Renewal renewals = 3;
+message GetArtifactResponse {
+  Artifact artifact = 1;
 }
 
-// Delegation is an instance of a template.
-message Delegation {
-  int64 id = 1;
-  // address is slot 0's address for a watch, empty otherwise.
-  string address = 2;
-  // status is active, cancelled, expired or done.
-  string status = 3;
-  string template_id = 4;
-  map<string, string> variables = 5;
-  // expires_at is 0 when the delegation never expires.
-  int64 expires_at = 6;
-  repeated Slot slots = 7;
-  int64 created_at = 8;
-  int64 updated_at = 9;
-  // parent_id is the delegation whose settled transaction advertised this one, or the stream delegation that spawned it; 0 otherwise.
-  int64 parent_id = 10;
+message RegisterTemplateRequest {
+  // document is the template JSON document.
+  string document = 1;
+}
+message RegisterTemplateResponse {
+  Template template = 1;
+}
+message GetTemplateRequest {
+  string id = 1;
+}
+message GetTemplateResponse {
+  Template template = 1;
+}
+message ListTemplatesRequest {
+  // status filters on active or disabled; empty lists all.
+  string status = 1;
+}
+message ListTemplatesResponse {
+  repeated Template templates = 1;
 }
 
-// Slot is one template input of a delegation.
-message Slot {
-  string name = 1;
-  bool onchain = 2;
-  repeated string tapscripts = 3;
-  // outpoint is "txid:vout" when bound, empty for a watch.
-  string outpoint = 4;
-}
-
-message Vtxo {
-  string outpoint = 1;
-  uint64 amount = 2;
-  int64 expires_at = 3;
-  bool preconfirmed = 4;
-  repeated Asset assets = 5;
-  int64 created_at = 6;
-  int64 renewable_at = 7;
-  bool onchain = 8;
-}
-
-message Asset {
-  string asset_id = 1;
-  uint64 amount = 2;
-}
-
-message Renewal {
-  repeated string outpoints = 1;
-  string commitment_txid = 2;
-  bool success = 3;
-  string error = 4;
-  int64 attempted_at = 5;
-}
-
-message RegisterArtifactRequest { string document = 1; }
-message RegisterArtifactResponse { Artifact artifact = 1; }
-message GetArtifactRequest { string id = 1; }
-message GetArtifactResponse { Artifact artifact = 1; }
 message Artifact {
   string id = 1;
   string document = 2;
+  // created_at is unix seconds.
   int64 created_at = 3;
 }
-
-message RegisterTemplateRequest { string document = 1; }
-message RegisterTemplateResponse { Template template = 1; }
-message GetTemplateRequest { string id = 1; }
-message GetTemplateResponse { Template template = 1; }
-// ListTemplatesRequest has no fields: the public list is always the active one.
-message ListTemplatesRequest {}
-message ListTemplatesResponse { repeated Template templates = 1; }
+message Template {
+  string id = 1;
+  string document = 2;
+  repeated string artifact_ids = 3;
+  repeated Param params = 4;
+  // type is intent or offchain.
+  string type = 5;
+  // status is active or disabled.
+  string status = 6;
+  // created_at is unix seconds.
+  int64 created_at = 8;
+}
 message Param {
   string name = 1;
   string type = 2;
 }
-message Template {
-  string id = 1;
-  string document = 2; // empty in list responses
-  repeated string artifact_ids = 3;
-  repeated Param params = 4;
-  string status = 5;
-  int64 created_at = 6;
+message Delegation {
+  int64 id = 1;
+  string fingerprint = 2;
+  string address = 3;
+  string template_id = 4;
+  map<string, string> variables = 5;
+  repeated Input inputs = 6;
+  // stream_id is the stream that spawned the delegation, 0 when a client registered it.
+  int64 stream_id = 7;
+  // expires_at is unix seconds, 0 when the delegation never expires.
+  int64 expires_at = 8;
+  // status is active, cancelled, expired or done.
+  string status = 9;
+  // created_at and updated_at are unix seconds.
+  int64 created_at = 10;
+  int64 updated_at = 11;
+}
+// Input is one template input of a delegation.
+message Input {
+  string name = 1;
+  bool onchain = 2;
+  // script is the hex output script of the input's contract.
+  string script = 3;
+  repeated string tapscripts = 4;
+  // locktime is the absolute locktime of the input's spend leaf, 0 without one.
+  uint32 locktime = 5;
+}
+// Coin is a vtxo found at a delegation's input.
+message Coin {
+  // outpoint is txid:vout.
+  string outpoint = 1;
+  // input is the index of the delegation input the coin landed at.
+  int32 input = 2;
+  uint64 amount = 3;
+  // expires_at is unix seconds, 0 when the coin never expires.
+  int64 expires_at = 4;
+  // due is unix seconds, when the delegation becomes eligible to spend the coin.
+  int64 due = 5;
+  // status is present or spent.
+  string status = 6;
+  // spent_by is the txid that consumed the coin, empty while present or unknown.
+  string spent_by = 7;
+  // confirmations is how deep an onchain coin is buried, 0 in the mempool and for vtxos.
+  int32 confirmations = 8;
 }

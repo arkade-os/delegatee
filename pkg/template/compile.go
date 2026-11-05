@@ -1,25 +1,22 @@
 package template
 
 import (
-	"context"
 	"slices"
 
 	"github.com/arkade-os/delegatee/pkg/template/internal/schema"
 )
 
-// compiler turns a typed document into a Template: names become indexes, bindings are typed,
-// and the rules relating one part of the document to another are checked. Each rule lives in
-// the file of the concept it is about; this file only sequences them.
+// compiler turns a typed document into a Template: names become indexes, bindings are typed and
+// cross-part rules are checked.
 type compiler struct {
-	ctx     context.Context
-	resolve Resolver
-	doc     *schema.Template
-	t       *Template
-	named   map[string]bool // variables and secrets some binding uses
+	artifacts map[string][]byte
+	doc       *schema.Template
+	t         *Template
+	named     map[string]bool // variables and secrets some binding uses
 }
 
-func compile(ctx context.Context, doc *schema.Template, resolve Resolver) (*Template, error) {
-	c := &compiler{ctx: ctx, resolve: resolve, doc: doc, named: map[string]bool{}, t: &Template{
+func compile(doc *schema.Template, artifacts map[string][]byte) (*Template, error) {
+	c := &compiler{artifacts: artifacts, doc: doc, named: map[string]bool{}, t: &Template{
 		typ: Type(doc.Type), variables: map[string]string{}, secrets: map[string]secret{},
 	}}
 	if err := c.declarations(); err != nil {

@@ -5,42 +5,12 @@
     "version": "version not set"
   },
   "paths": {
-    "/v1/admin/artifact": {
-      "get": {
-        "tags": [
-          "AdminService"
-        ],
-        "description": "ListArtifacts lists every artifact, newest first, without documents.",
-        "operationId": "AdminService_ListArtifacts",
-        "responses": {
-          "200": {
-            "description": "a successful response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListArtifactsResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Status"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/admin/artifact/{id}": {
       "delete": {
         "tags": [
           "AdminService"
         ],
+        "description": "DeleteArtifact fails with FailedPrecondition while a template references the artifact.",
         "operationId": "AdminService_DeleteArtifact",
         "parameters": [
           {
@@ -76,38 +46,70 @@
         }
       }
     },
-    "/v1/admin/delegate": {
+    "/v1/admin/artifacts": {
       "get": {
         "tags": [
           "AdminService"
         ],
-        "description": "ListDelegations lists one page, newest first.",
-        "operationId": "AdminService_ListDelegations",
+        "description": "ListArtifacts lists artifacts without their documents, newest first.",
+        "operationId": "AdminService_ListArtifacts",
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListArtifactsResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/delegation/{id}/attempts": {
+      "get": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "ListAttempts lists the attempts of a delegation newest first, paged by cursor.",
+        "operationId": "AdminService_ListAttempts",
         "parameters": [
           {
-            "name": "pageSize",
-            "in": "query",
-            "description": "page_size defaults to 100, at most 1000.",
+            "name": "id",
+            "in": "path",
+            "required": true,
             "schema": {
               "type": "integer",
-              "format": "int32"
+              "format": "int64"
             }
           },
           {
             "name": "cursor",
             "in": "query",
-            "description": "cursor is the next_cursor of the previous page, 0 for the first.",
+            "description": "cursor is the next_cursor of the previous page; 0 starts from the newest.",
             "schema": {
               "type": "integer",
               "format": "int64"
             }
           },
           {
-            "name": "status",
+            "name": "limit",
             "in": "query",
-            "description": "status filters when set: active, cancelled, expired or done.",
+            "description": "limit is the page size: 100 when 0, at most 1000.",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -117,7 +119,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListDelegationsResponse"
+                  "$ref": "#/components/schemas/ListAttemptsResponse"
                 }
               }
             }
@@ -135,65 +137,15 @@
         }
       }
     },
-    "/v1/admin/delegate/{address}": {
-      "delete": {
+    "/v1/admin/delegation/{id}/cancel": {
+      "post": {
         "tags": [
           "AdminService"
         ],
-        "description": "CancelDelegation stops the active watches of an address, or one\ndelegation by id: advertisements have no address. Registering a\ncancelled delegation again is refused until ResumeDelegation.",
+        "description": "CancelDelegation stops an active delegation; its fingerprint cannot be registered again until resumed.",
         "operationId": "AdminService_CancelDelegation",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "in": "query",
-            "description": "id, when set, takes precedence over address.",
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "a successful response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CancelDelegationResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Status"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/admin/delegation/{id}": {
-      "get": {
-        "tags": [
-          "AdminService"
-        ],
-        "description": "GetDelegationById returns any delegation, with its coins and history.",
-        "operationId": "AdminService_GetDelegationById",
-        "parameters": [
-          {
             "name": "id",
             "in": "path",
             "required": true,
@@ -203,54 +155,17 @@
             }
           }
         ],
-        "responses": {
-          "200": {
-            "description": "a successful response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GetDelegationByIdResponse"
-                }
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "CancelDelegationRequest",
+                "type": "object"
               }
             }
           },
-          "default": {
-            "description": "An unexpected error response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Status"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "AdminService"
-        ],
-        "description": "CancelDelegation stops the active watches of an address, or one\ndelegation by id: advertisements have no address. Registering a\ncancelled delegation again is refused until ResumeDelegation.",
-        "operationId": "AdminService_CancelDelegation2",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "id, when set, takes precedence over address.",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "address",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "a successful response.",
@@ -280,7 +195,7 @@
         "tags": [
           "AdminService"
         ],
-        "description": "ResumeDelegation sets a cancelled delegation active again.",
+        "description": "ResumeDelegation puts a cancelled delegation back to active.",
         "operationId": "AdminService_ResumeDelegation",
         "parameters": [
           {
@@ -328,12 +243,70 @@
         }
       }
     },
+    "/v1/admin/delegations": {
+      "get": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "ListDelegations lists delegations by the earliest due of their coins, those without coins last, paged by cursor.",
+        "operationId": "AdminService_ListDelegations",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "status filters on active, cancelled, expired or done; empty lists all.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "cursor is the next_cursor of the previous page; empty starts from the top.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "limit is the page size: 100 when 0, at most 1000.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDelegationsResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/health": {
       "get": {
         "tags": [
           "AdminService"
         ],
-        "description": "GetHealth checks each dependency, with the error of the failing ones.",
+        "description": "GetHealth names each dependency with the error it answers, if any.",
         "operationId": "AdminService_GetHealth",
         "responses": {
           "200": {
@@ -364,6 +337,7 @@
         "tags": [
           "AdminService"
         ],
+        "description": "GetStatus reports what the loop holds: the queue, what is registered at arkd and the forecast batches.",
         "operationId": "AdminService_GetStatus",
         "responses": {
           "200": {
@@ -389,18 +363,18 @@
         }
       }
     },
-    "/v1/admin/stream-delegation": {
+    "/v1/admin/stream": {
       "post": {
         "tags": [
           "AdminService"
         ],
-        "description": "RegisterStreamDelegation spawns a watch of the template for every streamed transaction its trigger matches.",
-        "operationId": "AdminService_RegisterStreamDelegation",
+        "description": "RegisterStream has the daemon run a template's trigger against arkd's transactions, spawning a delegation for each match.",
+        "operationId": "AdminService_RegisterStream",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterStreamDelegationRequest"
+                "$ref": "#/components/schemas/RegisterStreamRequest"
               }
             }
           },
@@ -412,7 +386,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RegisterStreamDelegationResponse"
+                  "$ref": "#/components/schemas/RegisterStreamResponse"
                 }
               }
             }
@@ -430,28 +404,73 @@
         }
       }
     },
-    "/v1/admin/template": {
-      "get": {
+    "/v1/admin/stream/{id}/cancel": {
+      "post": {
         "tags": [
           "AdminService"
         ],
-        "operationId": "AdminService_ListAllTemplates",
+        "description": "CancelStream stops a stream; registering it again fails while it stays cancelled.",
+        "operationId": "AdminService_CancelStream",
         "parameters": [
           {
-            "name": "status",
-            "in": "query",
+            "name": "id",
+            "in": "path",
+            "required": true,
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int64"
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "CancelStreamRequest",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "a successful response.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListAllTemplatesResponse"
+                  "$ref": "#/components/schemas/CancelStreamResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/streams": {
+      "get": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "ListStreams lists the streams of every status, oldest first.",
+        "operationId": "AdminService_ListStreams",
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListStreamsResponse"
                 }
               }
             }
@@ -470,10 +489,67 @@
       }
     },
     "/v1/admin/template/{id}": {
+      "post": {
+        "tags": [
+          "AdminService"
+        ],
+        "description": "UpdateTemplate sets a template's status; activating resets its failures.",
+        "operationId": "AdminService_UpdateTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "UpdateTemplateRequest",
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "description": "status is active or disabled."
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateTemplateResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "AdminService"
         ],
+        "description": "DeleteTemplate fails with FailedPrecondition while a delegation references the template.",
         "operationId": "AdminService_DeleteTemplate",
         "parameters": [
           {
@@ -492,120 +568,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DeleteTemplateResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Status"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/admin/template/{id}/status": {
-      "put": {
-        "tags": [
-          "AdminService"
-        ],
-        "operationId": "AdminService_SetTemplateStatus",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "title": "SetTemplateStatusRequest",
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "type": "string",
-                    "description": "active | disabled"
-                  }
-                }
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "a successful response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SetTemplateStatusResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Status"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/admin/template/{id}/trusted": {
-      "put": {
-        "tags": [
-          "AdminService"
-        ],
-        "description": "SetTemplateTrusted marks a template the operator vouches for.",
-        "operationId": "AdminService_SetTemplateTrusted",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "title": "SetTemplateTrustedRequest",
-                "type": "object",
-                "properties": {
-                  "trusted": {
-                    "type": "boolean"
-                  }
-                }
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "a successful response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SetTemplateTrustedResponse"
                 }
               }
             }
@@ -642,6 +604,7 @@
         "properties": {
           "createdAt": {
             "type": "integer",
+            "description": "created_at is unix seconds.",
             "format": "int64"
           },
           "document": {
@@ -652,16 +615,74 @@
           }
         }
       },
-      "Asset": {
-        "title": "Asset",
+      "Attempt": {
+        "title": "Attempt",
         "type": "object",
+        "description": "Attempt is one run of a delegation over coins.",
+        "properties": {
+          "coins": {
+            "type": "array",
+            "description": "coins are the outpoints the attempt spends.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "integer",
+            "description": "created_at and updated_at are unix seconds.",
+            "format": "int64"
+          },
+          "delegationId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "error": {
+            "type": "string",
+            "description": "error says why a failed attempt failed."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "description": "kind is the delegation's template type: offchain or intent."
+          },
+          "status": {
+            "type": "string",
+            "description": "status is submitted, succeeded or failed."
+          },
+          "txid": {
+            "type": "string",
+            "description": "txid is the transaction once known: the ark txid of an offchain attempt, the commitment txid of a batched one."
+          },
+          "updatedAt": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "BatchForecast": {
+        "title": "BatchForecast",
+        "type": "object",
+        "description": "BatchForecast is what a coming batch is expected to carry of ours.",
         "properties": {
           "amount": {
             "type": "integer",
             "format": "uint64"
           },
-          "assetId": {
-            "type": "string"
+          "at": {
+            "type": "integer",
+            "description": "at is unix seconds.",
+            "format": "int64"
+          },
+          "coins": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "intents": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -669,12 +690,8 @@
         "title": "CancelDelegationRequest",
         "type": "object",
         "properties": {
-          "address": {
-            "type": "string"
-          },
           "id": {
             "type": "integer",
-            "description": "id, when set, takes precedence over address.",
             "format": "int64"
           }
         }
@@ -683,42 +700,58 @@
         "title": "CancelDelegationResponse",
         "type": "object"
       },
+      "CancelStreamRequest": {
+        "title": "CancelStreamRequest",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CancelStreamResponse": {
+        "title": "CancelStreamResponse",
+        "type": "object"
+      },
       "Delegation": {
         "title": "Delegation",
         "type": "object",
-        "description": "Delegation is an instance of a template.",
         "properties": {
           "address": {
-            "type": "string",
-            "description": "address is slot 0's address for a watch, empty otherwise."
+            "type": "string"
           },
           "createdAt": {
             "type": "integer",
+            "description": "created_at and updated_at are unix seconds.",
             "format": "int64"
           },
           "expiresAt": {
             "type": "integer",
-            "description": "expires_at is 0 when the delegation never expires.",
+            "description": "expires_at is unix seconds, 0 when the delegation never expires.",
             "format": "int64"
+          },
+          "fingerprint": {
+            "type": "string"
           },
           "id": {
             "type": "integer",
             "format": "int64"
           },
-          "parentId": {
-            "type": "integer",
-            "description": "parent_id is the delegation whose settled transaction advertised this one, or the stream delegation that spawned it; 0 otherwise.",
-            "format": "int64"
-          },
-          "slots": {
+          "inputs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Slot"
+              "$ref": "#/components/schemas/Input"
             }
           },
           "status": {
             "type": "string",
             "description": "status is active, cancelled, expired or done."
+          },
+          "streamId": {
+            "type": "integer",
+            "description": "stream_id is the stream that spawned the delegation, 0 when a client registered it.",
+            "format": "int64"
           },
           "templateId": {
             "type": "string"
@@ -738,61 +771,27 @@
       "DelegationSummary": {
         "title": "DelegationSummary",
         "type": "object",
+        "description": "DelegationSummary is a delegation with what its present coins and its attempts come to.",
         "properties": {
-          "delegation": {
-            "$ref": "#/components/schemas/Delegation"
-          },
-          "failedAttempts": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "failingSince": {
-            "type": "integer",
-            "description": "failing_since is 0 unless the last attempt of a coin failed; failed_attempts counts the attempts since.",
-            "format": "int64"
-          },
-          "lastFailedAt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "lastRenewal": {
-            "$ref": "#/components/schemas/Renewal"
-          },
-          "managed": {
-            "type": "boolean",
-            "description": "managed is false when this instance cannot renew the delegation; unmanaged_reason says why."
-          },
-          "nextBatchAt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "nextDeadline": {
-            "type": "integer",
-            "description": "next_deadline is the latest the soonest vtxo is submitted; next_batch_at the planned batch it joins, 0 without a plan.",
-            "format": "int64"
-          },
-          "nextExpiry": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "nextRenewalAt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "renewing": {
-            "type": "boolean",
-            "description": "renewing is true while a session holds the delegation's coins."
-          },
-          "totalAmount": {
+          "amount": {
             "type": "integer",
             "format": "uint64"
           },
-          "unmanagedReason": {
-            "type": "string"
-          },
-          "vtxoCount": {
+          "coins": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
+          },
+          "delegation": {
+            "$ref": "#/components/schemas/Delegation"
+          },
+          "lastAttempt": {
+            "type": "string",
+            "description": "last_attempt is the status of the newest attempt, empty without one."
+          },
+          "nextDue": {
+            "type": "integer",
+            "description": "next_due is unix seconds, the earliest due of the present coins, 0 without any.",
+            "format": "int64"
           }
         }
       },
@@ -822,65 +821,6 @@
         "title": "DeleteTemplateResponse",
         "type": "object"
       },
-      "Dependency": {
-        "title": "Dependency",
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "string",
-            "description": "error is empty when the dependency answers."
-          },
-          "name": {
-            "type": "string"
-          }
-        }
-      },
-      "GetDelegationByIdRequest": {
-        "title": "GetDelegationByIdRequest",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
-      "GetDelegationByIdResponse": {
-        "title": "GetDelegationByIdResponse",
-        "type": "object",
-        "properties": {
-          "batchAt": {
-            "type": "object",
-            "description": "batch_at is the planned batch time by outpoint; a coin in a session, or waiting on something unforeseeable, is absent.",
-            "additionalProperties": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          "delegation": {
-            "$ref": "#/components/schemas/Delegation"
-          },
-          "pendingTxs": {
-            "type": "array",
-            "description": "pending_txs are the daemon's transactions holding the coins until they land.",
-            "items": {
-              "$ref": "#/components/schemas/PendingTx"
-            }
-          },
-          "renewals": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Renewal"
-            }
-          },
-          "vtxos": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Vtxo"
-            }
-          }
-        }
-      },
       "GetHealthRequest": {
         "title": "GetHealthRequest",
         "type": "object"
@@ -889,11 +829,15 @@
         "title": "GetHealthResponse",
         "type": "object",
         "properties": {
-          "dependencies": {
+          "entries": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Dependency"
+              "$ref": "#/components/schemas/HealthEntry"
             }
+          },
+          "healthy": {
+            "type": "boolean",
+            "description": "healthy is whether every entry is."
           }
         }
       },
@@ -905,77 +849,96 @@
         "title": "GetStatusResponse",
         "type": "object",
         "properties": {
+          "active": {
+            "type": "integer",
+            "description": "active is how many delegations are being served.",
+            "format": "int64"
+          },
+          "amount": {
+            "type": "integer",
+            "description": "amount is the sum of those coins, in sats.",
+            "format": "uint64"
+          },
           "batches": {
             "type": "array",
+            "description": "batches forecasts what the coming batches carry, the nearest first.",
             "items": {
-              "$ref": "#/components/schemas/PlannedBatch"
+              "$ref": "#/components/schemas/BatchForecast"
             }
           },
-          "boardingMaxWait": {
+          "coins": {
             "type": "integer",
+            "description": "coins is how many present coins the daemon watches.",
             "format": "int64"
           },
-          "intentFees": {
-            "$ref": "#/components/schemas/IntentFees"
-          },
-          "lastScanAt": {
+          "late": {
             "type": "integer",
+            "description": "late is how many coins are forecast to miss their deadline.",
             "format": "int64"
           },
-          "nextScanAt": {
+          "nextDue": {
             "type": "integer",
-            "description": "next_scan_at is backed off while throttled: an upstream rate limits the scan.",
+            "description": "next_due is unix seconds, when the next coin becomes ready, 0 when none will.",
             "format": "int64"
           },
-          "renewalReserve": {
+          "queued": {
             "type": "integer",
-            "description": "renewal_reserve and boarding_max_wait are seconds; batches are the next planned sessions, soonest first, at most 20.",
+            "description": "queued is how many entries wait to be registered at arkd.",
             "format": "int64"
           },
-          "renewingVtxos": {
+          "registered": {
             "type": "integer",
-            "format": "int32"
+            "description": "registered is how many entries are registered at arkd, waiting for a batch.",
+            "format": "int64"
           },
-          "throttled": {
+          "tipHeight": {
+            "type": "integer",
+            "description": "tip_height is the chain's latest block, 0 before the first one is seen.",
+            "format": "int64"
+          }
+        }
+      },
+      "HealthEntry": {
+        "title": "HealthEntry",
+        "type": "object",
+        "description": "HealthEntry is what one dependency answers: db, arkd, electrum, emulator or loop.",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "error says why the dependency is not healthy."
+          },
+          "healthy": {
             "type": "boolean"
-          }
-        }
-      },
-      "IntentFees": {
-        "title": "IntentFees",
-        "type": "object",
-        "properties": {
-          "offchainInput": {
-            "type": "string"
           },
-          "offchainOutput": {
-            "type": "string"
-          },
-          "onchainInput": {
-            "type": "string"
-          },
-          "onchainOutput": {
+          "name": {
             "type": "string"
           }
         }
       },
-      "ListAllTemplatesRequest": {
-        "title": "ListAllTemplatesRequest",
+      "Input": {
+        "title": "Input",
         "type": "object",
+        "description": "Input is one template input of a delegation.",
         "properties": {
-          "status": {
+          "locktime": {
+            "type": "integer",
+            "description": "locktime is the absolute locktime of the input's spend leaf, 0 without one.",
+            "format": "uint32"
+          },
+          "name": {
             "type": "string"
-          }
-        }
-      },
-      "ListAllTemplatesResponse": {
-        "title": "ListAllTemplatesResponse",
-        "type": "object",
-        "properties": {
-          "templates": {
+          },
+          "onchain": {
+            "type": "boolean"
+          },
+          "script": {
+            "type": "string",
+            "description": "script is the hex output script of the input's contract."
+          },
+          "tapscripts": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/TemplateSummary"
+              "type": "string"
             }
           }
         }
@@ -996,23 +959,59 @@
           }
         }
       },
+      "ListAttemptsRequest": {
+        "title": "ListAttemptsRequest",
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "integer",
+            "description": "cursor is the next_cursor of the previous page; 0 starts from the newest.",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "limit is the page size: 100 when 0, at most 1000.",
+            "format": "int32"
+          }
+        }
+      },
+      "ListAttemptsResponse": {
+        "title": "ListAttemptsResponse",
+        "type": "object",
+        "properties": {
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attempt"
+            }
+          },
+          "nextCursor": {
+            "type": "integer",
+            "description": "next_cursor starts the next page; 0 on the last one.",
+            "format": "int64"
+          }
+        }
+      },
       "ListDelegationsRequest": {
         "title": "ListDelegationsRequest",
         "type": "object",
         "properties": {
           "cursor": {
-            "type": "integer",
-            "description": "cursor is the next_cursor of the previous page, 0 for the first.",
-            "format": "int64"
+            "type": "string",
+            "description": "cursor is the next_cursor of the previous page; empty starts from the top."
           },
-          "pageSize": {
+          "limit": {
             "type": "integer",
-            "description": "page_size defaults to 100, at most 1000.",
+            "description": "limit is the page size: 100 when 0, at most 1000.",
             "format": "int32"
           },
           "status": {
             "type": "string",
-            "description": "status filters when set: active, cancelled, expired or done."
+            "description": "status filters on active, cancelled, expired or done; empty lists all."
           }
         }
       },
@@ -1027,84 +1026,29 @@
             }
           },
           "nextCursor": {
-            "type": "integer",
-            "description": "next_cursor is 0 on the last page.",
-            "format": "int64"
+            "type": "string",
+            "description": "next_cursor starts the next page; empty on the last one."
           }
         }
       },
-      "Param": {
-        "title": "Param",
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
+      "ListStreamsRequest": {
+        "title": "ListStreamsRequest",
+        "type": "object"
       },
-      "PendingTx": {
-        "title": "PendingTx",
+      "ListStreamsResponse": {
+        "title": "ListStreamsResponse",
         "type": "object",
         "properties": {
-          "coins": {
+          "streams": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Stream"
             }
-          },
-          "createdAt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "spentBy": {
-            "type": "string",
-            "description": "spent_by is what the indexer reports spending the coins: the commitment txid of a batch."
-          },
-          "state": {
-            "type": "string",
-            "description": "state is batch, submitted, finalizing or landed."
-          },
-          "txid": {
-            "type": "string"
           }
         }
       },
-      "PlannedBatch": {
-        "title": "PlannedBatch",
-        "type": "object",
-        "properties": {
-          "at": {
-            "type": "integer",
-            "description": "at is never in the past: a batch an overdue coin forces is due now.",
-            "format": "int64"
-          },
-          "delegationCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "forcedByDelegationId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "forcedByOutpoint": {
-            "type": "string",
-            "description": "the coin with the earliest deadline, which sets the time"
-          },
-          "totalAmount": {
-            "type": "integer",
-            "format": "uint64"
-          },
-          "vtxoCount": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "RegisterStreamDelegationRequest": {
-        "title": "RegisterStreamDelegationRequest",
+      "RegisterStreamRequest": {
+        "title": "RegisterStreamRequest",
         "type": "object",
         "properties": {
           "templateId": {
@@ -1112,44 +1056,19 @@
           },
           "variables": {
             "type": "object",
-            "description": "the variables the trigger does not bind, hex",
+            "description": "variables are the lower-case hex values the trigger does not bind.",
             "additionalProperties": {
               "type": "string"
             }
           }
         }
       },
-      "RegisterStreamDelegationResponse": {
-        "title": "RegisterStreamDelegationResponse",
+      "RegisterStreamResponse": {
+        "title": "RegisterStreamResponse",
         "type": "object",
         "properties": {
-          "delegation": {
-            "$ref": "#/components/schemas/Delegation"
-          }
-        }
-      },
-      "Renewal": {
-        "title": "Renewal",
-        "type": "object",
-        "properties": {
-          "attemptedAt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "commitmentTxid": {
-            "type": "string"
-          },
-          "error": {
-            "type": "string"
-          },
-          "outpoints": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "success": {
-            "type": "boolean"
+          "stream": {
+            "$ref": "#/components/schemas/Stream"
           }
         }
       },
@@ -1166,72 +1085,6 @@
       "ResumeDelegationResponse": {
         "title": "ResumeDelegationResponse",
         "type": "object"
-      },
-      "SetTemplateStatusRequest": {
-        "title": "SetTemplateStatusRequest",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "description": "active | disabled"
-          }
-        }
-      },
-      "SetTemplateStatusResponse": {
-        "title": "SetTemplateStatusResponse",
-        "type": "object",
-        "properties": {
-          "template": {
-            "$ref": "#/components/schemas/TemplateSummary"
-          }
-        }
-      },
-      "SetTemplateTrustedRequest": {
-        "title": "SetTemplateTrustedRequest",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "trusted": {
-            "type": "boolean"
-          }
-        }
-      },
-      "SetTemplateTrustedResponse": {
-        "title": "SetTemplateTrustedResponse",
-        "type": "object",
-        "properties": {
-          "template": {
-            "$ref": "#/components/schemas/TemplateSummary"
-          }
-        }
-      },
-      "Slot": {
-        "title": "Slot",
-        "type": "object",
-        "description": "Slot is one template input of a delegation.",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "onchain": {
-            "type": "boolean"
-          },
-          "outpoint": {
-            "type": "string",
-            "description": "outpoint is \"txid:vout\" when bound, empty for a watch."
-          },
-          "tapscripts": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
       },
       "Status": {
         "title": "Status",
@@ -1252,103 +1105,51 @@
           }
         }
       },
-      "Template": {
-        "title": "Template",
+      "Stream": {
+        "title": "Stream",
         "type": "object",
+        "description": "Stream is an operator's standing rule: a template's trigger run against arkd's transactions.",
         "properties": {
-          "artifactIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
           "createdAt": {
+            "type": "integer",
+            "description": "created_at is unix seconds.",
+            "format": "int64"
+          },
+          "id": {
             "type": "integer",
             "format": "int64"
           },
-          "document": {
+          "status": {
             "type": "string",
-            "description": "empty in list responses"
+            "description": "status is active or cancelled."
           },
+          "templateId": {
+            "type": "string"
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UpdateTemplateRequest": {
+        "title": "UpdateTemplateRequest",
+        "type": "object",
+        "properties": {
           "id": {
             "type": "string"
           },
-          "params": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Param"
-            }
-          },
           "status": {
-            "type": "string"
-          }
-        }
-      },
-      "TemplateSummary": {
-        "title": "TemplateSummary",
-        "type": "object",
-        "description": "TemplateSummary is a template with what only the operator sees.",
-        "properties": {
-          "delegations": {
-            "type": "integer",
-            "description": "delegations is how many delegations reference the template.",
-            "format": "int64"
-          },
-          "failures": {
-            "type": "integer",
-            "description": "failures is the count of consecutive renewal cycles the failure valve saw rejected.",
-            "format": "int32"
-          },
-          "template": {
-            "$ref": "#/components/schemas/Template",
-            "description": "without its document in list responses"
-          },
-          "trusted": {
-            "type": "boolean",
-            "description": "trusted templates get the daemon's own signature on delegate-key leaves\nand are exempt from the failure valve; seeded ones are trusted."
-          },
-          "type": {
             "type": "string",
-            "description": "type is intent, offchain or onchain."
+            "description": "status is active or disabled."
           }
         }
       },
-      "Vtxo": {
-        "title": "Vtxo",
-        "type": "object",
-        "properties": {
-          "amount": {
-            "type": "integer",
-            "format": "uint64"
-          },
-          "assets": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Asset"
-            }
-          },
-          "createdAt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "expiresAt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "onchain": {
-            "type": "boolean"
-          },
-          "outpoint": {
-            "type": "string"
-          },
-          "preconfirmed": {
-            "type": "boolean"
-          },
-          "renewableAt": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
+      "UpdateTemplateResponse": {
+        "title": "UpdateTemplateResponse",
+        "type": "object"
       }
     }
   },

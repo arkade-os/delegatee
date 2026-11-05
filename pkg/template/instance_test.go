@@ -3,14 +3,15 @@ package template
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
-	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 
 	"github.com/arkade-os/delegatee/pkg/template/packets"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -21,23 +22,23 @@ import (
 func TestInstantiateWatch(t *testing.T) {
 	tmpl := parseFixture(t, "minimal.json")
 	require.True(t, tmpl.ContextFree())
-	inst, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t)})
+	inst, err := tmpl.Instantiate(Context{Keys: testKeys(t)})
 	require.NoError(t, err)
 	require.Len(t, inst.Tapscripts(0), 1)
 	require.Len(t, inst.PkScript(0), 34)
 }
 
-func TestInstantiateDelegateKey(t *testing.T) {
+func TestInstantiateCosignerKey(t *testing.T) {
 	keys := testKeys(t)
-	inst, err := parseFixture(t, "minimal.json").Instantiate(t.Context(), Context{Keys: keys})
+	inst, err := parseFixture(t, "minimal.json").Instantiate(Context{Keys: keys})
 	require.NoError(t, err)
 	want, err := contract.Build(parseDef(t, `{"contractName":"R","constructorInputs":[],"functions":[
 	 {"name":"release","leaves":[{"name":"release","asm":["<SERVER_KEY>","OP_CHECKSIG"],"witness":[]}]}]}`), nil, keys, nil)
 	require.NoError(t, err)
 	require.Equal(t, want.Tapscripts, inst.Tapscripts(0), "x-only in a leaf, like the server key it equals here")
 
-	keys.Delegate = nil
-	_, err = parseFixture(t, "minimal.json").Instantiate(t.Context(), Context{Keys: keys})
+	keys.Cosigner = nil
+	_, err = parseFixture(t, "minimal.json").Instantiate(Context{Keys: keys})
 	require.Error(t, err)
 }
 
@@ -47,9 +48,9 @@ func TestInstantiateVariables(t *testing.T) {
 		m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)["arguments"] = map[string]any{"delegate": "<delegate>"}
 	}))
 	key := testKey(t, 2).SerializeCompressed()
-	a, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t), Variables: map[string][]byte{"delegate": key}})
+	a, err := tmpl.Instantiate(Context{Keys: testKeys(t), Variables: map[string][]byte{"delegate": key}})
 	require.NoError(t, err)
-	b, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t), Variables: map[string][]byte{"delegate": testKey(t, 4).SerializeCompressed()}})
+	b, err := tmpl.Instantiate(Context{Keys: testKeys(t), Variables: map[string][]byte{"delegate": testKey(t, 4).SerializeCompressed()}})
 	require.NoError(t, err)
 	require.NotEqual(t, a.PkScript(0), b.PkScript(0))
 
@@ -57,7 +58,7 @@ func TestInstantiateVariables(t *testing.T) {
 		"missing": {}, "extra": {"delegate": key, "x": {1}}, "x-only": {"delegate": key[1:]},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t), Variables: vars})
+			_, err := tmpl.Instantiate(Context{Keys: testKeys(t), Variables: vars})
 			require.ErrorIs(t, err, ErrInvalidVariables)
 		})
 	}
@@ -67,21 +68,21 @@ func TestInstantiateFromSource(t *testing.T) {
 	// the owner comes from packet 2 of the source: not watchable, and the script follows the packet
 	tmpl := parseDoc(t, ownerFromPacket(t))
 	require.False(t, tmpl.ContextFree())
-	_, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t)})
+	_, err := tmpl.Instantiate(Context{Keys: testKeys(t)})
 	require.ErrorIs(t, err, ErrUnsupported, "a watch needs context-free bindings")
 
 	alice := ownedSource(t, tmpl, testKey(t, 2), testKey(t, 2))
 	bob := ownedSource(t, tmpl, testKey(t, 4), testKey(t, 4))
-	a, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t), Sources: []*Source{alice}})
+	a, err := tmpl.Instantiate(Context{Keys: testKeys(t), Sources: []*Source{alice}})
 	require.NoError(t, err)
-	b, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t), Sources: []*Source{bob}})
+	b, err := tmpl.Instantiate(Context{Keys: testKeys(t), Sources: []*Source{bob}})
 	require.NoError(t, err)
 	require.NotEqual(t, a.PkScript(0), b.PkScript(0))
 	require.Equal(t, pkScript(alice), a.PkScript(0))
 
-	_, err = tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t), Sources: []*Source{sourceWith(t, 100_000)}})
+	_, err = tmpl.Instantiate(Context{Keys: testKeys(t), Sources: []*Source{sourceWith(t, 100_000)}})
 	require.ErrorIs(t, err, ErrIneligible, "no packet 2")
-	_, err = parseFixture(t, "minimal.json").Instantiate(t.Context(), Context{Keys: testKeys(t), Sources: []*Source{{Outpoint: wire.OutPoint{Index: 7}, Amount: 5}}})
+	_, err = parseFixture(t, "minimal.json").Instantiate(Context{Keys: testKeys(t), Sources: []*Source{{Outpoint: wire.OutPoint{Index: 7}, Amount: 5}}})
 	require.ErrorIs(t, err, ErrIneligible, "a source without its transaction")
 
 	for name, sources := range map[string][]*Source{
@@ -91,7 +92,7 @@ func TestInstantiateFromSource(t *testing.T) {
 		"none":                    {},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t), Sources: sources})
+			_, err := tmpl.Instantiate(Context{Keys: testKeys(t), Sources: sources})
 			require.ErrorIs(t, err, ErrIneligible)
 		})
 	}
@@ -109,7 +110,7 @@ func TestSecrets(t *testing.T) {
 			opened++
 			return preimage, nil
 		}}
-	inst, err := tmpl.Instantiate(t.Context(), c)
+	inst, err := tmpl.Instantiate(c)
 	require.NoError(t, err)
 	require.Equal(t, 1, opened)
 	_, kept := reflect.TypeFor[Instance]().FieldByName("secrets")
@@ -129,17 +130,17 @@ func TestSecrets(t *testing.T) {
 	require.Equal(t, 3, opened, "a fresh draft decrypts again")
 
 	c.Decrypt = func([]byte) ([]byte, error) { return preimage[:31], nil }
-	_, err = tmpl.Instantiate(t.Context(), c)
+	_, err = tmpl.Instantiate(c)
 	require.ErrorIs(t, err, ErrIneligible, "the plaintext is not a bytes32")
 	c.Decrypt = nil
-	_, err = tmpl.Instantiate(t.Context(), c)
+	_, err = tmpl.Instantiate(c)
 	require.ErrorIs(t, err, ErrUnsupported)
 }
 
 func TestResolveConcurrent(t *testing.T) {
 	preimage := bytes.Repeat([]byte{7}, 32)
 	var opened atomic.Int64
-	inst, err := parseDoc(t, hashLock(t)).Instantiate(t.Context(), Context{Keys: testKeys(t),
+	inst, err := parseDoc(t, hashLock(t)).Instantiate(Context{Keys: testKeys(t),
 		Variables: map[string][]byte{"ciphertext": []byte("sealed")},
 		Decrypt: func([]byte) ([]byte, error) {
 			opened.Add(1)
@@ -176,7 +177,7 @@ func TestDueAt(t *testing.T) {
 	offchain := parseDoc(t, ownerFromPacket(t)) // schedule before_expiry_seconds 1024
 	src := ownedSource(t, offchain, testKey(t, 2), testKey(t, 2))
 	src.Expiry = now.Add(2 * time.Hour)
-	inst, err := offchain.Instantiate(t.Context(), Context{Keys: testKeys(t), Sources: []*Source{src}})
+	inst, err := offchain.Instantiate(Context{Keys: testKeys(t), Sources: []*Source{src}})
 	require.NoError(t, err)
 	require.Equal(t, src.Expiry.Add(-1024*time.Second), inst.DueAt(0, src, now))
 	src.CreatedAt = now.Add(-time.Minute)
@@ -187,7 +188,7 @@ func TestDueAt(t *testing.T) {
 	onchain := parseDoc(t, edited(t, fixture(t, "minimal.json"), func(m map[string]any) {
 		m["inputs"].([]any)[0].(map[string]any)["schedule"] = map[string]any{"min_confirmations": 2}
 	}))
-	inst, err = onchain.Instantiate(t.Context(), Context{Keys: testKeys(t)})
+	inst, err = onchain.Instantiate(Context{Keys: testKeys(t)})
 	require.NoError(t, err)
 	coin := sourceWith(t, 100_000)
 	coin.Confirms = 1
@@ -199,7 +200,7 @@ func TestDueAt(t *testing.T) {
 	coin.CreatedAt = time.Time{}
 	require.Equal(t, now, inst.DueAt(0, coin, now))
 
-	inst, err = parseFixture(t, "minimal.json").Instantiate(t.Context(), Context{Keys: testKeys(t)})
+	inst, err = parseFixture(t, "minimal.json").Instantiate(Context{Keys: testKeys(t)})
 	require.NoError(t, err)
 	require.Equal(t, now, inst.DueAt(0, coin, now), "immediate")
 	coin.CreatedAt = now.Add(-time.Minute)
@@ -212,7 +213,7 @@ func TestInstantiateRefusesNonClosureEmulatorLeaf(t *testing.T) {
 		leafOf(def, 1)["asm"] = []any{"<EMULATOR_KEY:pay>", "OP_CHECKSIGVERIFY", "<SERVER_KEY>", "OP_CHECKSIGVERIFY", "OP_1"}
 	})
 	tmpl := parseDoc(t, doc)
-	_, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t)})
+	_, err := tmpl.Instantiate(Context{Keys: testKeys(t)})
 	require.ErrorIs(t, err, ErrUnsupported)
 }
 
@@ -226,19 +227,19 @@ func testKey(t testing.TB, n int) *btcec.PublicKey {
 
 func testKeys(t testing.TB) Keys {
 	t.Helper()
-	return Keys{Server: testKey(t, 1), Emulator: testKey(t, 3), Delegate: testKey(t, 1)}
+	return Keys{Server: testKey(t, 1), Emulator: testKey(t, 3), Cosigner: testKey(t, 1)}
 }
 
 func parseDoc(t *testing.T, doc []byte) *Template {
 	t.Helper()
-	tmpl, err := Parse(t.Context(), doc, nil)
+	tmpl, err := Parse(doc, nil)
 	require.NoError(t, err)
 	return tmpl
 }
 
 func parseFixture(t *testing.T, name string) *Template {
 	t.Helper()
-	tmpl, err := Parse(t.Context(), fixture(t, name), artifacts(t))
+	tmpl, err := Parse(fixture(t, name), artifacts(t))
 	require.NoError(t, err)
 	return tmpl
 }
@@ -257,7 +258,7 @@ func ownedSource(t *testing.T, tmpl *Template, packet, owner *btcec.PublicKey) *
 func ownerFromPacket(t *testing.T) []byte {
 	t.Helper()
 	return []byte(`{
-  "format": "delegateed-template/v1",
+  "format": "template/v1",
   "type": "intent",
   "inputs": [{
     "name": "funds",
@@ -297,7 +298,7 @@ func ownerFromPacket(t *testing.T) []byte {
 func hashLock(t *testing.T) []byte {
 	t.Helper()
 	return []byte(`{
-  "format": "delegateed-template/v1",
+  "format": "template/v1",
   "type": "offchain",
   "variables": {"ciphertext": "bytes"},
   "secrets": {"preimage": {"type": "bytes32", "from": "htlc", "ciphertext": "<ciphertext>"}},

@@ -15,6 +15,7 @@ import (
 
 	"github.com/meshapi/grpc-api-gateway/gateway"
 	"github.com/meshapi/grpc-api-gateway/protoconvert"
+	"github.com/meshapi/grpc-api-gateway/trie"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/protobuf/proto"
@@ -42,65 +43,24 @@ func request_DelegateeService_RegisterDelegation_0(ctx context.Context, marshale
 
 }
 
+var (
+	query_params_DelegateeService_GetDelegation_0 = gateway.QueryParameterParseOptions{
+		Filter: trie.New(),
+	}
+)
+
 func request_DelegateeService_GetDelegation_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client DelegateeServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
 	var protoReq GetDelegationRequest
 	var metadata gateway.ServerMetadata
 
-	var (
-		val string
-		err error
-		_   = err
-	)
-
-	val = pathParams.ByName("address")
-	if val == "" {
-		return nil, metadata, gateway.ErrPathParameterMissing{Name: "address"}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, gateway.ErrInvalidQueryParameters{Err: err}
 	}
-
-	protoReq.Address, err = protoconvert.String(val)
-	if err != nil {
-		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "address"}
+	if err := mux.PopulateQueryParameters(&protoReq, req.Form, query_params_DelegateeService_GetDelegation_0); err != nil {
+		return nil, metadata, gateway.ErrInvalidQueryParameters{Err: err}
 	}
 
 	msg, err := client.GetDelegation(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-
-}
-
-func request_DelegateeService_RegisterSpend_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client DelegateeServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq RegisterSpendRequest
-	var metadata gateway.ServerMetadata
-
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
-		return nil, metadata, gateway.ErrMarshal{Err: err, Inbound: true}
-	}
-
-	msg, err := client.RegisterSpend(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-
-}
-
-func request_DelegateeService_GetSpend_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client DelegateeServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
-	var protoReq GetSpendRequest
-	var metadata gateway.ServerMetadata
-
-	var (
-		val string
-		err error
-		_   = err
-	)
-
-	val = pathParams.ByName("id")
-	if val == "" {
-		return nil, metadata, gateway.ErrPathParameterMissing{Name: "id"}
-	}
-
-	protoReq.Id, err = protoconvert.String(val)
-	if err != nil {
-		return nil, metadata, gateway.ErrPathParameterTypeMismatch{Err: err, Name: "id"}
-	}
-
-	msg, err := client.GetSpend(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 
 }
@@ -181,9 +141,22 @@ func request_DelegateeService_GetTemplate_0(ctx context.Context, marshaler gatew
 
 }
 
+var (
+	query_params_DelegateeService_ListTemplates_0 = gateway.QueryParameterParseOptions{
+		Filter: trie.New(),
+	}
+)
+
 func request_DelegateeService_ListTemplates_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client DelegateeServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
 	var protoReq ListTemplatesRequest
 	var metadata gateway.ServerMetadata
+
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, gateway.ErrInvalidQueryParameters{Err: err}
+	}
+	if err := mux.PopulateQueryParameters(&protoReq, req.Form, query_params_DelegateeService_ListTemplates_0); err != nil {
+		return nil, metadata, gateway.ErrInvalidQueryParameters{Err: err}
+	}
 
 	msg, err := client.ListTemplates(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -251,13 +224,13 @@ func RegisterDelegateeServiceHandlerClient(ctx context.Context, mux *gateway.Ser
 		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
 	})
 
-	mux.HandleWithParams("POST", "/v1/delegate", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+	mux.HandleWithParams("POST", "/v1/delegation", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.DelegateeService/RegisterDelegation", gateway.WithHTTPPathPattern("/v1/delegate"))
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.DelegateeService/RegisterDelegation", gateway.WithHTTPPathPattern("/v1/delegation"))
 		if err != nil {
 			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
 			return
@@ -273,63 +246,19 @@ func RegisterDelegateeServiceHandlerClient(ctx context.Context, mux *gateway.Ser
 		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
 	})
 
-	mux.HandleWithParams("GET", "/v1/delegate/:address", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+	mux.HandleWithParams("GET", "/v1/delegation", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.DelegateeService/GetDelegation", gateway.WithHTTPPathPattern("/v1/delegate/{address}"))
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.DelegateeService/GetDelegation", gateway.WithHTTPPathPattern("/v1/delegation"))
 		if err != nil {
 			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
 			return
 		}
 
 		resp, md, err := request_DelegateeService_GetDelegation_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
-		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
-			return
-		}
-
-		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
-	})
-
-	mux.HandleWithParams("POST", "/v1/spend", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.DelegateeService/RegisterSpend", gateway.WithHTTPPathPattern("/v1/spend"))
-		if err != nil {
-			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
-			return
-		}
-
-		resp, md, err := request_DelegateeService_RegisterSpend_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
-		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
-			return
-		}
-
-		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
-	})
-
-	mux.HandleWithParams("GET", "/v1/spend/:id", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.DelegateeService/GetSpend", gateway.WithHTTPPathPattern("/v1/spend/{id}"))
-		if err != nil {
-			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
-			return
-		}
-
-		resp, md, err := request_DelegateeService_GetSpend_0(annotatedContext, inboundMarshaler, mux, client, req, pathParams)
 		annotatedContext = gateway.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			mux.HTTPError(annotatedContext, outboundMarshaler, w, req, err)
@@ -427,13 +356,13 @@ func RegisterDelegateeServiceHandlerClient(ctx context.Context, mux *gateway.Ser
 		mux.ForwardResponseMessage(annotatedContext, outboundMarshaler, w, req, resp)
 	})
 
-	mux.HandleWithParams("GET", "/v1/template", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
+	mux.HandleWithParams("GET", "/v1/templates", func(w http.ResponseWriter, req *http.Request, pathParams gateway.Params) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := mux.MarshalerForRequest(req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.DelegateeService/ListTemplates", gateway.WithHTTPPathPattern("/v1/template"))
+		annotatedContext, err = gateway.AnnotateContext(ctx, mux, req, "/delegatee.v1.DelegateeService/ListTemplates", gateway.WithHTTPPathPattern("/v1/templates"))
 		if err != nil {
 			mux.HTTPError(ctx, outboundMarshaler, w, req, err)
 			return

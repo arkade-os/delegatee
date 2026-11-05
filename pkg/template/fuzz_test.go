@@ -3,10 +3,11 @@ package template
 import (
 	"bytes"
 	"errors"
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 
 	"github.com/arkade-os/delegatee/pkg/template/internal/jcs"
 	"github.com/arkade-os/delegatee/pkg/template/packets"
@@ -22,9 +23,9 @@ func FuzzParse(f *testing.F) {
 		require.NoError(f, err)
 		f.Add(doc)
 	}
-	resolve := artifacts(f)
+	docs := artifacts(f)
 	f.Fuzz(func(t *testing.T, doc []byte) {
-		tmpl, err := Parse(t.Context(), doc, resolve)
+		tmpl, err := Parse(doc, docs)
 		if err != nil {
 			requireSentinel(t, err, ErrInvalidTemplate, ErrInvalidArtifact, ErrUnsupported)
 			return
@@ -33,7 +34,7 @@ func FuzzParse(f *testing.F) {
 		require.NoError(t, err)
 		canon, err := jcs.Canonical(v)
 		require.NoError(t, err)
-		again, err := Parse(t.Context(), canon, resolve)
+		again, err := Parse(canon, docs)
 		require.NoError(t, err)
 		require.Equal(t, tmpl.ID(), again.ID())
 	})

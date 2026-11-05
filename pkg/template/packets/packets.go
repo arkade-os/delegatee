@@ -4,7 +4,6 @@ package packets
 import (
 	"cmp"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -23,9 +22,6 @@ const (
 	// counts the whole body, version byte and length prefixes included
 	maxAdvertisementLen = 520
 )
-
-// ErrInvalidAdvertisement marks a malformed packet 5 body.
-var ErrInvalidAdvertisement = errors.New("packets: invalid advertisement")
 
 // Record is a template id and the output indexes it claims.
 type Record struct {

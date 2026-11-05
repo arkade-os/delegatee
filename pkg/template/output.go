@@ -26,8 +26,7 @@ type output struct {
 	name    string
 	index   uint16
 	onchain bool
-	from    int          // pool[0]
-	pool    []int        // inputs it draws from, sorted
+	from    int          // the input it draws from
 	amount  byteTemplate // nil: the remainder
 	locking locking
 	assets  []assetRoute
@@ -42,10 +41,9 @@ func (c *compiler) output(s *schema.Output) error {
 	if o.onchain, err = c.slotType(s.Type); err != nil {
 		return err
 	}
-	if o.pool, err = c.pool(s.Value.From); err != nil {
+	if o.from, err = c.inputIndex(s.Value.From, "value"); err != nil {
 		return err
 	}
-	o.from = o.pool[0]
 	if s.Value.Amount != nil {
 		if o.amount, err = c.amount(*s.Value.Amount); err != nil {
 			return err
@@ -54,7 +52,7 @@ func (c *compiler) output(s *schema.Output) error {
 	if o.locking, err = c.locking(s.Locking); err != nil {
 		return err
 	}
-	if len(s.Assets) > 0 && (o.onchain || slices.ContainsFunc(o.pool, func(i int) bool { return c.t.inputs[i].onchain })) {
+	if len(s.Assets) > 0 && (o.onchain || c.t.inputs[o.from].onchain) {
 		return bad("output %q cannot carry assets", o.name)
 	}
 	for i := range s.Assets {
@@ -69,23 +67,6 @@ func (c *compiler) output(s *schema.Output) error {
 	}
 	c.t.outputs = append(c.t.outputs, o)
 	return nil
-}
-
-// pool resolves the inputs an output draws from, sorted.
-func (c *compiler) pool(p schema.Pool) ([]int, error) {
-	var pool []int
-	for _, n := range p.Names {
-		i, err := c.inputIndex(n, "value")
-		if err != nil {
-			return nil, err
-		}
-		if slices.Contains(pool, i) {
-			return nil, bad("value names input %q twice", n)
-		}
-		pool = append(pool, i)
-	}
-	slices.Sort(pool)
-	return pool, nil
 }
 
 func (c *compiler) locking(s schema.Locking) (locking, error) {
@@ -124,19 +105,12 @@ func (t *Template) checkPrograms() error {
 	return nil
 }
 
-// checkBalances: one pool per input, one remainder output per pool, one remainder route per input and asset.
+// checkBalances: one remainder output per input, one remainder route per input and asset.
 func (t *Template) checkBalances() error {
 	for i, in := range t.inputs {
-		pool := t.poolOf(i)
 		n := 0
 		for _, o := range t.outputs {
-			if !slices.Contains(o.pool, i) {
-				continue
-			}
-			if !slices.Equal(o.pool, pool) {
-				return bad("input %q shares its value with two sets of inputs", in.name)
-			}
-			if o.amount == nil {
+			if o.from == i && o.amount == nil {
 				n++
 			}
 		}
@@ -154,16 +128,6 @@ func (t *Template) checkBalances() error {
 				return bad("input %q has two remainder routes for one asset", t.inputs[r.from].name)
 			}
 			remainders = append(remainders, r)
-		}
-	}
-	return nil
-}
-
-// poolOf is nil when no output draws from slot.
-func (t *Template) poolOf(slot int) []int {
-	for _, o := range t.outputs {
-		if slices.Contains(o.pool, slot) {
-			return o.pool
 		}
 	}
 	return nil
@@ -211,15 +175,15 @@ type allocation struct {
 	fee    uint64
 }
 
-// allocate balances every pool separately; fee goes to fees.from's pool and dust is the minimum output.
+// allocate balances every input separately; fee comes out of fees.from and dust is the minimum output.
 func (i *Instance) allocate(d *draft, sources []*Source, fee uint64, dust uint64) (*allocation, error) {
 	t := i.tmpl
-	feeCap, _ := i.FeeCap()
+	feeCap := i.feeCap()
 	switch {
 	case fee > 0 && t.fee == nil:
-		return nil, fmt.Errorf("%w: the template pays no fee, asked %d", ErrIneligible, fee)
+		return nil, fmt.Errorf("%w: %w: the template pays no fee, asked %d", ErrIneligible, ErrUnaffordable, fee)
 	case t.fee != nil && fee > feeCap:
-		return nil, fmt.Errorf("%w: fee %d exceeds the cap %d", ErrIneligible, fee, feeCap)
+		return nil, fmt.Errorf("%w: %w: fee %d exceeds the cap %d", ErrIneligible, ErrUnaffordable, fee, feeCap)
 	case len(sources) != len(t.inputs):
 		return nil, fmt.Errorf("%w: %d sources for %d inputs", ErrIneligible, len(sources), len(t.inputs))
 	}
@@ -245,14 +209,8 @@ func (i *Instance) allocate(d *draft, sources []*Source, fee uint64, dust uint64
 			}
 		}
 
-		if pool := t.poolOf(slot); pool[0] == slot {
-			var sum uint64
-			for _, k := range pool {
-				sum += sources[k].Amount
-			}
-			if err := i.routeSats(d, pool, sum, dust, a); err != nil {
-				return nil, err
-			}
+		if err := i.routeSats(d, slot, s.Amount, dust, a); err != nil {
+			return nil, err
 		}
 		if err := i.routeAssets(d, slot, held, a); err != nil {
 			return nil, err
@@ -266,33 +224,36 @@ func (i *Instance) allocate(d *draft, sources []*Source, fee uint64, dust uint64
 	return a, nil
 }
 
-func (i *Instance) routeSats(d *draft, pool []int, amount, dust uint64, a *allocation) error {
+func (i *Instance) routeSats(d *draft, slot int, amount, dust uint64, a *allocation) error {
 	t := i.tmpl
 	left := amount
 	for k, o := range t.outputs {
-		if !slices.Equal(o.pool, pool) || o.amount == nil {
+		if o.from != slot || o.amount == nil {
 			continue
 		}
 		n, err := i.fixedAmount(o.amount, d, o.from)
 		if err != nil {
 			return fmt.Errorf("output %q: %w", o.name, err)
 		}
-		if n > left || n < dust {
-			return fmt.Errorf("%w: output %q draws %d of %d left, minimum %d", ErrIneligible, o.name, n, left, dust)
+		if n < dust {
+			return fmt.Errorf("%w: %w: output %q draws %d, minimum %d", ErrIneligible, ErrUnaffordable, o.name, n, dust)
+		}
+		if n > left {
+			return fmt.Errorf("%w: output %q draws %d of %d left", ErrIneligible, o.name, n, left)
 		}
 		left -= n
 		a.sats[k] = n
 	}
-	if t.fee != nil && slices.Contains(pool, t.fee.from) {
+	if t.fee != nil && t.fee.from == slot {
 		if a.fee > left {
 			return fmt.Errorf("%w: input %q cannot pay fee %d", ErrIneligible, t.inputs[t.fee.from].name, a.fee)
 		}
 		left -= a.fee
 	}
 	for k, o := range t.outputs {
-		if slices.Equal(o.pool, pool) && o.amount == nil {
+		if o.from == slot && o.amount == nil {
 			if left < dust {
-				return fmt.Errorf("%w: output %q remainder %d below %d", ErrIneligible, o.name, left, dust)
+				return fmt.Errorf("%w: %w: output %q remainder %d below %d", ErrIneligible, ErrUnaffordable, o.name, left, dust)
 			}
 			a.sats[k] = left
 		}

@@ -1,15 +1,11 @@
 package main
 
 import (
-	"errors"
-	"os"
+	"context"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/arkade-os/delegatee/internal/config"
-	"github.com/arkade-os/delegatee/internal/infrastructure/db/postgres"
-	grpcservice "github.com/arkade-os/delegatee/internal/interface/grpc"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,35 +13,26 @@ var Version = "dev"
 
 func main() {
 	log.SetFormatter(&log.JSONFormatter{})
-
-	cfg, err := config.LoadConfig()
+	cfg, err := config.Load()
 	if err != nil {
 		log.WithError(err).Fatal("invalid config")
 	}
+	cfg.Version = Version
 	log.SetLevel(log.Level(cfg.LogLevel))
 	log.WithField("version", Version).Info("starting delegateed")
 
-	svc, err := grpcservice.NewService(Version, cfg)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	daemon, err := config.NewDaemon(ctx, cfg)
 	if err != nil {
-		log.WithError(err).Fatal("init service")
+		log.WithError(err).Fatal("start daemon")
 	}
-
-	for attempt := 1; ; attempt++ {
-		if err = svc.Start(); err == nil {
-			break
-		}
-		if attempt >= 30 || errors.Is(err, postgres.ErrKeyInUse) {
-			log.WithError(err).Fatal("start service")
-		}
-		log.WithError(err).WithField("attempt", attempt).Warn("dependencies not ready, retrying in 5s")
-		time.Sleep(5 * time.Second)
+	go func() {
+		<-ctx.Done()
+		log.Info("shutting down delegateed")
+		daemon.Stop()
+	}()
+	if err := daemon.Server.Serve(); err != nil {
+		log.WithError(err).Fatal("serve")
 	}
-	log.RegisterExitHandler(svc.Stop)
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
-	<-sigChan
-
-	log.Info("shutting down delegateed")
-	log.Exit(0)
 }

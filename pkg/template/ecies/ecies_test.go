@@ -20,7 +20,7 @@ func TestVectorDecrypts(t *testing.T) {
 	ciphertext := mustDecode(t, v.Ciphertext)
 	plaintext := mustDecode(t, v.Plaintext)
 
-	got, err := ecies.Decrypt(priv, ciphertext)
+	got, err := ecies.Decrypt(priv, ciphertext, "")
 	require.NoError(t, err)
 	require.Equal(t, plaintext, got)
 }
@@ -30,18 +30,28 @@ func TestEncryptDecryptRoundtrip(t *testing.T) {
 	require.NoError(t, err)
 	plaintext := []byte("a secret preimage, arbitrary length")
 
-	ciphertext, err := ecies.Encrypt(priv.PubKey(), plaintext)
+	ciphertext, err := ecies.Encrypt(priv.PubKey(), plaintext, tplA)
 	require.NoError(t, err)
 
-	got, err := ecies.Decrypt(priv, ciphertext)
+	got, err := ecies.Decrypt(priv, ciphertext, tplA)
 	require.NoError(t, err)
 	require.Equal(t, plaintext, got)
+}
+
+func TestDecryptRejectsOtherTemplate(t *testing.T) {
+	priv, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	ciphertext, err := ecies.Encrypt(priv.PubKey(), []byte("a secret"), tplA)
+	require.NoError(t, err)
+
+	_, err = ecies.Decrypt(priv, ciphertext, tplB)
+	require.Error(t, err)
 }
 
 func TestDecryptRejects(t *testing.T) {
 	priv, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
-	ciphertext, err := ecies.Encrypt(priv.PubKey(), []byte("some 32 byte long secret preimg"))
+	ciphertext, err := ecies.Encrypt(priv.PubKey(), []byte("some 32 byte long secret preimg"), tplA)
 	require.NoError(t, err)
 	flipped := func(i int) []byte {
 		out := bytes.Clone(ciphertext)
@@ -66,34 +76,17 @@ func TestDecryptRejects(t *testing.T) {
 		{name: "ephemeral point not on curve", ciphertext: offCurve},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := ecies.Decrypt(priv, tc.ciphertext)
+			_, err := ecies.Decrypt(priv, tc.ciphertext, tplA)
 			require.Error(t, err)
 			require.ErrorContains(t, err, tc.msg)
 		})
 	}
 }
 
-func TestDecryptAny(t *testing.T) {
-	oldKey, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	newKey, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	other, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	plaintext := []byte("a secret preimage, arbitrary length")
-
-	// sealed to the current key, the superseded one retained
-	ciphertext, err := ecies.Encrypt(newKey.PubKey(), plaintext)
-	require.NoError(t, err)
-	got, err := ecies.DecryptAny([]*btcec.PrivateKey{oldKey, newKey}, ciphertext)
-	require.NoError(t, err)
-	require.Equal(t, plaintext, got)
-
-	ciphertext, err = ecies.Encrypt(other.PubKey(), plaintext)
-	require.NoError(t, err)
-	_, err = ecies.DecryptAny([]*btcec.PrivateKey{oldKey, newKey}, ciphertext)
-	require.ErrorContains(t, err, "no key")
-}
+const (
+	tplA = "template-a"
+	tplB = "template-b"
+)
 
 type vector struct {
 	Privkey    string `json:"privkey"`

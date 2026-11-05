@@ -4,10 +4,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 	"strings"
 	"testing"
+
+	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"

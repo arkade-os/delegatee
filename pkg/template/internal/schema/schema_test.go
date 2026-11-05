@@ -52,7 +52,7 @@ func TestDecodeRejects(t *testing.T) {
 		"null variables":        func(m map[string]any) { m["variables"] = nil },
 		"immediate false":       func(m map[string]any) { in(m)["schedule"] = map[string]any{"immediate": false} },
 		"schedule two keys":     func(m map[string]any) { in(m)["schedule"] = map[string]any{"immediate": true, "min_confirmations": 1} },
-		"format":                func(m map[string]any) { m["format"] = "delegateed-template/v2" },
+		"format":                func(m map[string]any) { m["format"] = "template/v2" },
 		"type":                  func(m map[string]any) { m["type"] = "batch" },
 		"no input":              func(m map[string]any) { m["inputs"] = []any{} },
 		"bad name":              func(m map[string]any) { in(m)["name"] = "Funds" },
@@ -88,6 +88,16 @@ func TestDecodeRejects(t *testing.T) {
 	}
 }
 
+func TestPooledOutputValueIsRefused(t *testing.T) {
+	for name, from := range map[string]any{"several inputs": []any{"funds", "extra"}, "one in a list": []any{"funds"}, "empty": []any{}} {
+		doc := edited(t, fixture(t, "minimal.json"), func(m map[string]any) {
+			m["outputs"].([]any)[0].(map[string]any)["value"] = map[string]any{"from": from}
+		})
+		_, err := Decode(doc)
+		require.ErrorIs(t, err, ErrInvalid, name)
+	}
+}
+
 func TestInlineDefinitionErrorIsArtifactOnly(t *testing.T) {
 	doc := edited(t, fixture(t, "minimal.json"), func(m map[string]any) {
 		m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)["definition"].(map[string]any)["functions"] = []any{}
@@ -99,14 +109,11 @@ func TestInlineDefinitionErrorIsArtifactOnly(t *testing.T) {
 
 func TestCanonicalKeepsForms(t *testing.T) {
 	doc := fixture(t, "minimal.json")
-	out := func(m map[string]any) map[string]any { return m["outputs"].([]any)[0].(map[string]any) }
 	c := canonicalOf(t, edited(t, doc, func(m map[string]any) {
-		out(m)["value"] = map[string]any{"from": []any{"funds"}}
 		m["fees"] = map[string]any{"from": "funds", "max": "<x>"}
 		m["inputs"].([]any)[0].(map[string]any)["schedule"] = map[string]any{"before_expiry_seconds": 10}
 		m["packets"] = map[string]any{"output_index": 1, "unmatched": "reject"}
 	}))
-	require.Contains(t, c, `"from":["funds"]`)
 	require.Contains(t, c, `"max":"<x>"`)
 	require.Contains(t, c, `"before_expiry_seconds":10`)
 	require.NotContains(t, c, "unmatched")

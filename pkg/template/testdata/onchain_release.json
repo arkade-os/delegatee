@@ -1,5 +1,5 @@
 {
-  "format": "delegateed-template/v1",
+  "format": "template/v1",
   "type": "onchain",
   "inputs": [
     {
@@ -16,7 +16,7 @@
               "leaves": [
                 {
                   "name": "release",
-                  "asm": ["<DELEGATE_KEY>", "OP_CHECKSIG"],
+                  "asm": ["<COSIGNER_KEY>", "OP_CHECKSIG"],
                   "witness": [
                     {"name": "delegateSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
                   ]

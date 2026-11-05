@@ -1,16 +1,12 @@
 package asm
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/arkade-os/emulator/pkg/arkade"
 )
-
-// ErrBadExpression marks an expression a template may not run.
-var ErrBadExpression = errors.New("bad expression")
 
 var (
 	forbiddenPrefixes = []string{"OP_INSPECTOUTPUT", "OP_INSPECTOUTASSET", "OP_INSPECTASSETGROUP", "OP_INSPECTINPUTARKADE", "OP_INSPECTINASSET"}

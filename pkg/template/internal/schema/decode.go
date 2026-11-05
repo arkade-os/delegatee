@@ -196,7 +196,6 @@ func (b *Binding) fromJSON(v any, path string) error {
 	return nil
 }
 
-// MarshalJSON writes the binding in the form it was given.
 func (b Binding) MarshalJSON() ([]byte, error) {
 	switch {
 	case b.Int != nil:
@@ -253,42 +252,6 @@ func (iv IntOrVar) MarshalJSON() ([]byte, error) {
 	return json.Marshal("<" + iv.Var + ">")
 }
 
-// Pool is the inputs an output draws its value from: one name, or a list given as a list.
-type Pool struct {
-	Names []string
-	List  bool
-}
-
-func (p *Pool) fromJSON(v any, path string) error {
-	switch x := v.(type) {
-	case string:
-		p.Names = []string{x}
-	case []any:
-		if len(x) == 0 {
-			return bad("%s names no input", path)
-		}
-		p.List = true
-		for _, e := range x {
-			s, ok := e.(string)
-			if !ok {
-				return bad("%s holds a non-string", path)
-			}
-			p.Names = append(p.Names, s)
-		}
-	default:
-		return bad("%s must be an input name or a list of them", path)
-	}
-	return nil
-}
-
-// MarshalJSON writes the pool in the form it was given.
-func (p Pool) MarshalJSON() ([]byte, error) {
-	if p.List {
-		return json.Marshal(p.Names)
-	}
-	return json.Marshal(p.Names[0])
-}
-
 // Locking is an output's script: a byte template, the script of an input, or a contract.
 type Locking struct {
 	Script   *Binding
@@ -324,7 +287,6 @@ func (l *Locking) fromJSON(v any, path string) error {
 	return nil
 }
 
-// MarshalJSON writes the locking in the form it was given.
 func (l Locking) MarshalJSON() ([]byte, error) {
 	switch {
 	case l.Script != nil:
@@ -372,15 +334,15 @@ func (r DefinitionRef) MarshalJSON() ([]byte, error) {
 	return json.Marshal(r.Def.Canonical())
 }
 
-// TriggerBind is where a trigger variable comes from: a source name, or a push captured from a
+// TriggerCapture is where a trigger variable comes from: a source name, or a push captured from a
 // source by matching an asm pattern.
-type TriggerBind struct {
+type TriggerCapture struct {
 	Source string
 	From   string
 	Asm    []string
 }
 
-func (b *TriggerBind) fromJSON(v any, path string) error {
+func (b *TriggerCapture) fromJSON(v any, path string) error {
 	switch x := v.(type) {
 	case string:
 		b.Source = x
@@ -411,8 +373,7 @@ func (b *TriggerBind) fromJSON(v any, path string) error {
 	return nil
 }
 
-// MarshalJSON writes the bind in the form it was given.
-func (b TriggerBind) MarshalJSON() ([]byte, error) {
+func (b TriggerCapture) MarshalJSON() ([]byte, error) {
 	if b.Asm == nil {
 		return json.Marshal(b.Source)
 	}

@@ -2,8 +2,9 @@ package template
 
 import (
 	"encoding/hex"
-	"github.com/arkade-os/delegatee/pkg/template/internal/schema"
 	"testing"
+
+	"github.com/arkade-os/delegatee/pkg/template/internal/schema"
 
 	"github.com/stretchr/testify/require"
 )

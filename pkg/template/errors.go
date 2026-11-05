@@ -18,4 +18,7 @@ var (
 	ErrInvalidVariables = errors.New("invalid variables")
 	// ErrIneligible marks sources the template cannot spend as given.
 	ErrIneligible = errors.New("ineligible")
+	// ErrUnaffordable marks an ineligible source that fees or dust refuse, not a broken template.
+	ErrUnaffordable = errors.New("unaffordable")
+	ErrNoMatch      = errors.New("transaction does not match the trigger")
 )

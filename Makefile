@@ -2,7 +2,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 BINARY = delegateed
 LDFLAGS := -s -w -X 'main.Version=$(VERSION)'
 
-.PHONY: build build-all clean test test-e2e lint lint-fix fmt deps docker regtest-up regtest-run regtest-down run proto proto-lint pgsqlc pgmigrate
+.PHONY: build build-all clean test test-daemon test-e2e lint lint-fix fmt deps docker regtest-up regtest-run regtest-down run proto proto-lint pg sqlc migration
 
 build:
 	go build -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/delegateed
@@ -16,15 +16,21 @@ build-all:
 clean:
 	rm -rf bin/ build/
 
-## unit tests (no infrastructure), with coverage per package
+## unit and repository tests (postgres tests need `make pg`)
 test:
-	go test -race -cover $$(go list ./... | grep -v -e /test/e2e -e /infrastructure/db)
-	cd pkg/template && go test -race -cover ./...
+	go test -race ./internal/... ./cmd/...
+	cd pkg/template && go test -race ./...
 
-## repository tests against postgres, then end-to-end against the regtest stack (make regtest-up first)
+## the in-process daemon suite against postgres
+test-daemon: pg
+	go test -count=1 -timeout 15m ./test/daemon/...
+
+## end-to-end against the regtest stack (make regtest-up first)
 test-e2e:
-	docker compose -f docker-compose.regtest.yml up -d --force-recreate --wait pg
-	go test -v -count=1 -timeout 25m ./internal/infrastructure/... ./test/e2e/...
+	go test -tags e2e -v -count=1 -timeout 40m ./test/e2e/...
+
+pg:
+	docker compose -f docker-compose.regtest.yml up -d --wait pg
 
 lint:
 	golangci-lint run ./...
@@ -45,13 +51,13 @@ proto-lint:
 fmt:
 	gofmt -s -w .
 
-## pgsqlc: compile sql queries for postgres
-pgsqlc:
-	@docker run --rm -v ./internal/infrastructure/db/postgres:/src -w /src sqlc/sqlc:1.30.0 generate
+## sqlc: compile sql queries for postgres
+sqlc:
+	@docker run --rm -v ./internal/infrastructure/postgres:/src -w /src sqlc/sqlc:1.30.0 generate
 
-## pgmigrate: create a postgres migration file (e.g. make FILE=add_x pgmigrate)
-pgmigrate:
-	@docker run --rm -v ./internal/infrastructure/db/postgres/migration:/migration migrate/migrate create -ext sql -dir /migration $(FILE)
+## migration: create a postgres migration file (e.g. make FILE=add_x migration)
+migration:
+	@docker run --rm -v ./internal/infrastructure/postgres/migration:/migration migrate/migrate create -ext sql -dir /migration $(FILE)
 
 deps:
 	go mod tidy
@@ -62,7 +68,7 @@ docker:
 # nigiri can believe it is running after a docker restart: trust the container
 NIGIRI_UP = docker ps --format '{{.Names}}' | grep -qx bitcoin || { nigiri stop >/dev/null 2>&1; nigiri start; }
 
-## regtest-up: nigiri + arkd + emulator + postgres (delegateed runs from `make run` or the tests)
+## regtest-up: nigiri + arkd + emulator + fulcrum + postgres (delegateed runs from `make run` or the tests)
 regtest-up:
 	@$(NIGIRI_UP)
 	docker compose -f docker-compose.regtest.yml up -d
@@ -80,9 +86,5 @@ regtest-down:
 
 ## run: delegateed from source against the regtest stack
 run: build
-	DELEGATEE_ARK_URL=localhost:7070 DELEGATEE_EMULATOR_URL=localhost:7073 \
 	DELEGATEE_DATABASE_URL=postgres://postgres@localhost:5432/delegatee?sslmode=disable \
-	DELEGATEE_DELEGATE_KEY=$${DELEGATEE_DELEGATE_KEY:-0000000000000000000000000000000000000000000000000000000000000001} \
-	DELEGATEE_EXPLORER_URL=http://localhost:3000 \
-	DELEGATEE_ADMIN_AUTH=disabled \
-	DELEGATEE_LOG_LEVEL=5 DELEGATEE_MIN_WATCH_EXPIRY=0 ./bin/$(BINARY)
+	DELEGATEE_LOG_LEVEL=5 ./bin/$(BINARY)

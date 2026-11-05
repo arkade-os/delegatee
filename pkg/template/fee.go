@@ -38,17 +38,17 @@ func (c *compiler) fees() error {
 	return nil
 }
 
-// FeeCap is the most the instance lets one of its transactions pay in fees; false when it pays none.
-func (i *Instance) FeeCap() (uint64, bool) {
+// feeCap is the most one transaction may pay in fees; zero when it pays none.
+func (i *Instance) feeCap() uint64 {
 	f := i.tmpl.fee
 	if f == nil {
-		return 0, false
+		return 0
 	}
 	if f.maxVariable == "" {
-		return f.max, true
+		return f.max
 	}
 	n, _ := asm.ParseScriptNum(i.vars[f.maxVariable])
-	return uint64(n), true
+	return uint64(n)
 }
 
 // maxFeeRounds bounds the search for an intent fee that prices its own outputs.

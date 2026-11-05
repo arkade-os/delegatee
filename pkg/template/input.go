@@ -115,18 +115,15 @@ func (c *compiler) construction(s *schema.Construction) (*construction, error) {
 	return ct, nil
 }
 
-// definition returns the inline definition, or resolves and verifies the referenced artifact.
+// definition returns the inline definition, or verifies the referenced artifact.
 func (c *compiler) definition(ref schema.DefinitionRef) (*abi.Definition, error) {
 	if d := ref.Def; d != nil {
 		return d, nil
 	}
 	id := ref.Artifact
-	if c.resolve == nil {
-		return nil, bad("no resolver for artifact %s", id)
-	}
-	doc, err := c.resolve(c.ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("artifact %s: %w", id, err)
+	doc, ok := c.artifacts[id]
+	if !ok {
+		return nil, bad("artifact %s not provided", id)
 	}
 	a, err := abi.Parse(doc)
 	if err != nil {
@@ -233,7 +230,7 @@ func contractErr(err error) error {
 	switch {
 	case err == nil:
 		return nil
-	case errors.Is(err, contract.ErrNoDelegate):
+	case errors.Is(err, contract.ErrNoCosigner):
 		return fmt.Errorf("%w: %v", ErrUnsupported, err)
 	case errors.Is(err, contract.ErrBadTree):
 		return fmt.Errorf("%w: %v", ErrIneligible, err)
@@ -300,10 +297,8 @@ func checkSourceScript(in input, s *Source, ct *contract.Contract) error {
 	return nil
 }
 
-// Tapscripts lists the hex leaf scripts of the input's contract.
 func (i *Instance) Tapscripts(slot int) []string { return slices.Clone(i.contracts[slot].Tapscripts) }
 
-// PkScript is the output script of the input's contract.
 func (i *Instance) PkScript(slot int) []byte { return bytes.Clone(i.contracts[slot].PkScript) }
 
 // lead is how long before expiry the input becomes due, zero without an expiry schedule.
@@ -328,11 +323,11 @@ func (i *Instance) DueAt(slot int, s *Source, now time.Time) time.Time {
 }
 
 // scheduleDue is the window start for an expiry lead, else the source's creation, or now when unknown.
-// A fee-paying instance waits at least half the source's life: a longer lead would pay in every round.
+// A fee-paying instance waits at least half the source's life: a longer lead would pay in every batch.
 func (i *Instance) scheduleDue(slot int, s *Source, now time.Time) time.Time {
 	sch := i.tmpl.inputs[slot].schedule
 	lead := i.lead(slot)
-	if cap, _ := i.FeeCap(); cap > 0 && !s.CreatedAt.IsZero() {
+	if i.feeCap() > 0 && !s.CreatedAt.IsZero() {
 		if life := s.Expiry.Sub(s.CreatedAt); life > 0 {
 			lead = min(lead, life/2)
 		}

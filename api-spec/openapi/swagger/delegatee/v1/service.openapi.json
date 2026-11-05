@@ -10,7 +10,7 @@
         "tags": [
           "DelegateeService"
         ],
-        "description": "RegisterArtifact stores a compiler artifact templates may reference. Idempotent on its id.",
+        "description": "RegisterArtifact stores a compiler artifact under its content id. Idempotent.",
         "operationId": "DelegateeService_RegisterArtifact",
         "requestBody": {
           "content": {
@@ -86,12 +86,58 @@
         }
       }
     },
-    "/v1/delegate": {
+    "/v1/delegation": {
+      "get": {
+        "tags": [
+          "DelegateeService"
+        ],
+        "description": "GetDelegation returns a delegation with its coins, by ?id= or by ?address=.",
+        "operationId": "DelegateeService_GetDelegation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "address",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetDelegationResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "DelegateeService"
         ],
-        "description": "RegisterDelegation registers a watch: the daemon acts on coins sent to\nthe address the template derives for variables, until expires_at. The\ntemplate must have exactly one input; the wallet compares the address\nwith its own. Registering an active watch again returns it unchanged.",
+        "description": "RegisterDelegation binds a one-input template to variables: the daemon acts on every coin landing at\nthe derived address until expires_at. Registering an active delegation again returns it unchanged.",
         "operationId": "DelegateeService_RegisterDelegation",
         "requestBody": {
           "content": {
@@ -127,53 +173,12 @@
         }
       }
     },
-    "/v1/delegate/{address}": {
-      "get": {
-        "tags": [
-          "DelegateeService"
-        ],
-        "description": "GetDelegation returns the watch of an address (an active one first, else\nthe newest) with its spendable VTXOs (live from the arkd indexer) and its\nrenewal history.",
-        "operationId": "DelegateeService_GetDelegation",
-        "parameters": [
-          {
-            "name": "address",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "a successful response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GetDelegationResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Status"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/info": {
       "get": {
         "tags": [
           "DelegateeService"
         ],
-        "description": "GetInfo returns the keys a wallet instantiates a template with.",
+        "description": "GetInfo tells the daemon's version, network and keys.",
         "operationId": "DelegateeService_GetInfo",
         "responses": {
           "200": {
@@ -199,123 +204,12 @@
         }
       }
     },
-    "/v1/spend": {
-      "post": {
-        "tags": [
-          "DelegateeService"
-        ],
-        "description": "RegisterSpend spends outpoints once through a template, signed by their owner.",
-        "operationId": "DelegateeService_RegisterSpend",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterSpendRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "a successful response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegisterSpendResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Status"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/spend/{id}": {
-      "get": {
-        "tags": [
-          "DelegateeService"
-        ],
-        "description": "GetSpend returns a spend with its coins and attempts.",
-        "operationId": "DelegateeService_GetSpend",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "a successful response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GetSpendResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Status"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/template": {
-      "get": {
-        "tags": [
-          "DelegateeService"
-        ],
-        "description": "ListTemplates lists the active templates, without their documents.",
-        "operationId": "DelegateeService_ListTemplates",
-        "responses": {
-          "200": {
-            "description": "a successful response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListTemplatesResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Status"
-                }
-              }
-            }
-          }
-        }
-      },
       "post": {
         "tags": [
           "DelegateeService"
         ],
-        "description": "RegisterTemplate stores a template the engine accepts. It is active at once. Idempotent on its id.",
+        "description": "RegisterTemplate stores a template under its content id once its artifacts are registered. Idempotent.",
         "operationId": "DelegateeService_RegisterTemplate",
         "requestBody": {
           "content": {
@@ -390,6 +284,47 @@
           }
         }
       }
+    },
+    "/v1/templates": {
+      "get": {
+        "tags": [
+          "DelegateeService"
+        ],
+        "description": "ListTemplates lists templates without their documents, newest first.",
+        "operationId": "DelegateeService_ListTemplates",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "status filters on active or disabled; empty lists all.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "a successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTemplatesResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -410,6 +345,7 @@
         "properties": {
           "createdAt": {
             "type": "integer",
+            "description": "created_at is unix seconds.",
             "format": "int64"
           },
           "document": {
@@ -420,55 +356,87 @@
           }
         }
       },
-      "Asset": {
-        "title": "Asset",
+      "Coin": {
+        "title": "Coin",
         "type": "object",
+        "description": "Coin is a vtxo found at a delegation's input.",
         "properties": {
           "amount": {
             "type": "integer",
             "format": "uint64"
           },
-          "assetId": {
-            "type": "string"
+          "confirmations": {
+            "type": "integer",
+            "description": "confirmations is how deep an onchain coin is buried, 0 in the mempool and for vtxos.",
+            "format": "int32"
+          },
+          "due": {
+            "type": "integer",
+            "description": "due is unix seconds, when the delegation becomes eligible to spend the coin.",
+            "format": "int64"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "expires_at is unix seconds, 0 when the coin never expires.",
+            "format": "int64"
+          },
+          "input": {
+            "type": "integer",
+            "description": "input is the index of the delegation input the coin landed at.",
+            "format": "int32"
+          },
+          "outpoint": {
+            "type": "string",
+            "description": "outpoint is txid:vout."
+          },
+          "spentBy": {
+            "type": "string",
+            "description": "spent_by is the txid that consumed the coin, empty while present or unknown."
+          },
+          "status": {
+            "type": "string",
+            "description": "status is present or spent."
           }
         }
       },
       "Delegation": {
         "title": "Delegation",
         "type": "object",
-        "description": "Delegation is an instance of a template.",
         "properties": {
           "address": {
-            "type": "string",
-            "description": "address is slot 0's address for a watch, empty otherwise."
+            "type": "string"
           },
           "createdAt": {
             "type": "integer",
+            "description": "created_at and updated_at are unix seconds.",
             "format": "int64"
           },
           "expiresAt": {
             "type": "integer",
-            "description": "expires_at is 0 when the delegation never expires.",
+            "description": "expires_at is unix seconds, 0 when the delegation never expires.",
             "format": "int64"
+          },
+          "fingerprint": {
+            "type": "string"
           },
           "id": {
             "type": "integer",
             "format": "int64"
           },
-          "parentId": {
-            "type": "integer",
-            "description": "parent_id is the delegation whose settled transaction advertised this one, or the stream delegation that spawned it; 0 otherwise.",
-            "format": "int64"
-          },
-          "slots": {
+          "inputs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Slot"
+              "$ref": "#/components/schemas/Input"
             }
           },
           "status": {
             "type": "string",
             "description": "status is active, cancelled, expired or done."
+          },
+          "streamId": {
+            "type": "integer",
+            "description": "stream_id is the stream that spawned the delegation, 0 when a client registered it.",
+            "format": "int64"
           },
           "templateId": {
             "type": "string"
@@ -509,6 +477,10 @@
         "properties": {
           "address": {
             "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -516,20 +488,15 @@
         "title": "GetDelegationResponse",
         "type": "object",
         "properties": {
+          "coins": {
+            "type": "array",
+            "description": "coins are the vtxos found at the delegation's inputs, present and spent.",
+            "items": {
+              "$ref": "#/components/schemas/Coin"
+            }
+          },
           "delegation": {
             "$ref": "#/components/schemas/Delegation"
-          },
-          "renewals": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Renewal"
-            }
-          },
-          "vtxos": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Vtxo"
-            }
           }
         }
       },
@@ -541,11 +508,13 @@
         "title": "GetInfoResponse",
         "type": "object",
         "properties": {
-          "delegatePubkey": {
-            "type": "string"
+          "cosignerPubkey": {
+            "type": "string",
+            "description": "cosigner_pubkey is the compressed key that cosigns arkd's vtxo trees."
           },
           "emulatorPubkey": {
-            "type": "string"
+            "type": "string",
+            "description": "emulator_pubkey merges into server_pubkey once arkd's signer runs the arkade covenants."
           },
           "encryptionPubkey": {
             "type": "string",
@@ -559,36 +528,6 @@
           },
           "version": {
             "type": "string"
-          }
-        }
-      },
-      "GetSpendRequest": {
-        "title": "GetSpendRequest",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          }
-        }
-      },
-      "GetSpendResponse": {
-        "title": "GetSpendResponse",
-        "type": "object",
-        "properties": {
-          "delegation": {
-            "$ref": "#/components/schemas/Delegation"
-          },
-          "renewals": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Renewal"
-            }
-          },
-          "vtxos": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Vtxo"
-            }
           }
         }
       },
@@ -610,10 +549,43 @@
           }
         }
       },
+      "Input": {
+        "title": "Input",
+        "type": "object",
+        "description": "Input is one template input of a delegation.",
+        "properties": {
+          "locktime": {
+            "type": "integer",
+            "description": "locktime is the absolute locktime of the input's spend leaf, 0 without one.",
+            "format": "uint32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "onchain": {
+            "type": "boolean"
+          },
+          "script": {
+            "type": "string",
+            "description": "script is the hex output script of the input's contract."
+          },
+          "tapscripts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "ListTemplatesRequest": {
         "title": "ListTemplatesRequest",
         "type": "object",
-        "description": "ListTemplatesRequest has no fields: the public list is always the active one."
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "status filters on active or disabled; empty lists all."
+          }
+        }
       },
       "ListTemplatesResponse": {
         "title": "ListTemplatesResponse",
@@ -644,7 +616,8 @@
         "type": "object",
         "properties": {
           "document": {
-            "type": "string"
+            "type": "string",
+            "description": "document is the artifact JSON document."
           }
         }
       },
@@ -663,7 +636,7 @@
         "properties": {
           "expiresAt": {
             "type": "integer",
-            "description": "expires_at is a unix time after which the watch stops; 0 never expires.",
+            "description": "expires_at is unix seconds; 0 never expires.",
             "format": "int64"
           },
           "templateId": {
@@ -671,6 +644,7 @@
           },
           "variables": {
             "type": "object",
+            "description": "variables are the template's declared variables, values in lower-case hex.",
             "additionalProperties": {
               "type": "string"
             }
@@ -686,56 +660,13 @@
           }
         }
       },
-      "RegisterSpendRequest": {
-        "title": "RegisterSpendRequest",
-        "type": "object",
-        "properties": {
-          "expiresAt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "outpoints": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "pubkey": {
-            "type": "string"
-          },
-          "signature": {
-            "type": "string"
-          },
-          "templateId": {
-            "type": "string"
-          },
-          "variables": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "RegisterSpendResponse": {
-        "title": "RegisterSpendResponse",
-        "type": "object",
-        "properties": {
-          "delegation": {
-            "$ref": "#/components/schemas/Delegation"
-          },
-          "id": {
-            "type": "string",
-            "description": "id is the spend's fingerprint."
-          }
-        }
-      },
       "RegisterTemplateRequest": {
         "title": "RegisterTemplateRequest",
         "type": "object",
         "properties": {
           "document": {
-            "type": "string"
+            "type": "string",
+            "description": "document is the template JSON document."
           }
         }
       },
@@ -745,54 +676,6 @@
         "properties": {
           "template": {
             "$ref": "#/components/schemas/Template"
-          }
-        }
-      },
-      "Renewal": {
-        "title": "Renewal",
-        "type": "object",
-        "properties": {
-          "attemptedAt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "commitmentTxid": {
-            "type": "string"
-          },
-          "error": {
-            "type": "string"
-          },
-          "outpoints": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "success": {
-            "type": "boolean"
-          }
-        }
-      },
-      "Slot": {
-        "title": "Slot",
-        "type": "object",
-        "description": "Slot is one template input of a delegation.",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "onchain": {
-            "type": "boolean"
-          },
-          "outpoint": {
-            "type": "string",
-            "description": "outpoint is \"txid:vout\" when bound, empty for a watch."
-          },
-          "tapscripts": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
           }
         }
       },
@@ -827,11 +710,11 @@
           },
           "createdAt": {
             "type": "integer",
+            "description": "created_at is unix seconds.",
             "format": "int64"
           },
           "document": {
-            "type": "string",
-            "description": "empty in list responses"
+            "type": "string"
           },
           "id": {
             "type": "string"
@@ -843,44 +726,12 @@
             }
           },
           "status": {
-            "type": "string"
-          }
-        }
-      },
-      "Vtxo": {
-        "title": "Vtxo",
-        "type": "object",
-        "properties": {
-          "amount": {
-            "type": "integer",
-            "format": "uint64"
+            "type": "string",
+            "description": "status is active or disabled."
           },
-          "assets": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Asset"
-            }
-          },
-          "createdAt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "expiresAt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "onchain": {
-            "type": "boolean"
-          },
-          "outpoint": {
-            "type": "string"
-          },
-          "preconfirmed": {
-            "type": "boolean"
-          },
-          "renewableAt": {
-            "type": "integer",
-            "format": "int64"
+          "type": {
+            "type": "string",
+            "description": "type is intent or offchain."
           }
         }
       }

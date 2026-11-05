@@ -22,32 +22,29 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type ListDelegationsRequest struct {
+type UpdateTemplateRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// page_size defaults to 100, at most 1000.
-	PageSize int32 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	// cursor is the next_cursor of the previous page, 0 for the first.
-	Cursor int64 `protobuf:"varint,2,opt,name=cursor,proto3" json:"cursor,omitempty"`
-	// status filters when set: active, cancelled, expired or done.
-	Status        string `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// status is active or disabled.
+	Status        string `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListDelegationsRequest) Reset() {
-	*x = ListDelegationsRequest{}
+func (x *UpdateTemplateRequest) Reset() {
+	*x = UpdateTemplateRequest{}
 	mi := &file_delegatee_v1_admin_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListDelegationsRequest) String() string {
+func (x *UpdateTemplateRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListDelegationsRequest) ProtoMessage() {}
+func (*UpdateTemplateRequest) ProtoMessage() {}
 
-func (x *ListDelegationsRequest) ProtoReflect() protoreflect.Message {
+func (x *UpdateTemplateRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_delegatee_v1_admin_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -59,55 +56,45 @@ func (x *ListDelegationsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListDelegationsRequest.ProtoReflect.Descriptor instead.
-func (*ListDelegationsRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use UpdateTemplateRequest.ProtoReflect.Descriptor instead.
+func (*UpdateTemplateRequest) Descriptor() ([]byte, []int) {
 	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *ListDelegationsRequest) GetPageSize() int32 {
+func (x *UpdateTemplateRequest) GetId() string {
 	if x != nil {
-		return x.PageSize
+		return x.Id
 	}
-	return 0
+	return ""
 }
 
-func (x *ListDelegationsRequest) GetCursor() int64 {
-	if x != nil {
-		return x.Cursor
-	}
-	return 0
-}
-
-func (x *ListDelegationsRequest) GetStatus() string {
+func (x *UpdateTemplateRequest) GetStatus() string {
 	if x != nil {
 		return x.Status
 	}
 	return ""
 }
 
-type ListDelegationsResponse struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Delegations []*DelegationSummary   `protobuf:"bytes,1,rep,name=delegations,proto3" json:"delegations,omitempty"`
-	// next_cursor is 0 on the last page.
-	NextCursor    int64 `protobuf:"varint,2,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+type UpdateTemplateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListDelegationsResponse) Reset() {
-	*x = ListDelegationsResponse{}
+func (x *UpdateTemplateResponse) Reset() {
+	*x = UpdateTemplateResponse{}
 	mi := &file_delegatee_v1_admin_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListDelegationsResponse) String() string {
+func (x *UpdateTemplateResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListDelegationsResponse) ProtoMessage() {}
+func (*UpdateTemplateResponse) ProtoMessage() {}
 
-func (x *ListDelegationsResponse) ProtoReflect() protoreflect.Message {
+func (x *UpdateTemplateResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_delegatee_v1_admin_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -119,1428 +106,9 @@ func (x *ListDelegationsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListDelegationsResponse.ProtoReflect.Descriptor instead.
-func (*ListDelegationsResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use UpdateTemplateResponse.ProtoReflect.Descriptor instead.
+func (*UpdateTemplateResponse) Descriptor() ([]byte, []int) {
 	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *ListDelegationsResponse) GetDelegations() []*DelegationSummary {
-	if x != nil {
-		return x.Delegations
-	}
-	return nil
-}
-
-func (x *ListDelegationsResponse) GetNextCursor() int64 {
-	if x != nil {
-		return x.NextCursor
-	}
-	return 0
-}
-
-type DelegationSummary struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	Delegation *Delegation            `protobuf:"bytes,1,opt,name=delegation,proto3" json:"delegation,omitempty"`
-	// managed is false when this instance cannot renew the delegation; unmanaged_reason says why.
-	Managed         bool     `protobuf:"varint,2,opt,name=managed,proto3" json:"managed,omitempty"`
-	UnmanagedReason string   `protobuf:"bytes,3,opt,name=unmanaged_reason,json=unmanagedReason,proto3" json:"unmanaged_reason,omitempty"`
-	VtxoCount       int32    `protobuf:"varint,4,opt,name=vtxo_count,json=vtxoCount,proto3" json:"vtxo_count,omitempty"`
-	TotalAmount     uint64   `protobuf:"varint,5,opt,name=total_amount,json=totalAmount,proto3" json:"total_amount,omitempty"`
-	NextExpiry      int64    `protobuf:"varint,6,opt,name=next_expiry,json=nextExpiry,proto3" json:"next_expiry,omitempty"`
-	NextRenewalAt   int64    `protobuf:"varint,7,opt,name=next_renewal_at,json=nextRenewalAt,proto3" json:"next_renewal_at,omitempty"`
-	LastRenewal     *Renewal `protobuf:"bytes,8,opt,name=last_renewal,json=lastRenewal,proto3" json:"last_renewal,omitempty"`
-	// next_deadline is the latest the soonest vtxo is submitted; next_batch_at the planned batch it joins, 0 without a plan.
-	NextDeadline int64 `protobuf:"varint,9,opt,name=next_deadline,json=nextDeadline,proto3" json:"next_deadline,omitempty"`
-	NextBatchAt  int64 `protobuf:"varint,10,opt,name=next_batch_at,json=nextBatchAt,proto3" json:"next_batch_at,omitempty"`
-	// renewing is true while a session holds the delegation's coins.
-	Renewing bool `protobuf:"varint,11,opt,name=renewing,proto3" json:"renewing,omitempty"`
-	// failing_since is 0 unless the last attempt of a coin failed; failed_attempts counts the attempts since.
-	FailingSince   int64 `protobuf:"varint,12,opt,name=failing_since,json=failingSince,proto3" json:"failing_since,omitempty"`
-	LastFailedAt   int64 `protobuf:"varint,13,opt,name=last_failed_at,json=lastFailedAt,proto3" json:"last_failed_at,omitempty"`
-	FailedAttempts int32 `protobuf:"varint,14,opt,name=failed_attempts,json=failedAttempts,proto3" json:"failed_attempts,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *DelegationSummary) Reset() {
-	*x = DelegationSummary{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DelegationSummary) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DelegationSummary) ProtoMessage() {}
-
-func (x *DelegationSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DelegationSummary.ProtoReflect.Descriptor instead.
-func (*DelegationSummary) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *DelegationSummary) GetDelegation() *Delegation {
-	if x != nil {
-		return x.Delegation
-	}
-	return nil
-}
-
-func (x *DelegationSummary) GetManaged() bool {
-	if x != nil {
-		return x.Managed
-	}
-	return false
-}
-
-func (x *DelegationSummary) GetUnmanagedReason() string {
-	if x != nil {
-		return x.UnmanagedReason
-	}
-	return ""
-}
-
-func (x *DelegationSummary) GetVtxoCount() int32 {
-	if x != nil {
-		return x.VtxoCount
-	}
-	return 0
-}
-
-func (x *DelegationSummary) GetTotalAmount() uint64 {
-	if x != nil {
-		return x.TotalAmount
-	}
-	return 0
-}
-
-func (x *DelegationSummary) GetNextExpiry() int64 {
-	if x != nil {
-		return x.NextExpiry
-	}
-	return 0
-}
-
-func (x *DelegationSummary) GetNextRenewalAt() int64 {
-	if x != nil {
-		return x.NextRenewalAt
-	}
-	return 0
-}
-
-func (x *DelegationSummary) GetLastRenewal() *Renewal {
-	if x != nil {
-		return x.LastRenewal
-	}
-	return nil
-}
-
-func (x *DelegationSummary) GetNextDeadline() int64 {
-	if x != nil {
-		return x.NextDeadline
-	}
-	return 0
-}
-
-func (x *DelegationSummary) GetNextBatchAt() int64 {
-	if x != nil {
-		return x.NextBatchAt
-	}
-	return 0
-}
-
-func (x *DelegationSummary) GetRenewing() bool {
-	if x != nil {
-		return x.Renewing
-	}
-	return false
-}
-
-func (x *DelegationSummary) GetFailingSince() int64 {
-	if x != nil {
-		return x.FailingSince
-	}
-	return 0
-}
-
-func (x *DelegationSummary) GetLastFailedAt() int64 {
-	if x != nil {
-		return x.LastFailedAt
-	}
-	return 0
-}
-
-func (x *DelegationSummary) GetFailedAttempts() int32 {
-	if x != nil {
-		return x.FailedAttempts
-	}
-	return 0
-}
-
-type GetDelegationByIdRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetDelegationByIdRequest) Reset() {
-	*x = GetDelegationByIdRequest{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetDelegationByIdRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetDelegationByIdRequest) ProtoMessage() {}
-
-func (x *GetDelegationByIdRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetDelegationByIdRequest.ProtoReflect.Descriptor instead.
-func (*GetDelegationByIdRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *GetDelegationByIdRequest) GetId() int64 {
-	if x != nil {
-		return x.Id
-	}
-	return 0
-}
-
-type GetDelegationByIdResponse struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	Delegation *Delegation            `protobuf:"bytes,1,opt,name=delegation,proto3" json:"delegation,omitempty"`
-	Vtxos      []*Vtxo                `protobuf:"bytes,2,rep,name=vtxos,proto3" json:"vtxos,omitempty"`
-	Renewals   []*Renewal             `protobuf:"bytes,3,rep,name=renewals,proto3" json:"renewals,omitempty"`
-	// batch_at is the planned batch time by outpoint; a coin in a session, or waiting on something unforeseeable, is absent.
-	BatchAt map[string]int64 `protobuf:"bytes,4,rep,name=batch_at,json=batchAt,proto3" json:"batch_at,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	// pending_txs are the daemon's transactions holding the coins until they land.
-	PendingTxs    []*PendingTx `protobuf:"bytes,5,rep,name=pending_txs,json=pendingTxs,proto3" json:"pending_txs,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetDelegationByIdResponse) Reset() {
-	*x = GetDelegationByIdResponse{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetDelegationByIdResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetDelegationByIdResponse) ProtoMessage() {}
-
-func (x *GetDelegationByIdResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetDelegationByIdResponse.ProtoReflect.Descriptor instead.
-func (*GetDelegationByIdResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *GetDelegationByIdResponse) GetDelegation() *Delegation {
-	if x != nil {
-		return x.Delegation
-	}
-	return nil
-}
-
-func (x *GetDelegationByIdResponse) GetVtxos() []*Vtxo {
-	if x != nil {
-		return x.Vtxos
-	}
-	return nil
-}
-
-func (x *GetDelegationByIdResponse) GetRenewals() []*Renewal {
-	if x != nil {
-		return x.Renewals
-	}
-	return nil
-}
-
-func (x *GetDelegationByIdResponse) GetBatchAt() map[string]int64 {
-	if x != nil {
-		return x.BatchAt
-	}
-	return nil
-}
-
-func (x *GetDelegationByIdResponse) GetPendingTxs() []*PendingTx {
-	if x != nil {
-		return x.PendingTxs
-	}
-	return nil
-}
-
-type PendingTx struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Txid  string                 `protobuf:"bytes,1,opt,name=txid,proto3" json:"txid,omitempty"`
-	// spent_by is what the indexer reports spending the coins: the commitment txid of a batch.
-	SpentBy string   `protobuf:"bytes,2,opt,name=spent_by,json=spentBy,proto3" json:"spent_by,omitempty"`
-	Coins   []string `protobuf:"bytes,3,rep,name=coins,proto3" json:"coins,omitempty"`
-	// state is batch, submitted, finalizing or landed.
-	State         string `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
-	CreatedAt     int64  `protobuf:"varint,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *PendingTx) Reset() {
-	*x = PendingTx{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *PendingTx) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PendingTx) ProtoMessage() {}
-
-func (x *PendingTx) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use PendingTx.ProtoReflect.Descriptor instead.
-func (*PendingTx) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *PendingTx) GetTxid() string {
-	if x != nil {
-		return x.Txid
-	}
-	return ""
-}
-
-func (x *PendingTx) GetSpentBy() string {
-	if x != nil {
-		return x.SpentBy
-	}
-	return ""
-}
-
-func (x *PendingTx) GetCoins() []string {
-	if x != nil {
-		return x.Coins
-	}
-	return nil
-}
-
-func (x *PendingTx) GetState() string {
-	if x != nil {
-		return x.State
-	}
-	return ""
-}
-
-func (x *PendingTx) GetCreatedAt() int64 {
-	if x != nil {
-		return x.CreatedAt
-	}
-	return 0
-}
-
-type GetStatusRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetStatusRequest) Reset() {
-	*x = GetStatusRequest{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetStatusRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetStatusRequest) ProtoMessage() {}
-
-func (x *GetStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetStatusRequest.ProtoReflect.Descriptor instead.
-func (*GetStatusRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{6}
-}
-
-type GetStatusResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	LastScanAt    int64                  `protobuf:"varint,1,opt,name=last_scan_at,json=lastScanAt,proto3" json:"last_scan_at,omitempty"`
-	RenewingVtxos int32                  `protobuf:"varint,2,opt,name=renewing_vtxos,json=renewingVtxos,proto3" json:"renewing_vtxos,omitempty"`
-	IntentFees    *IntentFees            `protobuf:"bytes,4,opt,name=intent_fees,json=intentFees,proto3" json:"intent_fees,omitempty"`
-	// renewal_reserve and boarding_max_wait are seconds; batches are the next planned sessions, soonest first, at most 20.
-	RenewalReserve  int64           `protobuf:"varint,5,opt,name=renewal_reserve,json=renewalReserve,proto3" json:"renewal_reserve,omitempty"`
-	BoardingMaxWait int64           `protobuf:"varint,6,opt,name=boarding_max_wait,json=boardingMaxWait,proto3" json:"boarding_max_wait,omitempty"`
-	Batches         []*PlannedBatch `protobuf:"bytes,7,rep,name=batches,proto3" json:"batches,omitempty"`
-	// next_scan_at is backed off while throttled: an upstream rate limits the scan.
-	NextScanAt    int64 `protobuf:"varint,8,opt,name=next_scan_at,json=nextScanAt,proto3" json:"next_scan_at,omitempty"`
-	Throttled     bool  `protobuf:"varint,9,opt,name=throttled,proto3" json:"throttled,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetStatusResponse) Reset() {
-	*x = GetStatusResponse{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetStatusResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetStatusResponse) ProtoMessage() {}
-
-func (x *GetStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetStatusResponse.ProtoReflect.Descriptor instead.
-func (*GetStatusResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *GetStatusResponse) GetLastScanAt() int64 {
-	if x != nil {
-		return x.LastScanAt
-	}
-	return 0
-}
-
-func (x *GetStatusResponse) GetRenewingVtxos() int32 {
-	if x != nil {
-		return x.RenewingVtxos
-	}
-	return 0
-}
-
-func (x *GetStatusResponse) GetIntentFees() *IntentFees {
-	if x != nil {
-		return x.IntentFees
-	}
-	return nil
-}
-
-func (x *GetStatusResponse) GetRenewalReserve() int64 {
-	if x != nil {
-		return x.RenewalReserve
-	}
-	return 0
-}
-
-func (x *GetStatusResponse) GetBoardingMaxWait() int64 {
-	if x != nil {
-		return x.BoardingMaxWait
-	}
-	return 0
-}
-
-func (x *GetStatusResponse) GetBatches() []*PlannedBatch {
-	if x != nil {
-		return x.Batches
-	}
-	return nil
-}
-
-func (x *GetStatusResponse) GetNextScanAt() int64 {
-	if x != nil {
-		return x.NextScanAt
-	}
-	return 0
-}
-
-func (x *GetStatusResponse) GetThrottled() bool {
-	if x != nil {
-		return x.Throttled
-	}
-	return false
-}
-
-type GetHealthRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetHealthRequest) Reset() {
-	*x = GetHealthRequest{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetHealthRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetHealthRequest) ProtoMessage() {}
-
-func (x *GetHealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetHealthRequest.ProtoReflect.Descriptor instead.
-func (*GetHealthRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{8}
-}
-
-type GetHealthResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Dependencies  []*Dependency          `protobuf:"bytes,1,rep,name=dependencies,proto3" json:"dependencies,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetHealthResponse) Reset() {
-	*x = GetHealthResponse{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetHealthResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetHealthResponse) ProtoMessage() {}
-
-func (x *GetHealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetHealthResponse.ProtoReflect.Descriptor instead.
-func (*GetHealthResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *GetHealthResponse) GetDependencies() []*Dependency {
-	if x != nil {
-		return x.Dependencies
-	}
-	return nil
-}
-
-type Dependency struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// error is empty when the dependency answers.
-	Error         string `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Dependency) Reset() {
-	*x = Dependency{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Dependency) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Dependency) ProtoMessage() {}
-
-func (x *Dependency) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Dependency.ProtoReflect.Descriptor instead.
-func (*Dependency) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *Dependency) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *Dependency) GetError() string {
-	if x != nil {
-		return x.Error
-	}
-	return ""
-}
-
-type PlannedBatch struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// at is never in the past: a batch an overdue coin forces is due now.
-	At              int64  `protobuf:"varint,1,opt,name=at,proto3" json:"at,omitempty"`
-	VtxoCount       int32  `protobuf:"varint,2,opt,name=vtxo_count,json=vtxoCount,proto3" json:"vtxo_count,omitempty"`
-	TotalAmount     uint64 `protobuf:"varint,3,opt,name=total_amount,json=totalAmount,proto3" json:"total_amount,omitempty"`
-	DelegationCount int32  `protobuf:"varint,4,opt,name=delegation_count,json=delegationCount,proto3" json:"delegation_count,omitempty"`
-	// the coin with the earliest deadline, which sets the time
-	ForcedByOutpoint     string `protobuf:"bytes,5,opt,name=forced_by_outpoint,json=forcedByOutpoint,proto3" json:"forced_by_outpoint,omitempty"`
-	ForcedByDelegationId int64  `protobuf:"varint,6,opt,name=forced_by_delegation_id,json=forcedByDelegationId,proto3" json:"forced_by_delegation_id,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
-}
-
-func (x *PlannedBatch) Reset() {
-	*x = PlannedBatch{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *PlannedBatch) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PlannedBatch) ProtoMessage() {}
-
-func (x *PlannedBatch) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use PlannedBatch.ProtoReflect.Descriptor instead.
-func (*PlannedBatch) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *PlannedBatch) GetAt() int64 {
-	if x != nil {
-		return x.At
-	}
-	return 0
-}
-
-func (x *PlannedBatch) GetVtxoCount() int32 {
-	if x != nil {
-		return x.VtxoCount
-	}
-	return 0
-}
-
-func (x *PlannedBatch) GetTotalAmount() uint64 {
-	if x != nil {
-		return x.TotalAmount
-	}
-	return 0
-}
-
-func (x *PlannedBatch) GetDelegationCount() int32 {
-	if x != nil {
-		return x.DelegationCount
-	}
-	return 0
-}
-
-func (x *PlannedBatch) GetForcedByOutpoint() string {
-	if x != nil {
-		return x.ForcedByOutpoint
-	}
-	return ""
-}
-
-func (x *PlannedBatch) GetForcedByDelegationId() int64 {
-	if x != nil {
-		return x.ForcedByDelegationId
-	}
-	return 0
-}
-
-type IntentFees struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	OffchainInput  string                 `protobuf:"bytes,1,opt,name=offchain_input,json=offchainInput,proto3" json:"offchain_input,omitempty"`
-	OnchainInput   string                 `protobuf:"bytes,2,opt,name=onchain_input,json=onchainInput,proto3" json:"onchain_input,omitempty"`
-	OffchainOutput string                 `protobuf:"bytes,3,opt,name=offchain_output,json=offchainOutput,proto3" json:"offchain_output,omitempty"`
-	OnchainOutput  string                 `protobuf:"bytes,4,opt,name=onchain_output,json=onchainOutput,proto3" json:"onchain_output,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *IntentFees) Reset() {
-	*x = IntentFees{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *IntentFees) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*IntentFees) ProtoMessage() {}
-
-func (x *IntentFees) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use IntentFees.ProtoReflect.Descriptor instead.
-func (*IntentFees) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *IntentFees) GetOffchainInput() string {
-	if x != nil {
-		return x.OffchainInput
-	}
-	return ""
-}
-
-func (x *IntentFees) GetOnchainInput() string {
-	if x != nil {
-		return x.OnchainInput
-	}
-	return ""
-}
-
-func (x *IntentFees) GetOffchainOutput() string {
-	if x != nil {
-		return x.OffchainOutput
-	}
-	return ""
-}
-
-func (x *IntentFees) GetOnchainOutput() string {
-	if x != nil {
-		return x.OnchainOutput
-	}
-	return ""
-}
-
-type CancelDelegationRequest struct {
-	state   protoimpl.MessageState `protogen:"open.v1"`
-	Address string                 `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
-	// id, when set, takes precedence over address.
-	Id            int64 `protobuf:"varint,2,opt,name=id,proto3" json:"id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CancelDelegationRequest) Reset() {
-	*x = CancelDelegationRequest{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CancelDelegationRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CancelDelegationRequest) ProtoMessage() {}
-
-func (x *CancelDelegationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CancelDelegationRequest.ProtoReflect.Descriptor instead.
-func (*CancelDelegationRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *CancelDelegationRequest) GetAddress() string {
-	if x != nil {
-		return x.Address
-	}
-	return ""
-}
-
-func (x *CancelDelegationRequest) GetId() int64 {
-	if x != nil {
-		return x.Id
-	}
-	return 0
-}
-
-type CancelDelegationResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CancelDelegationResponse) Reset() {
-	*x = CancelDelegationResponse{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CancelDelegationResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CancelDelegationResponse) ProtoMessage() {}
-
-func (x *CancelDelegationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CancelDelegationResponse.ProtoReflect.Descriptor instead.
-func (*CancelDelegationResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{14}
-}
-
-type ResumeDelegationRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ResumeDelegationRequest) Reset() {
-	*x = ResumeDelegationRequest{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[15]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ResumeDelegationRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ResumeDelegationRequest) ProtoMessage() {}
-
-func (x *ResumeDelegationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[15]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ResumeDelegationRequest.ProtoReflect.Descriptor instead.
-func (*ResumeDelegationRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{15}
-}
-
-func (x *ResumeDelegationRequest) GetId() int64 {
-	if x != nil {
-		return x.Id
-	}
-	return 0
-}
-
-type ResumeDelegationResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ResumeDelegationResponse) Reset() {
-	*x = ResumeDelegationResponse{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[16]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ResumeDelegationResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ResumeDelegationResponse) ProtoMessage() {}
-
-func (x *ResumeDelegationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[16]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ResumeDelegationResponse.ProtoReflect.Descriptor instead.
-func (*ResumeDelegationResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{16}
-}
-
-type RegisterStreamDelegationRequest struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	TemplateId string                 `protobuf:"bytes,1,opt,name=template_id,json=templateId,proto3" json:"template_id,omitempty"`
-	// the variables the trigger does not bind, hex
-	Variables     map[string]string `protobuf:"bytes,2,rep,name=variables,proto3" json:"variables,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RegisterStreamDelegationRequest) Reset() {
-	*x = RegisterStreamDelegationRequest{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[17]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RegisterStreamDelegationRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RegisterStreamDelegationRequest) ProtoMessage() {}
-
-func (x *RegisterStreamDelegationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[17]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RegisterStreamDelegationRequest.ProtoReflect.Descriptor instead.
-func (*RegisterStreamDelegationRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{17}
-}
-
-func (x *RegisterStreamDelegationRequest) GetTemplateId() string {
-	if x != nil {
-		return x.TemplateId
-	}
-	return ""
-}
-
-func (x *RegisterStreamDelegationRequest) GetVariables() map[string]string {
-	if x != nil {
-		return x.Variables
-	}
-	return nil
-}
-
-type RegisterStreamDelegationResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Delegation    *Delegation            `protobuf:"bytes,1,opt,name=delegation,proto3" json:"delegation,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RegisterStreamDelegationResponse) Reset() {
-	*x = RegisterStreamDelegationResponse{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[18]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RegisterStreamDelegationResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RegisterStreamDelegationResponse) ProtoMessage() {}
-
-func (x *RegisterStreamDelegationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[18]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RegisterStreamDelegationResponse.ProtoReflect.Descriptor instead.
-func (*RegisterStreamDelegationResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{18}
-}
-
-func (x *RegisterStreamDelegationResponse) GetDelegation() *Delegation {
-	if x != nil {
-		return x.Delegation
-	}
-	return nil
-}
-
-// TemplateSummary is a template with what only the operator sees.
-type TemplateSummary struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	Template *Template              `protobuf:"bytes,1,opt,name=template,proto3" json:"template,omitempty"` // without its document in list responses
-	// failures is the count of consecutive renewal cycles the failure valve saw rejected.
-	Failures int32 `protobuf:"varint,2,opt,name=failures,proto3" json:"failures,omitempty"`
-	// delegations is how many delegations reference the template.
-	Delegations int64 `protobuf:"varint,3,opt,name=delegations,proto3" json:"delegations,omitempty"`
-	// trusted templates get the daemon's own signature on delegate-key leaves
-	// and are exempt from the failure valve; seeded ones are trusted.
-	Trusted bool `protobuf:"varint,4,opt,name=trusted,proto3" json:"trusted,omitempty"`
-	// type is intent, offchain or onchain.
-	Type          string `protobuf:"bytes,5,opt,name=type,proto3" json:"type,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *TemplateSummary) Reset() {
-	*x = TemplateSummary{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[19]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *TemplateSummary) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*TemplateSummary) ProtoMessage() {}
-
-func (x *TemplateSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[19]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use TemplateSummary.ProtoReflect.Descriptor instead.
-func (*TemplateSummary) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{19}
-}
-
-func (x *TemplateSummary) GetTemplate() *Template {
-	if x != nil {
-		return x.Template
-	}
-	return nil
-}
-
-func (x *TemplateSummary) GetFailures() int32 {
-	if x != nil {
-		return x.Failures
-	}
-	return 0
-}
-
-func (x *TemplateSummary) GetDelegations() int64 {
-	if x != nil {
-		return x.Delegations
-	}
-	return 0
-}
-
-func (x *TemplateSummary) GetTrusted() bool {
-	if x != nil {
-		return x.Trusted
-	}
-	return false
-}
-
-func (x *TemplateSummary) GetType() string {
-	if x != nil {
-		return x.Type
-	}
-	return ""
-}
-
-type ListAllTemplatesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListAllTemplatesRequest) Reset() {
-	*x = ListAllTemplatesRequest{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[20]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListAllTemplatesRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListAllTemplatesRequest) ProtoMessage() {}
-
-func (x *ListAllTemplatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[20]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListAllTemplatesRequest.ProtoReflect.Descriptor instead.
-func (*ListAllTemplatesRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{20}
-}
-
-func (x *ListAllTemplatesRequest) GetStatus() string {
-	if x != nil {
-		return x.Status
-	}
-	return ""
-}
-
-type ListAllTemplatesResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Templates     []*TemplateSummary     `protobuf:"bytes,1,rep,name=templates,proto3" json:"templates,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListAllTemplatesResponse) Reset() {
-	*x = ListAllTemplatesResponse{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[21]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListAllTemplatesResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListAllTemplatesResponse) ProtoMessage() {}
-
-func (x *ListAllTemplatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[21]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListAllTemplatesResponse.ProtoReflect.Descriptor instead.
-func (*ListAllTemplatesResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{21}
-}
-
-func (x *ListAllTemplatesResponse) GetTemplates() []*TemplateSummary {
-	if x != nil {
-		return x.Templates
-	}
-	return nil
-}
-
-type SetTemplateStatusRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"` // active | disabled
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetTemplateStatusRequest) Reset() {
-	*x = SetTemplateStatusRequest{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[22]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetTemplateStatusRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetTemplateStatusRequest) ProtoMessage() {}
-
-func (x *SetTemplateStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[22]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetTemplateStatusRequest.ProtoReflect.Descriptor instead.
-func (*SetTemplateStatusRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{22}
-}
-
-func (x *SetTemplateStatusRequest) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *SetTemplateStatusRequest) GetStatus() string {
-	if x != nil {
-		return x.Status
-	}
-	return ""
-}
-
-type SetTemplateStatusResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Template      *TemplateSummary       `protobuf:"bytes,1,opt,name=template,proto3" json:"template,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetTemplateStatusResponse) Reset() {
-	*x = SetTemplateStatusResponse{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[23]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetTemplateStatusResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetTemplateStatusResponse) ProtoMessage() {}
-
-func (x *SetTemplateStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[23]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetTemplateStatusResponse.ProtoReflect.Descriptor instead.
-func (*SetTemplateStatusResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{23}
-}
-
-func (x *SetTemplateStatusResponse) GetTemplate() *TemplateSummary {
-	if x != nil {
-		return x.Template
-	}
-	return nil
-}
-
-type SetTemplateTrustedRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Trusted       bool                   `protobuf:"varint,2,opt,name=trusted,proto3" json:"trusted,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetTemplateTrustedRequest) Reset() {
-	*x = SetTemplateTrustedRequest{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[24]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetTemplateTrustedRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetTemplateTrustedRequest) ProtoMessage() {}
-
-func (x *SetTemplateTrustedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[24]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetTemplateTrustedRequest.ProtoReflect.Descriptor instead.
-func (*SetTemplateTrustedRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{24}
-}
-
-func (x *SetTemplateTrustedRequest) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *SetTemplateTrustedRequest) GetTrusted() bool {
-	if x != nil {
-		return x.Trusted
-	}
-	return false
-}
-
-type SetTemplateTrustedResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Template      *TemplateSummary       `protobuf:"bytes,1,opt,name=template,proto3" json:"template,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetTemplateTrustedResponse) Reset() {
-	*x = SetTemplateTrustedResponse{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[25]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetTemplateTrustedResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetTemplateTrustedResponse) ProtoMessage() {}
-
-func (x *SetTemplateTrustedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[25]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetTemplateTrustedResponse.ProtoReflect.Descriptor instead.
-func (*SetTemplateTrustedResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{25}
-}
-
-func (x *SetTemplateTrustedResponse) GetTemplate() *TemplateSummary {
-	if x != nil {
-		return x.Template
-	}
-	return nil
 }
 
 type DeleteTemplateRequest struct {
@@ -1552,7 +120,7 @@ type DeleteTemplateRequest struct {
 
 func (x *DeleteTemplateRequest) Reset() {
 	*x = DeleteTemplateRequest{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[26]
+	mi := &file_delegatee_v1_admin_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1564,7 +132,7 @@ func (x *DeleteTemplateRequest) String() string {
 func (*DeleteTemplateRequest) ProtoMessage() {}
 
 func (x *DeleteTemplateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[26]
+	mi := &file_delegatee_v1_admin_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1577,7 +145,7 @@ func (x *DeleteTemplateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTemplateRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTemplateRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{26}
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *DeleteTemplateRequest) GetId() string {
@@ -1595,7 +163,7 @@ type DeleteTemplateResponse struct {
 
 func (x *DeleteTemplateResponse) Reset() {
 	*x = DeleteTemplateResponse{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[27]
+	mi := &file_delegatee_v1_admin_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1607,7 +175,7 @@ func (x *DeleteTemplateResponse) String() string {
 func (*DeleteTemplateResponse) ProtoMessage() {}
 
 func (x *DeleteTemplateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[27]
+	mi := &file_delegatee_v1_admin_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1620,7 +188,87 @@ func (x *DeleteTemplateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTemplateResponse.ProtoReflect.Descriptor instead.
 func (*DeleteTemplateResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{27}
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{3}
+}
+
+type ListArtifactsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListArtifactsRequest) Reset() {
+	*x = ListArtifactsRequest{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListArtifactsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListArtifactsRequest) ProtoMessage() {}
+
+func (x *ListArtifactsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListArtifactsRequest.ProtoReflect.Descriptor instead.
+func (*ListArtifactsRequest) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{4}
+}
+
+type ListArtifactsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Artifacts     []*Artifact            `protobuf:"bytes,1,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListArtifactsResponse) Reset() {
+	*x = ListArtifactsResponse{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListArtifactsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListArtifactsResponse) ProtoMessage() {}
+
+func (x *ListArtifactsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListArtifactsResponse.ProtoReflect.Descriptor instead.
+func (*ListArtifactsResponse) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ListArtifactsResponse) GetArtifacts() []*Artifact {
+	if x != nil {
+		return x.Artifacts
+	}
+	return nil
 }
 
 type DeleteArtifactRequest struct {
@@ -1632,7 +280,7 @@ type DeleteArtifactRequest struct {
 
 func (x *DeleteArtifactRequest) Reset() {
 	*x = DeleteArtifactRequest{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[28]
+	mi := &file_delegatee_v1_admin_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1644,7 +292,7 @@ func (x *DeleteArtifactRequest) String() string {
 func (*DeleteArtifactRequest) ProtoMessage() {}
 
 func (x *DeleteArtifactRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[28]
+	mi := &file_delegatee_v1_admin_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1657,7 +305,7 @@ func (x *DeleteArtifactRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteArtifactRequest.ProtoReflect.Descriptor instead.
 func (*DeleteArtifactRequest) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{28}
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DeleteArtifactRequest) GetId() string {
@@ -1675,7 +323,7 @@ type DeleteArtifactResponse struct {
 
 func (x *DeleteArtifactResponse) Reset() {
 	*x = DeleteArtifactResponse{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[29]
+	mi := &file_delegatee_v1_admin_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1687,7 +335,7 @@ func (x *DeleteArtifactResponse) String() string {
 func (*DeleteArtifactResponse) ProtoMessage() {}
 
 func (x *DeleteArtifactResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[29]
+	mi := &file_delegatee_v1_admin_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1700,29 +348,1260 @@ func (x *DeleteArtifactResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteArtifactResponse.ProtoReflect.Descriptor instead.
 func (*DeleteArtifactResponse) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{7}
+}
+
+type ListDelegationsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// status filters on active, cancelled, expired or done; empty lists all.
+	Status string `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	// cursor is the next_cursor of the previous page; empty starts from the top.
+	Cursor string `protobuf:"bytes,2,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	// limit is the page size: 100 when 0, at most 1000.
+	Limit         int32 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDelegationsRequest) Reset() {
+	*x = ListDelegationsRequest{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDelegationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDelegationsRequest) ProtoMessage() {}
+
+func (x *ListDelegationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDelegationsRequest.ProtoReflect.Descriptor instead.
+func (*ListDelegationsRequest) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ListDelegationsRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ListDelegationsRequest) GetCursor() string {
+	if x != nil {
+		return x.Cursor
+	}
+	return ""
+}
+
+func (x *ListDelegationsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type ListDelegationsResponse struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Delegations []*DelegationSummary   `protobuf:"bytes,1,rep,name=delegations,proto3" json:"delegations,omitempty"`
+	// next_cursor starts the next page; empty on the last one.
+	NextCursor    string `protobuf:"bytes,2,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDelegationsResponse) Reset() {
+	*x = ListDelegationsResponse{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDelegationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDelegationsResponse) ProtoMessage() {}
+
+func (x *ListDelegationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDelegationsResponse.ProtoReflect.Descriptor instead.
+func (*ListDelegationsResponse) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListDelegationsResponse) GetDelegations() []*DelegationSummary {
+	if x != nil {
+		return x.Delegations
+	}
+	return nil
+}
+
+func (x *ListDelegationsResponse) GetNextCursor() string {
+	if x != nil {
+		return x.NextCursor
+	}
+	return ""
+}
+
+// DelegationSummary is a delegation with what its present coins and its attempts come to.
+type DelegationSummary struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Delegation *Delegation            `protobuf:"bytes,1,opt,name=delegation,proto3" json:"delegation,omitempty"`
+	Coins      int64                  `protobuf:"varint,2,opt,name=coins,proto3" json:"coins,omitempty"`
+	Amount     uint64                 `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	// next_due is unix seconds, the earliest due of the present coins, 0 without any.
+	NextDue int64 `protobuf:"varint,4,opt,name=next_due,json=nextDue,proto3" json:"next_due,omitempty"`
+	// last_attempt is the status of the newest attempt, empty without one.
+	LastAttempt   string `protobuf:"bytes,5,opt,name=last_attempt,json=lastAttempt,proto3" json:"last_attempt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DelegationSummary) Reset() {
+	*x = DelegationSummary{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DelegationSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DelegationSummary) ProtoMessage() {}
+
+func (x *DelegationSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DelegationSummary.ProtoReflect.Descriptor instead.
+func (*DelegationSummary) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *DelegationSummary) GetDelegation() *Delegation {
+	if x != nil {
+		return x.Delegation
+	}
+	return nil
+}
+
+func (x *DelegationSummary) GetCoins() int64 {
+	if x != nil {
+		return x.Coins
+	}
+	return 0
+}
+
+func (x *DelegationSummary) GetAmount() uint64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *DelegationSummary) GetNextDue() int64 {
+	if x != nil {
+		return x.NextDue
+	}
+	return 0
+}
+
+func (x *DelegationSummary) GetLastAttempt() string {
+	if x != nil {
+		return x.LastAttempt
+	}
+	return ""
+}
+
+type CancelDelegationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelDelegationRequest) Reset() {
+	*x = CancelDelegationRequest{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelDelegationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelDelegationRequest) ProtoMessage() {}
+
+func (x *CancelDelegationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelDelegationRequest.ProtoReflect.Descriptor instead.
+func (*CancelDelegationRequest) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *CancelDelegationRequest) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+type CancelDelegationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelDelegationResponse) Reset() {
+	*x = CancelDelegationResponse{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelDelegationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelDelegationResponse) ProtoMessage() {}
+
+func (x *CancelDelegationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelDelegationResponse.ProtoReflect.Descriptor instead.
+func (*CancelDelegationResponse) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{12}
+}
+
+type ResumeDelegationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResumeDelegationRequest) Reset() {
+	*x = ResumeDelegationRequest{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResumeDelegationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResumeDelegationRequest) ProtoMessage() {}
+
+func (x *ResumeDelegationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResumeDelegationRequest.ProtoReflect.Descriptor instead.
+func (*ResumeDelegationRequest) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ResumeDelegationRequest) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+type ResumeDelegationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResumeDelegationResponse) Reset() {
+	*x = ResumeDelegationResponse{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResumeDelegationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResumeDelegationResponse) ProtoMessage() {}
+
+func (x *ResumeDelegationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResumeDelegationResponse.ProtoReflect.Descriptor instead.
+func (*ResumeDelegationResponse) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{14}
+}
+
+type ListAttemptsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	// cursor is the next_cursor of the previous page; 0 starts from the newest.
+	Cursor int64 `protobuf:"varint,2,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	// limit is the page size: 100 when 0, at most 1000.
+	Limit         int32 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAttemptsRequest) Reset() {
+	*x = ListAttemptsRequest{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAttemptsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAttemptsRequest) ProtoMessage() {}
+
+func (x *ListAttemptsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAttemptsRequest.ProtoReflect.Descriptor instead.
+func (*ListAttemptsRequest) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ListAttemptsRequest) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *ListAttemptsRequest) GetCursor() int64 {
+	if x != nil {
+		return x.Cursor
+	}
+	return 0
+}
+
+func (x *ListAttemptsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type ListAttemptsResponse struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Attempts []*Attempt             `protobuf:"bytes,1,rep,name=attempts,proto3" json:"attempts,omitempty"`
+	// next_cursor starts the next page; 0 on the last one.
+	NextCursor    int64 `protobuf:"varint,2,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAttemptsResponse) Reset() {
+	*x = ListAttemptsResponse{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAttemptsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAttemptsResponse) ProtoMessage() {}
+
+func (x *ListAttemptsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAttemptsResponse.ProtoReflect.Descriptor instead.
+func (*ListAttemptsResponse) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ListAttemptsResponse) GetAttempts() []*Attempt {
+	if x != nil {
+		return x.Attempts
+	}
+	return nil
+}
+
+func (x *ListAttemptsResponse) GetNextCursor() int64 {
+	if x != nil {
+		return x.NextCursor
+	}
+	return 0
+}
+
+// Attempt is one run of a delegation over coins.
+type Attempt struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Id           int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	DelegationId int64                  `protobuf:"varint,2,opt,name=delegation_id,json=delegationId,proto3" json:"delegation_id,omitempty"`
+	// kind is the delegation's template type: offchain or intent.
+	Kind string `protobuf:"bytes,3,opt,name=kind,proto3" json:"kind,omitempty"`
+	// coins are the outpoints the attempt spends.
+	Coins []string `protobuf:"bytes,4,rep,name=coins,proto3" json:"coins,omitempty"`
+	// txid is the transaction once known: the ark txid of an offchain attempt, the commitment txid of a batched one.
+	Txid string `protobuf:"bytes,5,opt,name=txid,proto3" json:"txid,omitempty"`
+	// status is submitted, succeeded or failed.
+	Status string `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
+	// error says why a failed attempt failed.
+	Error string `protobuf:"bytes,7,opt,name=error,proto3" json:"error,omitempty"`
+	// created_at and updated_at are unix seconds.
+	CreatedAt     int64 `protobuf:"varint,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     int64 `protobuf:"varint,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Attempt) Reset() {
+	*x = Attempt{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Attempt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Attempt) ProtoMessage() {}
+
+func (x *Attempt) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Attempt.ProtoReflect.Descriptor instead.
+func (*Attempt) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *Attempt) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *Attempt) GetDelegationId() int64 {
+	if x != nil {
+		return x.DelegationId
+	}
+	return 0
+}
+
+func (x *Attempt) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *Attempt) GetCoins() []string {
+	if x != nil {
+		return x.Coins
+	}
+	return nil
+}
+
+func (x *Attempt) GetTxid() string {
+	if x != nil {
+		return x.Txid
+	}
+	return ""
+}
+
+func (x *Attempt) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *Attempt) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *Attempt) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *Attempt) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
+}
+
+type RegisterStreamRequest struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	TemplateId string                 `protobuf:"bytes,1,opt,name=template_id,json=templateId,proto3" json:"template_id,omitempty"`
+	// variables are the lower-case hex values the trigger does not bind.
+	Variables     map[string]string `protobuf:"bytes,2,rep,name=variables,proto3" json:"variables,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterStreamRequest) Reset() {
+	*x = RegisterStreamRequest{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterStreamRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterStreamRequest) ProtoMessage() {}
+
+func (x *RegisterStreamRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterStreamRequest.ProtoReflect.Descriptor instead.
+func (*RegisterStreamRequest) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *RegisterStreamRequest) GetTemplateId() string {
+	if x != nil {
+		return x.TemplateId
+	}
+	return ""
+}
+
+func (x *RegisterStreamRequest) GetVariables() map[string]string {
+	if x != nil {
+		return x.Variables
+	}
+	return nil
+}
+
+type RegisterStreamResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Stream        *Stream                `protobuf:"bytes,1,opt,name=stream,proto3" json:"stream,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterStreamResponse) Reset() {
+	*x = RegisterStreamResponse{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterStreamResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterStreamResponse) ProtoMessage() {}
+
+func (x *RegisterStreamResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterStreamResponse.ProtoReflect.Descriptor instead.
+func (*RegisterStreamResponse) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *RegisterStreamResponse) GetStream() *Stream {
+	if x != nil {
+		return x.Stream
+	}
+	return nil
+}
+
+type ListStreamsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListStreamsRequest) Reset() {
+	*x = ListStreamsRequest{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListStreamsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListStreamsRequest) ProtoMessage() {}
+
+func (x *ListStreamsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListStreamsRequest.ProtoReflect.Descriptor instead.
+func (*ListStreamsRequest) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{20}
+}
+
+type ListStreamsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Streams       []*Stream              `protobuf:"bytes,1,rep,name=streams,proto3" json:"streams,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListStreamsResponse) Reset() {
+	*x = ListStreamsResponse{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListStreamsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListStreamsResponse) ProtoMessage() {}
+
+func (x *ListStreamsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListStreamsResponse.ProtoReflect.Descriptor instead.
+func (*ListStreamsResponse) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ListStreamsResponse) GetStreams() []*Stream {
+	if x != nil {
+		return x.Streams
+	}
+	return nil
+}
+
+type CancelStreamRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelStreamRequest) Reset() {
+	*x = CancelStreamRequest{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelStreamRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelStreamRequest) ProtoMessage() {}
+
+func (x *CancelStreamRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelStreamRequest.ProtoReflect.Descriptor instead.
+func (*CancelStreamRequest) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *CancelStreamRequest) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+type CancelStreamResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelStreamResponse) Reset() {
+	*x = CancelStreamResponse{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelStreamResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelStreamResponse) ProtoMessage() {}
+
+func (x *CancelStreamResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelStreamResponse.ProtoReflect.Descriptor instead.
+func (*CancelStreamResponse) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{23}
+}
+
+// Stream is an operator's standing rule: a template's trigger run against arkd's transactions.
+type Stream struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Id         int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	TemplateId string                 `protobuf:"bytes,2,opt,name=template_id,json=templateId,proto3" json:"template_id,omitempty"`
+	Variables  map[string]string      `protobuf:"bytes,3,rep,name=variables,proto3" json:"variables,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// status is active or cancelled.
+	Status string `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	// created_at is unix seconds.
+	CreatedAt     int64 `protobuf:"varint,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Stream) Reset() {
+	*x = Stream{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Stream) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Stream) ProtoMessage() {}
+
+func (x *Stream) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Stream.ProtoReflect.Descriptor instead.
+func (*Stream) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *Stream) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *Stream) GetTemplateId() string {
+	if x != nil {
+		return x.TemplateId
+	}
+	return ""
+}
+
+func (x *Stream) GetVariables() map[string]string {
+	if x != nil {
+		return x.Variables
+	}
+	return nil
+}
+
+func (x *Stream) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *Stream) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+type GetHealthRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetHealthRequest) Reset() {
+	*x = GetHealthRequest{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHealthRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHealthRequest) ProtoMessage() {}
+
+func (x *GetHealthRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHealthRequest.ProtoReflect.Descriptor instead.
+func (*GetHealthRequest) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{25}
+}
+
+type GetHealthResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// healthy is whether every entry is.
+	Healthy       bool           `protobuf:"varint,1,opt,name=healthy,proto3" json:"healthy,omitempty"`
+	Entries       []*HealthEntry `protobuf:"bytes,2,rep,name=entries,proto3" json:"entries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetHealthResponse) Reset() {
+	*x = GetHealthResponse{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHealthResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHealthResponse) ProtoMessage() {}
+
+func (x *GetHealthResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHealthResponse.ProtoReflect.Descriptor instead.
+func (*GetHealthResponse) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *GetHealthResponse) GetHealthy() bool {
+	if x != nil {
+		return x.Healthy
+	}
+	return false
+}
+
+func (x *GetHealthResponse) GetEntries() []*HealthEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+// HealthEntry is what one dependency answers: db, arkd, electrum, emulator or loop.
+type HealthEntry struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Name    string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Healthy bool                   `protobuf:"varint,2,opt,name=healthy,proto3" json:"healthy,omitempty"`
+	// error says why the dependency is not healthy.
+	Error         string `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HealthEntry) Reset() {
+	*x = HealthEntry{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HealthEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HealthEntry) ProtoMessage() {}
+
+func (x *HealthEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HealthEntry.ProtoReflect.Descriptor instead.
+func (*HealthEntry) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *HealthEntry) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *HealthEntry) GetHealthy() bool {
+	if x != nil {
+		return x.Healthy
+	}
+	return false
+}
+
+func (x *HealthEntry) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type GetStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetStatusRequest) Reset() {
+	*x = GetStatusRequest{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetStatusRequest) ProtoMessage() {}
+
+func (x *GetStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetStatusRequest) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{28}
+}
+
+type GetStatusResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// active is how many delegations are being served.
+	Active int64 `protobuf:"varint,1,opt,name=active,proto3" json:"active,omitempty"`
+	// queued is how many entries wait to be registered at arkd.
+	Queued int64 `protobuf:"varint,2,opt,name=queued,proto3" json:"queued,omitempty"`
+	// registered is how many entries are registered at arkd, waiting for a batch.
+	Registered int64 `protobuf:"varint,3,opt,name=registered,proto3" json:"registered,omitempty"`
+	// late is how many coins are forecast to miss their deadline.
+	Late int64 `protobuf:"varint,4,opt,name=late,proto3" json:"late,omitempty"`
+	// next_due is unix seconds, when the next coin becomes ready, 0 when none will.
+	NextDue int64 `protobuf:"varint,5,opt,name=next_due,json=nextDue,proto3" json:"next_due,omitempty"`
+	// batches forecasts what the coming batches carry, the nearest first.
+	Batches []*BatchForecast `protobuf:"bytes,6,rep,name=batches,proto3" json:"batches,omitempty"`
+	// tip_height is the chain's latest block, 0 before the first one is seen.
+	TipHeight int64 `protobuf:"varint,7,opt,name=tip_height,json=tipHeight,proto3" json:"tip_height,omitempty"`
+	// coins is how many present coins the daemon watches.
+	Coins int64 `protobuf:"varint,8,opt,name=coins,proto3" json:"coins,omitempty"`
+	// amount is the sum of those coins, in sats.
+	Amount        uint64 `protobuf:"varint,9,opt,name=amount,proto3" json:"amount,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetStatusResponse) Reset() {
+	*x = GetStatusResponse{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetStatusResponse) ProtoMessage() {}
+
+func (x *GetStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetStatusResponse) Descriptor() ([]byte, []int) {
 	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{29}
 }
 
-type ListArtifactsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+func (x *GetStatusResponse) GetActive() int64 {
+	if x != nil {
+		return x.Active
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetQueued() int64 {
+	if x != nil {
+		return x.Queued
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetRegistered() int64 {
+	if x != nil {
+		return x.Registered
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetLate() int64 {
+	if x != nil {
+		return x.Late
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetNextDue() int64 {
+	if x != nil {
+		return x.NextDue
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetBatches() []*BatchForecast {
+	if x != nil {
+		return x.Batches
+	}
+	return nil
+}
+
+func (x *GetStatusResponse) GetTipHeight() int64 {
+	if x != nil {
+		return x.TipHeight
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetCoins() int64 {
+	if x != nil {
+		return x.Coins
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetAmount() uint64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+// BatchForecast is what a coming batch is expected to carry of ours.
+type BatchForecast struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// at is unix seconds.
+	At            int64  `protobuf:"varint,1,opt,name=at,proto3" json:"at,omitempty"`
+	Intents       int64  `protobuf:"varint,2,opt,name=intents,proto3" json:"intents,omitempty"`
+	Coins         int64  `protobuf:"varint,3,opt,name=coins,proto3" json:"coins,omitempty"`
+	Amount        uint64 `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListArtifactsRequest) Reset() {
-	*x = ListArtifactsRequest{}
+func (x *BatchForecast) Reset() {
+	*x = BatchForecast{}
 	mi := &file_delegatee_v1_admin_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListArtifactsRequest) String() string {
+func (x *BatchForecast) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListArtifactsRequest) ProtoMessage() {}
+func (*BatchForecast) ProtoMessage() {}
 
-func (x *ListArtifactsRequest) ProtoReflect() protoreflect.Message {
+func (x *BatchForecast) ProtoReflect() protoreflect.Message {
 	mi := &file_delegatee_v1_admin_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1734,204 +1613,166 @@ func (x *ListArtifactsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListArtifactsRequest.ProtoReflect.Descriptor instead.
-func (*ListArtifactsRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use BatchForecast.ProtoReflect.Descriptor instead.
+func (*BatchForecast) Descriptor() ([]byte, []int) {
 	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{30}
 }
 
-type ListArtifactsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Artifacts     []*Artifact            `protobuf:"bytes,1,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListArtifactsResponse) Reset() {
-	*x = ListArtifactsResponse{}
-	mi := &file_delegatee_v1_admin_proto_msgTypes[31]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListArtifactsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListArtifactsResponse) ProtoMessage() {}
-
-func (x *ListArtifactsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_delegatee_v1_admin_proto_msgTypes[31]
+func (x *BatchForecast) GetAt() int64 {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
+		return x.At
 	}
-	return mi.MessageOf(x)
+	return 0
 }
 
-// Deprecated: Use ListArtifactsResponse.ProtoReflect.Descriptor instead.
-func (*ListArtifactsResponse) Descriptor() ([]byte, []int) {
-	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{31}
-}
-
-func (x *ListArtifactsResponse) GetArtifacts() []*Artifact {
+func (x *BatchForecast) GetIntents() int64 {
 	if x != nil {
-		return x.Artifacts
+		return x.Intents
 	}
-	return nil
+	return 0
+}
+
+func (x *BatchForecast) GetCoins() int64 {
+	if x != nil {
+		return x.Coins
+	}
+	return 0
+}
+
+func (x *BatchForecast) GetAmount() uint64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
 }
 
 var File_delegatee_v1_admin_proto protoreflect.FileDescriptor
 
 const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"\n" +
-	"\x18delegatee/v1/admin.proto\x12\fdelegatee.v1\x1a!meshapi/gateway/annotations.proto\x1a\x1adelegatee/v1/service.proto\"e\n" +
-	"\x16ListDelegationsRequest\x12\x1b\n" +
-	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x16\n" +
-	"\x06cursor\x18\x02 \x01(\x03R\x06cursor\x12\x16\n" +
-	"\x06status\x18\x03 \x01(\tR\x06status\"}\n" +
+	"\x18delegatee/v1/admin.proto\x12\fdelegatee.v1\x1a\x1adelegatee/v1/service.proto\x1a!meshapi/gateway/annotations.proto\"?\n" +
+	"\x15UpdateTemplateRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\"\x18\n" +
+	"\x16UpdateTemplateResponse\"'\n" +
+	"\x15DeleteTemplateRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x18\n" +
+	"\x16DeleteTemplateResponse\"\x16\n" +
+	"\x14ListArtifactsRequest\"M\n" +
+	"\x15ListArtifactsResponse\x124\n" +
+	"\tartifacts\x18\x01 \x03(\v2\x16.delegatee.v1.ArtifactR\tartifacts\"'\n" +
+	"\x15DeleteArtifactRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x18\n" +
+	"\x16DeleteArtifactResponse\"^\n" +
+	"\x16ListDelegationsRequest\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x16\n" +
+	"\x06cursor\x18\x02 \x01(\tR\x06cursor\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\"}\n" +
 	"\x17ListDelegationsResponse\x12A\n" +
 	"\vdelegations\x18\x01 \x03(\v2\x1f.delegatee.v1.DelegationSummaryR\vdelegations\x12\x1f\n" +
-	"\vnext_cursor\x18\x02 \x01(\x03R\n" +
-	"nextCursor\"\xb0\x04\n" +
+	"\vnext_cursor\x18\x02 \x01(\tR\n" +
+	"nextCursor\"\xb9\x01\n" +
 	"\x11DelegationSummary\x128\n" +
 	"\n" +
 	"delegation\x18\x01 \x01(\v2\x18.delegatee.v1.DelegationR\n" +
-	"delegation\x12\x18\n" +
-	"\amanaged\x18\x02 \x01(\bR\amanaged\x12)\n" +
-	"\x10unmanaged_reason\x18\x03 \x01(\tR\x0funmanagedReason\x12\x1d\n" +
-	"\n" +
-	"vtxo_count\x18\x04 \x01(\x05R\tvtxoCount\x12!\n" +
-	"\ftotal_amount\x18\x05 \x01(\x04R\vtotalAmount\x12\x1f\n" +
-	"\vnext_expiry\x18\x06 \x01(\x03R\n" +
-	"nextExpiry\x12&\n" +
-	"\x0fnext_renewal_at\x18\a \x01(\x03R\rnextRenewalAt\x128\n" +
-	"\flast_renewal\x18\b \x01(\v2\x15.delegatee.v1.RenewalR\vlastRenewal\x12#\n" +
-	"\rnext_deadline\x18\t \x01(\x03R\fnextDeadline\x12\"\n" +
-	"\rnext_batch_at\x18\n" +
-	" \x01(\x03R\vnextBatchAt\x12\x1a\n" +
-	"\brenewing\x18\v \x01(\bR\brenewing\x12#\n" +
-	"\rfailing_since\x18\f \x01(\x03R\ffailingSince\x12$\n" +
-	"\x0elast_failed_at\x18\r \x01(\x03R\flastFailedAt\x12'\n" +
-	"\x0ffailed_attempts\x18\x0e \x01(\x05R\x0efailedAttempts\"*\n" +
-	"\x18GetDelegationByIdRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x03R\x02id\"\xf9\x02\n" +
-	"\x19GetDelegationByIdResponse\x128\n" +
-	"\n" +
-	"delegation\x18\x01 \x01(\v2\x18.delegatee.v1.DelegationR\n" +
-	"delegation\x12(\n" +
-	"\x05vtxos\x18\x02 \x03(\v2\x12.delegatee.v1.VtxoR\x05vtxos\x121\n" +
-	"\brenewals\x18\x03 \x03(\v2\x15.delegatee.v1.RenewalR\brenewals\x12O\n" +
-	"\bbatch_at\x18\x04 \x03(\v24.delegatee.v1.GetDelegationByIdResponse.BatchAtEntryR\abatchAt\x128\n" +
-	"\vpending_txs\x18\x05 \x03(\v2\x17.delegatee.v1.PendingTxR\n" +
-	"pendingTxs\x1a:\n" +
-	"\fBatchAtEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"\x85\x01\n" +
-	"\tPendingTx\x12\x12\n" +
-	"\x04txid\x18\x01 \x01(\tR\x04txid\x12\x19\n" +
-	"\bspent_by\x18\x02 \x01(\tR\aspentBy\x12\x14\n" +
-	"\x05coins\x18\x03 \x03(\tR\x05coins\x12\x14\n" +
-	"\x05state\x18\x04 \x01(\tR\x05state\x12\x1d\n" +
-	"\n" +
-	"created_at\x18\x05 \x01(\x03R\tcreatedAt\"\x12\n" +
-	"\x10GetStatusRequest\"\xe8\x02\n" +
-	"\x11GetStatusResponse\x12 \n" +
-	"\flast_scan_at\x18\x01 \x01(\x03R\n" +
-	"lastScanAt\x12%\n" +
-	"\x0erenewing_vtxos\x18\x02 \x01(\x05R\rrenewingVtxos\x129\n" +
-	"\vintent_fees\x18\x04 \x01(\v2\x18.delegatee.v1.IntentFeesR\n" +
-	"intentFees\x12'\n" +
-	"\x0frenewal_reserve\x18\x05 \x01(\x03R\x0erenewalReserve\x12*\n" +
-	"\x11boarding_max_wait\x18\x06 \x01(\x03R\x0fboardingMaxWait\x124\n" +
-	"\abatches\x18\a \x03(\v2\x1a.delegatee.v1.PlannedBatchR\abatches\x12 \n" +
-	"\fnext_scan_at\x18\b \x01(\x03R\n" +
-	"nextScanAt\x12\x1c\n" +
-	"\tthrottled\x18\t \x01(\bR\tthrottledJ\x04\b\x03\x10\x04\"\x12\n" +
-	"\x10GetHealthRequest\"Q\n" +
-	"\x11GetHealthResponse\x12<\n" +
-	"\fdependencies\x18\x01 \x03(\v2\x18.delegatee.v1.DependencyR\fdependencies\"6\n" +
-	"\n" +
-	"Dependency\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"\xf0\x01\n" +
-	"\fPlannedBatch\x12\x0e\n" +
-	"\x02at\x18\x01 \x01(\x03R\x02at\x12\x1d\n" +
-	"\n" +
-	"vtxo_count\x18\x02 \x01(\x05R\tvtxoCount\x12!\n" +
-	"\ftotal_amount\x18\x03 \x01(\x04R\vtotalAmount\x12)\n" +
-	"\x10delegation_count\x18\x04 \x01(\x05R\x0fdelegationCount\x12,\n" +
-	"\x12forced_by_outpoint\x18\x05 \x01(\tR\x10forcedByOutpoint\x125\n" +
-	"\x17forced_by_delegation_id\x18\x06 \x01(\x03R\x14forcedByDelegationId\"\xa8\x01\n" +
-	"\n" +
-	"IntentFees\x12%\n" +
-	"\x0eoffchain_input\x18\x01 \x01(\tR\roffchainInput\x12#\n" +
-	"\ronchain_input\x18\x02 \x01(\tR\fonchainInput\x12'\n" +
-	"\x0foffchain_output\x18\x03 \x01(\tR\x0eoffchainOutput\x12%\n" +
-	"\x0eonchain_output\x18\x04 \x01(\tR\ronchainOutput\"C\n" +
-	"\x17CancelDelegationRequest\x12\x18\n" +
-	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x0e\n" +
-	"\x02id\x18\x02 \x01(\x03R\x02id\"\x1a\n" +
+	"delegation\x12\x14\n" +
+	"\x05coins\x18\x02 \x01(\x03R\x05coins\x12\x16\n" +
+	"\x06amount\x18\x03 \x01(\x04R\x06amount\x12\x19\n" +
+	"\bnext_due\x18\x04 \x01(\x03R\anextDue\x12!\n" +
+	"\flast_attempt\x18\x05 \x01(\tR\vlastAttempt\")\n" +
+	"\x17CancelDelegationRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\"\x1a\n" +
 	"\x18CancelDelegationResponse\")\n" +
 	"\x17ResumeDelegationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\"\x1a\n" +
-	"\x18ResumeDelegationResponse\"\xdc\x01\n" +
-	"\x1fRegisterStreamDelegationRequest\x12\x1f\n" +
+	"\x18ResumeDelegationResponse\"S\n" +
+	"\x13ListAttemptsRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x16\n" +
+	"\x06cursor\x18\x02 \x01(\x03R\x06cursor\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\"j\n" +
+	"\x14ListAttemptsResponse\x121\n" +
+	"\battempts\x18\x01 \x03(\v2\x15.delegatee.v1.AttemptR\battempts\x12\x1f\n" +
+	"\vnext_cursor\x18\x02 \x01(\x03R\n" +
+	"nextCursor\"\xe8\x01\n" +
+	"\aAttempt\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12#\n" +
+	"\rdelegation_id\x18\x02 \x01(\x03R\fdelegationId\x12\x12\n" +
+	"\x04kind\x18\x03 \x01(\tR\x04kind\x12\x14\n" +
+	"\x05coins\x18\x04 \x03(\tR\x05coins\x12\x12\n" +
+	"\x04txid\x18\x05 \x01(\tR\x04txid\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\tR\x06status\x12\x14\n" +
+	"\x05error\x18\a \x01(\tR\x05error\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\b \x01(\x03R\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\t \x01(\x03R\tupdatedAt\"\xc8\x01\n" +
+	"\x15RegisterStreamRequest\x12\x1f\n" +
 	"\vtemplate_id\x18\x01 \x01(\tR\n" +
-	"templateId\x12Z\n" +
-	"\tvariables\x18\x02 \x03(\v2<.delegatee.v1.RegisterStreamDelegationRequest.VariablesEntryR\tvariables\x1a<\n" +
+	"templateId\x12P\n" +
+	"\tvariables\x18\x02 \x03(\v22.delegatee.v1.RegisterStreamRequest.VariablesEntryR\tvariables\x1a<\n" +
 	"\x0eVariablesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\\\n" +
-	" RegisterStreamDelegationResponse\x128\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"F\n" +
+	"\x16RegisterStreamResponse\x12,\n" +
+	"\x06stream\x18\x01 \x01(\v2\x14.delegatee.v1.StreamR\x06stream\"\x14\n" +
+	"\x12ListStreamsRequest\"E\n" +
+	"\x13ListStreamsResponse\x12.\n" +
+	"\astreams\x18\x01 \x03(\v2\x14.delegatee.v1.StreamR\astreams\"%\n" +
+	"\x13CancelStreamRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\"\x16\n" +
+	"\x14CancelStreamResponse\"\xf1\x01\n" +
+	"\x06Stream\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1f\n" +
+	"\vtemplate_id\x18\x02 \x01(\tR\n" +
+	"templateId\x12A\n" +
+	"\tvariables\x18\x03 \x03(\v2#.delegatee.v1.Stream.VariablesEntryR\tvariables\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12\x1d\n" +
 	"\n" +
-	"delegation\x18\x01 \x01(\v2\x18.delegatee.v1.DelegationR\n" +
-	"delegation\"\xb1\x01\n" +
-	"\x0fTemplateSummary\x122\n" +
-	"\btemplate\x18\x01 \x01(\v2\x16.delegatee.v1.TemplateR\btemplate\x12\x1a\n" +
-	"\bfailures\x18\x02 \x01(\x05R\bfailures\x12 \n" +
-	"\vdelegations\x18\x03 \x01(\x03R\vdelegations\x12\x18\n" +
-	"\atrusted\x18\x04 \x01(\bR\atrusted\x12\x12\n" +
-	"\x04type\x18\x05 \x01(\tR\x04type\"1\n" +
-	"\x17ListAllTemplatesRequest\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status\"W\n" +
-	"\x18ListAllTemplatesResponse\x12;\n" +
-	"\ttemplates\x18\x01 \x03(\v2\x1d.delegatee.v1.TemplateSummaryR\ttemplates\"B\n" +
-	"\x18SetTemplateStatusRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\"V\n" +
-	"\x19SetTemplateStatusResponse\x129\n" +
-	"\btemplate\x18\x01 \x01(\v2\x1d.delegatee.v1.TemplateSummaryR\btemplate\"E\n" +
-	"\x19SetTemplateTrustedRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
-	"\atrusted\x18\x02 \x01(\bR\atrusted\"W\n" +
-	"\x1aSetTemplateTrustedResponse\x129\n" +
-	"\btemplate\x18\x01 \x01(\v2\x1d.delegatee.v1.TemplateSummaryR\btemplate\"'\n" +
-	"\x15DeleteTemplateRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\x18\n" +
-	"\x16DeleteTemplateResponse\"'\n" +
-	"\x15DeleteArtifactRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\x18\n" +
-	"\x16DeleteArtifactResponse\"\x16\n" +
-	"\x14ListArtifactsRequest\"M\n" +
-	"\x15ListArtifactsResponse\x124\n" +
-	"\tartifacts\x18\x01 \x03(\v2\x16.delegatee.v1.ArtifactR\tartifacts2\xb2\r\n" +
-	"\fAdminService\x12w\n" +
-	"\x0fListDelegations\x12$.delegatee.v1.ListDelegationsRequest\x1a%.delegatee.v1.ListDelegationsResponse\"\x17\xb2J\x14\x12\x12/v1/admin/delegate\x12\x84\x01\n" +
-	"\x11GetDelegationById\x12&.delegatee.v1.GetDelegationByIdRequest\x1a'.delegatee.v1.GetDelegationByIdResponse\"\x1e\xb2J\x1b\x12\x19/v1/admin/delegation/{id}\x12c\n" +
-	"\tGetStatus\x12\x1e.delegatee.v1.GetStatusRequest\x1a\x1f.delegatee.v1.GetStatusResponse\"\x15\xb2J\x12\x12\x10/v1/admin/status\x12c\n" +
-	"\tGetHealth\x12\x1e.delegatee.v1.GetHealthRequest\x1a\x1f.delegatee.v1.GetHealthResponse\"\x15\xb2J\x12\x12\x10/v1/admin/health\x12\xa1\x01\n" +
-	"\x10CancelDelegation\x12%.delegatee.v1.CancelDelegationRequest\x1a&.delegatee.v1.CancelDelegationResponse\">\xb2J;R\x1b*\x19/v1/admin/delegation/{id}*\x1c/v1/admin/delegate/{address}\x12\x8b\x01\n" +
-	"\x10ResumeDelegation\x12%.delegatee.v1.ResumeDelegationRequest\x1a&.delegatee.v1.ResumeDelegationResponse\"(\xb2J%B\x01*\" /v1/admin/delegation/{id}/resume\x12\x9e\x01\n" +
-	"\x18RegisterStreamDelegation\x12-.delegatee.v1.RegisterStreamDelegationRequest\x1a..delegatee.v1.RegisterStreamDelegationResponse\"#\xb2J B\x01*\"\x1b/v1/admin/stream-delegation\x12z\n" +
-	"\x10ListAllTemplates\x12%.delegatee.v1.ListAllTemplatesRequest\x1a&.delegatee.v1.ListAllTemplatesResponse\"\x17\xb2J\x14\x12\x12/v1/admin/template\x12\x8c\x01\n" +
-	"\x11SetTemplateStatus\x12&.delegatee.v1.SetTemplateStatusRequest\x1a'.delegatee.v1.SetTemplateStatusResponse\"&\xb2J#B\x01*\x1a\x1e/v1/admin/template/{id}/status\x12\x90\x01\n" +
-	"\x12SetTemplateTrusted\x12'.delegatee.v1.SetTemplateTrustedRequest\x1a(.delegatee.v1.SetTemplateTrustedResponse\"'\xb2J$B\x01*\x1a\x1f/v1/admin/template/{id}/trusted\x12y\n" +
-	"\x0eDeleteTemplate\x12#.delegatee.v1.DeleteTemplateRequest\x1a$.delegatee.v1.DeleteTemplateResponse\"\x1c\xb2J\x19*\x17/v1/admin/template/{id}\x12y\n" +
-	"\x0eDeleteArtifact\x12#.delegatee.v1.DeleteArtifactRequest\x1a$.delegatee.v1.DeleteArtifactResponse\"\x1c\xb2J\x19*\x17/v1/admin/artifact/{id}\x12q\n" +
-	"\rListArtifacts\x12\".delegatee.v1.ListArtifactsRequest\x1a#.delegatee.v1.ListArtifactsResponse\"\x17\xb2J\x14\x12\x12/v1/admin/artifactB\xa8\x01\n" +
+	"created_at\x18\x05 \x01(\x03R\tcreatedAt\x1a<\n" +
+	"\x0eVariablesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x12\n" +
+	"\x10GetHealthRequest\"b\n" +
+	"\x11GetHealthResponse\x12\x18\n" +
+	"\ahealthy\x18\x01 \x01(\bR\ahealthy\x123\n" +
+	"\aentries\x18\x02 \x03(\v2\x19.delegatee.v1.HealthEntryR\aentries\"Q\n" +
+	"\vHealthEntry\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\ahealthy\x18\x02 \x01(\bR\ahealthy\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\x12\n" +
+	"\x10GetStatusRequest\"\x96\x02\n" +
+	"\x11GetStatusResponse\x12\x16\n" +
+	"\x06active\x18\x01 \x01(\x03R\x06active\x12\x16\n" +
+	"\x06queued\x18\x02 \x01(\x03R\x06queued\x12\x1e\n" +
+	"\n" +
+	"registered\x18\x03 \x01(\x03R\n" +
+	"registered\x12\x12\n" +
+	"\x04late\x18\x04 \x01(\x03R\x04late\x12\x19\n" +
+	"\bnext_due\x18\x05 \x01(\x03R\anextDue\x125\n" +
+	"\abatches\x18\x06 \x03(\v2\x1b.delegatee.v1.BatchForecastR\abatches\x12\x1d\n" +
+	"\n" +
+	"tip_height\x18\a \x01(\x03R\ttipHeight\x12\x14\n" +
+	"\x05coins\x18\b \x01(\x03R\x05coins\x12\x16\n" +
+	"\x06amount\x18\t \x01(\x04R\x06amount\"g\n" +
+	"\rBatchForecast\x12\x0e\n" +
+	"\x02at\x18\x01 \x01(\x03R\x02at\x12\x18\n" +
+	"\aintents\x18\x02 \x01(\x03R\aintents\x12\x14\n" +
+	"\x05coins\x18\x03 \x01(\x03R\x05coins\x12\x16\n" +
+	"\x06amount\x18\x04 \x01(\x04R\x06amount2\xb8\f\n" +
+	"\fAdminService\x12|\n" +
+	"\x0eUpdateTemplate\x12#.delegatee.v1.UpdateTemplateRequest\x1a$.delegatee.v1.UpdateTemplateResponse\"\x1f\xb2J\x1cB\x01*\"\x17/v1/admin/template/{id}\x12y\n" +
+	"\x0eDeleteTemplate\x12#.delegatee.v1.DeleteTemplateRequest\x1a$.delegatee.v1.DeleteTemplateResponse\"\x1c\xb2J\x19*\x17/v1/admin/template/{id}\x12r\n" +
+	"\rListArtifacts\x12\".delegatee.v1.ListArtifactsRequest\x1a#.delegatee.v1.ListArtifactsResponse\"\x18\xb2J\x15\x12\x13/v1/admin/artifacts\x12y\n" +
+	"\x0eDeleteArtifact\x12#.delegatee.v1.DeleteArtifactRequest\x1a$.delegatee.v1.DeleteArtifactResponse\"\x1c\xb2J\x19*\x17/v1/admin/artifact/{id}\x12z\n" +
+	"\x0fListDelegations\x12$.delegatee.v1.ListDelegationsRequest\x1a%.delegatee.v1.ListDelegationsResponse\"\x1a\xb2J\x17\x12\x15/v1/admin/delegations\x12\x8b\x01\n" +
+	"\x10CancelDelegation\x12%.delegatee.v1.CancelDelegationRequest\x1a&.delegatee.v1.CancelDelegationResponse\"(\xb2J%B\x01*\" /v1/admin/delegation/{id}/cancel\x12\x8b\x01\n" +
+	"\x10ResumeDelegation\x12%.delegatee.v1.ResumeDelegationRequest\x1a&.delegatee.v1.ResumeDelegationResponse\"(\xb2J%B\x01*\" /v1/admin/delegation/{id}/resume\x12~\n" +
+	"\fListAttempts\x12!.delegatee.v1.ListAttemptsRequest\x1a\".delegatee.v1.ListAttemptsResponse\"'\xb2J$\x12\"/v1/admin/delegation/{id}/attempts\x12u\n" +
+	"\x0eRegisterStream\x12#.delegatee.v1.RegisterStreamRequest\x1a$.delegatee.v1.RegisterStreamResponse\"\x18\xb2J\x15B\x01*\"\x10/v1/admin/stream\x12j\n" +
+	"\vListStreams\x12 .delegatee.v1.ListStreamsRequest\x1a!.delegatee.v1.ListStreamsResponse\"\x16\xb2J\x13\x12\x11/v1/admin/streams\x12{\n" +
+	"\fCancelStream\x12!.delegatee.v1.CancelStreamRequest\x1a\".delegatee.v1.CancelStreamResponse\"$\xb2J!B\x01*\"\x1c/v1/admin/stream/{id}/cancel\x12c\n" +
+	"\tGetHealth\x12\x1e.delegatee.v1.GetHealthRequest\x1a\x1f.delegatee.v1.GetHealthResponse\"\x15\xb2J\x12\x12\x10/v1/admin/health\x12c\n" +
+	"\tGetStatus\x12\x1e.delegatee.v1.GetStatusRequest\x1a\x1f.delegatee.v1.GetStatusResponse\"\x15\xb2J\x12\x12\x10/v1/admin/statusB\xa8\x01\n" +
 	"\x10com.delegatee.v1B\n" +
 	"AdminProtoP\x01Z7github.com/arkade-os/delegatee/delegatee/v1;delegateev1\xa2\x02\x03DXX\xaa\x02\fDelegatee.V1\xca\x02\fDelegatee\\V1\xe2\x02\x18Delegatee\\V1\\GPBMetadata\xea\x02\rDelegatee::V1b\x06proto3"
 
@@ -1947,98 +1788,86 @@ func file_delegatee_v1_admin_proto_rawDescGZIP() []byte {
 	return file_delegatee_v1_admin_proto_rawDescData
 }
 
-var file_delegatee_v1_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_delegatee_v1_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_delegatee_v1_admin_proto_goTypes = []any{
-	(*ListDelegationsRequest)(nil),           // 0: delegatee.v1.ListDelegationsRequest
-	(*ListDelegationsResponse)(nil),          // 1: delegatee.v1.ListDelegationsResponse
-	(*DelegationSummary)(nil),                // 2: delegatee.v1.DelegationSummary
-	(*GetDelegationByIdRequest)(nil),         // 3: delegatee.v1.GetDelegationByIdRequest
-	(*GetDelegationByIdResponse)(nil),        // 4: delegatee.v1.GetDelegationByIdResponse
-	(*PendingTx)(nil),                        // 5: delegatee.v1.PendingTx
-	(*GetStatusRequest)(nil),                 // 6: delegatee.v1.GetStatusRequest
-	(*GetStatusResponse)(nil),                // 7: delegatee.v1.GetStatusResponse
-	(*GetHealthRequest)(nil),                 // 8: delegatee.v1.GetHealthRequest
-	(*GetHealthResponse)(nil),                // 9: delegatee.v1.GetHealthResponse
-	(*Dependency)(nil),                       // 10: delegatee.v1.Dependency
-	(*PlannedBatch)(nil),                     // 11: delegatee.v1.PlannedBatch
-	(*IntentFees)(nil),                       // 12: delegatee.v1.IntentFees
-	(*CancelDelegationRequest)(nil),          // 13: delegatee.v1.CancelDelegationRequest
-	(*CancelDelegationResponse)(nil),         // 14: delegatee.v1.CancelDelegationResponse
-	(*ResumeDelegationRequest)(nil),          // 15: delegatee.v1.ResumeDelegationRequest
-	(*ResumeDelegationResponse)(nil),         // 16: delegatee.v1.ResumeDelegationResponse
-	(*RegisterStreamDelegationRequest)(nil),  // 17: delegatee.v1.RegisterStreamDelegationRequest
-	(*RegisterStreamDelegationResponse)(nil), // 18: delegatee.v1.RegisterStreamDelegationResponse
-	(*TemplateSummary)(nil),                  // 19: delegatee.v1.TemplateSummary
-	(*ListAllTemplatesRequest)(nil),          // 20: delegatee.v1.ListAllTemplatesRequest
-	(*ListAllTemplatesResponse)(nil),         // 21: delegatee.v1.ListAllTemplatesResponse
-	(*SetTemplateStatusRequest)(nil),         // 22: delegatee.v1.SetTemplateStatusRequest
-	(*SetTemplateStatusResponse)(nil),        // 23: delegatee.v1.SetTemplateStatusResponse
-	(*SetTemplateTrustedRequest)(nil),        // 24: delegatee.v1.SetTemplateTrustedRequest
-	(*SetTemplateTrustedResponse)(nil),       // 25: delegatee.v1.SetTemplateTrustedResponse
-	(*DeleteTemplateRequest)(nil),            // 26: delegatee.v1.DeleteTemplateRequest
-	(*DeleteTemplateResponse)(nil),           // 27: delegatee.v1.DeleteTemplateResponse
-	(*DeleteArtifactRequest)(nil),            // 28: delegatee.v1.DeleteArtifactRequest
-	(*DeleteArtifactResponse)(nil),           // 29: delegatee.v1.DeleteArtifactResponse
-	(*ListArtifactsRequest)(nil),             // 30: delegatee.v1.ListArtifactsRequest
-	(*ListArtifactsResponse)(nil),            // 31: delegatee.v1.ListArtifactsResponse
-	nil,                                      // 32: delegatee.v1.GetDelegationByIdResponse.BatchAtEntry
-	nil,                                      // 33: delegatee.v1.RegisterStreamDelegationRequest.VariablesEntry
-	(*Delegation)(nil),                       // 34: delegatee.v1.Delegation
-	(*Renewal)(nil),                          // 35: delegatee.v1.Renewal
-	(*Vtxo)(nil),                             // 36: delegatee.v1.Vtxo
-	(*Template)(nil),                         // 37: delegatee.v1.Template
-	(*Artifact)(nil),                         // 38: delegatee.v1.Artifact
+	(*UpdateTemplateRequest)(nil),    // 0: delegatee.v1.UpdateTemplateRequest
+	(*UpdateTemplateResponse)(nil),   // 1: delegatee.v1.UpdateTemplateResponse
+	(*DeleteTemplateRequest)(nil),    // 2: delegatee.v1.DeleteTemplateRequest
+	(*DeleteTemplateResponse)(nil),   // 3: delegatee.v1.DeleteTemplateResponse
+	(*ListArtifactsRequest)(nil),     // 4: delegatee.v1.ListArtifactsRequest
+	(*ListArtifactsResponse)(nil),    // 5: delegatee.v1.ListArtifactsResponse
+	(*DeleteArtifactRequest)(nil),    // 6: delegatee.v1.DeleteArtifactRequest
+	(*DeleteArtifactResponse)(nil),   // 7: delegatee.v1.DeleteArtifactResponse
+	(*ListDelegationsRequest)(nil),   // 8: delegatee.v1.ListDelegationsRequest
+	(*ListDelegationsResponse)(nil),  // 9: delegatee.v1.ListDelegationsResponse
+	(*DelegationSummary)(nil),        // 10: delegatee.v1.DelegationSummary
+	(*CancelDelegationRequest)(nil),  // 11: delegatee.v1.CancelDelegationRequest
+	(*CancelDelegationResponse)(nil), // 12: delegatee.v1.CancelDelegationResponse
+	(*ResumeDelegationRequest)(nil),  // 13: delegatee.v1.ResumeDelegationRequest
+	(*ResumeDelegationResponse)(nil), // 14: delegatee.v1.ResumeDelegationResponse
+	(*ListAttemptsRequest)(nil),      // 15: delegatee.v1.ListAttemptsRequest
+	(*ListAttemptsResponse)(nil),     // 16: delegatee.v1.ListAttemptsResponse
+	(*Attempt)(nil),                  // 17: delegatee.v1.Attempt
+	(*RegisterStreamRequest)(nil),    // 18: delegatee.v1.RegisterStreamRequest
+	(*RegisterStreamResponse)(nil),   // 19: delegatee.v1.RegisterStreamResponse
+	(*ListStreamsRequest)(nil),       // 20: delegatee.v1.ListStreamsRequest
+	(*ListStreamsResponse)(nil),      // 21: delegatee.v1.ListStreamsResponse
+	(*CancelStreamRequest)(nil),      // 22: delegatee.v1.CancelStreamRequest
+	(*CancelStreamResponse)(nil),     // 23: delegatee.v1.CancelStreamResponse
+	(*Stream)(nil),                   // 24: delegatee.v1.Stream
+	(*GetHealthRequest)(nil),         // 25: delegatee.v1.GetHealthRequest
+	(*GetHealthResponse)(nil),        // 26: delegatee.v1.GetHealthResponse
+	(*HealthEntry)(nil),              // 27: delegatee.v1.HealthEntry
+	(*GetStatusRequest)(nil),         // 28: delegatee.v1.GetStatusRequest
+	(*GetStatusResponse)(nil),        // 29: delegatee.v1.GetStatusResponse
+	(*BatchForecast)(nil),            // 30: delegatee.v1.BatchForecast
+	nil,                              // 31: delegatee.v1.RegisterStreamRequest.VariablesEntry
+	nil,                              // 32: delegatee.v1.Stream.VariablesEntry
+	(*Artifact)(nil),                 // 33: delegatee.v1.Artifact
+	(*Delegation)(nil),               // 34: delegatee.v1.Delegation
 }
 var file_delegatee_v1_admin_proto_depIdxs = []int32{
-	2,  // 0: delegatee.v1.ListDelegationsResponse.delegations:type_name -> delegatee.v1.DelegationSummary
-	34, // 1: delegatee.v1.DelegationSummary.delegation:type_name -> delegatee.v1.Delegation
-	35, // 2: delegatee.v1.DelegationSummary.last_renewal:type_name -> delegatee.v1.Renewal
-	34, // 3: delegatee.v1.GetDelegationByIdResponse.delegation:type_name -> delegatee.v1.Delegation
-	36, // 4: delegatee.v1.GetDelegationByIdResponse.vtxos:type_name -> delegatee.v1.Vtxo
-	35, // 5: delegatee.v1.GetDelegationByIdResponse.renewals:type_name -> delegatee.v1.Renewal
-	32, // 6: delegatee.v1.GetDelegationByIdResponse.batch_at:type_name -> delegatee.v1.GetDelegationByIdResponse.BatchAtEntry
-	5,  // 7: delegatee.v1.GetDelegationByIdResponse.pending_txs:type_name -> delegatee.v1.PendingTx
-	12, // 8: delegatee.v1.GetStatusResponse.intent_fees:type_name -> delegatee.v1.IntentFees
-	11, // 9: delegatee.v1.GetStatusResponse.batches:type_name -> delegatee.v1.PlannedBatch
-	10, // 10: delegatee.v1.GetHealthResponse.dependencies:type_name -> delegatee.v1.Dependency
-	33, // 11: delegatee.v1.RegisterStreamDelegationRequest.variables:type_name -> delegatee.v1.RegisterStreamDelegationRequest.VariablesEntry
-	34, // 12: delegatee.v1.RegisterStreamDelegationResponse.delegation:type_name -> delegatee.v1.Delegation
-	37, // 13: delegatee.v1.TemplateSummary.template:type_name -> delegatee.v1.Template
-	19, // 14: delegatee.v1.ListAllTemplatesResponse.templates:type_name -> delegatee.v1.TemplateSummary
-	19, // 15: delegatee.v1.SetTemplateStatusResponse.template:type_name -> delegatee.v1.TemplateSummary
-	19, // 16: delegatee.v1.SetTemplateTrustedResponse.template:type_name -> delegatee.v1.TemplateSummary
-	38, // 17: delegatee.v1.ListArtifactsResponse.artifacts:type_name -> delegatee.v1.Artifact
-	0,  // 18: delegatee.v1.AdminService.ListDelegations:input_type -> delegatee.v1.ListDelegationsRequest
-	3,  // 19: delegatee.v1.AdminService.GetDelegationById:input_type -> delegatee.v1.GetDelegationByIdRequest
-	6,  // 20: delegatee.v1.AdminService.GetStatus:input_type -> delegatee.v1.GetStatusRequest
-	8,  // 21: delegatee.v1.AdminService.GetHealth:input_type -> delegatee.v1.GetHealthRequest
-	13, // 22: delegatee.v1.AdminService.CancelDelegation:input_type -> delegatee.v1.CancelDelegationRequest
-	15, // 23: delegatee.v1.AdminService.ResumeDelegation:input_type -> delegatee.v1.ResumeDelegationRequest
-	17, // 24: delegatee.v1.AdminService.RegisterStreamDelegation:input_type -> delegatee.v1.RegisterStreamDelegationRequest
-	20, // 25: delegatee.v1.AdminService.ListAllTemplates:input_type -> delegatee.v1.ListAllTemplatesRequest
-	22, // 26: delegatee.v1.AdminService.SetTemplateStatus:input_type -> delegatee.v1.SetTemplateStatusRequest
-	24, // 27: delegatee.v1.AdminService.SetTemplateTrusted:input_type -> delegatee.v1.SetTemplateTrustedRequest
-	26, // 28: delegatee.v1.AdminService.DeleteTemplate:input_type -> delegatee.v1.DeleteTemplateRequest
-	28, // 29: delegatee.v1.AdminService.DeleteArtifact:input_type -> delegatee.v1.DeleteArtifactRequest
-	30, // 30: delegatee.v1.AdminService.ListArtifacts:input_type -> delegatee.v1.ListArtifactsRequest
-	1,  // 31: delegatee.v1.AdminService.ListDelegations:output_type -> delegatee.v1.ListDelegationsResponse
-	4,  // 32: delegatee.v1.AdminService.GetDelegationById:output_type -> delegatee.v1.GetDelegationByIdResponse
-	7,  // 33: delegatee.v1.AdminService.GetStatus:output_type -> delegatee.v1.GetStatusResponse
-	9,  // 34: delegatee.v1.AdminService.GetHealth:output_type -> delegatee.v1.GetHealthResponse
-	14, // 35: delegatee.v1.AdminService.CancelDelegation:output_type -> delegatee.v1.CancelDelegationResponse
-	16, // 36: delegatee.v1.AdminService.ResumeDelegation:output_type -> delegatee.v1.ResumeDelegationResponse
-	18, // 37: delegatee.v1.AdminService.RegisterStreamDelegation:output_type -> delegatee.v1.RegisterStreamDelegationResponse
-	21, // 38: delegatee.v1.AdminService.ListAllTemplates:output_type -> delegatee.v1.ListAllTemplatesResponse
-	23, // 39: delegatee.v1.AdminService.SetTemplateStatus:output_type -> delegatee.v1.SetTemplateStatusResponse
-	25, // 40: delegatee.v1.AdminService.SetTemplateTrusted:output_type -> delegatee.v1.SetTemplateTrustedResponse
-	27, // 41: delegatee.v1.AdminService.DeleteTemplate:output_type -> delegatee.v1.DeleteTemplateResponse
-	29, // 42: delegatee.v1.AdminService.DeleteArtifact:output_type -> delegatee.v1.DeleteArtifactResponse
-	31, // 43: delegatee.v1.AdminService.ListArtifacts:output_type -> delegatee.v1.ListArtifactsResponse
-	31, // [31:44] is the sub-list for method output_type
-	18, // [18:31] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	33, // 0: delegatee.v1.ListArtifactsResponse.artifacts:type_name -> delegatee.v1.Artifact
+	10, // 1: delegatee.v1.ListDelegationsResponse.delegations:type_name -> delegatee.v1.DelegationSummary
+	34, // 2: delegatee.v1.DelegationSummary.delegation:type_name -> delegatee.v1.Delegation
+	17, // 3: delegatee.v1.ListAttemptsResponse.attempts:type_name -> delegatee.v1.Attempt
+	31, // 4: delegatee.v1.RegisterStreamRequest.variables:type_name -> delegatee.v1.RegisterStreamRequest.VariablesEntry
+	24, // 5: delegatee.v1.RegisterStreamResponse.stream:type_name -> delegatee.v1.Stream
+	24, // 6: delegatee.v1.ListStreamsResponse.streams:type_name -> delegatee.v1.Stream
+	32, // 7: delegatee.v1.Stream.variables:type_name -> delegatee.v1.Stream.VariablesEntry
+	27, // 8: delegatee.v1.GetHealthResponse.entries:type_name -> delegatee.v1.HealthEntry
+	30, // 9: delegatee.v1.GetStatusResponse.batches:type_name -> delegatee.v1.BatchForecast
+	0,  // 10: delegatee.v1.AdminService.UpdateTemplate:input_type -> delegatee.v1.UpdateTemplateRequest
+	2,  // 11: delegatee.v1.AdminService.DeleteTemplate:input_type -> delegatee.v1.DeleteTemplateRequest
+	4,  // 12: delegatee.v1.AdminService.ListArtifacts:input_type -> delegatee.v1.ListArtifactsRequest
+	6,  // 13: delegatee.v1.AdminService.DeleteArtifact:input_type -> delegatee.v1.DeleteArtifactRequest
+	8,  // 14: delegatee.v1.AdminService.ListDelegations:input_type -> delegatee.v1.ListDelegationsRequest
+	11, // 15: delegatee.v1.AdminService.CancelDelegation:input_type -> delegatee.v1.CancelDelegationRequest
+	13, // 16: delegatee.v1.AdminService.ResumeDelegation:input_type -> delegatee.v1.ResumeDelegationRequest
+	15, // 17: delegatee.v1.AdminService.ListAttempts:input_type -> delegatee.v1.ListAttemptsRequest
+	18, // 18: delegatee.v1.AdminService.RegisterStream:input_type -> delegatee.v1.RegisterStreamRequest
+	20, // 19: delegatee.v1.AdminService.ListStreams:input_type -> delegatee.v1.ListStreamsRequest
+	22, // 20: delegatee.v1.AdminService.CancelStream:input_type -> delegatee.v1.CancelStreamRequest
+	25, // 21: delegatee.v1.AdminService.GetHealth:input_type -> delegatee.v1.GetHealthRequest
+	28, // 22: delegatee.v1.AdminService.GetStatus:input_type -> delegatee.v1.GetStatusRequest
+	1,  // 23: delegatee.v1.AdminService.UpdateTemplate:output_type -> delegatee.v1.UpdateTemplateResponse
+	3,  // 24: delegatee.v1.AdminService.DeleteTemplate:output_type -> delegatee.v1.DeleteTemplateResponse
+	5,  // 25: delegatee.v1.AdminService.ListArtifacts:output_type -> delegatee.v1.ListArtifactsResponse
+	7,  // 26: delegatee.v1.AdminService.DeleteArtifact:output_type -> delegatee.v1.DeleteArtifactResponse
+	9,  // 27: delegatee.v1.AdminService.ListDelegations:output_type -> delegatee.v1.ListDelegationsResponse
+	12, // 28: delegatee.v1.AdminService.CancelDelegation:output_type -> delegatee.v1.CancelDelegationResponse
+	14, // 29: delegatee.v1.AdminService.ResumeDelegation:output_type -> delegatee.v1.ResumeDelegationResponse
+	16, // 30: delegatee.v1.AdminService.ListAttempts:output_type -> delegatee.v1.ListAttemptsResponse
+	19, // 31: delegatee.v1.AdminService.RegisterStream:output_type -> delegatee.v1.RegisterStreamResponse
+	21, // 32: delegatee.v1.AdminService.ListStreams:output_type -> delegatee.v1.ListStreamsResponse
+	23, // 33: delegatee.v1.AdminService.CancelStream:output_type -> delegatee.v1.CancelStreamResponse
+	26, // 34: delegatee.v1.AdminService.GetHealth:output_type -> delegatee.v1.GetHealthResponse
+	29, // 35: delegatee.v1.AdminService.GetStatus:output_type -> delegatee.v1.GetStatusResponse
+	23, // [23:36] is the sub-list for method output_type
+	10, // [10:23] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_delegatee_v1_admin_proto_init() }
@@ -2053,7 +1882,7 @@ func file_delegatee_v1_admin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_delegatee_v1_admin_proto_rawDesc), len(file_delegatee_v1_admin_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   34,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -1,76 +1,66 @@
-package grpcservice
+package grpc
 
 import (
 	"context"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/application"
+	executionapp "github.com/arkade-os/delegatee/internal/core/application/execution"
+	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
+	"github.com/arkade-os/delegatee/internal/interface/grpc/handlers"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// collector reads the service on every scrape: nothing to keep in sync.
+const scrapeTimeout = 5 * time.Second
+
+type StatusSource interface {
+	Status(ctx context.Context) (executionapp.Status, error)
+}
+
+// collector reads the status and the health on every scrape, so there is nothing to keep in sync.
 type collector struct {
-	svc application.Service
+	status StatusSource
+	health handlers.Health
 }
 
 var (
-	descActive     = prometheus.NewDesc("delegatee_delegations_active", "Active delegations, whatever their key.", nil, nil)
-	descForeign    = prometheus.NewDesc("delegatee_delegations_foreign", "Active delegations registered under another key, which this instance cannot renew.", nil, nil)
-	descVtxos      = prometheus.NewDesc("delegatee_vtxos_watched", "Spendable vtxos at the addresses this instance renews, as of the last scan.", nil, nil)
-	descSats       = prometheus.NewDesc("delegatee_sats_watched", "Amount of those vtxos, in sats.", nil, nil)
-	descLate       = prometheus.NewDesc("delegatee_vtxos_late", "Vtxos a session's worth of time past their planned batch and still not renewed. Alert on this.", nil, nil)
-	descLateSats   = prometheus.NewDesc("delegatee_sats_late", "Amount of the late vtxos, in sats.", nil, nil)
-	descRenewing   = prometheus.NewDesc("delegatee_vtxos_renewing", "Vtxos in the batch session in flight.", nil, nil)
-	descLastScan   = prometheus.NewDesc("delegatee_last_scan_timestamp_seconds", "Unix time of the last completed scan, 0 before the first.", nil, nil)
-	descRenewals   = prometheus.NewDesc("delegatee_renewals_total", "Vtxo renewals since the process started, by result.", []string{"result"}, nil)
-	descDependency = prometheus.NewDesc("delegatee_dependency_up", "1 when the dependency answers, 0 otherwise.", []string{"name"}, nil)
+	descActive           = prometheus.NewDesc("delegatee_delegations_active", "Active delegations.", nil, nil)
+	descQueued           = prometheus.NewDesc("delegatee_entries_queued", "Entries waiting to be registered at arkd.", nil, nil)
+	descRegistered       = prometheus.NewDesc("delegatee_entries_registered", "Entries registered at arkd, waiting for a batch.", nil, nil)
+	descLate             = prometheus.NewDesc("delegatee_coins_late", "Coins forecast to miss their deadline. Alert on this.", nil, nil)
+	descCoins            = prometheus.NewDesc("delegatee_coins_watched", "Present coins at the watched scripts.", nil, nil)
+	descAmount           = prometheus.NewDesc("delegatee_sats_watched", "Amount of the present coins, in sats.", nil, nil)
+	descTip              = prometheus.NewDesc("delegatee_chain_tip_height", "Height of the chain's latest block, 0 before the first.", nil, nil)
+	descAttempts         = prometheus.NewDesc("delegatee_attempts_total", "Attempts that ended since the process started, by status.", []string{"status"}, nil)
+	descTemplateFailures = prometheus.NewDesc("delegatee_template_failures_total", "Failed attempts charged to their template since the process started.", nil, nil)
+	descDependency       = prometheus.NewDesc("delegatee_dependency_up", "1 when the dependency is healthy, 0 otherwise.", []string{"name"}, nil)
 )
 
-func (c collector) Describe(ch chan<- *prometheus.Desc) {
-	for _, d := range []*prometheus.Desc{
-		descActive, descForeign, descVtxos, descSats, descLate, descLateSats, descRenewing, descLastScan, descRenewals, descDependency,
-	} {
-		ch <- d
-	}
-}
+// Describe sends nothing, which makes the collector unchecked.
+func (c collector) Describe(chan<- *prometheus.Desc) {}
 
 func (c collector) Collect(ch chan<- prometheus.Metric) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), scrapeTimeout)
 	defer cancel()
-	gauge := func(d *prometheus.Desc, v float64, labels ...string) {
-		ch <- prometheus.MustNewConstMetric(d, prometheus.GaugeValue, v, labels...)
+	metric := func(d *prometheus.Desc, kind prometheus.ValueType, v float64, labels ...string) {
+		ch <- prometheus.MustNewConstMetric(d, kind, v, labels...)
 	}
-
-	st := c.svc.Status()
-	var vtxos, late int
-	var sats, lateSats uint64
-	for _, h := range st.Holdings {
-		vtxos, sats, late, lateSats = vtxos+h.Vtxos, sats+h.Amount, late+h.Late, lateSats+h.LateAmount
+	if st, err := c.status.Status(ctx); err == nil {
+		metric(descActive, prometheus.GaugeValue, float64(st.Active))
+		metric(descQueued, prometheus.GaugeValue, float64(st.Queued))
+		metric(descRegistered, prometheus.GaugeValue, float64(st.Registered))
+		metric(descLate, prometheus.GaugeValue, float64(st.Late))
+		metric(descCoins, prometheus.GaugeValue, float64(st.Coins))
+		metric(descAmount, prometheus.GaugeValue, float64(st.Amount))
+		metric(descTip, prometheus.GaugeValue, float64(st.Tip.Height))
+		metric(descAttempts, prometheus.CounterValue, float64(st.Succeeded), string(delegation.Succeeded))
+		metric(descAttempts, prometheus.CounterValue, float64(st.Failed), string(delegation.Failed))
+		metric(descTemplateFailures, prometheus.CounterValue, float64(st.TemplateFailures))
 	}
-	gauge(descVtxos, float64(vtxos))
-	gauge(descSats, float64(sats))
-	gauge(descLate, float64(late))
-	gauge(descLateSats, float64(lateSats))
-	gauge(descRenewing, float64(st.RenewingVtxos))
-	if !st.LastScan.IsZero() {
-		gauge(descLastScan, float64(st.LastScan.Unix()))
-	} else {
-		gauge(descLastScan, 0)
-	}
-	ch <- prometheus.MustNewConstMetric(descRenewals, prometheus.CounterValue, float64(st.Renewed), "ok")
-	ch <- prometheus.MustNewConstMetric(descRenewals, prometheus.CounterValue, float64(st.Failed), "failed")
-
-	if active, err := c.svc.CountActive(ctx); err == nil {
-		gauge(descActive, float64(active))
-		if !st.LastScan.IsZero() {
-			gauge(descForeign, float64(max(0, int(active)-len(st.Holdings))))
-		}
-	}
-	for name, err := range c.svc.Health(ctx) {
+	for _, e := range c.health.Check(ctx) {
 		up := 1.0
-		if err != nil {
+		if e.Err != nil {
 			up = 0
 		}
-		gauge(descDependency, up, name)
+		metric(descDependency, prometheus.GaugeValue, up, e.Name)
 	}
 }

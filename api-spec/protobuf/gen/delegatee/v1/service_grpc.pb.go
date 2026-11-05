@@ -22,8 +22,6 @@ const (
 	DelegateeService_GetInfo_FullMethodName            = "/delegatee.v1.DelegateeService/GetInfo"
 	DelegateeService_RegisterDelegation_FullMethodName = "/delegatee.v1.DelegateeService/RegisterDelegation"
 	DelegateeService_GetDelegation_FullMethodName      = "/delegatee.v1.DelegateeService/GetDelegation"
-	DelegateeService_RegisterSpend_FullMethodName      = "/delegatee.v1.DelegateeService/RegisterSpend"
-	DelegateeService_GetSpend_FullMethodName           = "/delegatee.v1.DelegateeService/GetSpend"
 	DelegateeService_RegisterArtifact_FullMethodName   = "/delegatee.v1.DelegateeService/RegisterArtifact"
 	DelegateeService_GetArtifact_FullMethodName        = "/delegatee.v1.DelegateeService/GetArtifact"
 	DelegateeService_RegisterTemplate_FullMethodName   = "/delegatee.v1.DelegateeService/RegisterTemplate"
@@ -35,28 +33,20 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DelegateeServiceClient interface {
-	// GetInfo returns the keys a wallet instantiates a template with.
+	// GetInfo tells the daemon's version, network and keys.
 	GetInfo(ctx context.Context, in *GetInfoRequest, opts ...grpc.CallOption) (*GetInfoResponse, error)
-	// RegisterDelegation registers a watch: the daemon acts on coins sent to
-	// the address the template derives for variables, until expires_at. The
-	// template must have exactly one input; the wallet compares the address
-	// with its own. Registering an active watch again returns it unchanged.
+	// RegisterDelegation binds a one-input template to variables: the daemon acts on every coin landing at
+	// the derived address until expires_at. Registering an active delegation again returns it unchanged.
 	RegisterDelegation(ctx context.Context, in *RegisterDelegationRequest, opts ...grpc.CallOption) (*RegisterDelegationResponse, error)
-	// GetDelegation returns the watch of an address (an active one first, else
-	// the newest) with its spendable VTXOs (live from the arkd indexer) and its
-	// renewal history.
+	// GetDelegation returns a delegation with its coins, by ?id= or by ?address=.
 	GetDelegation(ctx context.Context, in *GetDelegationRequest, opts ...grpc.CallOption) (*GetDelegationResponse, error)
-	// RegisterSpend spends outpoints once through a template, signed by their owner.
-	RegisterSpend(ctx context.Context, in *RegisterSpendRequest, opts ...grpc.CallOption) (*RegisterSpendResponse, error)
-	// GetSpend returns a spend with its coins and attempts.
-	GetSpend(ctx context.Context, in *GetSpendRequest, opts ...grpc.CallOption) (*GetSpendResponse, error)
-	// RegisterArtifact stores a compiler artifact templates may reference. Idempotent on its id.
+	// RegisterArtifact stores a compiler artifact under its content id. Idempotent.
 	RegisterArtifact(ctx context.Context, in *RegisterArtifactRequest, opts ...grpc.CallOption) (*RegisterArtifactResponse, error)
 	GetArtifact(ctx context.Context, in *GetArtifactRequest, opts ...grpc.CallOption) (*GetArtifactResponse, error)
-	// RegisterTemplate stores a template the engine accepts. It is active at once. Idempotent on its id.
+	// RegisterTemplate stores a template under its content id once its artifacts are registered. Idempotent.
 	RegisterTemplate(ctx context.Context, in *RegisterTemplateRequest, opts ...grpc.CallOption) (*RegisterTemplateResponse, error)
 	GetTemplate(ctx context.Context, in *GetTemplateRequest, opts ...grpc.CallOption) (*GetTemplateResponse, error)
-	// ListTemplates lists the active templates, without their documents.
+	// ListTemplates lists templates without their documents, newest first.
 	ListTemplates(ctx context.Context, in *ListTemplatesRequest, opts ...grpc.CallOption) (*ListTemplatesResponse, error)
 }
 
@@ -92,26 +82,6 @@ func (c *delegateeServiceClient) GetDelegation(ctx context.Context, in *GetDeleg
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetDelegationResponse)
 	err := c.cc.Invoke(ctx, DelegateeService_GetDelegation_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *delegateeServiceClient) RegisterSpend(ctx context.Context, in *RegisterSpendRequest, opts ...grpc.CallOption) (*RegisterSpendResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RegisterSpendResponse)
-	err := c.cc.Invoke(ctx, DelegateeService_RegisterSpend_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *delegateeServiceClient) GetSpend(ctx context.Context, in *GetSpendRequest, opts ...grpc.CallOption) (*GetSpendResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetSpendResponse)
-	err := c.cc.Invoke(ctx, DelegateeService_GetSpend_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -172,28 +142,20 @@ func (c *delegateeServiceClient) ListTemplates(ctx context.Context, in *ListTemp
 // All implementations should embed UnimplementedDelegateeServiceServer
 // for forward compatibility.
 type DelegateeServiceServer interface {
-	// GetInfo returns the keys a wallet instantiates a template with.
+	// GetInfo tells the daemon's version, network and keys.
 	GetInfo(context.Context, *GetInfoRequest) (*GetInfoResponse, error)
-	// RegisterDelegation registers a watch: the daemon acts on coins sent to
-	// the address the template derives for variables, until expires_at. The
-	// template must have exactly one input; the wallet compares the address
-	// with its own. Registering an active watch again returns it unchanged.
+	// RegisterDelegation binds a one-input template to variables: the daemon acts on every coin landing at
+	// the derived address until expires_at. Registering an active delegation again returns it unchanged.
 	RegisterDelegation(context.Context, *RegisterDelegationRequest) (*RegisterDelegationResponse, error)
-	// GetDelegation returns the watch of an address (an active one first, else
-	// the newest) with its spendable VTXOs (live from the arkd indexer) and its
-	// renewal history.
+	// GetDelegation returns a delegation with its coins, by ?id= or by ?address=.
 	GetDelegation(context.Context, *GetDelegationRequest) (*GetDelegationResponse, error)
-	// RegisterSpend spends outpoints once through a template, signed by their owner.
-	RegisterSpend(context.Context, *RegisterSpendRequest) (*RegisterSpendResponse, error)
-	// GetSpend returns a spend with its coins and attempts.
-	GetSpend(context.Context, *GetSpendRequest) (*GetSpendResponse, error)
-	// RegisterArtifact stores a compiler artifact templates may reference. Idempotent on its id.
+	// RegisterArtifact stores a compiler artifact under its content id. Idempotent.
 	RegisterArtifact(context.Context, *RegisterArtifactRequest) (*RegisterArtifactResponse, error)
 	GetArtifact(context.Context, *GetArtifactRequest) (*GetArtifactResponse, error)
-	// RegisterTemplate stores a template the engine accepts. It is active at once. Idempotent on its id.
+	// RegisterTemplate stores a template under its content id once its artifacts are registered. Idempotent.
 	RegisterTemplate(context.Context, *RegisterTemplateRequest) (*RegisterTemplateResponse, error)
 	GetTemplate(context.Context, *GetTemplateRequest) (*GetTemplateResponse, error)
-	// ListTemplates lists the active templates, without their documents.
+	// ListTemplates lists templates without their documents, newest first.
 	ListTemplates(context.Context, *ListTemplatesRequest) (*ListTemplatesResponse, error)
 }
 
@@ -212,12 +174,6 @@ func (UnimplementedDelegateeServiceServer) RegisterDelegation(context.Context, *
 }
 func (UnimplementedDelegateeServiceServer) GetDelegation(context.Context, *GetDelegationRequest) (*GetDelegationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetDelegation not implemented")
-}
-func (UnimplementedDelegateeServiceServer) RegisterSpend(context.Context, *RegisterSpendRequest) (*RegisterSpendResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method RegisterSpend not implemented")
-}
-func (UnimplementedDelegateeServiceServer) GetSpend(context.Context, *GetSpendRequest) (*GetSpendResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetSpend not implemented")
 }
 func (UnimplementedDelegateeServiceServer) RegisterArtifact(context.Context, *RegisterArtifactRequest) (*RegisterArtifactResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RegisterArtifact not implemented")
@@ -304,42 +260,6 @@ func _DelegateeService_GetDelegation_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DelegateeServiceServer).GetDelegation(ctx, req.(*GetDelegationRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _DelegateeService_RegisterSpend_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RegisterSpendRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DelegateeServiceServer).RegisterSpend(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DelegateeService_RegisterSpend_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DelegateeServiceServer).RegisterSpend(ctx, req.(*RegisterSpendRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _DelegateeService_GetSpend_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetSpendRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DelegateeServiceServer).GetSpend(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DelegateeService_GetSpend_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DelegateeServiceServer).GetSpend(ctx, req.(*GetSpendRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -452,14 +372,6 @@ var DelegateeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetDelegation",
 			Handler:    _DelegateeService_GetDelegation_Handler,
-		},
-		{
-			MethodName: "RegisterSpend",
-			Handler:    _DelegateeService_RegisterSpend_Handler,
-		},
-		{
-			MethodName: "GetSpend",
-			Handler:    _DelegateeService_GetSpend_Handler,
 		},
 		{
 			MethodName: "RegisterArtifact",

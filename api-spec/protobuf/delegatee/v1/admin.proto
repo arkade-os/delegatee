@@ -2,223 +2,240 @@ syntax = "proto3";
 
 package delegatee.v1;
 
-import "meshapi/gateway/annotations.proto";
 import "delegatee/v1/service.proto";
+import "meshapi/gateway/annotations.proto";
 
+// AdminService is served on the admin port only, next to DelegateeService.
 service AdminService {
-  // ListDelegations lists one page, newest first.
+  // UpdateTemplate sets a template's status; activating resets its failures.
+  rpc UpdateTemplate(UpdateTemplateRequest) returns (UpdateTemplateResponse) {
+    option (meshapi.gateway.http) = {
+      post: "/v1/admin/template/{id}"
+      body: "*"
+    };
+  }
+  // DeleteTemplate fails with FailedPrecondition while a delegation references the template.
+  rpc DeleteTemplate(DeleteTemplateRequest) returns (DeleteTemplateResponse) {
+    option (meshapi.gateway.http) = {
+      delete: "/v1/admin/template/{id}"
+    };
+  }
+  // ListArtifacts lists artifacts without their documents, newest first.
+  rpc ListArtifacts(ListArtifactsRequest) returns (ListArtifactsResponse) {
+    option (meshapi.gateway.http) = {
+      get: "/v1/admin/artifacts"
+    };
+  }
+  // DeleteArtifact fails with FailedPrecondition while a template references the artifact.
+  rpc DeleteArtifact(DeleteArtifactRequest) returns (DeleteArtifactResponse) {
+    option (meshapi.gateway.http) = {
+      delete: "/v1/admin/artifact/{id}"
+    };
+  }
+  // ListDelegations lists delegations by the earliest due of their coins, those without coins last, paged by cursor.
   rpc ListDelegations(ListDelegationsRequest) returns (ListDelegationsResponse) {
     option (meshapi.gateway.http) = {
-      get: "/v1/admin/delegate"
+      get: "/v1/admin/delegations"
     };
   }
-
-  // GetDelegationById returns any delegation, with its coins and history.
-  rpc GetDelegationById(GetDelegationByIdRequest) returns (GetDelegationByIdResponse) {
+  // CancelDelegation stops an active delegation; its fingerprint cannot be registered again until resumed.
+  rpc CancelDelegation(CancelDelegationRequest) returns (CancelDelegationResponse) {
     option (meshapi.gateway.http) = {
-      get: "/v1/admin/delegation/{id}"
+      post: "/v1/admin/delegation/{id}/cancel"
+      body: "*"
     };
   }
-
+  // ResumeDelegation puts a cancelled delegation back to active.
+  rpc ResumeDelegation(ResumeDelegationRequest) returns (ResumeDelegationResponse) {
+    option (meshapi.gateway.http) = {
+      post: "/v1/admin/delegation/{id}/resume"
+      body: "*"
+    };
+  }
+  // ListAttempts lists the attempts of a delegation newest first, paged by cursor.
+  rpc ListAttempts(ListAttemptsRequest) returns (ListAttemptsResponse) {
+    option (meshapi.gateway.http) = {
+      get: "/v1/admin/delegation/{id}/attempts"
+    };
+  }
+  // RegisterStream has the daemon run a template's trigger against arkd's transactions, spawning a delegation for each match.
+  rpc RegisterStream(RegisterStreamRequest) returns (RegisterStreamResponse) {
+    option (meshapi.gateway.http) = {
+      post: "/v1/admin/stream"
+      body: "*"
+    };
+  }
+  // ListStreams lists the streams of every status, oldest first.
+  rpc ListStreams(ListStreamsRequest) returns (ListStreamsResponse) {
+    option (meshapi.gateway.http) = {
+      get: "/v1/admin/streams"
+    };
+  }
+  // CancelStream stops a stream; registering it again fails while it stays cancelled.
+  rpc CancelStream(CancelStreamRequest) returns (CancelStreamResponse) {
+    option (meshapi.gateway.http) = {
+      post: "/v1/admin/stream/{id}/cancel"
+      body: "*"
+    };
+  }
+  // GetHealth names each dependency with the error it answers, if any.
+  rpc GetHealth(GetHealthRequest) returns (GetHealthResponse) {
+    option (meshapi.gateway.http) = {
+      get: "/v1/admin/health"
+    };
+  }
+  // GetStatus reports what the loop holds: the queue, what is registered at arkd and the forecast batches.
   rpc GetStatus(GetStatusRequest) returns (GetStatusResponse) {
     option (meshapi.gateway.http) = {
       get: "/v1/admin/status"
     };
   }
-
-  // GetHealth checks each dependency, with the error of the failing ones.
-  rpc GetHealth(GetHealthRequest) returns (GetHealthResponse) {
-    option (meshapi.gateway.http) = { get: "/v1/admin/health" };
-  }
-
-  // CancelDelegation stops the active watches of an address, or one
-  // delegation by id: advertisements have no address. Registering a
-  // cancelled delegation again is refused until ResumeDelegation.
-  rpc CancelDelegation(CancelDelegationRequest) returns (CancelDelegationResponse) {
-    option (meshapi.gateway.http) = {
-      delete: "/v1/admin/delegate/{address}"
-      additional_bindings { delete: "/v1/admin/delegation/{id}" }
-    };
-  }
-
-  // ResumeDelegation sets a cancelled delegation active again.
-  rpc ResumeDelegation(ResumeDelegationRequest) returns (ResumeDelegationResponse) {
-    option (meshapi.gateway.http) = { post: "/v1/admin/delegation/{id}/resume" body: "*" };
-  }
-
-  // RegisterStreamDelegation spawns a watch of the template for every streamed transaction its trigger matches.
-  rpc RegisterStreamDelegation(RegisterStreamDelegationRequest) returns (RegisterStreamDelegationResponse) {
-    option (meshapi.gateway.http) = { post: "/v1/admin/stream-delegation" body: "*" };
-  }
-
-  rpc ListAllTemplates(ListAllTemplatesRequest) returns (ListAllTemplatesResponse) {
-    option (meshapi.gateway.http) = { get: "/v1/admin/template" };
-  }
-  rpc SetTemplateStatus(SetTemplateStatusRequest) returns (SetTemplateStatusResponse) {
-    option (meshapi.gateway.http) = { put: "/v1/admin/template/{id}/status" body: "*" };
-  }
-  // SetTemplateTrusted marks a template the operator vouches for.
-  rpc SetTemplateTrusted(SetTemplateTrustedRequest) returns (SetTemplateTrustedResponse) {
-    option (meshapi.gateway.http) = { put: "/v1/admin/template/{id}/trusted" body: "*" };
-  }
-  rpc DeleteTemplate(DeleteTemplateRequest) returns (DeleteTemplateResponse) {
-    option (meshapi.gateway.http) = { delete: "/v1/admin/template/{id}" };
-  }
-  rpc DeleteArtifact(DeleteArtifactRequest) returns (DeleteArtifactResponse) {
-    option (meshapi.gateway.http) = { delete: "/v1/admin/artifact/{id}" };
-  }
-  // ListArtifacts lists every artifact, newest first, without documents.
-  rpc ListArtifacts(ListArtifactsRequest) returns (ListArtifactsResponse) {
-    option (meshapi.gateway.http) = { get: "/v1/admin/artifact" };
-  }
 }
 
+message UpdateTemplateRequest {
+  string id = 1;
+  // status is active or disabled.
+  string status = 2;
+}
+message UpdateTemplateResponse {}
+message DeleteTemplateRequest {
+  string id = 1;
+}
+message DeleteTemplateResponse {}
+message ListArtifactsRequest {}
+message ListArtifactsResponse {
+  repeated Artifact artifacts = 1;
+}
+message DeleteArtifactRequest {
+  string id = 1;
+}
+message DeleteArtifactResponse {}
 message ListDelegationsRequest {
-  // page_size defaults to 100, at most 1000.
-  int32 page_size = 1;
-  // cursor is the next_cursor of the previous page, 0 for the first.
-  int64 cursor = 2;
-  // status filters when set: active, cancelled, expired or done.
-  string status = 3;
+  // status filters on active, cancelled, expired or done; empty lists all.
+  string status = 1;
+  // cursor is the next_cursor of the previous page; empty starts from the top.
+  string cursor = 2;
+  // limit is the page size: 100 when 0, at most 1000.
+  int32 limit = 3;
 }
 message ListDelegationsResponse {
   repeated DelegationSummary delegations = 1;
-  // next_cursor is 0 on the last page.
-  int64 next_cursor = 2;
+  // next_cursor starts the next page; empty on the last one.
+  string next_cursor = 2;
 }
-
+// DelegationSummary is a delegation with what its present coins and its attempts come to.
 message DelegationSummary {
   Delegation delegation = 1;
-  // managed is false when this instance cannot renew the delegation; unmanaged_reason says why.
-  bool managed = 2;
-  string unmanaged_reason = 3;
-  int32 vtxo_count = 4;
-  uint64 total_amount = 5;
-  int64 next_expiry = 6;
-  int64 next_renewal_at = 7;
-  Renewal last_renewal = 8;
-  // next_deadline is the latest the soonest vtxo is submitted; next_batch_at the planned batch it joins, 0 without a plan.
-  int64 next_deadline = 9;
-  int64 next_batch_at = 10;
-  // renewing is true while a session holds the delegation's coins.
-  bool renewing = 11;
-  // failing_since is 0 unless the last attempt of a coin failed; failed_attempts counts the attempts since.
-  int64 failing_since = 12;
-  int64 last_failed_at = 13;
-  int32 failed_attempts = 14;
+  int64 coins = 2;
+  uint64 amount = 3;
+  // next_due is unix seconds, the earliest due of the present coins, 0 without any.
+  int64 next_due = 4;
+  // last_attempt is the status of the newest attempt, empty without one.
+  string last_attempt = 5;
 }
-
-message GetDelegationByIdRequest {
+message CancelDelegationRequest {
   int64 id = 1;
 }
-message GetDelegationByIdResponse {
-  Delegation delegation = 1;
-  repeated Vtxo vtxos = 2;
-  repeated Renewal renewals = 3;
-  // batch_at is the planned batch time by outpoint; a coin in a session, or waiting on something unforeseeable, is absent.
-  map<string, int64> batch_at = 4;
-  // pending_txs are the daemon's transactions holding the coins until they land.
-  repeated PendingTx pending_txs = 5;
-}
-
-message PendingTx {
-  string txid = 1;
-  // spent_by is what the indexer reports spending the coins: the commitment txid of a batch.
-  string spent_by = 2;
-  repeated string coins = 3;
-  // state is batch, submitted, finalizing or landed.
-  string state = 4;
-  int64 created_at = 5;
-}
-
-message GetStatusRequest {}
-message GetStatusResponse {
-  int64 last_scan_at = 1;
-  int32 renewing_vtxos = 2;
-  reserved 3; // poll_interval: the scan is event driven
-  IntentFees intent_fees = 4;
-  // renewal_reserve and boarding_max_wait are seconds; batches are the next planned sessions, soonest first, at most 20.
-  int64 renewal_reserve = 5;
-  int64 boarding_max_wait = 6;
-  repeated PlannedBatch batches = 7;
-  // next_scan_at is backed off while throttled: an upstream rate limits the scan.
-  int64 next_scan_at = 8;
-  bool throttled = 9;
-}
-
-message GetHealthRequest {}
-message GetHealthResponse { repeated Dependency dependencies = 1; }
-
-message Dependency {
-  string name = 1;
-  // error is empty when the dependency answers.
-  string error = 2;
-}
-
-message PlannedBatch {
-  // at is never in the past: a batch an overdue coin forces is due now.
-  int64 at = 1;
-  int32 vtxo_count = 2;
-  uint64 total_amount = 3;
-  int32 delegation_count = 4;
-  // the coin with the earliest deadline, which sets the time
-  string forced_by_outpoint = 5;
-  int64 forced_by_delegation_id = 6;
-}
-
-message IntentFees {
-  string offchain_input = 1;
-  string onchain_input = 2;
-  string offchain_output = 3;
-  string onchain_output = 4;
-}
-
-message CancelDelegationRequest {
-  string address = 1;
-  // id, when set, takes precedence over address.
-  int64 id = 2;
-}
 message CancelDelegationResponse {}
-
-message ResumeDelegationRequest { int64 id = 1; }
+message ResumeDelegationRequest {
+  int64 id = 1;
+}
 message ResumeDelegationResponse {}
-
-message RegisterStreamDelegationRequest {
+message ListAttemptsRequest {
+  int64 id = 1;
+  // cursor is the next_cursor of the previous page; 0 starts from the newest.
+  int64 cursor = 2;
+  // limit is the page size: 100 when 0, at most 1000.
+  int32 limit = 3;
+}
+message ListAttemptsResponse {
+  repeated Attempt attempts = 1;
+  // next_cursor starts the next page; 0 on the last one.
+  int64 next_cursor = 2;
+}
+// Attempt is one run of a delegation over coins.
+message Attempt {
+  int64 id = 1;
+  int64 delegation_id = 2;
+  // kind is the delegation's template type: offchain or intent.
+  string kind = 3;
+  // coins are the outpoints the attempt spends.
+  repeated string coins = 4;
+  // txid is the transaction once known: the ark txid of an offchain attempt, the commitment txid of a batched one.
+  string txid = 5;
+  // status is submitted, succeeded or failed.
+  string status = 6;
+  // error says why a failed attempt failed.
+  string error = 7;
+  // created_at and updated_at are unix seconds.
+  int64 created_at = 8;
+  int64 updated_at = 9;
+}
+message RegisterStreamRequest {
   string template_id = 1;
-  // the variables the trigger does not bind, hex
+  // variables are the lower-case hex values the trigger does not bind.
   map<string, string> variables = 2;
 }
-message RegisterStreamDelegationResponse { Delegation delegation = 1; }
-
-// TemplateSummary is a template with what only the operator sees.
-message TemplateSummary {
-  Template template = 1; // without its document in list responses
-  // failures is the count of consecutive renewal cycles the failure valve saw rejected.
-  int32 failures = 2;
-  // delegations is how many delegations reference the template.
-  int64 delegations = 3;
-  // trusted templates get the daemon's own signature on delegate-key leaves
-  // and are exempt from the failure valve; seeded ones are trusted.
-  bool trusted = 4;
-  // type is intent, offchain or onchain.
-  string type = 5;
+message RegisterStreamResponse {
+  Stream stream = 1;
 }
-
-message ListAllTemplatesRequest { string status = 1; }
-message ListAllTemplatesResponse { repeated TemplateSummary templates = 1; }
-message SetTemplateStatusRequest {
-  string id = 1;
-  string status = 2; // active | disabled
+message ListStreamsRequest {}
+message ListStreamsResponse {
+  repeated Stream streams = 1;
 }
-message SetTemplateStatusResponse { TemplateSummary template = 1; }
-message SetTemplateTrustedRequest {
-  string id = 1;
-  bool trusted = 2;
+message CancelStreamRequest {
+  int64 id = 1;
 }
-message SetTemplateTrustedResponse { TemplateSummary template = 1; }
-message DeleteTemplateRequest { string id = 1; }
-message DeleteTemplateResponse {}
-message DeleteArtifactRequest { string id = 1; }
-message DeleteArtifactResponse {}
-message ListArtifactsRequest {}
-message ListArtifactsResponse { repeated Artifact artifacts = 1; }
+message CancelStreamResponse {}
+// Stream is an operator's standing rule: a template's trigger run against arkd's transactions.
+message Stream {
+  int64 id = 1;
+  string template_id = 2;
+  map<string, string> variables = 3;
+  // status is active or cancelled.
+  string status = 4;
+  // created_at is unix seconds.
+  int64 created_at = 5;
+}
+message GetHealthRequest {}
+message GetHealthResponse {
+  // healthy is whether every entry is.
+  bool healthy = 1;
+  repeated HealthEntry entries = 2;
+}
+// HealthEntry is what one dependency answers: db, arkd, electrum, emulator or loop.
+message HealthEntry {
+  string name = 1;
+  bool healthy = 2;
+  // error says why the dependency is not healthy.
+  string error = 3;
+}
+message GetStatusRequest {}
+message GetStatusResponse {
+  // active is how many delegations are being served.
+  int64 active = 1;
+  // queued is how many entries wait to be registered at arkd.
+  int64 queued = 2;
+  // registered is how many entries are registered at arkd, waiting for a batch.
+  int64 registered = 3;
+  // late is how many coins are forecast to miss their deadline.
+  int64 late = 4;
+  // next_due is unix seconds, when the next coin becomes ready, 0 when none will.
+  int64 next_due = 5;
+  // batches forecasts what the coming batches carry, the nearest first.
+  repeated BatchForecast batches = 6;
+  // tip_height is the chain's latest block, 0 before the first one is seen.
+  int64 tip_height = 7;
+  // coins is how many present coins the daemon watches.
+  int64 coins = 8;
+  // amount is the sum of those coins, in sats.
+  uint64 amount = 9;
+}
+// BatchForecast is what a coming batch is expected to carry of ours.
+message BatchForecast {
+  // at is unix seconds.
+  int64 at = 1;
+  int64 intents = 2;
+  int64 coins = 3;
+  uint64 amount = 4;
+}

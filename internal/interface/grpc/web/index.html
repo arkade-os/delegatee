@@ -7,1270 +7,342 @@
 <style>
 :root {
   color-scheme: light dark;
-  --paper: #f4f5f7; --surface: #ffffff; --ink: #16181d; --muted: #5f636d; --faint: #989ba4; --line: #e3e5e9; --hover: #f5f6f8; --current: #eeecfd;
-  --ok: #18794e; --ok-soft: #e3f4ea; --window: #a35f00; --window-a: #fbefd6; --window-b: #f2d9a0; --bad: #c4321f; --bad-soft: #fcebe8;
-  --track: #eceef1; --elapsed: rgba(22, 24, 29, .2); --accent: #5b4bdb; --accent-soft: #e9e6fc; --accent-ink: #ffffff; --shadow: 0 12px 32px rgba(22, 24, 29, .16);
+  --paper: #f4f5f7; --surface: #ffffff; --ink: #16181d; --muted: #5f636d; --faint: #989ba4; --line: #e3e5e9; --hover: #f5f6f8;
+  --ok: #18794e; --ok-soft: #e3f4ea; --warn: #a35f00; --warn-soft: #fbefd6; --bad: #c4321f; --bad-soft: #fcebe8;
+  --accent: #5b4bdb; --accent-soft: #e9e6fc;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --r: 6px; --panel: 12px; --head: 3.25rem;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #0d0e11; --surface: #15161a; --ink: #ececf0; --muted: #9a9ca6; --faint: #686a73; --line: #26272d; --hover: #1c1d22; --current: #221f38;
-    --ok: #4cc38a; --ok-soft: #12291d; --window: #e9a83b; --window-a: #33270f; --window-b: #4d3b14; --bad: #f2735f; --bad-soft: #36160f;
-    --track: #23242a; --elapsed: rgba(236, 236, 240, .22); --accent: #a99bff; --accent-soft: #29254a; --accent-ink: #0d0e11; --shadow: 0 12px 32px rgba(0, 0, 0, .55);
+    --paper: #0d0e11; --surface: #15161a; --ink: #ececf0; --muted: #9a9ca6; --faint: #686a73; --line: #26272d; --hover: #1c1d22;
+    --ok: #4cc38a; --ok-soft: #12291d; --warn: #e9a83b; --warn-soft: #33270f; --bad: #f2735f; --bad-soft: #36160f;
+    --accent: #a99bff; --accent-soft: #29254a;
   }
 }
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
-button, input, select, textarea { font: inherit; color: inherit; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.5 var(--sans); }
+h2 { margin: 0 0 .75rem; font-size: 1rem; font-weight: 600; line-height: 1.25; }
 a { color: var(--accent); }
-h1, h2, h3, h4 { margin: 0; font-weight: 600; line-height: 1.25; }
-p { margin: 0; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.hash { font-family: var(--mono); font-size: .86em; word-break: break-all; }
-.n { font-variant-numeric: tabular-nums; }
-kbd { font: .8em var(--mono); border: 1px solid var(--line); border-radius: 4px; padding: 0 .3rem; background: var(--surface); }
 [hidden] { display: none !important; }
+.mono { font-family: var(--mono); font-size: .86em; word-break: break-all; }
+.n { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
 
-/* buttons */
-button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: var(--r); padding: 0 .8rem; min-height: 2rem; font-weight: 500; font-size: .86rem; transition: background .12s, border-color .12s, color .12s; }
-button:hover { background: var(--hover); border-color: var(--faint); }
-button:active { background: var(--current); }
-button:disabled { cursor: default; opacity: .5; }
-button:disabled:hover { background: var(--surface); border-color: var(--line); }
-button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+button, select { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: .25rem .7rem; }
+button:hover, select:hover { background: var(--hover); border-color: var(--faint); }
 button.danger { color: var(--bad); }
-button.danger:hover { background: var(--bad-soft); border-color: var(--bad); }
-button.danger.solid { background: var(--bad); color: #fff; border-color: var(--bad); }
-button.danger.solid:hover { filter: brightness(1.08); background: var(--bad); }
-button.link { border: 0; background: none; padding: 0; min-height: 0; font-weight: inherit; font-size: inherit; color: var(--accent); text-decoration: underline; text-underline-offset: .15em; border-radius: 2px; }
-button.link:hover { background: none; color: var(--ink); }
-/* hashes read as data: ink, underlined on hover only */
-button.link.hash, .horizon button, a.hash { color: var(--ink); text-decoration: none; }
-button.link.hash:hover, .horizon button:hover, a.hash:hover { color: var(--accent); text-decoration: underline; text-underline-offset: .2em; }
-button.mini { min-height: 0; padding: 0 .45rem; margin-left: .5rem; font: 500 .74rem/1.6 var(--sans); color: var(--muted); border-radius: 4px; vertical-align: .1em; }
-button.mini:hover { color: var(--ink); }
-button[aria-busy=true] { pointer-events: none; opacity: .7; }
-button[aria-busy=true]::after { content: "…"; }
+button:disabled { opacity: .5; cursor: default; }
+button.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* tooltips */
-#tooltip { position: fixed; z-index: 50; max-width: 19rem; padding: .4rem .6rem; border-radius: var(--r); background: var(--ink); color: var(--paper); font: 400 .76rem/1.45 var(--sans); pointer-events: none; box-shadow: var(--shadow); }
-.tip { display: inline-grid; place-items: center; width: 1rem; height: 1rem; min-height: 0; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: none; color: var(--faint); font: 600 .64rem/1 var(--sans); vertical-align: .08em; cursor: help; }
-.tip:hover { color: var(--ink); background: none; }
-
-/* header */
-header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 1.75rem; height: var(--head); padding: 0 clamp(1rem, 3vw, 2rem); background: var(--surface); border-bottom: 1px solid var(--line); }
-.brand { display: flex; align-items: center; gap: .55rem; font-weight: 650; font-size: .98rem; letter-spacing: -.015em; color: var(--ink); text-decoration: none; flex: none; }
-.brand::before { content: ""; width: .8rem; height: .8rem; border-radius: 3px; background: var(--accent); box-shadow: .3rem .3rem 0 -.1rem color-mix(in srgb, var(--accent) 40%, transparent); }
+header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 1.5rem; padding: 0 clamp(1rem, 3vw, 2rem); height: 3.25rem; background: var(--surface); border-bottom: 1px solid var(--line); }
+.brand { font-weight: 650; }
 nav { display: flex; align-self: stretch; gap: .25rem; }
-nav a { display: flex; align-items: center; gap: .4rem; padding: 0 .7rem; color: var(--muted); text-decoration: none; font-weight: 500; font-size: .88rem; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+nav a { display: flex; align-items: center; padding: 0 .75rem; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; }
 nav a:hover { color: var(--ink); }
 nav a[aria-current=page] { color: var(--ink); border-bottom-color: var(--accent); }
-nav .count { min-width: 1.15rem; padding: 0 .35rem; border-radius: 99px; background: var(--bad); color: #fff; font-size: .7rem; font-weight: 600; text-align: center; line-height: 1.15rem; }
-.headright { margin-left: auto; display: flex; align-items: center; gap: 1.25rem; min-width: 0; }
-#pulse { display: inline-block; min-height: 1.85rem; padding: 0 .75rem; border-radius: 99px; background: var(--paper); border-color: var(--line); color: var(--muted); font-size: .8rem; font-weight: 500; white-space: nowrap; }
-#pulse b { color: var(--ink); font-weight: 600; }
-#pulse.busy, #pulse.busy b { color: var(--window); }
-#pulse.warn, #pulse.warn b { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
-#meta { display: flex; align-items: center; gap: .9rem; color: var(--muted); font-size: .8rem; white-space: nowrap; }
-#meta .net { padding: .05rem .5rem; border-radius: 99px; border: 1px solid var(--line); color: var(--ink); font-weight: 500; }
-#meta button { all: unset; cursor: pointer; color: var(--ink); font: .78rem var(--mono); text-decoration: underline dotted; text-underline-offset: .2em; border-radius: 2px; }
-#meta button:hover { color: var(--accent); }
-#health { width: .6rem; height: .6rem; border-radius: 50%; background: var(--faint); flex: none; }
-#health.ok { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
-#health.down { width: auto; height: auto; padding: .2rem .65rem; border-radius: 99px; background: var(--bad-soft); color: var(--bad); font-size: .78rem; font-weight: 600; white-space: nowrap; }
-.outage { margin: 0 0 1.1rem; padding: .8rem 1rem; border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--line)); border-radius: var(--panel); background: var(--bad-soft); font-size: .88rem; }
-.outage p + p { margin-top: .4rem; }
-.outage b { color: var(--bad); }
-.outage .err { display: block; margin-top: .15rem; color: var(--muted); font: .78rem/1.4 var(--mono); overflow-wrap: anywhere; }
-.pulse { display: inline-block; width: .5rem; height: .5rem; margin-right: .45rem; border-radius: 50%; background: var(--window); animation: pulse 1.4s ease-in-out infinite; }
-@keyframes pulse { 50% { opacity: .25; } }
+#pulse { margin-left: auto; font-size: .8rem; padding: .1rem .7rem; border-radius: 99px; background: var(--ok-soft); color: var(--ok); }
+#pulse.down { background: var(--bad-soft); color: var(--bad); }
+main { max-width: 72rem; margin: 0 auto; padding: 1.5rem clamp(1rem, 3vw, 2rem) 3rem; }
+#error { margin-bottom: 1rem; padding: .6rem .9rem; border-radius: 6px; background: var(--bad-soft); color: var(--bad); }
 
-/* split pages: a list on the left, what it selects on the right */
-.split { display: grid; grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr); min-height: calc(100vh - var(--head)); }
-.list { border-right: 1px solid var(--line); background: var(--surface); min-width: 0; }
-.list .pane { display: flex; flex-direction: column; height: calc(100vh - var(--head)); position: sticky; top: var(--head); }
-.list .pane > :not(.rows) { flex-shrink: 0; }
-.filters { display: flex; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
-.filters button { flex: 1; border: 0; border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: .65rem .5rem; min-height: 0; color: var(--muted); font-size: .86rem; font-weight: 500; background: none; white-space: nowrap; }
-.filters button:hover { background: var(--hover); color: var(--ink); }
-.filters button[aria-pressed=true] { color: var(--ink); border-bottom-color: var(--accent); }
-.filters .n { color: var(--faint); margin-left: .15rem; }
-.filters .alert .n { color: var(--bad); font-weight: 600; }
-.filters button[aria-pressed=true] .n { color: var(--muted); }
-.search { display: block; width: calc(100% - 1.5rem); margin: .65rem .75rem .55rem; padding: .45rem .7rem; min-height: 2.15rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
-.search:focus, .register textarea:focus { background: var(--surface); border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
-.listbar { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: 0 .75rem .6rem; }
-.kinds { display: flex; gap: .35rem; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-.kinds::-webkit-scrollbar { display: none; }
-.kinds.more { mask-image: linear-gradient(to right, #000 82%, transparent); }
-.kinds button { flex: none; min-height: 0; padding: .15rem .6rem; border: 1px solid var(--line); border-radius: 99px; background: none; color: var(--muted); font-size: .76rem; font-weight: 500; }
-.kinds button[aria-pressed=true] { color: var(--accent); border-color: var(--accent); background: var(--current); }
-.kinds .n { color: var(--faint); margin-left: .25rem; }
-.sort { position: relative; flex: none; color: var(--muted); }
-.sort:hover { color: var(--ink); }
-.sort select { appearance: none; -webkit-appearance: none; border: 0; background: none; color: inherit; font: 500 .76rem var(--sans); padding: .25rem 1.15rem .25rem .4rem; border-radius: var(--r); cursor: pointer; }
-.sort select:hover { background: var(--hover); }
-.sort::after { content: ""; position: absolute; right: .45rem; top: 50%; width: .32rem; height: .32rem; margin-top: -.24rem; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); pointer-events: none; }
-.rows { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
-.rows li > button { display: grid; grid-template-columns: .6rem minmax(0, 1fr) auto; gap: .15rem .7rem; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: .7rem 1rem; min-height: 0; font-weight: 400; background: none; box-shadow: inset 3px 0 0 transparent; }
-.rows li > button:hover { background: var(--hover); }
-.rows li > button[aria-current=true] { background: var(--current); box-shadow: inset 3px 0 0 var(--accent); }
-.rows li > button:focus-visible { outline-offset: -2px; }
-.rows .amt { font-variant-numeric: tabular-nums; font-size: .86rem; font-weight: 600; white-space: nowrap; text-align: right; }
-.rows .count { color: var(--faint); font-size: .76rem; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
-.rows .kind { color: var(--faint); }
-.rows .sub { color: var(--muted); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rows .sub.bad, .rows .sub.late { color: var(--bad); } .rows .sub.running { color: var(--window); }
-.dot { width: .5rem; height: .5rem; border-radius: 50%; align-self: center; background: var(--line); flex: none; }
-.dot.ok { background: var(--ok); } .dot.bad, .dot.late { background: var(--bad); } .dot.running { background: var(--window); } .dot.off { background: none; border: 1px solid var(--faint); }
-.tag { display: inline-block; margin-right: .35rem; padding: 0 .4rem; border-radius: 4px; background: var(--track); color: var(--muted); font-size: .7rem; font-weight: 500; line-height: 1.5; vertical-align: .05em; }
-.tag.bad { background: var(--bad-soft); color: var(--bad); } .tag.ok { background: var(--accent-soft); color: var(--accent); }
-.empty { padding: 1.25rem 1rem; color: var(--muted); max-width: 36rem; line-height: 1.55; }
-.hint { display: flex; justify-content: space-between; gap: .5rem; padding: .45rem .9rem; border-top: 1px solid var(--line); color: var(--faint); font-size: .76rem; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: .75rem 1rem; }
+.card .label { color: var(--muted); font-size: .78rem; }
+.card .value { font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.card.alert .value { color: var(--bad); }
 
-/* skeletons */
-.sk { display: block; height: .8em; border-radius: 3px; background: var(--track); animation: sk 1.2s ease-in-out infinite; }
-@keyframes sk { 50% { opacity: .45; } }
-.rows li.sk-row { display: grid; grid-template-columns: .6rem 1fr auto; gap: .35rem .6rem; align-items: center; padding: .8rem .75rem .8rem .9rem; border-bottom: 1px solid var(--line); }
-.rows li.sk-row .sk:first-child { width: .55rem; height: .55rem; border-radius: 50%; }
-.rows li.sk-row .sk:last-child { width: 4rem; }
-.rows li.sk-row .sk:nth-child(4) { grid-column: 2 / 4; width: 60%; }
-.sk-detail .sk { margin: .6rem 0; }
-@media (prefers-reduced-motion: reduce) { .pulse, .sk { animation: none; } button { transition: none; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin-bottom: 1.5rem; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: baseline; }
+th { color: var(--muted); font-size: .78rem; font-weight: 500; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; }
+tr.row { cursor: pointer; }
+tr.row:hover { background: var(--hover); }
+.empty { color: var(--muted); padding: .5rem 0; }
 
-/* detail */
-.detail { padding: 2rem clamp(1rem, 3.5vw, 3rem) 5rem; min-width: 0; max-width: 76rem; }
-.detail[aria-busy=true] { opacity: .85; }
-.detail h2 { font-size: 1.4rem; letter-spacing: -.025em; display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; }
-.detail h3 { display: flex; align-items: center; gap: .45rem; font-size: .96rem; margin: 2rem 0 .9rem; padding-top: 1.5rem; border-top: 1px solid var(--line); letter-spacing: -.01em; }
-.detail h3 .aside { margin-left: auto; color: var(--muted); font-size: .8rem; font-weight: 400; }
-.detail h4 { font-size: .88rem; margin: 1.25rem 0 .4rem; display: flex; align-items: center; gap: .5rem; }
-.detail .empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 1.1rem 1.25rem; }
-.blank { display: grid; place-content: center; min-height: 60vh; text-align: center; color: var(--muted); gap: .6rem; }
-.blank b { color: var(--ink); font-size: 1rem; }
-.title { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; align-items: flex-start; justify-content: space-between; }
-.title .hash { margin-top: .35rem; font-size: .86rem; max-width: 46rem; color: var(--muted); }
-.actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, max-content)); gap: .75rem 3rem; margin: 1.5rem 0 0; padding: 1rem 0 0; border-top: 1px solid var(--line); }
-.facts div { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
-.facts dt { color: var(--muted); font-size: .76rem; display: flex; align-items: center; gap: .35rem; }
-.facts dd { margin: 0; font-weight: 600; font-size: .96rem; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .45rem; }
-.facts dd .mini { margin-left: 0; flex: none; }
-.facts dd .hash { word-break: normal; }
-.facts.vars { margin-top: .9rem; padding: .85rem 1rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
-.facts.vars dt { font-family: var(--mono); font-size: .72rem; }
-.badge { display: inline-flex; align-items: center; gap: .4rem; border-radius: 99px; padding: .1rem .65rem .1rem .5rem; font-size: .76rem; font-weight: 500; letter-spacing: 0; border: 1px solid var(--line); color: var(--muted); }
-.badge::before { content: ""; width: .45rem; height: .45rem; border-radius: 50%; background: var(--faint); }
-.badge.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; } .badge.ok::before { background: var(--ok); }
-.badge.bad, .badge.late { color: var(--bad); background: var(--bad-soft); border-color: transparent; } .badge.bad::before, .badge.late::before { background: var(--bad); }
-.badge.running { color: var(--window); background: var(--window-a); border-color: transparent; } .badge.running::before { background: var(--window); }
-.badge.accent { color: var(--accent); background: var(--accent-soft); border-color: transparent; } .badge.accent::before { background: var(--accent); }
-.note { border-left: 3px solid var(--bad); padding: .55rem .9rem; margin: 1rem 0 0; background: var(--bad-soft); border-radius: 0 var(--r) var(--r) 0; max-width: 46rem; font-size: .88rem; }
-.paths { list-style: none; margin: 0; padding: 0; max-width: 46rem; }
-.paths li { display: flex; justify-content: space-between; gap: 1rem; padding: .5rem 0; border-bottom: 1px solid var(--line); } .paths li:last-child { border-bottom: 0; }
-.paths .words { font-family: var(--mono); font-size: .86em; }
-.refs { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; }
-.refs button { font: .8rem var(--mono); min-height: 1.75rem; }
-.refs .tag { font: .78rem var(--mono); padding: .15rem .5rem; }
+.tag { display: inline-block; padding: 0 .45rem; border-radius: 4px; font-size: .74rem; background: var(--hover); color: var(--muted); }
+.tag.ok { background: var(--ok-soft); color: var(--ok); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.bad { background: var(--bad-soft); color: var(--bad); }
+.tag.accent { background: var(--accent-soft); color: var(--accent); }
 
-/* lifetime bar: birth to expiry, due window hatched */
-.vtxo { padding: .9rem 0; } .vtxo + .vtxo { border-top: 1px solid var(--line); }
-.vtxo .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; }
-.vtxo .amount { font-weight: 600; }
-.life { position: relative; height: .55rem; margin: .65rem 0 .45rem; background: var(--track); border-radius: 99px; }
-.life .elapsed { position: absolute; inset: 0 auto 0 0; background: var(--elapsed); z-index: 1; border-radius: 4px 0 0 4px; }
-.life .window { position: absolute; inset: 0 0 0 auto; background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); border-radius: 0 4px 4px 0; }
-.life .now { position: absolute; z-index: 2; top: -3px; bottom: -3px; width: 2px; background: var(--ink); border-radius: 1px; }
-.life .reserve, .horizon .lane .reserve, .legend i.r { background: repeating-linear-gradient(45deg, var(--bad-soft) 0 4px, var(--track) 4px 8px); border-left: 2px solid var(--bad); }
-.life .reserve { position: absolute; inset: 0 0 0 auto; z-index: 1; border-radius: 0 4px 4px 0; }
-.life .batch, .horizon .lane .batch, .legend i.b { position: absolute; z-index: 3; top: 50%; width: .7rem; height: .7rem; margin: -.35rem 0 0 -.35rem; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-sizing: border-box; }
-.legend i.b { position: static; display: inline-block; margin: 0 .35rem 0 .2rem; vertical-align: middle; }
-.state { font-size: .82rem; color: var(--muted); }
-.state.in, .state.running { color: var(--window); font-weight: 600; } .state.late { color: var(--bad); font-weight: 600; }
-.life-info { font-size: .78rem; font-variant-numeric: tabular-nums; }
-.life-info summary { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: .35rem .85rem; padding: .15rem 1.25rem .15rem 0; cursor: pointer; list-style: none; border-radius: 4px; }
-.life-info summary::-webkit-details-marker { display: none; }
-.life-info summary::after { content: ""; position: absolute; right: .3rem; top: .6rem; width: .35rem; height: .35rem; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
-.life-info[open] summary::after { transform: rotate(225deg); top: .8rem; }
-.life-info summary:hover { background: var(--hover); }
-.life-status { padding: .1rem .45rem; border-radius: 4px; background: var(--track); color: var(--muted); font-weight: 500; }
-.life-status.in, .life-status.running { background: var(--window-a); color: var(--window); }
-.life-status.late { background: var(--bad-soft); color: var(--bad); }
-.life-batch { color: var(--accent); font-weight: 500; }
-.life-expiry.late { color: var(--bad); }
-.life-peers, .life-expiry, .life-pending { color: var(--muted); }
-.life-expiry { margin-left: auto; }
-.life-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .65rem 1.25rem; margin: .6rem 0 0; padding: .75rem; background: var(--hover); border-radius: var(--r); }
-.life-meta dt { color: var(--muted); font-size: .72rem; }
-.life-meta dd { margin: .1rem 0 0; overflow-wrap: anywhere; }
-.life-meta small { display: block; color: var(--muted); }
-
-/* every address on one time axis */
-.horizon { display: grid; grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr) minmax(0, 22rem); gap: .55rem 1.25rem; align-items: center; font-size: .84rem; }
-.horizon button { all: unset; font: .86em var(--mono); cursor: pointer; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 2px; }
-.horizon button:focus-visible { outline: 2px solid var(--accent); }
-.horizon .lane { position: relative; display: flex; height: .55rem; background: var(--track); border-radius: 99px; }
-.horizon .lane .left, .horizon .lane .window, .horizon .lane .reserve { height: 100%; }
-.horizon .lane .left { border-radius: 99px 0 0 99px; background: var(--elapsed); } .horizon .lane .reserve { border-radius: 0 99px 99px 0; }
-.horizon .lane .window { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
-.horizon .lane.late { background: var(--bad-soft); box-shadow: inset 3px 0 0 var(--bad); }
-.horizon .lane .window, .life .window, .horizon .lane .reserve, .life .reserve { min-width: 3px; }
-.horizon .t { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.horizon .t.in, .horizon .t.running { color: var(--window); font-weight: 600; } .horizon .t.late { color: var(--bad); font-weight: 600; }
-.axis { position: relative; height: 1.4rem; border-top: 1px solid var(--line); font-size: .72rem; color: var(--faint); }
-.axis i { position: absolute; top: 0; padding: .25rem 0 0 .3rem; border-left: 1px solid var(--line); font-style: normal; white-space: nowrap; }
-.legend { display: flex; flex-wrap: wrap; gap: .3rem 1.25rem; margin: 1rem 0 0; color: var(--muted); font-size: .78rem; }
-.legend i { display: inline-block; width: 1.1rem; height: .55rem; border-radius: 2px; vertical-align: middle; margin-right: .35rem; background: var(--elapsed); }
-.legend i.w { background: repeating-linear-gradient(135deg, var(--window-a) 0 5px, var(--window-b) 5px 10px); border-left: 2px solid var(--window); }
-
-/* overview */
-.overview { max-width: 84rem; margin: 0 auto; padding: 1.75rem clamp(1rem, 3vw, 2rem) 4rem; }
-.ov-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem 1.5rem; margin-bottom: 1.1rem; }
-.ov-head h2 { font-size: 1.35rem; letter-spacing: -.025em; }
-.ov-head p { color: var(--muted); font-size: .84rem; }
-.ov-head .warn { color: var(--bad); font-weight: 500; }
-.overview > .note { margin: 0 0 1.1rem; max-width: none; }
-.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0 0 1.25rem; background: var(--line); border: 1px solid var(--line); border-radius: var(--panel); overflow: hidden; }
-.stat { display: flex; flex-direction: column; gap: .3rem; min-width: 0; padding: 1rem 1.25rem 1.1rem; margin: 0; border: 0; border-radius: 0; background: var(--surface); text-align: left; font-weight: 400; color: var(--ink); }
-button.stat:hover { background: var(--hover); }
-.stat .label { color: var(--muted); font-size: .8rem; font-weight: 500; }
-.stat .fig { font-size: clamp(1.3rem, 2.4vw, 1.6rem); font-weight: 600; letter-spacing: -.03em; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.stat .fig small { margin-left: .3rem; font-size: .78rem; font-weight: 500; letter-spacing: 0; color: var(--muted); }
-.stat .sub { color: var(--muted); font-size: .78rem; }
-.stat.alert .fig { color: var(--bad); }
-.stat.good .fig { color: var(--ok); }
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--panel); padding: 1.15rem 1.35rem 1.35rem; margin-bottom: 1.25rem; min-width: 0; }
-.ph { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1rem; margin-bottom: 1.1rem; }
-.ph h3, .detail .ph h3 { margin: 0; padding: 0; border: 0; display: flex; align-items: center; gap: .45rem; font-size: .96rem; letter-spacing: -.01em; }
-.ph .aside { margin-left: auto; color: var(--muted); font-size: .8rem; }
-.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 1.25rem; }
-
-/* planned batches: the next one, then all of them on a log time axis */
-.hero { display: grid; grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr); gap: 1.5rem 2.5rem; align-items: center; padding-bottom: 1.35rem; }
-.next .label { color: var(--muted); font-size: .8rem; font-weight: 500; display: flex; align-items: center; gap: .45rem; }
-.next .when { margin: .2rem 0 .45rem; font-size: 2.1rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.next .when.busy { color: var(--window); }
-.next p { color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; }
-.next p b { color: var(--ink); font-weight: 600; }
-.tl { position: relative; height: 5.5rem; margin: 0 .75rem; }
-.tl .rail { position: absolute; left: 0; right: 0; top: 2.9rem; height: 2px; border-radius: 1px; background: var(--track); }
-.tl .rail::before { content: ""; position: absolute; left: -1px; top: -.4rem; width: 2px; height: calc(.8rem + 2px); border-radius: 1px; background: var(--ink); }
-.tl .m { position: absolute; top: 2.9rem; z-index: 2; width: var(--s); height: var(--s); margin: calc(var(--s) / -2 + 1px) 0 0 calc(var(--s) / -2); padding: 0; min-height: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--accent) 78%, var(--surface)); box-shadow: 0 0 0 2px var(--surface); }
-.tl .m:hover, .tl .m:focus-visible { background: var(--accent); }
-.tl .m.first { background: var(--accent); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); }
-.tl .m .v { position: absolute; bottom: calc(100% + .35rem); left: 50%; transform: translateX(-50%); color: var(--muted); font-size: .72rem; font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.tl .m.first .v { color: var(--ink); font-weight: 600; }
-.tl .axis { position: absolute; left: 0; right: 0; top: 4rem; height: 1.4rem; border: 0; }
-.tl .axis i { border-left: 0; padding: 0; transform: translateX(-50%); }
-.tl .axis i:first-child { transform: none; }
-table { border-collapse: collapse; width: 100%; font-size: .86rem; }
-th { text-align: left; font-weight: 500; color: var(--muted); font-size: .76rem; padding: .5rem .75rem .5rem 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
-td { padding: .55rem .75rem .55rem 0; border-bottom: 1px solid var(--line); vertical-align: top; font-variant-numeric: tabular-nums; }
-tbody tr:last-child td { border-bottom: 0; }
-tbody tr:hover td { background: var(--hover); }
-th.r, td.r { text-align: right; }
-td:first-child, td.hash { white-space: nowrap; word-break: normal; }
-td.res { white-space: nowrap; font-weight: 500; } td.res.ok { color: var(--ok); } td.res.bad { color: var(--bad); }
-.scroll { overflow-x: auto; }
-.more { margin-top: .75rem; font-size: .82rem; color: var(--muted); }
-
-/* value by earliest expiry */
-.dist { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: .55rem 1rem; align-items: center; font-size: .82rem; }
-.dist > span { color: var(--muted); white-space: nowrap; }
-.dist .bar { height: .7rem; border-radius: 0 4px 4px 0; background: color-mix(in srgb, var(--accent) 72%, var(--surface)); min-width: 2px; }
-.dist .bar.late { background: var(--bad); }
-.dist .v { color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
-.dist .v small { color: var(--faint); margin-left: .45rem; }
-.attn { list-style: none; margin: -.4rem 0 0; padding: 0; }
-.attn button { display: grid; grid-template-columns: .5rem minmax(0, 9rem) minmax(0, 1fr) auto; gap: .75rem; align-items: center; width: 100%; padding: .55rem .25rem; min-height: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; text-align: left; font-weight: 400; font-size: .84rem; }
-.attn li:last-child button { border-bottom: 0; }
-.attn .hash { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.attn .why { color: var(--bad); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.attn .amt { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
-.calm { display: flex; align-items: center; gap: .6rem; color: var(--muted); padding: .5rem 0; }
-.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 1rem 2rem; margin: 0; }
-.panel .group { display: flex; align-items: center; gap: .4rem; margin: 1.35rem 0 .75rem; padding-top: 1.1rem; border-top: 1px solid var(--line); font-size: .84rem; color: var(--muted); font-weight: 500; }
-.settings div { display: flex; flex-direction: column; gap: .15rem; }
-.settings dt { color: var(--muted); font-size: .78rem; display: flex; align-items: center; gap: .35rem; }
-.settings dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
-
-/* documents */
-.doc { max-width: 60rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); }
-.doc .bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .35rem .5rem .35rem .75rem; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .78rem; }
-.doc pre { margin: 0; padding: .75rem; overflow: auto; max-height: 36rem; font: .8rem/1.55 var(--mono); tab-size: 2; }
-.j-k { color: var(--accent); } .j-s { color: var(--ok); } .j-n { color: var(--window); } .j-b { color: var(--bad); } .j-p { color: var(--faint); }
-.register textarea { display: block; width: 100%; min-height: 12rem; margin-bottom: .75rem; padding: .6rem .75rem; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); color: var(--ink); font: .82rem/1.5 var(--mono); resize: vertical; }
-.register[aria-busy=true] { opacity: .7; pointer-events: none; }
-
-dialog { border: 1px solid var(--line); border-radius: var(--panel); padding: 1.25rem 1.5rem 1.5rem; width: min(30rem, calc(100vw - 2rem)); color: var(--ink); background: var(--surface); box-shadow: var(--shadow); }
-dialog::backdrop { background: rgba(12, 12, 14, .55); backdrop-filter: blur(2px); }
-dialog h2 { font-size: 1.05rem; }
-dialog p { margin: .6rem 0 1.5rem; color: var(--muted); }
-dialog .actions { justify-content: flex-end; }
-#toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: .55rem 1rem; border-radius: var(--r); font-size: .86rem; z-index: 40; box-shadow: var(--shadow); max-width: calc(100vw - 2rem); }
-#toast.bad { background: var(--bad); color: #fff; }
-
-@media (max-width: 1100px) {
-  #meta .ver, #meta .key { display: none; }
-  .cols { grid-template-columns: minmax(0, 1fr); }
-  .horizon { grid-template-columns: minmax(6rem, 8rem) minmax(0, 1fr) minmax(0, 14rem); }
-}
-@media (max-width: 800px) {
-  :root { --head: auto; }
-  header { position: static; flex-wrap: wrap; height: auto; gap: 0 1rem; padding-top: .55rem; }
-  nav { order: 3; width: 100%; height: 2.6rem; overflow-x: auto; margin: .2rem 0 0 -.7rem; }
-  #meta { display: none; }
-  .split { grid-template-columns: minmax(0, 1fr); min-height: 0; }
-  .list { border-right: 0; border-bottom: 1px solid var(--line); }
-  .list .pane { position: static; height: auto; max-height: 50vh; }
-  .hint { display: none; }
-  .hero { grid-template-columns: minmax(0, 1fr); }
-  .axis i.tight { display: none; }
-  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .facts { grid-template-columns: 1fr 1fr; gap: .75rem 1.5rem; }
-  table { white-space: nowrap; }
-  .horizon { grid-template-columns: minmax(5.5rem, 7.5rem) minmax(0, 1fr); gap: .2rem .75rem; }
-  .horizon .t { grid-column: 2; white-space: normal; font-size: .76rem; margin-bottom: .45rem; }
-  .attn button { grid-template-columns: .5rem minmax(0, 1fr) auto; }
-  .attn .why { grid-column: 2 / 4; }
-}
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .75rem; }
+.toolbar .spacer { flex: 1; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: .3rem 1.25rem; margin: 0; }
+dt { color: var(--muted); }
+dd { margin: 0; min-width: 0; }
 </style>
 </head>
 <body>
 <header>
-  <a class="brand" href="#">delegateed</a>
-  <nav aria-label="Pages">
-    <a href="#" data-page="overview">Overview</a>
-    <a href="#delegations" data-page="delegations">Delegations <span class="count" id="nav-attention" hidden></span></a>
-    <a href="#templates" data-page="catalog">Templates</a>
+  <span class="brand">delegateed</span>
+  <nav id="nav">
+    <a href="#overview" data-view="overview">Overview</a>
+    <a href="#delegations" data-view="delegations">Delegations</a>
+    <a href="#templates" data-view="templates">Templates</a>
+    <a href="#streams" data-view="streams">Streams</a>
   </nav>
-  <div class="headright">
-    <button id="pulse" data-go="" hidden></button>
-    <div id="meta"></div>
-    <span id="health" role="status" tabindex="0" data-tip="Checking…" aria-label="Checking…"></span>
-  </div>
+  <span id="pulse">health</span>
 </header>
 <main>
-  <section id="overview" class="overview" aria-live="polite">
-    <div class="sk-detail" aria-hidden="true"><i class="sk" style="width:9rem;height:1.4rem"></i><i class="sk" style="height:5.5rem"></i><i class="sk" style="height:14rem"></i></div>
-  </section>
-  <section id="delegations" class="split" hidden>
-    <aside class="list" aria-label="Delegations"><div class="pane">
-      <div class="filters" id="filters"></div>
-      <input id="search" class="search" type="search" placeholder="Address, #id, key or outpoint" aria-label="Find a delegation">
-      <div class="listbar">
-        <div class="kinds" id="kinds"></div>
-        <label class="sort"><select id="sort" aria-label="Sort the list"><option value="urgency">Urgent</option><option value="amount">Largest</option><option value="newest">Newest</option></select></label>
-      </div>
-      <ul class="rows" id="rows"><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li><li class="sk-row"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></li></ul>
-      <div class="hint"><span id="shown"></span><span><kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>/</kbd> find</span></div>
-    </div></aside>
-    <section id="detail" class="detail" aria-live="polite"></section>
-  </section>
-  <section id="catalog" class="split" hidden>
-    <aside class="list" aria-label="Templates and artifacts"><div class="pane">
-      <div class="filters" id="ctabs"></div>
-      <input id="csearch" class="search" type="search" aria-label="Find a document">
-      <div class="listbar">
-        <div class="kinds" id="cfilters"></div>
-        <label class="sort"><select id="csort" aria-label="Sort the list"></select></label>
-      </div>
-      <ul class="rows" id="crows"></ul>
-      <div class="hint"><span id="cshown"></span><span><kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>/</kbd> find</span></div>
-    </div></aside>
-    <section id="cdetail" class="detail" aria-live="polite"></section>
-  </section>
+  <div id="error" role="alert" hidden></div>
+  <div id="view"></div>
 </main>
-<dialog id="confirm" aria-labelledby="confirm-title">
-  <form method="dialog">
-    <h2 id="confirm-title"></h2>
-    <p id="confirm-text"></p>
-    <div class="actions"><button value="no" id="confirm-no"></button><button value="yes" class="danger solid" id="confirm-yes"></button></div>
-  </form>
-</dialog>
-<div id="toast" role="status" hidden></div>
-<div id="tooltip" aria-hidden="true" hidden></div>
+
 <script>
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const short = (s, n = 10) => (s.length > 2 * n + 1 ? s.slice(0, n) + "…" + s.slice(-n) : s);
-const num = (v) => Number(v || 0); // the gateway encodes int64 as strings
-const sats = (v) => num(v).toLocaleString() + " sats";
-const plural = (n, word, many = word + "s") => `${num(n).toLocaleString()} ${num(n) === 1 ? word : many}`;
-const nowSecs = () => Date.now() / 1000;
-const charges = (program) => Boolean(program) && Number(program) !== 0; // "0.0" is a fee program too
-const skeleton = (n) => `<div class="sk-detail" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<i class="sk" style="width:${[55, 90, 40, 70, 30][i % 5]}%"></i>`).join("")}</div>`;
-const tip = (text) => `<button type="button" class="tip" data-tip="${esc(text)}" aria-label="${esc(text)}">?</button>`;
-const dateOf = (ts) => new Date(num(ts) * 1000).toLocaleString();
-const cap = (s) => s[0].toUpperCase() + s.slice(1);
+const $ = (selector) => document.querySelector(selector);
+const view = $('#view');
+let timer;
 
-const EXPLORERS = { bitcoin: "https://arkade.space", mutinynet: "https://explorer.mutinynet.arkade.sh" };
-const explorer = () => EXPLORERS[info?.network];
-// explore links a txid, an outpoint or an Ark address to the network's explorer, else shows it as is
-function explore(value, label = value) {
-  if (!explorer() || !value) return esc(label);
-  const path = /^t?ark1/.test(value) ? "address/" + value : "tx/" + value.split(":")[0];
-  return `<a class="hash" href="${esc(explorer() + "/" + path)}" target="_blank" rel="noopener" title="Open in the explorer">${esc(label)}</a>`;
-}
-let delegations = [], status = null, filter = null, detail = null, allVtxos = false, allBatches = false, info = null;
-let templates = [], artifacts = [], usedBy = {};
-let loadLimit = 5000, moreRows = false; // newest first, a page of 1000 at a time
-// page is overview, delegations or catalog; selected is "id/N" or an address, csel a template or artifact id
-let page = "overview", selected = "", ctab = "templates", csel = "";
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sats = (value) => Number(value || 0).toLocaleString();
+const when = (seconds) => (Number(seconds) ? new Date(Number(seconds) * 1000).toLocaleString() : '-');
+const short = (text, n = 14) => (text.length > n * 2 + 1 ? `${text.slice(0, n)}…${text.slice(-n)}` : text);
+const vars = (variables) => Object.entries(variables || {}).map(([k, v]) => `${esc(k)}=${esc(v)}`).join('<br>') || '-';
+const tag = (text, kind = '') => (text ? `<span class="tag ${kind}">${esc(text)}</span>` : '');
 
-const OPS = { 0x75: "DROP", 0x87: "EQUAL", 0x88: "EQUALVERIFY", 0xa8: "SHA256", 0xa9: "HASH160", 0xac: "CHECKSIG", 0xad: "CHECKSIGVERIFY",
-  0xae: "CHECKMULTISIG", 0xb1: "CHECKLOCKTIMEVERIFY", 0xb2: "CHECKSEQUENCEVERIFY", 0xba: "CHECKSIGADD" };
-// a key that is none of these is a tweaked covenant key, named by its own bytes
-function keyName(x) {
-  const known = [...(info ? [["server", info.serverPubkey], ["emulator", info.emulatorPubkey], ["delegatee", info.delegatePubkey]] : []),
-    ...Object.entries(detail?.delegation.variables || {})];
-  return known.find(([, k]) => k && (k.length === 64 || k.length === 66) && k.slice(-64) === x)?.[0] ?? "covenant·" + x.slice(0, 6);
-}
-const bytes = (hex) => Uint8Array.from(hex.match(/../g) ?? [], (h) => parseInt(h, 16));
-// minimal little-endian, the top bit of the last byte is the sign
-function scriptNum(b) {
-  if (!b.length) return 0;
-  const v = b.reduceRight((a, x, i) => a * 256 + (i === b.length - 1 ? x & 0x7f : x), 0);
-  return b[b.length - 1] & 0x80 ? -v : v;
-}
-const bip68 = (v) => (v & (1 << 22) ? span((v & 0xffff) * 512) : (v & 0xffff) + " blocks");
-function variable(name, type, hex) {
-  if (type !== "int") return `<span class="hash" title="${esc(hex)}">${esc(short(hex, 10))}</span>${hex.length > 21 ? `<button class="mini" data-copy="${esc(hex)}" title="Copy ${esc(name)}">copy</button>` : ""}`;
-  const n = scriptNum(bytes(hex));
-  const text = /delay/.test(name) ? bip68(n) : /window/.test(name) ? span(n) : /fee/.test(name) ? sats(n) : n.toLocaleString();
-  return `<span class="n" title="script number 0x${esc(hex) || "(empty)"}">${esc(text)}</span>`;
-}
-function scriptWords(hex) {
-  const b = bytes(hex), out = [];
-  for (let i = 0; i < b.length;) {
-    const op = b[i++];
-    let n = op > 0 && op <= 0x4b ? op : op === 0x4c ? b[i++] : op === 0x4d ? b[i] | (b[i + 1] << 8) : -1;
-    if (op === 0x4d) i += 2;
-    if (n < 0) { out.push(op === 0 ? "0" : op >= 0x51 && op <= 0x60 ? String(op - 0x50) : OPS[op] ?? "OP_" + op.toString(16)); continue; }
-    const data = Array.from(b.slice(i, i + n), (x) => x.toString(16).padStart(2, "0")).join(""); i += n;
-    if (n === 32) { out.push(keyName(data)); continue; }
-    const next = b[i], v = scriptNum(b.slice(i - n, i));
-    if (next === 0xb2) out.push("after " + bip68(v));
-    else if (next === 0xb1) out.push(v < 500_000_000 ? "from block " + v.toLocaleString() : "from " + new Date(v * 1000).toLocaleDateString());
-    else out.push(n <= 8 ? String(v) : short(data, 6));
-  }
-  return out.join(" ");
+function until(seconds) {
+  if (!Number(seconds)) return '-';
+  const delta = Number(seconds) - Date.now() / 1000;
+  const magnitude = Math.abs(delta);
+  const text = magnitude < 90 ? `${Math.round(magnitude)}s` : magnitude < 5400 ? `${Math.round(magnitude / 60)}m`
+    : magnitude < 129600 ? `${Math.round(magnitude / 3600)}h` : `${Math.round(magnitude / 86400)}d`;
+  return delta < 0 ? `${text} ago` : `in ${text}`;
 }
 
-// a watch boards an onchain coin; an intent watch renews VTXOs, any other spends them in a transaction of its own
-const boards = (delegation) => (delegation.slots || []).some((s) => s.onchain);
-// a spend binds coins until it expires, as RegisterSpend does
-const spends = (delegation) => !delegation.address && num(delegation.expiresAt) > 0;
-// a stream delegation has no address and no slots
-const streams = (delegation) => !delegation.address && !(delegation.slots || []).length;
-// a template's type, from its document; intents share a batch session, the rest run alone
-const typeOf = (id) => templates.find((t) => t.id === id)?.type || undefined;
-const batched = (delegation) => (typeOf(delegation.templateId) ?? "intent") === "intent";
-const WATCH = { coins: "Coins at this address", attempts: "Attempts", ready: "due", stop: "Stop watching", resume: "Resume watching",
-  keep: "Keep watching", ask: "Stop watching this address?", stopped: "Watch stopped" };
-const KINDS = {
-  stream: { ...WATCH, done: "spawned", doing: "watching", coins: "Coins", ask: "Stop this stream delegation?", stopped: "Stream stopped",
-    noAttempt: "A stream delegation spends nothing: the watches it spawns do.", noCoin: "A stream delegation holds no coin." },
-  spend: { ...WATCH, done: "spent", doing: "spending", attempts: "Spend attempts", coins: "Coins it spends", stop: "Cancel spend", resume: "Resume spend",
-    keep: "Keep the spend", ask: "Cancel this spend?", stopped: "Spend cancelled",
-    noAttempt: "No attempt yet. A spend runs at the next scan.", noCoin: "No coin left: the spend ran, or something else spent its coins." },
-  boarding: { ...WATCH, done: "boarded", doing: "active", attempts: "Boarding attempts", coins: "Deposits at this address",
-    noAttempt: "No attempt yet. A deposit is boarded once it confirms.", noCoin: "No deposit sits at this address right now." },
-  renewal: { ...WATCH, done: "renewed", doing: "renewing", attempts: "Renewal attempts", coins: "VTXOs at this address", ready: "renewable",
-    stop: "Stop renewing", resume: "Resume renewing", keep: "Keep renewing", ask: "Stop renewing this address?", stopped: "Renewal stopped",
-    noAttempt: "No attempt yet. A VTXO is first renewed in its renewal window.", noCoin: "No spendable VTXO sits at this address right now." },
-  watch: { ...WATCH, done: "spent", doing: "watching",
-    noAttempt: "No attempt yet. A coin is spent at the first scan after it is due.", noCoin: "No spendable coin sits at this address right now." },
-};
-const kindKey = (delegation) => (streams(delegation) ? "stream" : spends(delegation) ? "spend" : boards(delegation) ? "boarding" : batched(delegation) ? "renewal" : "watch");
-const kindOf = (delegation) => KINDS[kindKey(delegation)];
-function stateOf(d) {
-  const r = d.lastRenewal, done = kindOf(d.delegation).done;
-  if (d.delegation.status !== "active") return { key: "off", dot: "off", text: d.delegation.status === "cancelled" ? "stopped" : d.delegation.status === "done" ? done : d.delegation.status };
-  if (d.unmanagedReason)
-    return { key: "bad", dot: "bad", skipped: true, text: d.unmanagedReason, why: "The scanner skips it: " + d.unmanagedReason + "." };
-  const fails = num(d.failedAttempts), failing = fails && `failing for ${span(nowSecs() - num(d.failingSince))}, ${plural(fails, "attempt")}`;
-  if (d.renewing && fails) return { key: "bad", dot: "running", text: "retrying, " + failing, why: `Trying again now. The last attempt failed: ${r?.error || "see the attempts"}` };
-  if (d.renewing) return batched(d.delegation)
-    ? { key: "ok", dot: "running", text: "in a batch now", why: "A batch session holds its coins; the result shows up when it ends." }
-    : { key: "ok", dot: "running", text: "running now", why: "Its transaction is being submitted; the result shows up when it ends." };
-  if (fails > 1) return { key: "bad", dot: "bad", text: failing, why: `${r?.error || "The last attempt failed."} Last tried ${ago(d.lastFailedAt)}; the daemon keeps retrying.` };
-  if (r && !r.success) return { key: "bad", dot: "bad", text: "failed " + ago(r.attemptedAt), why: r.error };
-  // A planned batch time is a scheduling target, not a failure deadline.
-  const left = num(d.nextExpiry) - nowSecs(), at = num(d.nextBatchAt);
-  if (num(d.nextExpiry) && left <= 0)
-    return { key: "late", dot: "late", text: "expired " + ago(d.nextExpiry), why: "A VTXO expired without being " + done + "." };
-  if (at && at <= nowSecs())
-    return { key: "ok", dot: "ok", text: "waiting for batch" };
-  if (!r) return { key: "ok", dot: "", text: "not " + done + " yet" };
-  return { key: "ok", dot: "ok", text: done + " " + ago(r.attemptedAt) };
-}
-const PENDING = {
-  batch: "registered for a batch, waiting for its commitment", submitted: "submitted, waiting to see it land",
-  finalizing: "accepted by arkd, finalization pending", landed: "landed, its successors are being created",
-};
-const TYPES = { intent: "Joins arkd batches", offchain: "An offchain transaction of its own", onchain: "An onchain transaction" };
-const needsAttention = (d) => ["bad", "late"].includes(stateOf(d).key);
-const MAX_ROWS = 300; // the first ones in the chosen order
-const MAX_LANES = 12, MAX_VTXOS = 40, MAX_BATCHES = 8, MAX_ATTENTION = 6, AXIS_UNIT = 600; // ten minutes: the horizon's finest step
-const URGENCY = { bad: 0, late: 1, ok: 2, off: 3 };
-const FILTERS = [
-  ["attention", "Attention", needsAttention],
-  ["active", "Active", (d) => d.delegation.status === "active"],
-  ["cancelled", "Ended", (d) => d.delegation.status !== "active"],
-  ["all", "All", () => true],
-];
+const attemptKind = { succeeded: 'ok', failed: 'bad' };
+const statusKind = { active: 'ok', cancelled: 'bad', expired: 'warn', done: 'accent' };
+const copy = (text) => `<span class="mono">${esc(short(text || '', 12))}</span> ${text ? `<button class="link" data-copy="${esc(text)}">copy</button>` : ''}`;
 
-async function api(path, opts) {
-  const res = await fetch(path, opts);
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.message || res.statusText);
+async function api(path, options = {}) {
+  const response = await fetch(`/v1/${path}`, {
+    ...options, headers: { 'Content-Type': 'application/json' }, body: options.body && JSON.stringify(options.body),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.message || response.statusText);
   return body;
 }
-const send = (method, path, body) => api(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-const act = (request, done, failed) => request.then(() => { toast(done); refresh(); return true; }, (e) => { toast(failed + e.message, true); return false; });
 
-// ask opens the confirmation dialog and resolves to whether the operator said yes
-function ask(title, text, yes, no = "Cancel") {
-  const d = $("confirm");
-  $("confirm-title").textContent = title; $("confirm-text").textContent = text;
-  $("confirm-yes").textContent = yes; $("confirm-no").textContent = no;
-  d.returnValue = ""; d.showModal();
-  return new Promise((resolve) => d.addEventListener("close", () => resolve(d.returnValue === "yes"), { once: true }));
+function fail(error) {
+  $('#error').textContent = error.message;
+  $('#error').hidden = false;
 }
 
-function jsonHtml(v, pad = "") {
-  const p = (c) => `<span class="j-p">${c}</span>`, inner = pad + "  ";
-  if (v === null || typeof v !== "object") return `<span class="${typeof v === "string" ? "j-s" : typeof v === "number" ? "j-n" : "j-b"}">${esc(JSON.stringify(v))}</span>`;
-  const entries = Object.entries(v), [open, close] = Array.isArray(v) ? "[]" : "{}";
-  if (!entries.length) return p(open + close);
-  const item = ([k, x]) => (Array.isArray(v) ? "" : `<span class="j-k">${esc(JSON.stringify(k))}</span>${p(":")} `) + jsonHtml(x, inner);
-  if (Array.isArray(v) && v.every((x) => x === null || typeof x !== "object") && JSON.stringify(v).length < 100)
-    return p("[") + entries.map(item).join(p(",") + " ") + p("]");
-  return p(open) + "\n" + entries.map((e) => inner + item(e)).join(p(",") + "\n") + "\n" + pad + p(close);
-}
-function documentView(document) {
-  if (document === undefined) return skeleton(4);
-  let body;
-  try { body = jsonHtml(JSON.parse(document)); } catch { body = esc(document); }
-  return `<div class="doc"><div class="bar"><span>${(document.length / 1024).toFixed(1)} KiB</span>
-    <button class="mini" data-copy="${esc(document)}">copy</button></div><pre>${body}</pre></div>`;
-}
-
-function toast(msg, bad) {
-  const t = $("toast");
-  t.textContent = msg; t.className = bad ? "bad" : ""; t.hidden = false;
-  clearTimeout(toast.timer); toast.timer = setTimeout(() => (t.hidden = true), 4000);
-}
-
-function span(s) {
-  s = Math.abs(s);
-  const [n, u] = s < 90 ? [s, " s"] : s < 5400 ? [s / 60, " min"] : s < 129600 ? [s / 3600, " h"] : [s / 86400, " d"];
-  return Math.round(n) + u;
-}
-function ago(ts) {
-  const s = nowSecs() - num(ts);
-  return s < 0 ? "in " + span(s) : span(s) + " ago";
-}
-// logScale maps seconds from now to a percent of an axis reaching far, so that the near end stays readable
-function logScale(far) {
-  return (x) => Math.log1p(Math.max(0, x) / AXIS_UNIT) / Math.log1p(far / AXIS_UNIT) * 100;
-}
-// ticks are the round spans before far that sit apart on the axis
-function ticks(far, pct) {
-  const out = [];
-  for (const t of [600, 3600, 6 * 3600, 86400, 3 * 86400, 7 * 86400, 14 * 86400, 30 * 86400, 90 * 86400])
-    if (t < far * 0.9 && pct(t) - (out.length ? pct(out[out.length - 1]) : 0) >= 9) out.push(t);
-  return `<i style="left:0">now</i>${out.map((t, i) => `<i style="left:${pct(t)}%"${pct(t) - (i ? pct(out[i - 1]) : 0) < 14 ? ' class="tight"' : ""}>${span(t)}</i>`).join("")}`;
-}
-
-async function loadMeta() {
+// act runs a change and shows the view again
+async function act(change) {
   try {
-    const i = await api("/v1/info");
-    info = i;
-    $("meta").innerHTML = `<span class="net">${esc(i.network)}</span><span class="ver">${esc(i.version)}</span>
-      <span class="key">key <button title="Copy the delegate public key" data-copy="${esc(i.delegatePubkey)}">${esc(short(i.delegatePubkey, 6))}</button></span>`;
-  } catch { /* the health dot says why */ }
+    await change();
+    await show();
+  } catch (error) {
+    fail(error);
+  }
 }
 
-const DEPENDENCY = {
-  ark: ["arkd", "No batch, offchain transaction or fee can be read or submitted."],
-  emulator: ["The emulator", "Transactions with an Arkade script cannot be cosigned."],
-  database: ["The database", "Nothing can be registered or recorded."],
-  scanner: ["The scanner", "No coin is being looked at: nothing runs."],
-};
-let down = []; // the dependencies that do not answer; null when the daemon itself does not
-const depName = (d) => (DEPENDENCY[d.name] || [d.name])[0];
-function outage() {
-  if (down === null) return `<div class="outage" role="alert"><b>delegateed does not answer.</b> The figures below are from its last answer.</div>`;
-  return down.length ? `<div class="outage" role="alert">${down.map((d) => `<p><b>${esc(depName(d))} is unreachable.</b> ${esc((DEPENDENCY[d.name] || [])[1] || "")} <span class="err">${esc(d.error)}</span></p>`).join("")}</div>` : "";
-}
-async function loadHealth() {
-  const h = $("health");
-  let ok = false, text = "delegateed is unreachable";
-  try {
-    const deps = (await api("/v1/admin/health")).dependencies || [];
-    down = deps.filter((d) => d.error);
-    ok = !down.length;
-    text = ok ? "arkd, emulator, database and scanner all answer" : down.map((d) => `${depName(d)} is down: ${d.error}`).join(". ");
-  } catch { down = null; }
-  h.className = ok ? "ok" : "down";
-  h.textContent = ok ? "" : down === null ? "unreachable" : down.length > 1 ? `${down.length} services down` : `${depName(down[0]).replace(/^The /, "")} down`;
-  h.dataset.tip = text; h.setAttribute("aria-label", text);
+function table(columns, rows, rowAttributes = () => '') {
+  if (!rows.length) return '<p class="empty">Nothing here.</p>';
+  const head = columns.map((c) => `<th class="${c.num ? 'num' : ''}">${esc(c.title)}</th>`).join('');
+  const body = rows.map((row) => `<tr ${rowAttributes(row)}>${columns.map((c) => `<td class="${c.num ? 'num n' : ''}">${c.cell(row)}</td>`).join('')}</tr>`).join('');
+  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
-async function loadDelegations() {
-  const rows = [];
-  let cursor = 0;
-  do {
-    const page = await api("/v1/admin/delegate?page_size=1000" + (cursor ? "&cursor=" + cursor : ""));
-    rows.push(...(page.delegations || []));
-    cursor = num(page.nextCursor);
-  } while (cursor && rows.length < loadLimit);
-  moreRows = Boolean(cursor);
-  return rows;
+async function showHealth() {
+  const health = await api('admin/health');
+  const down = (health.entries || []).filter((e) => !e.healthy);
+  const pulse = $('#pulse');
+  pulse.className = down.length ? 'down' : '';
+  pulse.textContent = down.length ? `down: ${down.map((e) => e.name).join(', ')}` : 'healthy';
+  return health.entries || [];
 }
 
-async function loadList() {
-  try {
-    [status, delegations, { templates = [] }, { artifacts = [] }] = await Promise.all([
-      api("/v1/admin/status"), loadDelegations(), api("/v1/admin/template"), api("/v1/admin/artifact"),
+const views = {
+  async overview() {
+    const [status, entries] = await Promise.all([api('admin/status'), showHealth()]);
+    const card = (label, value, alert) => `<div class="card ${alert ? 'alert' : ''}"><div class="label">${label}</div><div class="value">${value}</div></div>`;
+    view.innerHTML = `
+      <div class="cards">
+        ${card('Active delegations', sats(status.active))}
+        ${card('Queued', sats(status.queued))}
+        ${card('Registered', sats(status.registered))}
+        ${card('Late', sats(status.late), Number(status.late) > 0)}
+        ${card('Coins watched', sats(status.coins))}
+        ${card('Amount watched (sats)', sats(status.amount))}
+        ${card('Next due', esc(until(status.nextDue)))}
+        ${card('Chain tip', sats(status.tipHeight))}
+      </div>
+      <div class="panel"><h2>Batch forecast</h2>${table([
+        { title: 'At', cell: (r) => `${esc(when(r.at))} <span class="muted">${esc(until(r.at))}</span>` },
+        { title: 'Intents', num: true, cell: (r) => sats(r.intents) },
+        { title: 'Coins', num: true, cell: (r) => sats(r.coins) },
+        { title: 'Amount (sats)', num: true, cell: (r) => sats(r.amount) },
+      ], status.batches || [])}</div>
+      <div class="panel"><h2>Health</h2>${table([
+        { title: 'Dependency', cell: (e) => esc(e.name) },
+        { title: 'State', cell: (e) => (e.healthy ? tag('ok', 'ok') : tag('down', 'bad')) },
+        { title: 'Error', cell: (e) => `<span class="mono">${esc(e.error)}</span>` },
+      ], entries)}</div>`;
+  },
+
+  async delegations(arg) {
+    return arg ? this.detail(arg) : this.list();
+  },
+
+  async list() {
+    const state = views.listState;
+    state.rows = [];
+    state.cursor = '';
+    view.innerHTML = `
+      <div class="toolbar">
+        <label>Status
+          <select id="filter">${['', 'active', 'cancelled', 'expired', 'done'].map((s) => `<option value="${s}" ${s === state.status ? 'selected' : ''}>${s || 'all'}</option>`).join('')}</select>
+        </label>
+        <span class="spacer"></span>
+        <span class="muted">ordered by the earliest due coin, those without coins last</span>
+      </div>
+      <div class="panel" id="rows"></div>
+      <div class="toolbar"><button id="more" hidden>Load more</button></div>`;
+    $('#filter').onchange = (event) => { state.status = event.target.value; views.list(); };
+    $('#more').onclick = () => fill();
+    const rows = $('#rows');
+    const fill = async () => {
+      try {
+        const query = new URLSearchParams({ status: state.status, cursor: state.cursor, limit: 50 });
+        const page = await api(`admin/delegations?${query}`);
+        state.rows = state.rows.concat(page.delegations || []);
+        state.cursor = page.nextCursor || '';
+        rows.innerHTML = table([
+          { title: 'ID', cell: (s) => s.delegation.id },
+          { title: 'Address', cell: (s) => `<span class="mono">${esc(short(s.delegation.address || '', 10))}</span>` },
+          { title: 'Origin', cell: (s) => Number(s.delegation.streamId) ? tag('stream', 'accent') : tag('client', '') },
+          { title: 'Status', cell: (s) => tag(s.delegation.status, statusKind[s.delegation.status]) },
+          { title: 'Coins', num: true, cell: (s) => sats(s.coins) },
+          { title: 'Amount (sats)', num: true, cell: (s) => sats(s.amount) },
+          { title: 'Next due', cell: (s) => esc(Number(s.coins) ? until(s.nextDue) : '-') },
+          { title: 'Last attempt', cell: (s) => tag(s.lastAttempt, attemptKind[s.lastAttempt]) },
+        ], state.rows, (s) => `class="row" data-go="delegations/${s.delegation.id}"`);
+        $('#more').hidden = !state.cursor;
+      } catch (error) {
+        fail(error);
+      }
+    };
+    await fill();
+  },
+  listState: { status: '', rows: [], cursor: '' },
+
+  async detail(id) {
+    const [detail, { attempts = [], nextCursor = '' }] = await Promise.all([
+      api(`delegation?id=${encodeURIComponent(id)}`), api(`admin/delegation/${encodeURIComponent(id)}/attempts?limit=100`),
     ]);
-  } catch (e) { return toast("Could not load delegations: " + e.message, true); }
-  templates = templates.map((t) => ({ ...t.template, ...t }));
-  usedBy = {};
-  for (const t of templates) for (const a of t.artifactIds || []) (usedBy[a] ||= []).push(t.id);
-  if (!filter) filter = delegations.some(needsAttention) ? "attention" : "active";
-}
+    const d = detail.delegation;
+    const actions = d.status === 'active' ? `<button class="danger" data-cancel="${d.id}">Cancel</button>`
+      : d.status === 'cancelled' ? `<button data-resume="${d.id}">Resume</button>` : '';
+    view.innerHTML = `
+      <div class="toolbar"><button class="link" data-go="delegations">&larr; Delegations</button><span class="spacer"></span>${actions}</div>
+      <div class="panel"><h2>Delegation ${esc(d.id)} ${tag(d.status, statusKind[d.status])}</h2><dl>
+        <dt>Address</dt><dd class="mono">${esc(d.address)}</dd>
+        <dt>Fingerprint</dt><dd class="mono">${esc(d.fingerprint)}</dd>
+        <dt>Template</dt><dd class="mono">${esc(d.templateId)}</dd>
+        <dt>Origin</dt><dd>${Number(d.streamId) ? `stream ${esc(d.streamId)}` : 'client'}</dd>
+        <dt>Expires</dt><dd>${esc(when(d.expiresAt))}</dd>
+        <dt>Created</dt><dd>${esc(when(d.createdAt))}</dd>
+        <dt>Variables</dt><dd class="mono">${vars(d.variables)}</dd>
+      </dl></div>
+      <div class="panel"><h2>Coins</h2>${table([
+        { title: 'Outpoint', cell: (c) => copy(c.outpoint) },
+        { title: 'Status', cell: (c) => tag(c.status, c.status === 'present' ? 'ok' : '') },
+        { title: 'Amount (sats)', num: true, cell: (c) => sats(c.amount) },
+        { title: 'Due', cell: (c) => esc(when(c.due)) },
+        { title: 'Expires', cell: (c) => esc(when(c.expiresAt)) },
+        { title: 'Spent by', cell: (c) => copy(c.spentBy) },
+      ], detail.coins || [])}</div>
+      <div class="panel"><h2>Attempts (newest first${nextCursor ? ', first 100' : ''})</h2>${table([
+        { title: 'ID', cell: (a) => a.id },
+        { title: 'Status', cell: (a) => tag(a.status, attemptKind[a.status] || 'warn') },
+        { title: 'Txid', cell: (a) => copy(a.txid) },
+        { title: 'Coins', cell: (a) => (a.coins || []).map((o) => `<span class="mono">${esc(short(o, 8))}</span>`).join('<br>') || '-' },
+        { title: 'Error', cell: (a) => `<span class="mono">${esc(a.error)}</span>` },
+        { title: 'Updated', cell: (a) => esc(when(a.updatedAt)) },
+      ], attempts)}</div>`;
+  },
 
-function parseRoute() {
-  const h = location.hash.slice(1), [head, ...rest] = h.split("/");
-  selected = csel = "";
-  if (head === "id" || /^t?ark1/.test(h)) { page = "delegations"; selected = h; }
-  else if (head === "delegations") page = "delegations";
-  else if (head === "templates" || head === "artifacts") { page = "catalog"; ctab = head; csel = decodeURIComponent(rest.join("/")); }
-  else page = "overview";
-}
-const go = (hash) => { location.hash = hash || ""; if (!hash) history.replaceState(null, "", location.pathname); };
+  async templates() {
+    const [{ templates = [] }, { artifacts = [] }] = await Promise.all([api('templates'), api('admin/artifacts')]);
+    view.innerHTML = `<div class="panel"><h2>Templates</h2>${table([
+      { title: 'ID', cell: (t) => copy(t.id) },
+      { title: 'Type', cell: (t) => esc(t.type) },
+      { title: 'Status', cell: (t) => tag(t.status, t.status === 'active' ? 'ok' : 'bad') },
+      { title: 'Artifacts', num: true, cell: (t) => (t.artifactIds || []).length },
+      { title: 'Created', cell: (t) => esc(when(t.createdAt)) },
+      { title: '', cell: (t) => `
+        <button data-template="${esc(t.id)}" data-status="${t.status === 'active' ? 'disabled' : 'active'}">${t.status === 'active' ? 'Disable' : 'Enable'}</button>
+        <button class="danger" data-deltemplate="${esc(t.id)}">Delete</button>` },
+    ], templates)}</div>
+    <div class="panel"><h2>Artifacts</h2>${table([
+      { title: 'ID', cell: (a) => copy(a.id) },
+      { title: 'Created', cell: (a) => esc(when(a.createdAt)) },
+      { title: '', cell: (a) => `<button class="danger" data-delartifact="${esc(a.id)}">Delete</button>` },
+    ], artifacts)}</div>`;
+  },
 
-function render() {
-  for (const id of ["overview", "delegations", "catalog"]) $(id).hidden = id !== page;
-  for (const a of document.querySelectorAll("nav a")) a.dataset.page === page ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current");
-  $("tooltip").hidden = true;
-  if (!status) return;
-  renderHeader();
-  if (page === "overview") renderOverview();
-  else if (page === "delegations") { renderList(); loadDetail(); }
-  else { renderCatalog(); loadCatalogDetail(); }
-}
-
-function scanState() {
-  const last = num(status.lastScanAt), next = num(status.nextScanAt), busy = status.renewingVtxos > 0;
-  return { last, busy, stale: !busy && next > 0 && nowSecs() - next > 300 };
-}
-
-function renderHeader() {
-  const { busy, stale, last } = scanState(), next = (status.batches || [])[0], p = $("pulse");
-  p.className = busy ? "busy" : stale || status.throttled ? "warn" : "";
-  p.innerHTML = busy ? `<i class="pulse"></i>Running <b>${plural(status.renewingVtxos, "coin")}</b>`
-    : status.throttled ? `Upstream rate limited, next scan <b>${ago(status.nextScanAt)}</b>`
-    : stale ? `Scanner stalled, last scan <b>${ago(last)}</b>`
-    : next ? `Next batch <b>${num(next.at) <= nowSecs() ? "now" : ago(next.at)}</b>, ${plural(next.vtxoCount, "VTXO")}`
-    : !last ? "First scan pending" : "No batch planned";
-  p.hidden = false;
-  const n = delegations.filter(needsAttention).length;
-  $("nav-attention").hidden = !n; $("nav-attention").textContent = n;
-}
-
-function renderOverview() {
-  const now = nowSecs(), { poll, last, stale } = scanState();
-  const active = delegations.filter((d) => d.delegation.status === "active"), managed = active.filter((d) => d.managed);
-  const total = managed.reduce((a, d) => a + num(d.totalAmount), 0), vtxos = managed.reduce((a, d) => a + num(d.vtxoCount), 0);
-  const kinds = ["renewal", "boarding", "spend", "watch", "stream"].map((k) => [k, active.filter((d) => kindKey(d.delegation) === k).length]).filter(([, n]) => n);
-  const attention = delegations.filter(needsAttention).sort(SORTS.urgency), failing = attention.filter((d) => stateOf(d).key === "bad").length;
-  const recent = delegations.filter((d) => d.lastRenewal && now - num(d.lastRenewal.attemptedAt) < 86400), served = recent.filter((d) => d.lastRenewal.success).length;
-  const broken = templates.filter((t) => t.status === "active" && t.failures > 0);
-  const strangers = delegations.filter((d) => d.unmanagedReason === "registered under another key").length;
-
-  const stats = `<div class="stats">
-    <div class="stat"><span class="label">Under watch</span><span class="fig" title="${(total / 1e8).toFixed(8)} BTC">${total.toLocaleString()}<small>sats</small></span><span class="sub">${plural(vtxos, "VTXO")}</span></div>
-    <button class="stat" data-go="delegations" data-filter="active"><span class="label">Active delegations</span><span class="fig">${active.length.toLocaleString()}</span><span class="sub">${kinds.map(([k, n]) => `${n.toLocaleString()} ${k}`).join(", ") || "none yet"}</span></button>
-    <button class="stat ${attention.length ? "alert" : ""}" data-go="delegations" data-filter="attention"><span class="label">Needs attention</span><span class="fig">${attention.length.toLocaleString()}</span><span class="sub">${attention.length ? `${failing.toLocaleString()} failing, ${(attention.length - failing).toLocaleString()} expired` : "no issues"}</span></button>
-    <div class="stat"><span class="label">Served, last 24 h</span><span class="fig">${served.toLocaleString()}</span><span class="sub">${recent.length - served ? `${(recent.length - served).toLocaleString()} failed their last attempt` : "no failure"}</span></div>
-  </div>`;
-
-  $("overview").innerHTML = `
-    <div class="ov-head"><h2>Overview</h2>
-      <p class="${stale ? "warn" : ""}">${!last ? "First scan pending" : `Scanned ${ago(last)}, ${stale ? `expected every ${span(poll)}` : `every ${span(poll)}`}`}</p></div>
-    ${outage()}
-    ${strangers ? `<p class="note"><b>${plural(strangers, "active delegation")}</b> registered under another delegate key cannot be run by this instance. ${tip("If the key was rotated by mistake, restore the previous key in the configured keyring.")}</p>` : ""}
-    ${stats}
-    ${batchesPanel(now)}
-    <div class="cols">
-      ${expiryPanel(managed, now)}
-      <section class="panel"><div class="ph"><h3>Needs attention</h3>${attention.length ? `<span class="aside">${plural(attention.length, "delegation")}</span>` : ""}</div>
-        ${attention.length ? `<ul class="attn">${attention.slice(0, MAX_ATTENTION).map((d) => {
-          const st = stateOf(d);
-          return `<li><button data-go="id/${esc(d.delegation.id)}" title="${esc(st.why || st.text)}"><span class="dot ${st.dot}"></span><span class="hash">${esc(label(d))}</span>
-            <span class="why">${esc(st.text)}</span><span class="amt">${num(d.vtxoCount) ? sats(d.totalAmount) : ""}</span></button></li>`;
-        }).join("")}</ul>${attention.length > MAX_ATTENTION ? `<p class="more"><button class="link" data-go="delegations" data-filter="attention">See all ${attention.length.toLocaleString()}</button></p>` : ""}`
-        : `<p class="calm"><span class="dot ok"></span>Every active delegation runs on time.</p>`}
-        ${broken.length ? `<p class="more"><button class="link" data-go="templates">${plural(broken.length, "template")} had every intent rejected lately</button> ${tip("The failure valve disables an untrusted template after too many such cycles.")}</p>` : ""}
-      </section>
-    </div>
-    ${horizonPanel(managed, now)}
-    ${daemonPanel()}`;
-}
-
-function batchesPanel(now) {
-  const batches = status.batches || [], first = batches[0], byId = Object.fromEntries(delegations.map((d) => [num(d.delegation.id), d]));
-  const amount = batches.reduce((a, b) => a + num(b.totalAmount), 0), session = delegations.filter((d) => d.renewing && batched(d.delegation));
-  const next = session.length ? `<div class="next"><span class="label"><i class="pulse"></i>In progress</span><div class="when busy">Batch running</div><p><b>${plural(session.length, "delegation")}</b> in the session</p></div>`
-    : first ? `<div class="next"><span class="label">Next batch</span><div class="when">${num(first.at) <= now ? "now" : ago(first.at)}</div>
-        <p><b>${plural(first.vtxoCount, "VTXO")}</b> from ${plural(first.delegationCount, "delegation")}</p><p><b>${sats(first.totalAmount)}</b></p></div>`
-    : `<div class="next"><span class="label">Next batch</span><div class="when">None planned</div><p>No coin is due for a batch yet.</p></div>`;
-  let timeline = "";
-  if (batches.length) {
-    const far = Math.max(num(batches[batches.length - 1].at) - now, 2 * 3600), pct = logScale(far);
-    const big = Math.max(...batches.map((b) => num(b.vtxoCount)), 1);
-    let labelled = -Infinity;
-    timeline = `<div class="tl" role="img" aria-label="${plural(batches.length, "planned batch", "planned batches")} over the next ${span(far)}"><div class="rail"></div>
-      ${batches.map((b, i) => {
-        const x = pct(num(b.at) - now), size = 10 + 18 * Math.sqrt(num(b.vtxoCount) / big), show = x - labelled >= 10;
-        if (show) labelled = x;
-        const text = `${num(b.at) <= now ? "Now" : ago(b.at)}: ${plural(b.vtxoCount, "VTXO")} from ${plural(b.delegationCount, "delegation")}, ${sats(b.totalAmount)}`;
-        return `<button class="m ${i ? "" : "first"}" style="left:${x}%;--s:${size.toFixed(1)}px" data-go="id/${esc(b.forcedByDelegationId)}" data-tip="${esc(text)}" aria-label="${esc(text)}">${show ? `<span class="v">${num(b.vtxoCount).toLocaleString()}</span>` : ""}</button>`;
-      }).join("")}
-      <div class="axis">${ticks(far, pct)}</div></div>`;
-  }
-  const rows = (allBatches ? batches : batches.slice(0, MAX_BATCHES)).map((b) => {
-    const at = num(b.at), d = byId[num(b.forcedByDelegationId)], expiry = d ? num(d.nextExpiry) : 0;
-    return `<tr><td title="${esc(dateOf(at))}">${at <= now ? "now" : ago(b.at)}</td><td class="r">${num(b.vtxoCount).toLocaleString()}</td><td class="r">${num(b.delegationCount).toLocaleString()}</td>
-      <td class="r">${sats(b.totalAmount)}</td>
-      <td><button class="link hash" data-go="id/${esc(b.forcedByDelegationId)}" title="${esc(b.forcedByOutpoint)}">${esc(short(b.forcedByOutpoint, 8))}</button></td>
-      <td class="r">${expiry > at ? span(expiry - at) : expiry ? "" : "deposit"}</td></tr>`;
-  }).join("");
-  return `<section class="panel"><div class="ph"><h3>Planned batches ${tip(`A batch is submitted ${span(num(status.renewalReserve))} before its first VTXO expires at the latest, and takes every VTXO due by then. Deposits wait at most ${span(num(status.boardingMaxWait))}.`)}</h3>
-      ${batches.length ? `<span class="aside">${plural(batches.length, "batch", "batches")}, ${sats(amount)}</span>` : ""}</div>
-    <div class="hero">${next}${timeline}</div>
-    ${rows ? `<div class="scroll"><table><thead><tr><th>When</th><th class="r">VTXOs</th><th class="r">Delegations</th><th class="r">Amount</th>
-      <th>Forced by ${tip("The VTXO whose deadline sets the batch time.")}</th><th class="r">Margin ${tip("How long before that VTXO expires the batch runs.")}</th></tr></thead><tbody>${rows}</tbody></table></div>
-      ${batches.length > MAX_BATCHES ? `<p class="more"><button class="link" id="all-batches">${allBatches ? "Show fewer" : `Show all ${batches.length}`}</button></p>` : ""}` : ""}
-  </section>`;
-}
-
-const BUCKETS = [["Expired", 0], ["Under 1 h", 3600], ["1 to 6 h", 6 * 3600], ["6 to 24 h", 86400], ["1 to 3 days", 3 * 86400], ["3 to 7 days", 7 * 86400], ["Over a week", Infinity]];
-function expiryPanel(managed, now) {
-  const held = managed.filter((d) => num(d.nextExpiry));
-  const buckets = BUCKETS.map(([name, upTo]) => ({ name, upTo, value: 0, count: 0 }));
-  for (const d of held) {
-    const b = buckets.find((x) => num(d.nextExpiry) - now <= x.upTo);
-    b.value += num(d.totalAmount); b.count++;
-  }
-  const shown = buckets.filter((b) => b.count || b.upTo), top = Math.max(...shown.map((b) => b.value), 1);
-  return `<section class="panel"><div class="ph"><h3>Value by earliest expiry ${tip("Each delegation's balance, counted at the expiry of its soonest VTXO.")}</h3></div>
-    ${held.length ? `<div class="dist">${shown.map((b) => `<span>${b.name}</span><div class="bar ${b.upTo ? "" : "late"}" style="width:${(b.value / top) * 100}%" data-tip="${esc(`${plural(b.count, "delegation")}, ${sats(b.value)}`)}"></div>
-      <span class="v">${b.value ? sats(b.value) : "none"}<small>${b.count.toLocaleString()}</small></span>`).join("")}</div>`
-      : `<p class="calm">No VTXO is watched yet.</p>`}
-  </section>`;
-}
-
-function horizonPanel(managed, now) {
-  const held = managed.filter((d) => num(d.nextExpiry)).sort((a, b) => num(a.nextExpiry) - num(b.nextExpiry)), shown = held.slice(0, MAX_LANES);
-  if (!shown.length) return "";
-  const far = Math.max(...shown.map((d) => num(d.nextExpiry) - now), 2 * AXIS_UNIT), pct = logScale(far);
-  const batches = status.batches || [], forcing = (at) => batches.find((b) => num(b.at) === at);
-  const lanes = shown.map((d) => {
-    const left = num(d.nextExpiry) - now, win = num(d.nextExpiry) - num(d.nextRenewalAt), st = stateOf(d), ready = kindOf(d.delegation).ready;
-    // the reserve starts at the deadline: the window's end when it is shorter than the reserve
-    const deadline = Math.max(num(d.nextDeadline) - now, left - win), at = num(d.nextBatchAt), joins = at ? Math.max(at - now, 0) : null;
-    const cls = left <= 0 || st.key !== "ok" ? "late" : st.dot === "running" ? "running" : left <= win ? "in" : "";
-    const text = left <= 0 ? "expired " + ago(d.nextExpiry) : st.key === "bad" ? "failing, " + span(left) + " left"
-      : st.dot === "running" || st.key === "late" ? st.text
-      : joins === null ? (left <= win ? `${ready} now, ${batched(d.delegation) ? "not planned yet" : "runs at the next scan"}` : ready + " " + ago(d.nextRenewalAt))
-      : `${left <= win ? ready + " now" : ready + " " + ago(d.nextRenewalAt)}, ${joins ? "joins the batch " + ago(at) : "waiting for batch"}${deadline - joins > 60 ? `, ${span(deadline - joins)} before its deadline` : ""}`;
-    const forced = at && forcing(Math.max(at, Math.floor(now)))?.forcedByOutpoint;
-    return `<button data-go="${esc("id/" + d.delegation.id)}" title="${esc(d.delegation.address)}">${esc(label(d, 12))}</button>
-      <div class="lane ${left <= 0 ? "late" : ""}" role="img" aria-label="${esc(text)}, expires ${ago(d.nextExpiry)}" title="${forced ? esc("batch forced by " + short(forced, 8)) : ""}">
-        <div class="left" style="width:${pct(left - win)}%"></div><div class="window" style="width:${pct(deadline) - pct(left - win)}%"></div><div class="reserve" style="width:${pct(left) - pct(deadline)}%"></div>
-        ${joins === null || st.dot === "running" ? "" : `<i class="batch" style="left:${Math.min(pct(joins), 100)}%"></i>`}</div>
-      <span class="t n ${cls}" title="${esc(text)}">${text}</span>`;
-  }).join("");
-  return `<section class="panel"><div class="ph"><h3>Next to expire ${tip("Each bar runs from now to the delegation's earliest expiry, on a log scale.")}</h3>
-      ${held.length > shown.length ? `<span class="aside">${shown.length} soonest of ${held.length.toLocaleString()}</span>` : ""}</div>
-    <div class="horizon">${lanes}<span></span><div class="axis">${ticks(far, pct)}</div><span></span></div>
-    <p class="legend"><span><i></i>waiting</span><span><i class="w"></i>due</span><span><i class="r"></i>reserve, never submitted in</span><span><i class="b"></i>planned batch</span></p>
-  </section>`;
-}
-
-function daemonPanel() {
-  const f = status.intentFees, fees = f && [["Fee per VTXO input", f.offchainInput], ["Fee per VTXO output", f.offchainOutput],
-    ["Fee per boarding input", f.onchainInput], ["Fee per onchain output", f.onchainOutput]];
-  return `<section class="panel"><div class="ph"><h3>Daemon</h3></div><dl class="settings">
-    <div><dt>Expiry reserve ${tip("DELEGATEE_RENEWAL_RESERVE: the batch lane never submits a VTXO this close to its expiry.")}</dt><dd>${span(num(status.renewalReserve))}</dd></div>
-    <div><dt>Boarding max wait ${tip("The longest a confirmed deposit waits for a batch.")}</dt><dd>${span(num(status.boardingMaxWait))}</dd></div>
-  </dl>
-  <h4 class="group">arkd intent fees ${tip("arkd fee programs, in sats. A delegation whose template caps its fee lower is skipped.")}</h4>
-  ${!f ? `<p class="state late">Unknown: arkd is unreachable.</p>`
-    : `<dl class="settings">${fees.map(([k, v]) => `<div><dt>${k}</dt><dd class="${charges(v) ? "hash" : ""}">${charges(v) ? esc(v) : "free"}</dd></div>`).join("")}</dl>`}
-  </section>`;
-}
-
-let kindFilter = "all";
-// addresses of one server share their first characters: the tail tells them apart
-const label = (d, n = 16) => {
-  const address = d.delegation.address, parent = num(d.delegation.parentId);
-  return address ? "…" + address.slice(-n) : parent ? `#${d.delegation.id} successor of #${parent}` : `#${d.delegation.id}`;
+  async streams() {
+    const { streams = [] } = await api('admin/streams');
+    const { templates = [] } = await api('templates');
+    view.innerHTML = `<div class="panel"><h2>Register a stream</h2>
+      <form id="reg" class="toolbar">
+        <select name="t">${templates.filter((t) => t.status === 'active').map((t) => `<option value="${esc(t.id)}">${esc(short(t.id, 10))} (${esc(t.type)})</option>`).join('')}</select>
+        <textarea name="v" rows="2" cols="50" placeholder="variables, one name=hex per line"></textarea>
+        <button>Register</button>
+      </form></div>
+      <div class="panel"><h2>Streams</h2>${table([
+      { title: 'ID', cell: (s) => s.id },
+      { title: 'Template', cell: (s) => copy(s.templateId) },
+      { title: 'Variables', cell: (s) => `<span class="mono">${vars(s.variables)}</span>` },
+      { title: 'Status', cell: (s) => tag(s.status, s.status === 'active' ? 'ok' : 'bad') },
+      { title: 'Created', cell: (s) => esc(when(s.createdAt)) },
+      { title: '', cell: (s) => (s.status === 'active' ? `<button class="danger" data-stream="${s.id}">Cancel</button>` : '') },
+    ], streams)}</div>`;
+    $('#reg').onsubmit = (event) => {
+      event.preventDefault();
+      const f = event.target;
+      const variables = Object.fromEntries(f.v.value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => l.split('=').map((x) => x.trim())));
+      act(() => api('admin/stream', { method: 'POST', body: { templateId: f.t.value, variables } }));
+    };
+  },
 };
-// a delegation matches its address, #id, template id, a variable value or a bound outpoint
-const matches = (d, q) => {
-  const x = d.delegation;
-  return !q || q.replace("#", "") === String(x.id) || [x.address, x.templateId, ...Object.values(x.variables || {}), ...(x.slots || []).map((s) => s.outpoint || "")]
-    .some((v) => v && v.toLowerCase().includes(q));
-};
-const SORTS = {
-  urgency: (a, b) => URGENCY[stateOf(a).key] - URGENCY[stateOf(b).key] || (num(a.nextExpiry) || Infinity) - (num(b.nextExpiry) || Infinity),
-  amount: (a, b) => num(b.totalAmount) - num(a.totalAmount),
-  newest: (a, b) => num(b.delegation.createdAt) - num(a.delegation.createdAt),
-};
-function visibleRows() {
-  const q = $("search").value.trim().toLowerCase(), fn = FILTERS.find((f) => f[0] === filter)[2];
-  return delegations.filter((d) => fn(d) && (kindFilter === "all" || kindKey(d.delegation) === kindFilter) && matches(d, q)).sort(SORTS[$("sort").value]);
-}
-// nextOf says what comes next for an active delegation, else what happened last
-function nextOf(d, st) {
-  const k = kindOf(d.delegation), at = num(d.nextBatchAt), due = num(d.nextRenewalAt);
-  if (st.key !== "ok" || st.dot === "running" || d.delegation.status !== "active") return st.text;
-  if (at) return (at <= nowSecs() ? "waiting for batch" : "joins a batch " + ago(at));
-  if (due) return k.ready + " " + (due <= nowSecs() ? "now" : ago(due));
-  return st.text;
-}
 
-function renderList() {
-  $("filters").innerHTML = FILTERS.map(([id, name, fn]) => {
-    const n = delegations.filter(fn).length;
-    return `<button data-filter="${id}" aria-pressed="${id === filter}" class="${id === "attention" && n ? "alert" : ""}">${name} <span class="n">${n.toLocaleString()}</span></button>`;
-  }).join("");
-  const inFilter = delegations.filter(FILTERS.find((f) => f[0] === filter)[2]);
-  $("kinds").innerHTML = [["all", "All"], ["renewal", "Renewal"], ["boarding", "Boarding"], ["spend", "Spend"], ["watch", "Watch"], ["stream", "Stream"]].map(([id, name]) => {
-    const n = id === "all" ? inFilter.length : inFilter.filter((d) => kindKey(d.delegation) === id).length;
-    return n || id === "all" || id === kindFilter ? `<button data-kind="${id}" aria-pressed="${id === kindFilter}">${name}<span class="n">${n.toLocaleString()}</span></button>` : "";
-  }).join("");
-  $("kinds").classList.toggle("more", $("kinds").scrollWidth > $("kinds").clientWidth);
-  const rows = visibleRows();
-  $("shown").textContent = `${rows.length.toLocaleString()} shown, ${sats(rows.reduce((a, d) => a + num(d.totalAmount), 0))}`;
-  if (!rows.length) {
-    $("rows").innerHTML = `<li class="empty">${$("search").value.trim() ? "Nothing matches your search."
-      : filter === "attention" ? "No active delegation needs attention."
-      : delegations.length ? "No delegations here."
-      : "No delegations yet. Wallets register them on the public port."}</li>`;
-    return;
-  }
-  const more = rows.length - MAX_ROWS;
-  $("rows").innerHTML = rows.slice(0, MAX_ROWS).map((d) => {
-    const st = stateOf(d), selection = "id/" + d.delegation.id;
-    const kind = kindKey(d.delegation), coins = num(d.vtxoCount), next = nextOf(d, st);
-    return `<li><button data-go="${esc(selection)}" aria-current="${selection === selected}" title="${esc(d.delegation.address || "#" + d.delegation.id)}">
-      <span class="dot ${st.dot}"></span><span class="hash">${esc(label(d))}</span><span class="amt">${coins ? sats(d.totalAmount) : ""}</span>
-      <span></span><span class="sub ${st.key !== "ok" ? st.key : st.dot}" title="${esc(st.why || next)}"><span class="kind">${kind}</span>, ${esc(next)}</span><span class="count">${coins ? plural(coins, "coin") : ""}</span></button></li>`;
-  }).join("") + (more > 0 ? `<li class="empty">${more.toLocaleString()} more. Search or filter to narrow down.</li>` : "")
-    + (moreRows ? `<li class="empty">Only the newest ${delegations.length.toLocaleString()} delegations are loaded. <button class="link" id="load-more">Load more</button></li>` : "");
-  $("rows").querySelector("[aria-current=true]")?.scrollIntoView({ block: "nearest" });
-}
-
-async function loadDetail() {
-  if (!selected) {
-    detail = null;
-    $("detail").removeAttribute("aria-busy");
-    $("detail").innerHTML = `<div class="blank"><b>No delegation selected</b><p>Pick one in the list to see its coins, attempts and inputs.</p></div>`;
-    return;
-  }
-  const address = selected;
-  if ("id/" + detail?.delegation.id !== address) {
-    allVtxos = false;
-    $("detail").setAttribute("aria-busy", "true");
-    $("detail").innerHTML = `<h2 class="hash" style="font-size:.95rem;color:var(--muted)">${esc(short(address, 12))}</h2>${skeleton(5)}`;
-  }
+async function show() {
+  clearTimeout(timer);
+  $('#error').hidden = true;
+  const [name, arg] = (location.hash.slice(1) || 'overview').split('/');
+  const current = views[name] ? name : 'overview';
+  document.querySelectorAll('#nav a').forEach((a) => (a.dataset.view === current ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
   try {
-    detail = await api(address.startsWith("id/") ? "/v1/admin/delegation/" + encodeURIComponent(address.slice(3)) : "/v1/delegate/" + encodeURIComponent(address));
-  } catch (e) {
-    $("detail").removeAttribute("aria-busy");
-    $("detail").innerHTML = `<p class="empty">Could not load ${esc(short(address, 12))}: ${esc(e.message)}. <button class="link" data-go="delegations">Back to the list</button></p>`;
-    return;
-  }
-  if (address !== selected) return; // the operator moved on while this was loading
-  $("detail").removeAttribute("aria-busy");
-  renderDetail();
-}
-
-// batchAt is the planned batch time, 0 without one; running when a lane holds the delegation; lane is false for a transaction of its own
-const openLifetimes = new Set();
-document.addEventListener("toggle", (e) => {
-  const key = e.target.dataset?.lifetime;
-  if (key && e.target.isConnected) e.target.open ? openLifetimes.add(key) : openLifetimes.delete(key);
-}, true);
-function lifeBar(v, batchAt, running, company, ready, lane) {
-  const now = nowSecs(), at = num(batchAt);
-  const joins = running ? (lane ? "in the batch now" : "running now")
-    : !lane ? (now >= num(v.renewableAt) ? "runs at the next scan" : "runs at the first scan after")
-    : !at ? "" : at <= now ? "waiting for batch" : `joins the batch ${ago(at)}`;
-  const born = num(v.createdAt), dies = num(v.expiresAt), windowSecs = dies - num(v.renewableAt), reserve = num(status?.renewalReserve);
-  const life = Math.max(dies - born, 1), pct = (x) => Math.min(100, Math.max(0, (x / life) * 100)), left = dies - now;
-  const deadline = Math.max(num(v.renewableAt), dies - reserve);
-  const [cls, text] = left <= 0 ? ["late", `expired ${ago(dies)}`]
-    : running ? ["running", joins]
-    : num(v.renewableAt) >= dies ? ["late", "due only after it expires"]
-    : left <= windowSecs ? ["in", `${ready} since ${span(now - num(v.renewableAt))}, ${joins || "not planned yet: waiting for a locktime or confirmations"}`]
-    : ["", `${ready} ${ago(v.renewableAt)}, ${joins || "not planned yet"}`];
-  const onchain = !dies, due = num(v.renewableAt), waiting = at && at <= now && !running;
-  const label = !onchain && left <= 0 ? "Expired" : running ? (lane ? "In batch" : "Running")
-    : onchain ? "Onchain" : due >= dies ? "Due after expiry" : now >= due ? cap(ready) : "Waiting";
-  const tone = onchain ? (running ? "running" : "") : cls;
-  const batch = running || !lane ? "" : at ? (waiting ? "Waiting for batch" : `Batch ${ago(at)}`) : "Batch unplanned";
-  const peers = company.here + company.elsewhere;
-  const fact = (name, value, date) => `<div><dt>${name}</dt><dd>${esc(value)}${date ? `<small>${esc(dateOf(date))}</small>` : ""}</dd></div>`;
-  const eligibility = due ? (due <= now ? `For ${span(now - due)}` : ago(due)) : "Not available";
-  return `${onchain ? "" : `<div class="life" role="img" aria-label="${esc(text)}, expires ${ago(dies)}">
-      <div class="elapsed" style="width:${pct(now - born)}%"></div>
-      <div class="window" style="width:${pct(windowSecs)}%"></div>
-      <div class="reserve" style="width:${pct(dies - deadline)}%"></div>
-      <div class="now" style="left:${pct(now - born)}%"></div>
-      ${at && !running ? `<i class="batch" style="left:${pct(Math.max(at, now) - born)}%"></i>` : ""}
-    </div>`}<details class="life-info" data-lifetime="${esc(v.outpoint)}"${openLifetimes.has(v.outpoint) ? " open" : ""}>
-      <summary title="Expand timing and batch details">
-        <span class="life-status ${tone}">${label}</span>
-        ${batch ? `<span class="${at && !waiting ? "life-batch" : "life-pending"}">${batch}</span>` : ""}
-        ${at && peers ? `<span class="life-peers">+${plural(peers, "other")}${company.elsewhere === null ? " here" : ""}</span>` : ""}
-        ${v.preconfirmed ? `<span class="life-pending">Preconfirmed</span>` : ""}
-        ${!onchain ? `<span class="life-expiry ${left <= 0 ? "late" : ""}">${left <= 0 ? "Expired" : "Expires"} ${ago(dies)}</span>` : ""}
-      </summary>
-      <dl class="life-meta">
-        ${fact(onchain ? "Boarding eligible" : cap(ready), !onchain && due >= dies ? "Not before expiry" : eligibility, due)}
-        ${lane ? fact("Batch", running ? "In progress" : at ? (waiting ? `Waiting · target was ${ago(at)}` : ago(at)) : "Unplanned — waiting for a locktime or confirmations", at) : ""}
-        ${at ? fact("Other VTXOs in this batch", `${company.here} in this delegation · ${company.elsewhere === null ? "unknown" : company.elsewhere} elsewhere`) : ""}
-        ${!onchain ? fact("Expiry", ago(dies), dies) : ""}
-        ${v.preconfirmed ? fact("Confirmation", "Not in a batch yet") : ""}
-      </dl>
-    </details>`;
-}
-
-function renderDetail() {
-  const d = detail.delegation, attempts = detail.renewals || [];
-  const vtxos = (detail.vtxos || []).slice().sort((a, b) => num(a.renewableAt) - num(b.renewableAt));
-  const held = vtxos.reduce((a, v) => a + num(v.amount), 0), shownVtxos = allVtxos ? vtxos : vtxos.slice(0, MAX_VTXOS);
-  const active = d.status === "active";
-  const inList = delegations.find((x) => x.delegation.id === d.id), st = inList && stateOf(inList);
-  const slots = d.slots || [], kind = kindOf(d), spend = kind === KINDS.spend, done = kind.done;
-  const types = Object.fromEntries((templates.find((t) => t.id === d.templateId)?.params || []).map((p) => [p.name, p.type]));
-  const batchAt = detail.batchAt || {}, running = Boolean(inList?.renewing), reserve = num(status?.renewalReserve), lane = batched(d);
-  const children = delegations.filter((x) => x.delegation.parentId === d.id).sort((a, b) => num(b.delegation.createdAt) - num(a.delegation.createdAt));
-  // who else is in a vtxo's batch: the others here, and the batch's count when it is among the ones listed
-  const company = (v) => {
-    const at = num(batchAt[v.outpoint]), here = vtxos.filter((x) => num(batchAt[x.outpoint]) === at).length - 1;
-    const b = (status?.batches || []).find((x) => num(x.at) === Math.max(at, Math.floor(nowSecs())));
-    const elsewhere = b ? Math.max(0, num(b.vtxoCount) - here - 1) : null;
-    return { here: at ? here : 0, elsewhere };
-  };
-  $("detail").innerHTML = `
-    <div class="title">
-      <div><h2>Delegation ${esc(d.id)} <span class="badge ${!active ? "off" : st?.key === "bad" ? "bad" : st?.key === "late" ? "late" : st?.dot === "running" ? "running" : "ok"}">${!active ? (d.status === "cancelled" ? "stopped by an operator" : d.status === "done" ? done : esc(d.status)) : st?.skipped ? esc(st.text) : st?.key === "bad" ? "failing" : st?.key === "late" ? "expired" : st?.dot === "running" ? st.text : kind.doing}</span></h2>
-        ${d.address ? `<div class="hash">${esc(d.address)}</div>` : ""}</div>
-      <div class="actions">${d.address ? `<button data-copy="${esc(d.address)}">Copy address</button>` : ""}
-        ${explorer() && /^t?ark1/.test(d.address) ? `<button data-open="${esc(explorer() + "/address/" + d.address)}">View in explorer</button>` : ""}
-        ${active ? `<button class="danger" id="stop">${kind.stop}</button>` : d.status === "cancelled" ? `<button class="primary" id="resume">${kind.resume}</button>` : ""}</div>
-    </div>
-    <dl class="facts"><div><dt>Template</dt><dd class="hash" title="${esc(d.templateId)}"><button class="link hash" data-go="templates/${esc(d.templateId)}">${esc(short(d.templateId, 8))}</button><button class="mini" data-copy="${esc(d.templateId)}" title="Copy the template id">copy</button></dd></div>
-      ${num(d.parentId) ? `<div><dt>Parent</dt><dd><a href="#id/${num(d.parentId)}">#${num(d.parentId)}</a></dd></div>` : ""}
-      <div><dt>Registered</dt><dd title="${esc(dateOf(d.createdAt))}">${ago(d.createdAt)}</dd></div>
-      <div><dt>Expires</dt><dd>${num(d.expiresAt) ? `<span title="${esc(dateOf(d.expiresAt))}">${ago(d.expiresAt)}</span>` : "never"}</dd></div></dl>
-    ${Object.keys(d.variables || {}).length ? `<dl class="facts vars" aria-label="Template variables">${Object.entries(d.variables).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${variable(k, types[k], v)}</dd></div>`).join("")}</dl>` : ""}
-    ${st?.why && active ? `<p class="note">${esc(st.why)}</p>` : ""}
-    ${children.length ? `<h3>${streams(d) ? "Spawned watches" : "Successors"} <span class="aside">${children.length}${moreRows ? " among the loaded delegations" : ""}</span></h3>
-    <div class="scroll"><table><thead><tr><th>Delegation</th><th>State</th><th>Coins</th><th>Registered</th></tr></thead><tbody>
-      ${children.slice(0, MAX_ROWS).map((x) => { const cs = stateOf(x); return `<tr><td><a href="#id/${esc(x.delegation.id)}">#${esc(x.delegation.id)}</a></td>
-        <td class="state ${["bad", "late"].includes(cs.key) ? "late" : cs.dot === "running" ? "running" : ""}"><span class="dot ${cs.dot}" style="display:inline-block"></span> ${esc(cs.text)}</td>
-        <td class="n">${num(x.vtxoCount) ? sats(x.totalAmount) : ""}</td>
-        <td title="${esc(dateOf(x.delegation.createdAt))}">${ago(x.delegation.createdAt)}</td></tr>`; }).join("")}
-      </tbody></table></div>${children.length > MAX_ROWS ? `<p class="state">The ${MAX_ROWS} newest are above.</p>` : ""}` : ""}
-    ${(detail.pendingTxs || []).length ? `<h3>In-flight transactions ${tip("The daemon's own transactions spending these coins. Their coins wait until each one lands or is dropped.")}</h3>
-    <div class="scroll"><table><thead><tr><th>Since</th><th>Transaction</th><th>State</th><th>Coins</th></tr></thead><tbody>
-      ${detail.pendingTxs.map((p) => `<tr><td title="${esc(dateOf(p.createdAt))}">${ago(p.createdAt)}</td>
-        <td class="hash">${explore(p.spentBy || p.txid, short(p.spentBy || p.txid, 12))}</td>
-        <td>${esc(PENDING[p.state] || p.state)}</td>
-        <td class="hash">${(p.coins || []).map((o) => explore(o, short(o, 8))).join("<br>")}</td></tr>`).join("")}
-      </tbody></table></div>` : ""}
-    ${streams(d) ? "" : `<h3>${kind.coins} ${vtxos.length && kind === KINDS.renewal ? tip(`A renewable VTXO waits for the batch of the first one to reach its deadline, ${span(reserve)} before expiry, so that they renew together. The dot is that batch.`) : ""}
-      ${vtxos.length > 1 ? `<span class="aside">${vtxos.length} VTXOs, ${sats(held)}</span>` : ""}</h3>
-    ${vtxos.length ? shownVtxos.map((v) => `<div class="vtxo"><div class="top"><span class="hash">${explore(v.outpoint)}</span>
-        <span class="amount n">${sats(v.amount)}${(v.assets || []).map((a) => ` + ${num(a.amount).toLocaleString()} of ${esc(short(a.assetId, 6))}`).join("")}</span></div>
-        ${spend ? `<div class="state">${num(v.expiresAt) ? "expires " + ago(v.expiresAt) : "onchain"}</div>` : lifeBar(v, batchAt[v.outpoint], running, company(v), kind.ready, lane)}</div>`).join("") + (vtxos.length > shownVtxos.length ? `<p class="state"><button class="link" id="all-vtxos">Show all ${vtxos.length}</button>, the ${shownVtxos.length} soonest are above.</p>` : "")
-      : `<p class="empty">${kind.noCoin}</p>`}
-    <h3>${kind.attempts} ${attempts.length ? tip("A failure that repeats is listed once, at the time it first happened.") : ""}</h3>
-    ${num(inList?.failedAttempts) > 1 ? `<p class="note">The same failure repeated over ${plural(inList.failedAttempts, "attempt")} in ${span(nowSecs() - num(inList.failingSince))}, the last ${ago(inList.lastFailedAt)}. It is listed once below.</p>` : ""}
-    ${attempts.length ? `<div class="scroll"><table><thead><tr><th>When</th><th>Result</th><th>Coins</th><th>Transaction or reason</th></tr></thead><tbody>
-      ${attempts.map((r) => `<tr><td title="${esc(dateOf(r.attemptedAt))}">${ago(r.attemptedAt)}</td>
-        <td class="res ${r.success ? "ok" : "bad"}">${r.success ? done : "failed"}</td>
-        <td class="hash">${(r.outpoints || []).map((o) => explore(o, short(o, 8))).join("<br>")}</td>
-        <td class="${r.success ? "hash" : ""}">${!r.success ? esc(r.error) : explorer() ? explore(r.commitmentTxid, short(r.commitmentTxid, 12)) : `<button class="link hash" data-copy="${esc(r.commitmentTxid)}" title="Copy the txid">${esc(short(r.commitmentTxid, 12))}</button>`}</td></tr>`).join("")}
-      </tbody></table></div>`
-      : `<p class="empty">${kind.noAttempt}</p>`}`}
-    ${slots.length ? `<h3>Inputs ${tip("Each input of the template: what it watches or the output bound to it, and who can spend it, one tapscript each.")}</h3>` : ""}
-    ${slots.map((sl) => `<h4>${esc(sl.name)} <span class="badge">${sl.onchain ? "onchain" : "offchain"}</span></h4>
-      ${sl.outpoint ? `<p class="hash">${explore(sl.outpoint)} <button class="mini" data-copy="${esc(sl.outpoint)}" title="Copy the outpoint">copy</button></p>` : ""}
-      <ul class="paths">${(sl.tapscripts || []).map((t) => `<li><span class="words">${esc(scriptWords(t))}</span><button class="mini" data-copy="${esc(t)}" title="Copy the script hex">hex</button></li>`).join("")}</ul>`).join("")}`;
-}
-
-async function setActive(on) {
-  const d = detail.delegation;
-  $("detail").querySelector("#stop, #resume")?.setAttribute("aria-busy", "true");
-  try {
-    if (on) await send("POST", "/v1/admin/delegation/" + encodeURIComponent(d.id) + "/resume", {});
-    else await api("/v1/admin/delegation/" + encodeURIComponent(d.id), { method: "DELETE" });
-    toast(on ? "Resumed" : kindOf(d).stopped);
-  } catch (e) { toast(`Could not ${on ? "resume" : "stop"} it: ${e.message}`, true); }
-  refresh();
-}
-
-function askStop() {
-  const d = detail.delegation, k = kindOf(d), held = delegations.find((x) => x.delegation.id === d.id);
-  ask(k.ask,
-    streams(d) ? "It spawns no more watches until you resume. Nothing is deleted." : spends(d) ? "The daemon stops trying it: its coins stay with their owner, who can sign a new spend. Nothing is deleted."
-    : boards(d) ? "Deposits at this address are not boarded until you resume. The owner cannot register it again until you resume. Nothing is deleted." : (num(held?.vtxoCount)
-      ? `${sats(held.totalAmount)} in ${plural(held.vtxoCount, "VTXO")}, the first expiring ${ago(held.nextExpiry)}, will expire`
-      : "Coins sent to it later will expire") + " unless the owner exits or you resume. The owner cannot register it again until you resume. Nothing is deleted.",
-    k.stop, k.keep).then((yes) => yes && setActive(false));
-}
-
-// templates and artifacts
-const docs = {}; // "templates/id": document, immutable once registered
-const TPL = {
-  filters: [["all", "All", () => true], ["active", "Active", (t) => t.status === "active"], ["disabled", "Disabled", (t) => t.status !== "active"],
-    ["failing", "Failing", (t) => t.failures > 0], ["trusted", "Trusted", (t) => t.trusted], ["unused", "Unused", (t) => !num(t.delegations)]],
-  sorts: [["used", "Most used", (a, b) => num(b.delegations) - num(a.delegations) || num(b.createdAt) - num(a.createdAt)],
-    ["newest", "Newest", (a, b) => num(b.createdAt) - num(a.createdAt)], ["failures", "Failures", (a, b) => b.failures - a.failures || num(b.delegations) - num(a.delegations)]],
-  matches: (t, q) => [t.id, ...(t.params || []).map((p) => p.name), ...(t.artifactIds || [])].some((v) => v.toLowerCase().includes(q)),
-  placeholder: "Template id, variable or artifact id",
-};
-const ART = {
-  filters: [["all", "All", () => true], ["used", "In use", (a) => usedBy[a.id]], ["unused", "Unused", (a) => !usedBy[a.id]]],
-  sorts: [["newest", "Newest", (a, b) => num(b.createdAt) - num(a.createdAt)], ["used", "Most used", (a, b) => (usedBy[b.id]?.length || 0) - (usedBy[a.id]?.length || 0)]],
-  matches: (a, q) => a.id.includes(q),
-  placeholder: "Artifact id",
-};
-const cstate = { templates: { filter: "all", sort: "used", q: "" }, artifacts: { filter: "all", sort: "newest", q: "" } };
-const catalogOf = () => (ctab === "templates" ? [TPL, templates] : [ART, artifacts]);
-function catalogRows() {
-  const [c, items] = catalogOf(), s = cstate[ctab], q = s.q.trim().toLowerCase(), fn = c.filters.find((f) => f[0] === s.filter)[2];
-  return items.filter((x) => fn(x) && (!q || c.matches(x, q))).sort(c.sorts.find((x) => x[0] === s.sort)[2]);
-}
-
-function renderCatalog() {
-  const [c, items] = catalogOf(), s = cstate[ctab];
-  $("ctabs").innerHTML = [["templates", "Templates", templates], ["artifacts", "Artifacts", artifacts]].map(([id, name, list]) =>
-    `<button data-go="${id}" aria-pressed="${id === ctab}">${name} <span class="n">${list.length.toLocaleString()}</span></button>`).join("");
-  $("csearch").placeholder = c.placeholder;
-  if ($("csearch").value !== s.q) $("csearch").value = s.q;
-  $("cfilters").innerHTML = c.filters.map(([id, name, fn]) => {
-    const n = items.filter(fn).length;
-    return n || id === "all" || id === s.filter ? `<button data-cfilter="${id}" aria-pressed="${id === s.filter}">${name}<span class="n">${n.toLocaleString()}</span></button>` : "";
-  }).join("");
-  $("cfilters").classList.toggle("more", $("cfilters").scrollWidth > $("cfilters").clientWidth);
-  $("csort").innerHTML = c.sorts.map(([id, name]) => `<option value="${id}" ${id === s.sort ? "selected" : ""}>${name}</option>`).join("");
-  const rows = catalogRows();
-  $("cshown").textContent = `${rows.length.toLocaleString()} shown`;
-  if (!rows.length) {
-    $("crows").innerHTML = `<li class="empty">${s.q.trim() ? "Nothing matches your search." : items.length ? "None here." : `No ${ctab} registered yet.`}</li>`;
-    return;
-  }
-  const more = rows.length - MAX_ROWS;
-  $("crows").innerHTML = rows.slice(0, MAX_ROWS).map((x) => {
-    const here = `${ctab}/${x.id}`, current = `aria-current="${x.id === csel}"`;
-    if (ctab === "artifacts") {
-      const n = usedBy[x.id]?.length || 0;
-      return `<li><button data-go="${esc(here)}" ${current} title="${esc(x.id)}"><span class="dot ${n ? "ok" : "off"}"></span><span class="hash">${esc(short(x.id, 10))}</span>
-        <span class="amt">${n ? n.toLocaleString() : ""}</span><span></span><span class="sub">registered ${ago(x.createdAt)}</span><span class="count">${n ? (n === 1 ? "template" : "templates") : "unused"}</span></button></li>`;
-    }
-    const n = num(x.delegations), tags = (x.type ? `<span class="tag">${esc(x.type)}</span>` : "") + (x.status !== "active" ? `<span class="tag">disabled</span>` : "") + (x.trusted ? `<span class="tag ok">trusted</span>` : "")
-      + (x.failures ? `<span class="tag bad">${x.failures} failed</span>` : "");
-    return `<li><button data-go="${esc(here)}" ${current} title="${esc(x.id)}"><span class="dot ${x.status !== "active" ? "off" : x.failures ? "bad" : "ok"}"></span><span class="hash">${esc(short(x.id, 10))}</span>
-      <span class="amt">${n ? n.toLocaleString() : ""}</span><span></span><span class="sub">${tags}${esc((x.params || []).map((p) => p.name).join(", ") || "no variable")}</span>
-      <span class="count">${n ? (n === 1 ? "delegation" : "delegations") : "unused"}</span></button></li>`;
-  }).join("") + (more > 0 ? `<li class="empty">${more.toLocaleString()} more. Search or filter to narrow down.</li>` : "");
-  $("crows").querySelector("[aria-current=true]")?.scrollIntoView({ block: "nearest" });
-}
-
-async function loadCatalogDetail() {
-  renderCatalogDetail();
-  const key = ctab + "/" + csel;
-  if (!csel || key in docs) return;
-  try {
-    const r = await api(`/v1/${ctab === "templates" ? "template" : "artifact"}/` + encodeURIComponent(csel));
-    docs[key] = (r.template || r.artifact).document;
-  } catch (e) { return toast("Could not load the document: " + e.message, true); }
-  if (key === ctab + "/" + csel) renderCatalogDetail();
-}
-
-function renderCatalogDetail() {
-  const box = $("cdetail");
-  // don't wipe a half-typed form on refresh
-  if (!csel && box.querySelector(".register")?.document.value) return;
-  if (!csel) return (box.innerHTML = catalogHome());
-  const doc = docs[ctab + "/" + csel];
-  if (ctab === "templates") {
-    const t = templates.find((x) => x.id === csel);
-    box.innerHTML = t ? templateView(t, doc) : missing("template");
-  } else {
-    const a = artifacts.find((x) => x.id === csel);
-    box.innerHTML = a ? artifactView(a, doc) : missing("artifact");
+    await views[current](arg);
+    if (current === 'overview') timer = setTimeout(show, 5000);
+    else await showHealth();
+  } catch (error) {
+    fail(error);
   }
 }
-const missing = (kind) => `<p class="empty">No ${kind} ${esc(short(csel, 10))} is registered. <button class="link" data-go="${ctab}">Back to the list</button></p>`;
 
-function catalogHome() {
-  const tpl = ctab === "templates";
-  const cells = tpl ? [["Active", templates.filter((t) => t.status === "active").length, "active"], ["Disabled", templates.filter((t) => t.status !== "active").length, "disabled"],
-    ["Failing", templates.filter((t) => t.failures > 0).length, "failing"], ["Trusted", templates.filter((t) => t.trusted).length, "trusted"]]
-    : [["Registered", artifacts.length, "all"], ["In use", artifacts.filter((a) => usedBy[a.id]).length, "used"], ["Unused", artifacts.filter((a) => !usedBy[a.id]).length, "unused"]];
-  return `<h2>${tpl ? "Templates" : "Artifacts"}</h2>
-    <div class="stats" style="margin-top:1.25rem">${cells.map(([name, n, f]) => `<button class="stat ${f === "failing" && n ? "alert" : ""}" data-cfilter="${f}"><span class="label">${name}</span><span class="fig">${n.toLocaleString()}</span></button>`).join("")}</div>
-    <section class="panel"><div class="ph"><h3>Register a document ${tip("The same public endpoints developers use, POST /v1/template and POST /v1/artifact, served on this port.")}</h3></div>
-      <form class="register"><textarea name="document" placeholder='{"format": "..."}' aria-label="Document"></textarea>
-        <div class="actions"><button class="${tpl ? "primary" : ""}" value="template">Register template</button><button class="${tpl ? "" : "primary"}" value="artifact">Register artifact</button></div></form></section>`;
-}
-
-function templateView(t, doc) {
-  const n = num(t.delegations), on = t.status === "active", params = t.params || [], arts = t.artifactIds || [];
-  return `<div class="title"><div><h2>Template <span class="hash" style="font-size:.8em">${esc(short(t.id, 6))}</span>
-        <span class="badge ${!on ? "off" : t.failures ? "bad" : "ok"}">${on ? (t.failures ? "failing" : "active") : "disabled"}</span>${t.trusted ? `<span class="badge accent">trusted</span>` : ""}${t.type ? `<span class="badge" title="${esc(TYPES[t.type] || "")}">${esc(t.type)}</span>` : ""}</h2>
-      <div class="hash">${esc(t.id)}</div></div>
-    <div class="actions"><button data-copy="${esc(t.id)}">Copy id</button>
-      <button data-template-trusted="${!t.trusted}" data-id="${esc(t.id)}">${t.trusted ? "Distrust" : "Trust"}</button>
-      <button class="${on ? "danger" : "primary"}" data-template-status="${on ? "disabled" : "active"}" data-id="${esc(t.id)}">${on ? "Disable" : "Enable"}</button>
-      ${n ? "" : `<button class="danger" data-template-delete="${esc(t.id)}">Delete</button>`}</div></div>
-    <dl class="facts">
-      <div><dt>Delegations</dt><dd>${n ? `<button class="link" data-go="delegations" data-filter="all" data-search="${esc(t.id)}">${n.toLocaleString()}</button>` : "none"}</dd></div>
-      <div><dt>Failed cycles ${tip(t.trusted ? "Trusted templates are never disabled for failures." : "Consecutive cycles in which every intent was rejected. The daemon disables a template whose intents keep being rejected.")}</dt><dd class="${t.failures ? "state late" : ""}">${t.failures}</dd></div>
-      <div><dt>Trusted ${tip("The daemon signs the delegate-key leaves of a trusted template and never disables it for failures.")}</dt><dd>${t.trusted ? "yes" : "no"}</dd></div>
-      <div><dt>Registered</dt><dd title="${esc(dateOf(t.createdAt))}">${ago(t.createdAt)}</dd></div></dl>
-    ${!on ? `<p class="note">Disabled: it registers and runs nothing.</p>` : ""}
-    <h3>Variables <span class="aside">${params.length}</span></h3>
-    ${params.length ? `<div class="scroll"><table style="max-width:32rem"><thead><tr><th>Name</th><th>Type</th></tr></thead><tbody>${params.map((p) => `<tr><td class="hash">${esc(p.name)}</td><td>${esc(p.type)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="empty">No variable.</p>`}
-    <h3>Artifacts <span class="aside">${arts.length}</span></h3>
-    ${arts.length ? `<ul class="refs">${arts.map((a) => `<li>${artifacts.some((x) => x.id === a) ? `<button data-go="artifacts/${esc(a)}" title="${esc(a)}">${esc(short(a, 8))}</button>` : `<span class="tag" title="${esc(a)}">${esc(short(a, 8))}</span>`}</li>`).join("")}</ul>` : `<p class="empty">References no artifact.</p>`}
-    <h3>Document</h3>${documentView(doc)}`;
-}
-
-function artifactView(a, doc) {
-  let parsed = {};
-  try { parsed = JSON.parse(doc ?? "{}"); } catch { /* shown raw below */ }
-  const users = usedBy[a.id] || [], inputs = parsed.constructorInputs || [], fns = parsed.functions || [];
-  return `<div class="title"><div><h2>${esc(parsed.contractName || "Artifact")} <span class="badge ${users.length ? "ok" : ""}">${users.length ? "in use" : "unused"}</span></h2>
-      <div class="hash">${esc(a.id)}</div></div>
-    <div class="actions"><button data-copy="${esc(a.id)}">Copy id</button>
-      ${users.length ? "" : `<button class="danger" data-artifact-delete="${esc(a.id)}">Delete</button>`}</div></div>
-    <dl class="facts"><div><dt>Used by</dt><dd>${plural(users.length, "template")}</dd></div>
-      <div><dt>Functions</dt><dd>${doc === undefined ? "…" : fns.length}</dd></div>
-      <div><dt>Registered</dt><dd title="${esc(dateOf(a.createdAt))}">${ago(a.createdAt)}</dd></div></dl>
-    ${doc !== undefined && inputs.length ? `<h3>Constructor inputs <span class="aside">${inputs.length}</span></h3>
-      <div class="scroll"><table style="max-width:32rem"><thead><tr><th>Name</th><th>Type</th></tr></thead><tbody>${inputs.map((p) => `<tr><td class="hash">${esc(p.name)}</td><td>${esc(p.type)}</td></tr>`).join("")}</tbody></table></div>` : ""}
-    ${fns.length ? `<h3>Functions</h3><ul class="refs">${fns.map((f) => `<li><span class="tag">${esc(f.name)}</span></li>`).join("")}</ul>` : ""}
-    <h3>Used by <span class="aside">${users.length}</span></h3>
-    ${users.length ? `<ul class="refs">${users.slice(0, 100).map((id) => `<li><button data-go="templates/${esc(id)}" title="${esc(id)}">${esc(short(id, 8))}</button></li>`).join("")}</ul>
-      ${users.length > 100 ? `<p class="more">and ${(users.length - 100).toLocaleString()} more</p>` : ""}` : `<p class="empty">No template references it.</p>`}
-    <h3>Document</h3>${documentView(doc)}`;
-}
-
-document.addEventListener("click", (e) => {
-  const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.filter) filter = b.dataset.filter;
-  if (b.dataset.search !== undefined) { $("search").value = b.dataset.search; kindFilter = "all"; }
-  if (b.dataset.go !== undefined) {
-    const same = location.hash.slice(1) === b.dataset.go;
-    go(b.dataset.go);
-    if (same) render();
-  }
-  else if (b.dataset.filter) renderList();
-  else if (b.dataset.kind) { kindFilter = b.dataset.kind; renderList(); }
-  else if (b.dataset.cfilter) { cstate[ctab].filter = b.dataset.cfilter; renderCatalog(); }
-  else if (b.dataset.open) window.open(b.dataset.open, "_blank", "noopener");
-  else if (b.dataset.copy) navigator.clipboard.writeText(b.dataset.copy).then(() => toast("Copied"), () => toast("Copy failed, select the text instead", true));
-  else if (b.id === "all-vtxos") { allVtxos = true; renderDetail(); }
-  else if (b.id === "all-batches") { allBatches = !allBatches; renderOverview(); }
-  else if (b.id === "stop") askStop();
-  else if (b.id === "resume") setActive(true);
-  else if (b.id === "load-more") { loadLimit += 5000; refresh(); }
-  else if (b.dataset.templateStatus) act(send("PUT", "/v1/admin/template/" + encodeURIComponent(b.dataset.id) + "/status", { status: b.dataset.templateStatus }),
-    b.dataset.templateStatus === "active" ? "Template enabled" : "Template disabled", "Could not change the template: ");
-  else if (b.dataset.templateTrusted) {
-    const trust = b.dataset.templateTrusted === "true", id = b.dataset.id;
-    (trust ? ask("Trust this template?", "The daemon will sign its delegate-key leaves and never disable it for failures.", "Trust") : Promise.resolve(true))
-      .then((yes) => yes && act(send("PUT", "/v1/admin/template/" + encodeURIComponent(id) + "/trusted", { trusted: trust }),
-        trust ? "Template trusted" : "Template no longer trusted", "Could not change the template: "));
-  }
-  else if (b.dataset.templateDelete) {
-    const id = b.dataset.templateDelete;
-    ask("Delete this template?", "Wallets can no longer register delegations with it. Registering the same document again restores it.", "Delete")
-      .then((yes) => yes && act(api("/v1/admin/template/" + encodeURIComponent(id), { method: "DELETE" }), "Template deleted", "Could not delete the template: ").then((ok) => ok && go("templates")));
-  }
-  else if (b.dataset.artifactDelete) {
-    const id = b.dataset.artifactDelete;
-    ask("Delete this artifact?", "Templates registered later can no longer reference it. Registering the same document again restores it.", "Delete")
-      .then((yes) => yes && act(api("/v1/admin/artifact/" + encodeURIComponent(id), { method: "DELETE" }), "Artifact deleted", "Could not delete the artifact: ").then((ok) => ok && go("artifacts")));
-  }
+document.addEventListener('click', (event) => {
+  const el = event.target.closest('[data-go], [data-cancel], [data-resume], [data-template], [data-stream], [data-copy], [data-deltemplate], [data-delartifact]');
+  if (!el) return;
+  const { go, cancel, resume, template, status, stream, deltemplate, delartifact } = el.dataset;
+  if (el.dataset.copy) navigator.clipboard.writeText(el.dataset.copy).then(() => { el.textContent = 'copied'; });
+  else if (deltemplate && confirm(`Delete template ${deltemplate}?`)) act(() => api(`admin/template/${deltemplate}`, { method: 'DELETE' }));
+  else if (delartifact && confirm(`Delete artifact ${delartifact}?`)) act(() => api(`admin/artifact/${delartifact}`, { method: 'DELETE' }));
+  else if (go) location.hash = go;
+  else if (cancel && confirm(`Cancel delegation ${cancel}?`)) act(() => api(`admin/delegation/${cancel}/cancel`, { method: 'POST', body: {} }));
+  else if (resume) act(() => api(`admin/delegation/${resume}/resume`, { method: 'POST', body: {} }));
+  else if (template && status) act(() => api(`admin/template/${template}`, { method: 'POST', body: { status } }));
+  else if (stream && confirm(`Cancel stream ${stream}?`)) act(() => api(`admin/stream/${stream}/cancel`, { method: 'POST', body: {} }));
 });
-document.addEventListener("submit", (e) => {
-  if (!e.target.classList.contains("register")) return;
-  e.preventDefault();
-  const kind = e.submitter?.value === "artifact" ? "artifact" : "template", document_ = e.target.document.value.trim();
-  if (!document_) return toast("Paste a document first", true);
-  e.target.setAttribute("aria-busy", "true");
-  send("POST", "/v1/" + kind, { document: document_ })
-    .then((r) => { const id = (r.artifact || r.template).id; toast(`Registered ${kind} ${short(id, 8)}`); e.target.reset(); refresh(); go(`${kind}s/${id}`); }, (err) => toast(`Could not register the ${kind}: ${err.message}`, true))
-    .finally(() => e.target.removeAttribute("aria-busy"));
-});
-document.addEventListener("keydown", (e) => {
-  if ($("confirm").open || e.metaKey || e.ctrlKey || e.altKey) return;
-  const typing = e.target.matches("input, textarea"), catalog = page === "catalog";
-  if (e.key === "/" && !typing) {
-    e.preventDefault();
-    if (page === "overview") go("delegations");
-    $(catalog ? "csearch" : "search").focus();
-  }
-  else if (e.key === "Escape") typing ? e.target.blur() : go(selected ? "delegations" : csel ? ctab : "");
-  else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !typing && page !== "overview") {
-    const ids = catalog ? catalogRows().slice(0, MAX_ROWS).map((x) => `${ctab}/${x.id}`) : visibleRows().slice(0, MAX_ROWS).map((d) => "id/" + d.delegation.id);
-    if (!ids.length) return;
-    e.preventDefault();
-    const i = ids.indexOf(catalog ? `${ctab}/${csel}` : selected), step = e.key === "ArrowDown" ? 1 : -1;
-    go(ids[Math.min(ids.length - 1, Math.max(0, i < 0 ? 0 : i + step))]);
-  }
-});
-$("search").addEventListener("input", renderList);
-$("sort").addEventListener("change", renderList);
-$("csearch").addEventListener("input", () => { cstate[ctab].q = $("csearch").value; renderCatalog(); });
-$("csort").addEventListener("change", () => { cstate[ctab].sort = $("csort").value; renderCatalog(); });
-// tooltips float above everything, kept inside the viewport
-function showTip(e) {
-  const t = e.target.closest?.("[data-tip]"), el = $("tooltip");
-  if (!t) return;
-  el.textContent = t.dataset.tip; el.hidden = false;
-  const r = t.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
-  el.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8) + "px";
-  el.style.top = (r.top - h - 8 < 8 ? r.bottom + 8 : r.top - h - 8) + "px";
-}
-const hideTip = (e) => e.target.closest?.("[data-tip]") && ($("tooltip").hidden = true);
-document.addEventListener("mouseover", showTip); document.addEventListener("focusin", showTip);
-document.addEventListener("mouseout", hideTip); document.addEventListener("focusout", hideTip);
-addEventListener("scroll", () => ($("tooltip").hidden = true), true);
-addEventListener("hashchange", () => { parseRoute(); render(); });
 
-function refresh() { return Promise.all([loadHealth(), loadList()]).then(render); }
-parseRoute(); render(); loadMeta(); refresh();
-setInterval(() => { if (!document.hidden && !$("confirm").open) refresh(); }, 15000);
+window.addEventListener('hashchange', show);
+show();
 </script>
 </body>
 </html>

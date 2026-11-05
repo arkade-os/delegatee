@@ -4,7 +4,6 @@
 package schema
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -13,12 +12,8 @@ import (
 	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 )
 
-// ErrInvalid marks a malformed template document.
-var ErrInvalid = errors.New("invalid template")
-
 const (
-	// format is the only accepted value of the format field.
-	format = "delegateed-template/v1"
+	format = "template/v1"
 	// MaxSlots bounds inputs, outputs, variables plus secrets, and every list of rules.
 	MaxSlots = 255
 )
@@ -38,7 +33,7 @@ var (
 
 // Template is a whole document. A field is required unless tagged opt; null is refused unless tagged null.
 type Template struct {
-	Format    string            `json:"format"`                           // format
+	Format    string            `json:"format"`
 	Type      string            `json:"type"`                             // intent, offchain or onchain
 	Variables map[string]string `json:"variables,omitempty" schema:"opt"` // name → scalar type
 	Secrets   map[string]Secret `json:"secrets,omitempty" schema:"opt"`
@@ -56,7 +51,6 @@ type Secret struct {
 	Ciphertext Binding `json:"ciphertext"` // bytes, usually a variable
 }
 
-// Input is one slot the template spends.
 type Input struct {
 	Name     string       `json:"name"`                            // identifier
 	Type     string       `json:"type,omitempty" schema:"opt"`     // offchain or onchain; defaults to the template's kind
@@ -87,7 +81,6 @@ type Spend struct {
 	Witness   map[string]Binding `json:"witness,omitempty" schema:"opt"`   // non-signature witness items
 }
 
-// Output is one output the template creates.
 type Output struct {
 	Name    string       `json:"name"`                        // identifier
 	Type    string       `json:"type,omitempty" schema:"opt"` // offchain or onchain; defaults to the template's kind
@@ -99,7 +92,7 @@ type Output struct {
 
 // Value is where an output's satoshis come from.
 type Value struct {
-	From   Pool     `json:"from"`                          // one input or a list of inputs sharing their value
+	From   string   `json:"from"`                          // an input name
 	Amount *Binding `json:"amount,omitempty" schema:"opt"` // an int; absent takes the remainder
 }
 
@@ -138,14 +131,14 @@ type Advert struct {
 	Outputs  []string `json:"outputs"`  // output names, non-empty
 }
 
-// Trigger selects streamed transactions by a packet and binds variables from them.
+// Trigger selects streamed transactions by a packet and captures variables from them.
 type Trigger struct {
-	Packet       int64                  `json:"packet"`                           // 0..255
-	Decode       string                 `json:"decode"`                           // tlv or raw
-	Require      map[string]string      `json:"require,omitempty" schema:"opt"`   // source → 0x literal or <DAEMON_KEY>
-	Bind         map[string]TriggerBind `json:"bind"`                             // variable → source; non-empty
-	ExpiresAfter int64                  `json:"expires_after_seconds"`            // 1..MaxInt32
-	MinValue     int64                  `json:"min_value,omitempty" schema:"opt"` // 0..MaxScriptNum; 0 is the default
+	Packet       int64                     `json:"packet"`                           // 0..255
+	Decode       string                    `json:"decode"`                           // tlv or raw
+	Require      map[string]string         `json:"require,omitempty" schema:"opt"`   // source → 0x literal or <DAEMON_KEY>
+	Capture      map[string]TriggerCapture `json:"capture"`                          // variable → source; non-empty
+	ExpiresAfter int64                     `json:"expires_after_seconds"`            // 1..MaxInt32
+	MinValue     int64                     `json:"min_value,omitempty" schema:"opt"` // 0..MaxScriptNum; 0 is the default
 }
 
 func (t *Template) check() error {
@@ -328,8 +321,8 @@ func (tr *Trigger) check() error {
 	if err := integer(tr.MinValue, "trigger min_value", 0, asm.MaxScriptNum); err != nil {
 		return err
 	}
-	if len(tr.Bind) == 0 {
-		return bad("a trigger binds at least one variable")
+	if len(tr.Capture) == 0 {
+		return bad("a trigger captures at least one variable")
 	}
 	return nil
 }

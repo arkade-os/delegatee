@@ -1,10 +1,11 @@
 package template
 
 import (
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 	"maps"
 	"testing"
 	"time"
+
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -14,7 +15,7 @@ import (
 
 func TestLocktimeOnlyOffchain(t *testing.T) {
 	parseDoc(t, []byte(releaseDoc))
-	_, err := Parse(t.Context(), edited(t, []byte(releaseDoc), func(m map[string]any) { m["type"] = "intent" }), nil)
+	_, err := Parse(edited(t, []byte(releaseDoc), func(m map[string]any) { m["type"] = "intent" }), nil)
 	require.ErrorIs(t, err, ErrUnsupported)
 	require.ErrorContains(t, err, "absolute locktime")
 }
@@ -31,7 +32,7 @@ func TestLocktimeFromLeaf(t *testing.T) {
 	require.True(t, ok)
 	require.True(t, lt.IsSeconds())
 
-	minimal, err := parseFixture(t, "minimal.json").Instantiate(t.Context(), Context{Keys: testKeys(t)})
+	minimal, err := parseFixture(t, "minimal.json").Instantiate(Context{Keys: testKeys(t)})
 	require.NoError(t, err)
 	_, ok = minimal.Locktime(0)
 	require.False(t, ok, "no CLTV leaf, no locktime")
@@ -41,7 +42,7 @@ func TestLocktimeNeedsCLTVClosure(t *testing.T) {
 	doc := edited(t, []byte(releaseDoc), func(m map[string]any) {
 		releaseLeaf(m)["asm"] = []any{"<lock>", "OP_CHECKLOCKTIMEVERIFY", "OP_DROP", "<SERVER_KEY>", "OP_CHECKSIGVERIFY", "1"}
 	})
-	_, err := parseDoc(t, doc).Instantiate(t.Context(), releaseContext(t, 200))
+	_, err := parseDoc(t, doc).Instantiate(releaseContext(t, 200))
 	require.ErrorIs(t, err, ErrUnsupported)
 	require.ErrorContains(t, err, "CLTV multisig closure")
 }
@@ -71,11 +72,11 @@ func TestInstantiateRefusesMixedLocktimes(t *testing.T) {
 	}
 	c := releaseContext(t, 200)
 	c.Variables["lock2"], c.Sources = asm.ScriptNum(300), sources(200, 300)
-	_, err := tmpl.Instantiate(t.Context(), c)
+	_, err := tmpl.Instantiate(c)
 	require.NoError(t, err, "two heights")
 
 	c.Variables["lock2"], c.Sources = asm.ScriptNum(1_800_000_000), sources(200, 1_800_000_000)
-	_, err = tmpl.Instantiate(t.Context(), c)
+	_, err = tmpl.Instantiate(c)
 	require.ErrorIs(t, err, ErrUnsupported)
 	require.ErrorContains(t, err, "mix block heights and timestamps")
 }
@@ -96,10 +97,10 @@ func TestBuildSetsLocktime(t *testing.T) {
 	lockTo(src, releaseWatch(t, tmpl, 200).PkScript(0))
 	c := releaseContext(t, 200)
 	c.Sources = []*Source{src}
-	inst, err := tmpl.Instantiate(t.Context(), c)
+	inst, err := tmpl.Instantiate(c)
 	require.NoError(t, err)
 
-	act, err := inst.Build(t.Context(), []*Source{src}, Fee{Dust: 330})
+	act, err := inst.Build([]*Source{src}, Fee{Dust: 330})
 	require.NoError(t, err)
 	require.EqualValues(t, 200, act.Tx.UnsignedTx.LockTime)
 	require.Equal(t, uint32(wire.MaxTxInSequenceNum-1), act.Tx.UnsignedTx.TxIn[0].Sequence)
@@ -107,7 +108,7 @@ func TestBuildSetsLocktime(t *testing.T) {
 
 // releaseDoc pays its coin to dest once lock is reached, without any owner signature.
 const releaseDoc = `{
-  "format": "delegateed-template/v1",
+  "format": "template/v1",
   "type": "offchain",
   "variables": {"owner": "pubkey", "lock": "int", "dest": "bytes32"},
   "inputs": [{
@@ -145,7 +146,7 @@ func releaseContext(t *testing.T, lock int64) Context {
 
 func releaseWatch(t *testing.T, tmpl *Template, lock int64) *Instance {
 	t.Helper()
-	inst, err := tmpl.Instantiate(t.Context(), releaseContext(t, lock))
+	inst, err := tmpl.Instantiate(releaseContext(t, lock))
 	require.NoError(t, err)
 	return inst
 }

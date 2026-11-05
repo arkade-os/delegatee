@@ -4,7 +4,6 @@ package abi
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -18,7 +17,6 @@ import (
 // Field is a named, typed value: a constructor input, a struct field or a covenant input.
 type Field struct{ Name, Type string }
 
-// Struct is a user-defined constructor type.
 type Struct struct {
 	Name   string
 	Fields []Field
@@ -30,7 +28,6 @@ type WitnessItem struct {
 	Injected             bool
 }
 
-// Leaf is one tapscript of a function.
 type Leaf struct {
 	Name    string
 	Asm     []string
@@ -63,9 +60,6 @@ type Artifact struct {
 	ID         string
 	Definition Definition
 }
-
-// ErrInvalid marks a malformed compiler artifact.
-var ErrInvalid = errors.New("invalid artifact")
 
 const (
 	// maxArray bounds the length of an array type.
@@ -321,7 +315,7 @@ func (d *Definition) checkAsm(tokens []string, names map[string]string) error {
 		}
 		parts := strings.Split(p[1], ":")
 		switch {
-		case p[1] == "SERVER_KEY", p[1] == "DELEGATE_KEY":
+		case p[1] == "SERVER_KEY", p[1] == "COSIGNER_KEY":
 		case parts[0] == "EMULATOR_KEY" && len(parts) == 2:
 			if !d.hasCovenant(parts[1]) {
 				return invalid("%q names no function with arkade", tok)
@@ -444,7 +438,6 @@ func (d *Definition) FlatConstructor() ([]Field, error) {
 	return out, nil
 }
 
-// FindFunction returns the function named name, nil when absent.
 func (d *Definition) FindFunction(name string) *Function {
 	i := slices.IndexFunc(d.Functions, func(f Function) bool { return f.Name == name })
 	if i < 0 {
@@ -453,7 +446,6 @@ func (d *Definition) FindFunction(name string) *Function {
 	return &d.Functions[i]
 }
 
-// FindLeaf returns the leaf named name, nil when absent.
 func (f *Function) FindLeaf(name string) *Leaf {
 	i := slices.IndexFunc(f.Leaves, func(l Leaf) bool { return l.Name == name })
 	if i < 0 {

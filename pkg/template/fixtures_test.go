@@ -1,19 +1,18 @@
 package template
 
 import (
-	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
-	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
@@ -34,10 +33,10 @@ import (
 func TestFixtures(t *testing.T) {
 	var ids map[string]string
 	require.NoError(t, json.Unmarshal(fixture(t, "ids.json"), &ids))
-	resolve := artifacts(t)
+	docs := artifacts(t)
 	for _, name := range []string{"renewal.json", "boarding.json", "counter.json", "vhtlc_claim.json", "vhtlc_refund.json", "noninteractiveclaim.json", "onchain_release.json", "counter_seed.json", "minimal.json"} {
 		t.Run(name, func(t *testing.T) {
-			tmpl, err := Parse(t.Context(), fixture(t, name), resolve)
+			tmpl, err := Parse(fixture(t, name), docs)
 			require.NoError(t, err)
 			require.Equal(t, ids[name], tmpl.ID(), "a fixture changed: update ids.json")
 		})
@@ -77,7 +76,7 @@ func TestProgramBinding(t *testing.T) {
 			c["arguments"].(map[string]any)["owner"] = map[string]any{"program": "funds"}
 		},
 	} {
-		_, err := Parse(t.Context(), edited(t, doc, edit), artifacts(t))
+		_, err := Parse(edited(t, doc, edit), artifacts(t))
 		require.ErrorIs(t, err, ErrInvalidTemplate, name)
 	}
 }
@@ -88,7 +87,7 @@ func TestFixtureShapes(t *testing.T) {
 	require.True(t, claim.Secrets())
 	require.Len(t, claim.Variables(), 9)
 
-	_, err := parseFixture(t, "counter.json").Instantiate(t.Context(), Context{Keys: testKeys(t)})
+	_, err := parseFixture(t, "counter.json").Instantiate(Context{Keys: testKeys(t)})
 	require.ErrorIs(t, err, ErrUnsupported, "a watch on two slots")
 }
 
@@ -98,7 +97,7 @@ func TestRenewalAddress(t *testing.T) {
 		{owner: testKey(t, 5), exit: arklib.RelativeLocktime{Type: arklib.LocktimeTypeBlock, Value: 144}, window: 86_400, maxFee: 0},
 		{owner: testKey(t, 6), exit: arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: 1024}, window: 1, maxFee: 1_000_000},
 	} {
-		inst, err := parseFixture(t, "renewal.json").Instantiate(t.Context(), Context{Keys: testKeys(t), Variables: p.vars(t)})
+		inst, err := parseFixture(t, "renewal.json").Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t)})
 		require.NoError(t, err)
 		require.Equal(t, masterPkScript(t, testKeys(t), p), inst.PkScript(0))
 	}
@@ -106,16 +105,16 @@ func TestRenewalAddress(t *testing.T) {
 
 func TestRenewalDueAt(t *testing.T) {
 	p := defaultParams(t)
-	inst, err := parseFixture(t, "renewal.json").Instantiate(t.Context(), Context{Keys: testKeys(t), Variables: p.vars(t)})
+	inst, err := parseFixture(t, "renewal.json").Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t)})
 	require.NoError(t, err)
 	now := time.Now()
 	expiry := now.Add(time.Hour)
 	require.Equal(t, expiry.Add(-1024*time.Second), inst.DueAt(0, &Source{Expiry: expiry, CreatedAt: now.Add(-time.Hour)}, now))
-	// a window over half the life would pay a fee every round
+	// a window over half the life would pay a fee every batch
 	require.Equal(t, expiry.Add(-5*time.Minute), inst.DueAt(0, &Source{Expiry: expiry, CreatedAt: expiry.Add(-10 * time.Minute)}, now))
 
 	p.maxFee = 0
-	free, err := parseFixture(t, "renewal.json").Instantiate(t.Context(), Context{Keys: testKeys(t), Variables: p.vars(t)})
+	free, err := parseFixture(t, "renewal.json").Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t)})
 	require.NoError(t, err)
 	require.Equal(t, expiry.Add(-1024*time.Second), free.DueAt(0, &Source{Expiry: expiry, CreatedAt: expiry.Add(-10 * time.Minute)}, now))
 }
@@ -130,7 +129,7 @@ func TestRenewalVariableRanges(t *testing.T) {
 	} {
 		vars := defaultParams(t).vars(t)
 		edit(vars)
-		_, err := renewal.Instantiate(t.Context(), Context{Keys: testKeys(t), Variables: vars})
+		_, err := renewal.Instantiate(Context{Keys: testKeys(t), Variables: vars})
 		require.ErrorIs(t, err, ErrInvalidVariables, name)
 	}
 }
@@ -138,16 +137,16 @@ func TestRenewalVariableRanges(t *testing.T) {
 func TestRenewalCovenant(t *testing.T) {
 	p := defaultParams(t)
 	renewal := parseFixture(t, "renewal.json")
-	watch, err := renewal.Instantiate(t.Context(), Context{Keys: testKeys(t), Variables: p.vars(t)})
+	watch, err := renewal.Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t)})
 	require.NoError(t, err)
 	vtxo := sourceWith(t, 100_000)
 	lockTo(vtxo, watch.PkScript(0))
 	vtxo.Expiry = time.Now().Add(time.Minute)
 	vtxo.Assets = []Asset{{assetID(9), 21}}
 	sources := []*Source{vtxo}
-	inst, err := renewal.Instantiate(t.Context(), Context{Keys: testKeys(t), Variables: p.vars(t), Sources: sources})
+	inst, err := renewal.Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t), Sources: sources})
 	require.NoError(t, err)
-	act, err := inst.Build(t.Context(), sources, Fee{Dust: 330})
+	act, err := inst.Build(sources, Fee{Dust: 330})
 	require.NoError(t, err)
 	require.Equal(t, watch.PkScript(0), act.Tx.UnsignedTx.TxOut[0].PkScript, "the renewed coin stays at the watched address")
 
@@ -161,7 +160,7 @@ func TestRenewalCovenant(t *testing.T) {
 	}
 
 	charged := func(fee string) (*Action, error) {
-		return inst.Build(t.Context(), sources, Fee{Dust: 330, Intent: arkfee.Config{IntentOffchainInputProgram: fee}})
+		return inst.Build(sources, Fee{Dust: 330, Intent: arkfee.Config{IntentOffchainInputProgram: fee}})
 	}
 	paid, err := charged("1000.0")
 	require.NoError(t, err)
@@ -198,9 +197,9 @@ func TestBoardingThenRenewal(t *testing.T) {
 	// the settlement leaf keeps output 0: the renewal watch finds it, renewal after renewal
 	for generation := range 2 {
 		vtxo := &Source{Outpoint: wire.OutPoint{Hash: tx.TxHash()}, Tx: tx, Amount: uint64(tx.TxOut[0].Value), Expiry: time.Now().Add(time.Minute)}
-		inst, err := parseFixture(t, "renewal.json").Instantiate(t.Context(), Context{Keys: testKeys(t), Variables: p.vars(t), Sources: []*Source{vtxo}})
+		inst, err := parseFixture(t, "renewal.json").Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t), Sources: []*Source{vtxo}})
 		require.NoError(t, err, "generation %d", generation)
-		act, err := inst.Build(t.Context(), []*Source{vtxo}, Fee{Dust: 330})
+		act, err := inst.Build([]*Source{vtxo}, Fee{Dust: 330})
 		require.NoError(t, err)
 		require.NoError(t, runIntent(t, act, []*Source{vtxo}, 0, nil), "generation %d", generation)
 		require.Equal(t, tx.TxOut[0].PkScript, act.Tx.UnsignedTx.TxOut[0].PkScript)
@@ -212,7 +211,7 @@ func TestCounterIncrements(t *testing.T) {
 	counter := parseFixture(t, "counter.json")
 	require.Len(t, counter.Inputs(), 2)
 	watch := instantiateBound(t, counter, 5) // both coins from one transaction with packet 2 = 05 00 .. 00
-	act, err := watch.inst.Build(t.Context(), watch.sources, Fee{Dust: 330})
+	act, err := watch.inst.Build(watch.sources, Fee{Dust: 330})
 	require.NoError(t, err)
 	state, ok := packets.Find(act.Tx.UnsignedTx, packets.TypeState)
 	require.True(t, ok)
@@ -233,7 +232,7 @@ func TestVHTLCAddress(t *testing.T) {
 
 func TestCounterCovenant(t *testing.T) {
 	counter := instantiateBound(t, parseFixture(t, "counter.json"), 5)
-	act, err := counter.inst.Build(t.Context(), counter.sources, Fee{Dust: 330})
+	act, err := counter.inst.Build(counter.sources, Fee{Dust: 330})
 	require.NoError(t, err)
 	for slot, name := range []string{"counter", "reserve"} {
 		require.NoError(t, runIntent(t, act, counter.sources, slot, nil), name)
@@ -255,7 +254,7 @@ func TestVHTLCClaimCovenant(t *testing.T) {
 	htlc := sourceWith(t, 100_000)
 	lockTo(htlc, instantiateVHTLC(t, v.Server, v.Vars).PkScript(0))
 	inst := instantiateVHTLC(t, v.Server, v.Vars, htlc)
-	act, err := inst.Build(t.Context(), []*Source{htlc}, Fee{Dust: 330})
+	act, err := inst.Build([]*Source{htlc}, Fee{Dust: 330})
 	require.NoError(t, err)
 
 	claim := func(edit func(*wire.TxOut)) error {
@@ -311,7 +310,7 @@ func TestNonInteractiveClaimCovenant(t *testing.T) {
 	lockTo(htlc, watch.PkScript(0))
 	inst, err := instantiateNonInteractiveClaim(t, v, v.Tapscripts, htlc)
 	require.NoError(t, err)
-	act, err := inst.Build(t.Context(), []*Source{htlc}, Fee{Dust: 330})
+	act, err := inst.Build([]*Source{htlc}, Fee{Dust: 330})
 	require.NoError(t, err)
 
 	claim := func(edit func(*wire.TxOut)) error {
@@ -349,14 +348,14 @@ func TestNonInteractiveClaimTrigger(t *testing.T) {
 	ptx, _ := streamed(t, tlv(1, []byte{1, 2, 3}, 2, cov, 3, enc.PubKey().SerializeCompressed()))
 	ptx.UnsignedTx.TxOut[0].PkScript = pkScript
 	ptx.Outputs[0].TaprootTapTree = tree
-	got, err := parseFixture(t, "noninteractiveclaim.json").Trigger().Match(ptx, TriggerKeys{Encryption: []*btcec.PublicKey{enc.PubKey()}})
+	got, err := parseFixture(t, "noninteractiveclaim.json").Trigger().Match(ptx, TriggerKeys{Encryption: enc.PubKey()})
 	require.NoError(t, err)
-	require.Equal(t, []Binding{{Output: 0, Variables: map[string]string{
+	require.Equal(t, []Capture{{Output: 0, Variables: map[string]string{
 		"ciphertext": "010203", "receiver_program": v.ReceiverProgram, "taptree": hex.EncodeToString(tree),
 	}}}, got)
 
 	ptx.UnsignedTx.TxOut[0].Value = 999
-	_, err = parseFixture(t, "noninteractiveclaim.json").Trigger().Match(ptx, TriggerKeys{Encryption: []*btcec.PublicKey{enc.PubKey()}})
+	_, err = parseFixture(t, "noninteractiveclaim.json").Trigger().Match(ptx, TriggerKeys{Encryption: enc.PubKey()})
 	require.ErrorIs(t, err, ErrNoMatch, "a coin below 1000 sats is not claimed")
 }
 
@@ -371,14 +370,14 @@ func TestCounterSeedCovenant(t *testing.T) {
 	}
 	vars := map[string][]byte{"counter_program": programs[0], "reserve_program": programs[1]}
 	seed := parseFixture(t, "counter_seed.json")
-	watch, err := seed.Instantiate(t.Context(), Context{Keys: keys, Variables: vars})
+	watch, err := seed.Instantiate(Context{Keys: keys, Variables: vars})
 	require.NoError(t, err)
 	deposit := sourceWith(t, 20_000)
 	lockTo(deposit, watch.PkScript(0))
 	deposit.Confirms = 1
-	inst, err := seed.Instantiate(t.Context(), Context{Keys: keys, Variables: vars, Sources: []*Source{deposit}})
+	inst, err := seed.Instantiate(Context{Keys: keys, Variables: vars, Sources: []*Source{deposit}})
 	require.NoError(t, err)
-	act, err := inst.Build(t.Context(), []*Source{deposit}, Fee{Dust: 330})
+	act, err := inst.Build([]*Source{deposit}, Fee{Dust: 330})
 	require.NoError(t, err)
 
 	out := act.Tx.UnsignedTx.TxOut
@@ -406,7 +405,7 @@ func TestCounterSeedCovenant(t *testing.T) {
 
 var otherScript = append([]byte{0x51, 0x20}, make([]byte, 32)...)
 
-// cosignerHex is private scalar 1, the delegate key of testKeys, as intent messages spell it.
+// cosignerHex is private scalar 1, the cosigner key of testKeys, as intent messages spell it.
 const cosignerHex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
 
 type renewalParams struct {
@@ -430,7 +429,7 @@ func (p renewalParams) vars(t *testing.T) map[string][]byte {
 }
 
 // masterCovenant is master's buildArkadeScript in its fee-check form, the only one renewal.json keeps.
-func masterCovenant(t *testing.T, delegateHex string, window, maxFee int64) []byte {
+func masterCovenant(t *testing.T, cosignerHex string, window, maxFee int64) []byte {
 	t.Helper()
 	s, err := txscript.NewScriptBuilder().
 		AddOp(arkade.OP_PUSHEXPIRY).AddInt64(window).AddOp(arkade.OP_SUB).AddOp(arkade.OP_CHECKTIME).AddOp(txscript.OP_VERIFY).
@@ -439,7 +438,7 @@ func masterCovenant(t *testing.T, delegateHex string, window, maxFee int64) []by
 		AddData([]byte("onchain_output_indexes")).AddOp(arkade.OP_INSPECTINTENTMESSAGE).AddOp(txscript.OP_VERIFY).
 		AddData([]byte("[]")).AddOp(arkade.OP_EQUALVERIFY).
 		AddData([]byte("cosigners_public_keys.0")).AddOp(arkade.OP_INSPECTINTENTMESSAGE).AddOp(txscript.OP_VERIFY).
-		AddData([]byte(delegateHex)).AddOp(arkade.OP_EQUALVERIFY).
+		AddData([]byte(cosignerHex)).AddOp(arkade.OP_EQUALVERIFY).
 		AddData([]byte("cosigners_public_keys.1")).AddOp(arkade.OP_INSPECTINTENTMESSAGE).AddOp(txscript.OP_NOT).AddOp(txscript.OP_VERIFY).AddOp(txscript.OP_DROP).
 		AddOp(arkade.OP_PUSHCURRENTINPUTINDEX).AddOp(arkade.OP_1SUB).AddOp(arkade.OP_INSPECTOUTPUTVALUE).AddInt64(maxFee).AddOp(arkade.OP_ADD).
 		AddOp(arkade.OP_PUSHCURRENTINPUTINDEX).AddOp(arkade.OP_INSPECTINPUTVALUE).AddOp(arkade.OP_GREATERTHANOREQUAL).AddOp(txscript.OP_VERIFY).
@@ -449,10 +448,10 @@ func masterCovenant(t *testing.T, delegateHex string, window, maxFee int64) []by
 	return s
 }
 
-// masterPkScript is master's tree around the delegate leaf, with the forfeit leaf of ark's default vtxo script first.
+// masterPkScript is master's tree around the cosigner leaf, with the forfeit leaf of ark's default vtxo script first.
 func masterPkScript(t *testing.T, keys Keys, p renewalParams) []byte {
 	t.Helper()
-	cov := masterCovenant(t, hex.EncodeToString(keys.Delegate.SerializeCompressed()), p.window, p.maxFee)
+	cov := masterCovenant(t, hex.EncodeToString(keys.Cosigner.SerializeCompressed()), p.window, p.maxFee)
 	tweaked := arkade.ComputeArkadeScriptPublicKey(keys.Emulator, arkade.ArkadeScriptHash(cov))
 	vtxo := script.TapscriptsVtxoScript{Closures: []script.Closure{
 		&script.MultisigClosure{PubKeys: []*btcec.PublicKey{p.owner, keys.Server}},
@@ -466,7 +465,7 @@ func masterPkScript(t *testing.T, keys Keys, p renewalParams) []byte {
 	return pk
 }
 
-func artifacts(t testing.TB) Resolver {
+func artifacts(t testing.TB) map[string][]byte {
 	t.Helper()
 	paths, err := filepath.Glob(filepath.Join("testdata", "artifacts", "*.json"))
 	require.NoError(t, err)
@@ -480,13 +479,7 @@ func artifacts(t testing.TB) Resolver {
 			docs[a.ID] = doc
 		}
 	}
-	return func(_ context.Context, id string) ([]byte, error) {
-		doc, ok := docs[id]
-		if !ok {
-			return nil, fmt.Errorf("unknown artifact %s", id)
-		}
-		return doc, nil
-	}
+	return docs
 }
 
 type boundInstance struct {
@@ -525,7 +518,7 @@ func instantiateBound(t *testing.T, tmpl *Template, counter uint64) boundInstanc
 			Outpoint: wire.OutPoint{Hash: tx.TxHash(), Index: uint32(i)}, Tx: tx, Amount: 100_000, Expiry: time.Now().Add(time.Minute),
 		})
 	}
-	inst, err := tmpl.Instantiate(t.Context(), Context{Keys: keys, Sources: sources})
+	inst, err := tmpl.Instantiate(Context{Keys: keys, Sources: sources})
 	require.NoError(t, err)
 	return boundInstance{inst: inst, sources: sources}
 }
@@ -550,7 +543,7 @@ func instantiateVHTLC(t *testing.T, server string, vars map[string]string, sourc
 	if len(sources) > 0 {
 		c.Sources = sources
 	}
-	inst, err := parseFixture(t, "vhtlc_claim.json").Instantiate(t.Context(), c)
+	inst, err := parseFixture(t, "vhtlc_claim.json").Instantiate(c)
 	require.NoError(t, err)
 	return inst
 }
@@ -562,14 +555,14 @@ func boarded(t *testing.T) boundInstance {
 	vars := defaultParams(t).vars(t)
 	vars["boarding_exit_delay"] = asm.ScriptNum(1<<22 | 2) // 1024 seconds, in BIP 68
 	boarding := parseFixture(t, "boarding.json")
-	watch, err := boarding.Instantiate(t.Context(), Context{Keys: keys, Variables: vars})
+	watch, err := boarding.Instantiate(Context{Keys: keys, Variables: vars})
 	require.NoError(t, err)
 	deposit := sourceWith(t, 100_000)
 	lockTo(deposit, watch.PkScript(0))
 	deposit.Confirms = 1
-	inst, err := boarding.Instantiate(t.Context(), Context{Keys: keys, Variables: vars, Sources: []*Source{deposit}})
+	inst, err := boarding.Instantiate(Context{Keys: keys, Variables: vars, Sources: []*Source{deposit}})
 	require.NoError(t, err)
-	act, err := inst.Build(t.Context(), []*Source{deposit}, Fee{Dust: 330})
+	act, err := inst.Build([]*Source{deposit}, Fee{Dust: 330})
 	require.NoError(t, err)
 	return boundInstance{inst: inst, sources: []*Source{deposit}, act: act}
 }
@@ -792,7 +785,7 @@ func instantiateNonInteractiveClaim(t *testing.T, v vhtlcVec, leaves []string, s
 	}
 	server, err := btcec.ParsePubKey(unhex(v.Server))
 	require.NoError(t, err)
-	return parseFixture(t, "noninteractiveclaim.json").Instantiate(t.Context(), Context{
+	return parseFixture(t, "noninteractiveclaim.json").Instantiate(Context{
 		Keys:      Keys{Server: server, Emulator: testKey(t, 3)},
 		Variables: map[string][]byte{"taptree": tree, "receiver_program": unhex(v.ReceiverProgram), "ciphertext": unhex(v.Preimage)},
 		Decrypt:   func(ciphertext []byte) ([]byte, error) { return ciphertext, nil },

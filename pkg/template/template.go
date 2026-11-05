@@ -7,7 +7,6 @@
 package template
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -30,9 +29,6 @@ const (
 	// Onchain is a Bitcoin transaction.
 	Onchain Type = "onchain"
 )
-
-// Resolver returns the stored document of an artifact.
-type Resolver func(ctx context.Context, artifactID string) ([]byte, error)
 
 // Schedule is when an input becomes eligible; the zero value is immediately.
 type Schedule struct {
@@ -61,13 +57,37 @@ type Template struct {
 	artifacts []string
 }
 
-// Parse decodes and validates a template; its id is the hash of the normalized document.
-func Parse(ctx context.Context, doc []byte, resolve Resolver) (*Template, error) {
+// ArtifactIDs lists the artifact ids a document references, in order of first appearance.
+func ArtifactIDs(doc []byte) ([]string, error) {
 	d, err := schema.Decode(doc)
 	if err != nil {
 		return nil, err
 	}
-	t, err := compile(ctx, d, resolve)
+	var ids []string
+	add := func(c *schema.Construction) {
+		if id := c.Definition.Artifact; c.Definition.Def == nil && !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	for i := range d.Inputs {
+		add(&d.Inputs[i].Contract)
+	}
+	for i := range d.Outputs {
+		if c := d.Outputs[i].Locking.Contract; c != nil {
+			add(c)
+		}
+	}
+	return ids, nil
+}
+
+// Parse decodes and validates a template, with the documents of the artifacts it references keyed
+// by id; its id is the hash of the normalized document.
+func Parse(doc []byte, artifacts map[string][]byte) (*Template, error) {
+	d, err := schema.Decode(doc)
+	if err != nil {
+		return nil, err
+	}
+	t, err := compile(d, artifacts)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +104,6 @@ func Parse(ctx context.Context, doc []byte, resolve Resolver) (*Template, error)
 // ID is the hex SHA-256 of the canonical document.
 func (t *Template) ID() string { return t.id }
 
-// Type is the kind of transaction the template builds.
 func (t *Template) Type() Type { return t.typ }
 
 // Variables lists the declared variables, sorted by name.
@@ -96,13 +115,20 @@ func (t *Template) Variables() []Field {
 	return out
 }
 
-// Inputs describes the template inputs in slot order.
 func (t *Template) Inputs() []Slot {
 	out := make([]Slot, 0, len(t.inputs))
 	for _, in := range t.inputs {
 		out = append(out, Slot{Name: in.name, Onchain: in.onchain, Schedule: in.schedule})
 	}
 	return out
+}
+
+// Arkade reports whether a spend carries an arkade packet: an input runs a covenant function.
+func (t *Template) Arkade() bool {
+	return slices.ContainsFunc(t.inputs, func(in input) bool {
+		fn := in.contract.def.FindFunction(in.function)
+		return fn != nil && fn.Arkade != nil
+	})
 }
 
 // Artifacts lists the referenced artifact ids in order of first appearance.

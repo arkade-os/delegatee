@@ -3,9 +3,10 @@ package template
 import (
 	"bytes"
 	"encoding/hex"
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 	"strings"
 	"testing"
+
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 
 	"github.com/arkade-os/arkd/pkg/ark-lib/extension"
 	"github.com/arkade-os/delegatee/pkg/template/packets"

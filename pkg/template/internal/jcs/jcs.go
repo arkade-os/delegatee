@@ -4,7 +4,6 @@ package jcs
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -19,9 +18,6 @@ const (
 	maxSafeInt = 1<<53 - 1
 	maxDepth   = 64
 )
-
-// ErrInvalid marks a document this package refuses.
-var ErrInvalid = errors.New("invalid json")
 
 // Decode parses one JSON value, rejecting invalid UTF-8, duplicate keys and trailing data.
 // Numbers are kept as json.Number; CheckNumbers judges them.

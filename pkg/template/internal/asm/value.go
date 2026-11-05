@@ -1,7 +1,6 @@
 package asm
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 
@@ -11,9 +10,6 @@ import (
 
 // MaxScriptNum bounds the magnitude of an int value.
 const MaxScriptNum = 1<<53 - 1
-
-// ErrBadValue marks bytes that are not the canonical encoding of their type.
-var ErrBadValue = errors.New("bad value")
 
 // ScalarTypes are the types a variable, a constructor field or a witness item can have.
 var ScalarTypes = []string{"pubkey", "bytes", "bytes20", "bytes32", "asset", "int", "bool"}

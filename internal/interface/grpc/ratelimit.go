@@ -1,6 +1,7 @@
-package grpcservice
+package grpc
 
 import (
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -8,7 +9,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// rateLimiter keys on the connection's address: behind a reverse proxy it sees a single client.
+// rateLimiter keeps a token bucket per client address; behind a reverse proxy every request has the proxy's.
 type rateLimiter struct {
 	mu      sync.Mutex
 	limit   rate.Limit
@@ -21,8 +22,8 @@ type client struct {
 	lastSeen time.Time
 }
 
-func newRateLimiter(perSecond float64) *rateLimiter {
-	return &rateLimiter{limit: rate.Limit(perSecond), burst: max(1, int(perSecond*10)), clients: map[string]*client{}}
+func newRateLimiter(perSecond int) *rateLimiter {
+	return &rateLimiter{limit: rate.Limit(perSecond), burst: perSecond * 10, clients: map[string]*client{}}
 }
 
 func (l *rateLimiter) allow(ip string, now time.Time) bool {
@@ -32,7 +33,7 @@ func (l *rateLimiter) allow(ip string, now time.Time) bool {
 	if !ok {
 		c = &client{limiter: rate.NewLimiter(l.limit, l.burst)}
 		l.clients[ip] = c
-		// purge on insert keeps the map bounded without a goroutine
+		// purging on insert keeps the map bounded without a goroutine
 		if len(l.clients)%1024 == 0 {
 			for ip, c := range l.clients {
 				if now.Sub(c.lastSeen) > time.Minute {
@@ -45,9 +46,14 @@ func (l *rateLimiter) allow(ip string, now time.Time) bool {
 	return c.limiter.AllowN(now, 1)
 }
 
+// middleware refuses the clients over their rate; loopback is exempt, which is where the gateway calls from.
 func (l *rateLimiter) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !l.allow(clientIP(r), time.Now()) {
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			ip = r.RemoteAddr
+		}
+		if parsed := net.ParseIP(ip); (parsed == nil || !parsed.IsLoopback()) && !l.allow(ip, time.Now()) {
 			w.Header().Set("Retry-After", "1")
 			http.Error(w, "too many requests", http.StatusTooManyRequests)
 			return

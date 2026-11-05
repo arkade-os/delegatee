@@ -2,7 +2,6 @@ package template
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"slices"
 
@@ -36,7 +35,7 @@ type spending struct {
 }
 
 // Build builds the unsigned transaction spending sources, one per input in slot order.
-func (i *Instance) Build(_ context.Context, sources []*Source, fee Fee) (*Action, error) {
+func (i *Instance) Build(sources []*Source, fee Fee) (*Action, error) {
 	t := i.tmpl
 	if err := checkSources(sources, len(t.inputs)); err != nil {
 		return nil, err

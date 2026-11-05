@@ -21,26 +21,24 @@ import (
 	"github.com/btcsuite/btcd/txscript/v2"
 )
 
-var ErrNoMatch = errors.New("transaction does not match the trigger")
-
 // TriggerKeys are the daemon keys a trigger may require, compared compressed.
 type TriggerKeys struct {
-	Encryption []*btcec.PublicKey
+	Encryption *btcec.PublicKey
 	Keys
 }
 
-// Binding is a candidate output of a matched transaction and the variables bound for it, in hex.
-type Binding struct {
+// Capture is a candidate output of a matched transaction and the variables captured for it, in hex.
+type Capture struct {
 	Output    int
 	Variables map[string]string
 }
 
-// Trigger selects streamed transactions by an extension packet and binds variables from them.
+// Trigger selects streamed transactions by an extension packet and captures variables from them.
 type Trigger struct {
 	packet   uint8
 	raw      bool // the body is one source, else tlv records
 	require  []requirement
-	binds    []capture // sorted by variable
+	captures []captureRule // sorted by variable
 	ttl      time.Duration
 	minValue int64
 }
@@ -51,19 +49,19 @@ type requirement struct {
 	lit    []byte
 }
 
-type capture struct {
+type captureRule struct {
 	variable, typ string
 	source        string
-	asm           []string // nil binds the source bytes
+	asm           []string // nil captures the source bytes
 }
 
 const outputTaptree = "output:taptree"
 
-var daemonKeys = map[string]func(TriggerKeys) []*btcec.PublicKey{
-	"ENCRYPTION_KEY": func(k TriggerKeys) []*btcec.PublicKey { return k.Encryption },
-	"SERVER_KEY":     func(k TriggerKeys) []*btcec.PublicKey { return []*btcec.PublicKey{k.Server} },
-	"EMULATOR_KEY":   func(k TriggerKeys) []*btcec.PublicKey { return []*btcec.PublicKey{k.Emulator} },
-	"DELEGATE_KEY":   func(k TriggerKeys) []*btcec.PublicKey { return []*btcec.PublicKey{k.Delegate} },
+var daemonKeys = map[string]func(TriggerKeys) *btcec.PublicKey{
+	"ENCRYPTION_KEY": func(k TriggerKeys) *btcec.PublicKey { return k.Encryption },
+	"SERVER_KEY":     func(k TriggerKeys) *btcec.PublicKey { return k.Server },
+	"EMULATOR_KEY":   func(k TriggerKeys) *btcec.PublicKey { return k.Emulator },
+	"COSIGNER_KEY":   func(k TriggerKeys) *btcec.PublicKey { return k.Cosigner },
 }
 
 // Trigger is nil unless the template reacts to streamed transactions.
@@ -72,10 +70,10 @@ func (t *Template) Trigger() *Trigger { return t.trigger }
 // TTL is how long a watch the trigger spawns lives.
 func (tr *Trigger) TTL() time.Duration { return tr.ttl }
 
-// Bound lists the variables the trigger binds, sorted.
-func (tr *Trigger) Bound() []string {
-	out := make([]string, len(tr.binds))
-	for i, c := range tr.binds {
+// Captured lists the variables the trigger captures, sorted.
+func (tr *Trigger) Captured() []string {
+	out := make([]string, len(tr.captures))
+	for i, c := range tr.captures {
 		out[i] = c.variable
 	}
 	return out
@@ -110,13 +108,13 @@ func (c *compiler) trigger() error {
 		}
 		tr.require = append(tr.require, r)
 	}
-	for _, name := range slices.Sorted(maps.Keys(s.Bind)) {
+	for _, name := range slices.Sorted(maps.Keys(s.Capture)) {
 		typ, ok := c.t.variables[name]
 		if !ok {
-			return bad("trigger binds undeclared variable %q", name)
+			return bad("trigger captures undeclared variable %q", name)
 		}
-		b := s.Bind[name]
-		cp := capture{variable: name, typ: typ, source: b.Source}
+		b := s.Capture[name]
+		cp := captureRule{variable: name, typ: typ, source: b.Source}
 		if b.Asm != nil {
 			cp.source = b.From
 			var err error
@@ -131,15 +129,15 @@ func (c *compiler) trigger() error {
 			return err
 		}
 		if cp.source == outputTaptree && typ != "bytes" {
-			return bad("trigger binds a taptree to %s variable %q", typ, name)
+			return bad("trigger captures a taptree into %s variable %q", typ, name)
 		}
-		tr.binds = append(tr.binds, cp)
+		tr.captures = append(tr.captures, cp)
 	}
 	c.t.trigger = tr
 	return nil
 }
 
-// checkSource: a source fits the decoding; only a plain bind reads an output.
+// checkSource: a source fits the decoding; only a plain capture reads an output.
 func (tr *Trigger) checkSource(src string, output bool) error {
 	switch {
 	case src == outputTaptree && output, src == "raw" && tr.raw:
@@ -174,8 +172,8 @@ func capturePattern(toks []string, name string) ([]string, error) {
 	return slices.Clone(toks), nil
 }
 
-// Match returns a binding per output of tx that may be the coin; the caller checks the template locks it.
-func (tr *Trigger) Match(tx *psbt.Packet, keys TriggerKeys) ([]Binding, error) {
+// Match returns a capture per output of tx that may be the coin; the caller checks the template locks it.
+func (tr *Trigger) Match(tx *psbt.Packet, keys TriggerKeys) ([]Capture, error) {
 	body, ok := packets.Find(tx.UnsignedTx, tr.packet)
 	if !ok {
 		return nil, fmt.Errorf("%w: no packet %d", ErrNoMatch, tr.packet)
@@ -189,13 +187,13 @@ func (tr *Trigger) Match(tx *psbt.Packet, keys TriggerKeys) ([]Binding, error) {
 	}
 	for _, r := range tr.require {
 		got, ok := fields[r.source]
-		if !ok || !slices.ContainsFunc(r.values(keys), func(w []byte) bool { return bytes.Equal(w, got) }) {
+		if want := r.value(keys); !ok || want == nil || !bytes.Equal(want, got) {
 			return nil, fmt.Errorf("%w: %s", ErrNoMatch, r.source)
 		}
 	}
 	vars := map[string]string{}
 	var tree string
-	for _, c := range tr.binds {
+	for _, c := range tr.captures {
 		if c.source == outputTaptree {
 			tree = c.variable
 			continue
@@ -216,7 +214,7 @@ func (tr *Trigger) Match(tx *psbt.Packet, keys TriggerKeys) ([]Binding, error) {
 		}
 		vars[c.variable] = hex.EncodeToString(got)
 	}
-	var out []Binding
+	var out []Capture
 	for i, o := range tx.UnsignedTx.TxOut {
 		if o.Value < tr.minValue {
 			continue
@@ -235,7 +233,7 @@ func (tr *Trigger) Match(tx *psbt.Packet, keys TriggerKeys) ([]Binding, error) {
 			}
 			v[tree] = hex.EncodeToString(raw)
 		}
-		out = append(out, Binding{Output: i, Variables: v})
+		out = append(out, Capture{Output: i, Variables: v})
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("%w: no candidate output", ErrNoMatch)
@@ -243,17 +241,15 @@ func (tr *Trigger) Match(tx *psbt.Packet, keys TriggerKeys) ([]Binding, error) {
 	return out, nil
 }
 
-func (r requirement) values(k TriggerKeys) [][]byte {
+// value is what r requires: its literal, or the daemon key compressed, nil without that key.
+func (r requirement) value(k TriggerKeys) []byte {
 	if r.key == "" {
-		return [][]byte{r.lit}
+		return r.lit
 	}
-	var out [][]byte
-	for _, pk := range daemonKeys[r.key](k) {
-		if pk != nil {
-			out = append(out, pk.SerializeCompressed())
-		}
+	if pk := daemonKeys[r.key](k); pk != nil {
+		return pk.SerializeCompressed()
 	}
-	return out
+	return nil
 }
 
 // decodeTLV reads tag[1] || length[2, big-endian] || value records; a repeated tag keeps the last value.

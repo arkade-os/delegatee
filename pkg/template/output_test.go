@@ -3,12 +3,13 @@ package template
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"maps"
+	"testing"
+
 	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
-	"maps"
-	"slices"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 )
@@ -21,14 +22,15 @@ func TestAllocate(t *testing.T) {
 		wantChange      uint64
 		wantChangeAsset uint64
 		err             error
+		unaffordable    bool
 	}{
 		{name: "remainder", amount: 100_000, wantChange: 75_000},
 		{name: "fee from the remainder", amount: 100_000, fee: 600, wantChange: 74_400},
 		{name: "fee at the cap", amount: 100_000, fee: 1000, wantChange: 74_000},
-		{name: "fee above the cap", amount: 100_000, fee: 1001, err: ErrIneligible},
+		{name: "fee above the cap", amount: 100_000, fee: 1001, err: ErrIneligible, unaffordable: true},
 		{name: "fixed draw not covered", amount: 20_000, err: ErrIneligible},
-		{name: "dust remainder", amount: 25_100, err: ErrIneligible},
-		{name: "dust remainder after the fee", amount: 25_600, fee: 300, err: ErrIneligible},
+		{name: "dust remainder", amount: 25_100, err: ErrIneligible, unaffordable: true},
+		{name: "dust remainder after the fee", amount: 25_600, fee: 300, err: ErrIneligible, unaffordable: true},
 		{name: "source above 21e14", amount: 21e14 + 1, err: ErrIneligible},
 		{name: "assets follow the catch-all", amount: 100_000, assets: []Asset{{ID: assetID(1), Amount: 7}}, wantChange: 75_000, wantChangeAsset: 7},
 		{name: "asset entries combine", amount: 100_000, assets: []Asset{{ID: assetID(1), Amount: 7}, {ID: assetID(1), Amount: 3}}, wantChange: 75_000, wantChangeAsset: 10},
@@ -41,6 +43,7 @@ func TestAllocate(t *testing.T) {
 			got, err := inst.allocate(d, src, tc.fee, 330)
 			if tc.err != nil {
 				require.ErrorIs(t, err, tc.err)
+				require.Equal(t, tc.unaffordable, errors.Is(err, ErrUnaffordable))
 				return
 			}
 			require.NoError(t, err)
@@ -55,6 +58,7 @@ func TestAllocateWithoutFees(t *testing.T) {
 	inst, d, src := mixedPaymentNoFees(t, 100_000)
 	_, err := inst.allocate(d, src, 1, 330)
 	require.ErrorIs(t, err, ErrIneligible, "a template without fees pays none")
+	require.ErrorIs(t, err, ErrUnaffordable)
 	require.ErrorContains(t, err, "pays no fee")
 	got, err := inst.allocate(d, src, 0, 330)
 	require.NoError(t, err)
@@ -80,40 +84,6 @@ func TestAllocateTwoInputs(t *testing.T) {
 	require.ErrorIs(t, err, ErrIneligible)
 	_, err = inst.allocate(d, src, 49_700, 330)
 	require.ErrorIs(t, err, ErrIneligible, "fee above the cap")
-}
-
-func TestAllocatePooled(t *testing.T) {
-	inst, d, src := instanceOf(t, pooled(t), coin(t, 10_000, Asset{ID: assetID(1), Amount: 3}), coin(t, 20_000))
-	got, err := inst.allocate(d, src, 700, 330)
-	require.NoError(t, err)
-	require.Equal(t, []uint64{4_300, 25_000}, got.sats, "neither input alone pays 25,000")
-	require.Equal(t, map[string]uint64{hex.EncodeToString(assetID(1)): 3}, got.assets[0])
-	requireBalanced(t, inst, got, src)
-
-	inst, d, src = instanceOf(t, pooled(t), coin(t, 10_000), coin(t, 15_000))
-	_, err = inst.allocate(d, src, 0, 330)
-	require.ErrorIs(t, err, ErrIneligible, "the pool cannot pay 25,000 and leave dust")
-}
-
-func TestParsePoolRejects(t *testing.T) {
-	out := func(m map[string]any, i int) map[string]any { return m["outputs"].([]any)[i].(map[string]any) }
-	for name, edit := range map[string]func(map[string]any){
-		"input twice":    func(m map[string]any) { out(m, 0)["value"] = map[string]any{"from": []any{"funds", "funds"}} },
-		"unknown input":  func(m map[string]any) { out(m, 0)["value"] = map[string]any{"from": []any{"funds", "nope"}} },
-		"empty pool":     func(m map[string]any) { out(m, 0)["value"] = map[string]any{"from": []any{}} },
-		"not a name":     func(m map[string]any) { out(m, 0)["value"] = map[string]any{"from": []any{"funds", 1}} },
-		"two pools":      func(m map[string]any) { out(m, 1)["value"] = map[string]any{"from": "extra", "amount": 25000} },
-		"two remainders": func(m map[string]any) { out(m, 1)["value"] = map[string]any{"from": []any{"extra", "funds"}} },
-		"input in no pool": func(m map[string]any) {
-			out(m, 0)["value"] = map[string]any{"from": "funds"}
-			out(m, 1)["value"] = map[string]any{"from": "funds", "amount": 25000}
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := Parse(t.Context(), edited(t, pooled(t), edit), nil)
-			require.ErrorIs(t, err, ErrInvalidTemplate)
-		})
-	}
 }
 
 func TestAllocateAssetOverflowAcrossInputs(t *testing.T) {
@@ -191,27 +161,21 @@ func TestAllocateAssetRoutes(t *testing.T) {
 	}
 }
 
-// outputs combine assets of several inputs: assets are summed over all inputs
+// every input's satoshis go to the outputs drawing from it and to the fee, assets are summed over all inputs
 func requireBalanced(t *testing.T, inst *Instance, a *allocation, src []*Source) {
 	t.Helper()
 	in, out := map[string]uint64{}, map[string]uint64{}
 	for slot, s := range src {
-		pool := inst.tmpl.poolOf(slot)
-		if pool[0] == slot {
-			held, drawn := uint64(0), uint64(0)
-			for _, i := range pool {
-				held += src[i].Amount
-			}
-			if f := inst.tmpl.fee; f != nil && slices.Contains(pool, f.from) {
-				drawn = a.fee
-			}
-			for k, o := range inst.tmpl.outputs {
-				if slices.Equal(o.pool, pool) {
-					drawn += a.sats[k]
-				}
-			}
-			require.Equal(t, held, drawn, "pool %v", pool)
+		drawn := uint64(0)
+		if f := inst.tmpl.fee; f != nil && f.from == slot {
+			drawn = a.fee
 		}
+		for k, o := range inst.tmpl.outputs {
+			if o.from == slot {
+				drawn += a.sats[k]
+			}
+		}
+		require.Equal(t, s.Amount, drawn, "input %d", slot)
 		for _, as := range s.Assets {
 			in[hex.EncodeToString(as.ID)] += as.Amount
 		}
@@ -262,7 +226,7 @@ func instanceOf(t *testing.T, doc []byte, sources ...*Source) (*Instance, *draft
 		require.NoError(t, err)
 		lockTo(src, c.PkScript)
 	}
-	inst, err := tmpl.Instantiate(t.Context(), Context{Keys: testKeys(t), Sources: sources})
+	inst, err := tmpl.Instantiate(Context{Keys: testKeys(t), Sources: sources})
 	require.NoError(t, err)
 	return inst, newDraft(tmpl.typ, sources), sources
 }
@@ -289,23 +253,6 @@ func twoFunds(t *testing.T) []byte {
 	})
 }
 
-// pooled: funds and extra pay 25,000 on chain together; extra pays the fee.
-func pooled(t *testing.T) []byte {
-	t.Helper()
-	return edited(t, mixedPaymentDoc(t, false), func(m map[string]any) {
-		ins := m["inputs"].([]any)
-		extra := maps.Clone(ins[0].(map[string]any))
-		extra["name"] = "extra"
-		m["inputs"] = append(ins, extra)
-		outs := m["outputs"].([]any)
-		change, payment := outs[0].(map[string]any), outs[1].(map[string]any)
-		change["value"] = map[string]any{"from": []any{"funds", "extra"}}
-		change["assets"] = []any{map[string]any{"from": "funds"}, map[string]any{"from": "extra"}}
-		payment["value"] = map[string]any{"from": []any{"extra", "funds"}, "amount": 25000}
-		m["fees"] = map[string]any{"from": "extra", "max": 1000}
-	})
-}
-
 func mixedPaymentDoc(t *testing.T, fees bool) []byte {
 	t.Helper()
 	feeField := ""
@@ -313,7 +260,7 @@ func mixedPaymentDoc(t *testing.T, fees bool) []byte {
 		feeField = `, "fees": {"from": "funds", "max": 1000}`
 	}
 	return fmt.Appendf(nil, `{
-  "format": "delegateed-template/v1",
+  "format": "template/v1",
   "type": "intent",
   "inputs": [{
     "name": "funds",

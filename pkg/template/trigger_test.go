@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
-	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 	"maps"
 	"testing"
+
+	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
 
 	"github.com/arkade-os/arkd/pkg/ark-lib/extension"
 	"github.com/arkade-os/arkd/pkg/ark-lib/txutils"
@@ -25,12 +26,12 @@ func TestTriggerMatch(t *testing.T) {
 	push := pushScript(t, to)
 	tr := parseDoc(t, triggerDoc(t, baseTrigger())).Trigger()
 	require.NotNil(t, tr)
-	require.Equal(t, []string{"note", "to", "tree"}, tr.Bound())
+	require.Equal(t, []string{"note", "to", "tree"}, tr.Captured())
 
 	ptx, tree := streamed(t, tlv(1, []byte("hi"), 2, push, 3, server, 9, []byte{1}))
 	got, err := tr.Match(ptx, keys)
 	require.NoError(t, err)
-	require.Equal(t, []Binding{{Output: 0, Variables: map[string]string{
+	require.Equal(t, []Capture{{Output: 0, Variables: map[string]string{
 		"note": hex.EncodeToString([]byte("hi")), "to": hex.EncodeToString(to), "tree": hex.EncodeToString(tree),
 	}}}, got, "only the output whose tree derives its key; unknown tag 9 is ignored")
 
@@ -97,7 +98,7 @@ func TestTriggerMinValue(t *testing.T) {
 	for _, v := range []any{-1, "1000"} {
 		trig := baseTrigger()
 		trig["min_value"] = v
-		_, err := Parse(t.Context(), triggerDoc(t, trig), nil)
+		_, err := Parse(triggerDoc(t, trig), nil)
 		require.ErrorIs(t, err, ErrInvalidTemplate, v)
 		require.ErrorContains(t, err, "min_value", v)
 	}
@@ -105,7 +106,7 @@ func TestTriggerMinValue(t *testing.T) {
 	for _, v := range []any{1.5, asm.MaxScriptNum + 1} {
 		trig := baseTrigger()
 		trig["min_value"] = v
-		_, err := Parse(t.Context(), triggerDoc(t, trig), nil)
+		_, err := Parse(triggerDoc(t, trig), nil)
 		require.ErrorIs(t, err, ErrInvalidTemplate, v)
 	}
 
@@ -115,16 +116,14 @@ func TestTriggerMinValue(t *testing.T) {
 }
 
 func TestTriggerRequiresAndRaw(t *testing.T) {
-	rotated, err := btcec.NewPrivateKey()
+	encryption, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
-	current, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	keys := TriggerKeys{Encryption: []*btcec.PublicKey{current.PubKey(), rotated.PubKey()}, Keys: testKeys(t)}
+	keys := TriggerKeys{Encryption: encryption.PubKey(), Keys: testKeys(t)}
 	to := bytes.Repeat([]byte{7}, 32)
 	for name, want := range map[string][]byte{
-		"<ENCRYPTION_KEY>": rotated.PubKey().SerializeCompressed(),
+		"<ENCRYPTION_KEY>": encryption.PubKey().SerializeCompressed(),
 		"<EMULATOR_KEY>":   keys.Emulator.SerializeCompressed(),
-		"<DELEGATE_KEY>":   keys.Delegate.SerializeCompressed(),
+		"<COSIGNER_KEY>":   keys.Cosigner.SerializeCompressed(),
 	} {
 		trig := baseTrigger()
 		trig["require"] = map[string]any{"tlv:3": name}
@@ -136,7 +135,7 @@ func TestTriggerRequiresAndRaw(t *testing.T) {
 	pushed := append([]byte{0x20}, to...)
 	raw := map[string]any{
 		"packet": 4, "decode": "raw", "require": map[string]any{"raw": "0x" + hex.EncodeToString(pushed)},
-		"bind":                  map[string]any{"note": "raw", "tree": "output:taptree", "to": map[string]any{"from": "raw", "asm": []any{"<to>"}}},
+		"capture":               map[string]any{"note": "raw", "tree": "output:taptree", "to": map[string]any{"from": "raw", "asm": []any{"<to>"}}},
 		"expires_after_seconds": 60,
 	}
 	tr := parseDoc(t, triggerDoc(t, raw)).Trigger()
@@ -151,7 +150,7 @@ func TestTriggerRequiresAndRaw(t *testing.T) {
 
 func TestTriggerParse(t *testing.T) {
 	for name, edit := range map[string]func(map[string]any){
-		"no bind":           func(m map[string]any) { m["bind"] = map[string]any{} },
+		"no capture":        func(m map[string]any) { m["capture"] = map[string]any{} },
 		"undeclared":        func(m map[string]any) { bind(m)["nope"] = "tlv:1" },
 		"bad decode":        func(m map[string]any) { m["decode"] = "cbor" },
 		"raw source in tlv": func(m map[string]any) { bind(m)["note"] = "raw" },
@@ -177,7 +176,7 @@ func TestTriggerParse(t *testing.T) {
 	} {
 		trig := baseTrigger()
 		edit(trig)
-		_, err := Parse(t.Context(), triggerDoc(t, trig), nil)
+		_, err := Parse(triggerDoc(t, trig), nil)
 		require.ErrorIs(t, err, ErrInvalidTemplate, name)
 	}
 
@@ -185,7 +184,7 @@ func TestTriggerParse(t *testing.T) {
 		trig := baseTrigger()
 		bind(trig)["count"] = map[string]any{"from": "tlv:2", "asm": []any{"<count>"}}
 		doc := edited(t, triggerDoc(t, trig), func(m map[string]any) { m["variables"].(map[string]any)["count"] = typ })
-		_, err := Parse(t.Context(), doc, nil)
+		_, err := Parse(doc, nil)
 		require.ErrorIs(t, err, ErrInvalidTemplate, typ)
 		require.ErrorContains(t, err, "capture", typ)
 	}
@@ -196,7 +195,7 @@ func TestTriggerParse(t *testing.T) {
 		m["inputs"] = append(m["inputs"].([]any), c)
 		m["outputs"] = append(m["outputs"].([]any), map[string]any{"name": "out2", "index": 1, "value": map[string]any{"from": "coin2"}, "locking": "5120<to>"})
 	})
-	_, err := Parse(t.Context(), two, nil)
+	_, err := Parse(two, nil)
 	require.ErrorIs(t, err, ErrInvalidTemplate)
 	require.ErrorContains(t, err, "trigger", "a trigger template has one input")
 
@@ -221,7 +220,7 @@ func baseTrigger() map[string]any {
 	return map[string]any{
 		"packet": 4, "decode": "tlv",
 		"require": map[string]any{"tlv:3": "<SERVER_KEY>"},
-		"bind": map[string]any{
+		"capture": map[string]any{
 			"note": "tlv:1",
 			"to":   map[string]any{"from": "tlv:2", "asm": []any{"OP_DUP", "<to>", "OP_EQUAL"}},
 			"tree": "output:taptree",
@@ -272,5 +271,5 @@ func pushScript(t *testing.T, to []byte) []byte {
 }
 
 func bind(trigger map[string]any) map[string]any {
-	return trigger["bind"].(map[string]any)
+	return trigger["capture"].(map[string]any)
 }
