@@ -29,6 +29,8 @@ type Status struct {
 	Failed    uint64
 	// TemplateFailures counts the failed attempts charged to their template since the daemon started.
 	TemplateFailures uint64
+	Reserve          time.Duration // before expiry, the latest a coin enters a batch
+	Session          execution.Session
 }
 
 // BatchForecast is what a coming batch is expected to carry of ours.
@@ -116,6 +118,7 @@ func (s *Service) publish(now time.Time) {
 		Queued:  queued, Registered: reserved, Late: len(plan.Late),
 		NextDue: s.nextDue, Tip: s.tip,
 		Succeeded: s.attemptsSucceeded, Failed: s.attemptsFailed, TemplateFailures: s.templateFailures,
+		Reserve: s.limits.Reserve, Session: s.session,
 	}
 	st.Batches = forecastBatches(plan)
 	s.status.Store(&st)

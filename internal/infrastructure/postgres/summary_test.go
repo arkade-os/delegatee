@@ -70,6 +70,39 @@ func TestSummariesFilterByStatus(t *testing.T) {
 	require.Equal(t, []int64{ids["soon"], ids["later"], ids["spent"]}, summaryIDs(list))
 }
 
+func TestSummariesFilterByStreamAndTemplate(t *testing.T) {
+	repo, ids := testSummaries(t)
+	ctx := t.Context()
+	stream := delegation.Stream{TemplateID: "t", Variables: map[string]string{}}
+	require.NoError(t, repo.db.Streams().AddOrUpdate(ctx, &stream))
+	var spawnedIDs []int64
+	for _, name := range []string{"spawn1", "spawn2"} {
+		d := testDelegation(name)
+		d.StreamID = stream.ID
+		require.NoError(t, repo.db.Delegations().AddOrUpdate(ctx, &d))
+		spawnedIDs = append(spawnedIDs, d.ID)
+	}
+	require.NoError(t, repo.db.Delegations().AddOrUpdate(ctx, &delegation.Delegation{ID: spawnedIDs[1], Status: delegation.StatusCancelled}))
+
+	list, err := repo.List(ctx, ports.SummaryFilter{StreamID: stream.ID, Limit: 10})
+	require.NoError(t, err)
+	require.Equal(t, spawnedIDs, summaryIDs(list))
+	list, err = repo.List(ctx, ports.SummaryFilter{TemplateID: "t", Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, list, 7)
+	require.Contains(t, summaryIDs(list), ids["soon"])
+	list, err = repo.List(ctx, ports.SummaryFilter{TemplateID: "none", Limit: 10})
+	require.NoError(t, err)
+	require.Empty(t, list)
+
+	spawned, err := repo.Spawned(ctx)
+	require.NoError(t, err)
+	require.Len(t, spawned, 1)
+	require.Equal(t, 2, spawned[stream.ID].Delegations)
+	require.Equal(t, 1, spawned[stream.ID].Active)
+	require.False(t, spawned[stream.ID].Last.IsZero())
+}
+
 func TestSummariesOfNothing(t *testing.T) {
 	list, err := testDB(t).Summaries().List(t.Context(), ports.SummaryFilter{Limit: 10})
 	require.NoError(t, err)

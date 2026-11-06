@@ -33,6 +33,7 @@ type Executor interface {
 	Attempts(ctx context.Context, delegationID, cursor int64, limit int) ([]delegation.Attempt, error)
 	Coins(ctx context.Context, delegationID int64) ([]delegation.Coin, error)
 	Summaries(ctx context.Context, f ports.SummaryFilter) ([]ports.Summary, error)
+	Spawned(ctx context.Context) (map[int64]ports.Spawned, error)
 	Status(ctx context.Context, horizon time.Duration) (executionapp.Status, error)
 }
 
@@ -115,7 +116,9 @@ func (h *Admin) ListDelegations(
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	list, err := h.execution.Summaries(ctx, ports.SummaryFilter{Status: req.GetStatus(), After: after, Limit: limit})
+	list, err := h.execution.Summaries(ctx, ports.SummaryFilter{
+		Status: req.GetStatus(), StreamID: req.GetStreamId(), TemplateID: req.GetTemplateId(), After: after, Limit: limit,
+	})
 	if err != nil {
 		return nil, toStatus(err)
 	}
@@ -177,9 +180,17 @@ func (h *Admin) ListStreams(ctx context.Context, _ *delegateev1.ListStreamsReque
 	if err != nil {
 		return nil, toStatus(err)
 	}
+	spawned, err := h.execution.Spawned(ctx)
+	if err != nil {
+		return nil, toStatus(err)
+	}
 	resp := &delegateev1.ListStreamsResponse{Streams: make([]*delegateev1.Stream, 0, len(list))}
 	for _, st := range list {
-		resp.Streams = append(resp.Streams, toStream(&st))
+		out := toStream(&st)
+		if sp, ok := spawned[st.ID]; ok {
+			out.Spawned, out.Active, out.LastSpawnedAt = int64(sp.Delegations), int64(sp.Active), sp.Last.Unix()
+		}
+		resp.Streams = append(resp.Streams, out)
 	}
 	return resp, nil
 }
@@ -252,8 +263,10 @@ func (h *Admin) GetStatus(ctx context.Context, req *delegateev1.GetStatusRequest
 	}
 	resp := &delegateev1.GetStatusResponse{
 		Active: st.Active, Queued: int64(st.Queued), Registered: int64(st.Registered), Late: int64(st.Late), TipHeight: st.Tip.Height,
-		Coins: int64(st.Coins), Amount: st.Amount,
-		Batches: make([]*delegateev1.BatchForecast, 0, len(st.Batches)),
+		Coins: int64(st.Coins), Amount: st.Amount, Succeeded: st.Succeeded, Failed: st.Failed, TemplateFailures: st.TemplateFailures,
+		ReserveSeconds: int64(st.Reserve / time.Second), SessionSeconds: int64(st.Session.Duration / time.Second),
+		MaxIntents: int64(st.Session.MaxIntents),
+		Batches:    make([]*delegateev1.BatchForecast, 0, len(st.Batches)),
 	}
 	if !st.NextDue.IsZero() {
 		resp.NextDue = st.NextDue.Unix()

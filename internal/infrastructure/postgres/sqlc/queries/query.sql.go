@@ -535,19 +535,21 @@ WITH held AS (
 ), with_coins AS (
     SELECT d.id, h.coins, h.amount, h.next_due FROM held h JOIN delegations d ON d.id = h.delegation_id
     WHERE NOT $1::boolean AND ($2::text = '' OR d.status = $2::text)
-      AND (h.next_due, d.id) > ($3::timestamptz, $4::bigint)
+      AND ($3::bigint = 0 OR d.stream_id = $3::bigint) AND ($4::text = '' OR d.template_id = $4::text)
+      AND (h.next_due, d.id) > ($5::timestamptz, $6::bigint)
     ORDER BY h.next_due, d.id
-    LIMIT $5::int
+    LIMIT $7::int
 ), idle AS (
     SELECT d.id, 0::bigint AS coins, 0::bigint AS amount, NULL::timestamptz AS next_due FROM delegations d
-    WHERE d.id > $6::bigint AND ($2::text = '' OR d.status = $2::text)
+    WHERE d.id > $8::bigint AND ($2::text = '' OR d.status = $2::text)
+      AND ($3::bigint = 0 OR d.stream_id = $3::bigint) AND ($4::text = '' OR d.template_id = $4::text)
       AND NOT EXISTS (SELECT 1 FROM coins c WHERE c.delegation_id = d.id AND c.status = 'present')
     ORDER BY d.id
-    LIMIT $5::int
+    LIMIT $7::int
 ), page AS (
     SELECT id, coins, amount, next_due FROM with_coins UNION ALL SELECT id, coins, amount, next_due FROM idle
     ORDER BY next_due NULLS LAST, id
-    LIMIT $5::int
+    LIMIT $7::int
 )
 SELECT d.id, d.fingerprint, d.address, d.template_id, d.variables, d.inputs, d.stream_id, d.expires_at, d.status,
     d.created_at, d.updated_at, page.coins, page.amount, COALESCE(page.next_due, 'epoch'::timestamptz)::timestamptz AS next_due,
@@ -557,12 +559,14 @@ ORDER BY page.next_due NULLS LAST, d.id
 `
 
 type ListDelegationSummariesParams struct {
-	SkipHeld  bool
-	Status    string
-	AfterDue  time.Time
-	AfterID   int64
-	MaxCount  int32
-	IdleAfter int64
+	SkipHeld   bool
+	Status     string
+	StreamID   int64
+	TemplateID string
+	AfterDue   time.Time
+	AfterID    int64
+	MaxCount   int32
+	IdleAfter  int64
 }
 
 type ListDelegationSummariesRow struct {
@@ -589,6 +593,8 @@ func (q *Queries) ListDelegationSummaries(ctx context.Context, arg ListDelegatio
 	rows, err := q.db.QueryContext(ctx, listDelegationSummaries,
 		arg.SkipHeld,
 		arg.Status,
+		arg.StreamID,
+		arg.TemplateID,
 		arg.AfterDue,
 		arg.AfterID,
 		arg.MaxCount,
@@ -826,6 +832,48 @@ func (q *Queries) ListReadyCoins(ctx context.Context, arg ListReadyCoinsParams) 
 			&i.RetryAt,
 			&i.ReadyAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSpawned = `-- name: ListSpawned :many
+SELECT stream_id::bigint AS stream_id, COUNT(*)::bigint AS spawned, COUNT(*) FILTER (WHERE status = 'active')::bigint AS active,
+    MAX(created_at)::timestamptz AS last_at
+FROM delegations WHERE stream_id IS NOT NULL GROUP BY stream_id
+`
+
+type ListSpawnedRow struct {
+	StreamID int64
+	Spawned  int64
+	Active   int64
+	LastAt   time.Time
+}
+
+// what each stream spawned: delegations, the active ones and when the last one was
+func (q *Queries) ListSpawned(ctx context.Context) ([]ListSpawnedRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSpawned)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSpawnedRow
+	for rows.Next() {
+		var i ListSpawnedRow
+		if err := rows.Scan(
+			&i.StreamID,
+			&i.Spawned,
+			&i.Active,
+			&i.LastAt,
 		); err != nil {
 			return nil, err
 		}

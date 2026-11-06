@@ -358,7 +358,11 @@ type ListDelegationsRequest struct {
 	// cursor is the next_cursor of the previous page; empty starts from the top.
 	Cursor string `protobuf:"bytes,2,opt,name=cursor,proto3" json:"cursor,omitempty"`
 	// limit is the page size: 100 when 0, at most 1000.
-	Limit         int32 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	Limit int32 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	// stream_id lists only the delegations the stream spawned; 0 lists all.
+	StreamId int64 `protobuf:"varint,4,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
+	// template_id lists only the delegations of the template; empty lists all.
+	TemplateId    string `protobuf:"bytes,5,opt,name=template_id,json=templateId,proto3" json:"template_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -412,6 +416,20 @@ func (x *ListDelegationsRequest) GetLimit() int32 {
 		return x.Limit
 	}
 	return 0
+}
+
+func (x *ListDelegationsRequest) GetStreamId() int64 {
+	if x != nil {
+		return x.StreamId
+	}
+	return 0
+}
+
+func (x *ListDelegationsRequest) GetTemplateId() string {
+	if x != nil {
+		return x.TemplateId
+	}
+	return ""
 }
 
 type ListDelegationsResponse struct {
@@ -1202,7 +1220,12 @@ type Stream struct {
 	// status is active or cancelled.
 	Status string `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
 	// created_at is unix seconds.
-	CreatedAt     int64 `protobuf:"varint,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	CreatedAt int64 `protobuf:"varint,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// spawned is how many delegations the stream spawned, active how many of them are still active.
+	Spawned int64 `protobuf:"varint,6,opt,name=spawned,proto3" json:"spawned,omitempty"`
+	Active  int64 `protobuf:"varint,7,opt,name=active,proto3" json:"active,omitempty"`
+	// last_spawned_at is unix seconds, 0 before the first one.
+	LastSpawnedAt int64 `protobuf:"varint,8,opt,name=last_spawned_at,json=lastSpawnedAt,proto3" json:"last_spawned_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1268,6 +1291,27 @@ func (x *Stream) GetStatus() string {
 func (x *Stream) GetCreatedAt() int64 {
 	if x != nil {
 		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *Stream) GetSpawned() int64 {
+	if x != nil {
+		return x.Spawned
+	}
+	return 0
+}
+
+func (x *Stream) GetActive() int64 {
+	if x != nil {
+		return x.Active
+	}
+	return 0
+}
+
+func (x *Stream) GetLastSpawnedAt() int64 {
+	if x != nil {
+		return x.LastSpawnedAt
 	}
 	return 0
 }
@@ -1487,9 +1531,19 @@ type GetStatusResponse struct {
 	// coins is how many present coins the daemon watches.
 	Coins int64 `protobuf:"varint,8,opt,name=coins,proto3" json:"coins,omitempty"`
 	// amount is the sum of those coins, in sats.
-	Amount        uint64 `protobuf:"varint,9,opt,name=amount,proto3" json:"amount,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Amount uint64 `protobuf:"varint,9,opt,name=amount,proto3" json:"amount,omitempty"`
+	// succeeded and failed count the attempts ended since the daemon started.
+	Succeeded uint64 `protobuf:"varint,10,opt,name=succeeded,proto3" json:"succeeded,omitempty"`
+	Failed    uint64 `protobuf:"varint,11,opt,name=failed,proto3" json:"failed,omitempty"`
+	// template_failures counts the failed attempts charged to their template since the daemon started.
+	TemplateFailures uint64 `protobuf:"varint,12,opt,name=template_failures,json=templateFailures,proto3" json:"template_failures,omitempty"`
+	// reserve_seconds is how long before expiry a coin enters a batch at the latest.
+	ReserveSeconds int64 `protobuf:"varint,13,opt,name=reserve_seconds,json=reserveSeconds,proto3" json:"reserve_seconds,omitempty"`
+	// session_seconds is how often arkd runs a batch, max_intents how many of ours one batch takes.
+	SessionSeconds int64 `protobuf:"varint,14,opt,name=session_seconds,json=sessionSeconds,proto3" json:"session_seconds,omitempty"`
+	MaxIntents     int64 `protobuf:"varint,15,opt,name=max_intents,json=maxIntents,proto3" json:"max_intents,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetStatusResponse) Reset() {
@@ -1581,6 +1635,48 @@ func (x *GetStatusResponse) GetCoins() int64 {
 func (x *GetStatusResponse) GetAmount() uint64 {
 	if x != nil {
 		return x.Amount
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetSucceeded() uint64 {
+	if x != nil {
+		return x.Succeeded
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetFailed() uint64 {
+	if x != nil {
+		return x.Failed
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetTemplateFailures() uint64 {
+	if x != nil {
+		return x.TemplateFailures
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetReserveSeconds() int64 {
+	if x != nil {
+		return x.ReserveSeconds
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetSessionSeconds() int64 {
+	if x != nil {
+		return x.SessionSeconds
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetMaxIntents() int64 {
+	if x != nil {
+		return x.MaxIntents
 	}
 	return 0
 }
@@ -1759,11 +1855,14 @@ const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"\tartifacts\x18\x01 \x03(\v2\x16.delegatee.v1.ArtifactR\tartifacts\"'\n" +
 	"\x15DeleteArtifactRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x18\n" +
-	"\x16DeleteArtifactResponse\"^\n" +
+	"\x16DeleteArtifactResponse\"\x9c\x01\n" +
 	"\x16ListDelegationsRequest\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x16\n" +
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\x12\x14\n" +
-	"\x05limit\x18\x03 \x01(\x05R\x05limit\"}\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\x12\x1b\n" +
+	"\tstream_id\x18\x04 \x01(\x03R\bstreamId\x12\x1f\n" +
+	"\vtemplate_id\x18\x05 \x01(\tR\n" +
+	"templateId\"}\n" +
 	"\x17ListDelegationsResponse\x12A\n" +
 	"\vdelegations\x18\x01 \x03(\v2\x1f.delegatee.v1.DelegationSummaryR\vdelegations\x12\x1f\n" +
 	"\vnext_cursor\x18\x02 \x01(\tR\n" +
@@ -1816,7 +1915,7 @@ const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"\astreams\x18\x01 \x03(\v2\x14.delegatee.v1.StreamR\astreams\"%\n" +
 	"\x13CancelStreamRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\"\x16\n" +
-	"\x14CancelStreamResponse\"\xf1\x01\n" +
+	"\x14CancelStreamResponse\"\xcb\x02\n" +
 	"\x06Stream\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1f\n" +
 	"\vtemplate_id\x18\x02 \x01(\tR\n" +
@@ -1824,7 +1923,10 @@ const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"\tvariables\x18\x03 \x03(\v2#.delegatee.v1.Stream.VariablesEntryR\tvariables\x12\x16\n" +
 	"\x06status\x18\x04 \x01(\tR\x06status\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\x03R\tcreatedAt\x1a<\n" +
+	"created_at\x18\x05 \x01(\x03R\tcreatedAt\x12\x18\n" +
+	"\aspawned\x18\x06 \x01(\x03R\aspawned\x12\x16\n" +
+	"\x06active\x18\a \x01(\x03R\x06active\x12&\n" +
+	"\x0flast_spawned_at\x18\b \x01(\x03R\rlastSpawnedAt\x1a<\n" +
 	"\x0eVariablesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x12\n" +
@@ -1837,7 +1939,7 @@ const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"\ahealthy\x18\x02 \x01(\bR\ahealthy\x12\x14\n" +
 	"\x05error\x18\x03 \x01(\tR\x05error\";\n" +
 	"\x10GetStatusRequest\x12'\n" +
-	"\x0fhorizon_seconds\x18\x01 \x01(\x03R\x0ehorizonSeconds\"\x96\x02\n" +
+	"\x0fhorizon_seconds\x18\x01 \x01(\x03R\x0ehorizonSeconds\"\xec\x03\n" +
 	"\x11GetStatusResponse\x12\x16\n" +
 	"\x06active\x18\x01 \x01(\x03R\x06active\x12\x16\n" +
 	"\x06queued\x18\x02 \x01(\x03R\x06queued\x12\x1e\n" +
@@ -1850,7 +1952,15 @@ const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"\n" +
 	"tip_height\x18\a \x01(\x03R\ttipHeight\x12\x14\n" +
 	"\x05coins\x18\b \x01(\x03R\x05coins\x12\x16\n" +
-	"\x06amount\x18\t \x01(\x04R\x06amount\"\x9e\x01\n" +
+	"\x06amount\x18\t \x01(\x04R\x06amount\x12\x1c\n" +
+	"\tsucceeded\x18\n" +
+	" \x01(\x04R\tsucceeded\x12\x16\n" +
+	"\x06failed\x18\v \x01(\x04R\x06failed\x12+\n" +
+	"\x11template_failures\x18\f \x01(\x04R\x10templateFailures\x12'\n" +
+	"\x0freserve_seconds\x18\r \x01(\x03R\x0ereserveSeconds\x12'\n" +
+	"\x0fsession_seconds\x18\x0e \x01(\x03R\x0esessionSeconds\x12\x1f\n" +
+	"\vmax_intents\x18\x0f \x01(\x03R\n" +
+	"maxIntents\"\x9e\x01\n" +
 	"\rBatchForecast\x12\x0e\n" +
 	"\x02at\x18\x01 \x01(\x03R\x02at\x12\x18\n" +
 	"\aintents\x18\x02 \x01(\x03R\aintents\x12\x14\n" +

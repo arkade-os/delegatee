@@ -248,6 +248,11 @@ func (s *Service) Summaries(ctx context.Context, f ports.SummaryFilter) ([]ports
 	return s.summaries.List(ctx, f)
 }
 
+// Spawned returns what each stream spawned, by stream id.
+func (s *Service) Spawned(ctx context.Context) (map[int64]ports.Spawned, error) {
+	return s.summaries.Spawned(ctx)
+}
+
 // Attempts lists the attempts of a delegation newest first, below cursor when not zero.
 func (s *Service) Attempts(ctx context.Context, delegationID, cursor int64, limit int) ([]delegation.Attempt, error) {
 	return s.attempts.ListByDelegation(ctx, delegationID, cursor, limit)

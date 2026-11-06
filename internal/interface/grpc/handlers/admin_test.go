@@ -11,6 +11,7 @@ import (
 	executionapp "github.com/arkade-os/delegatee/internal/core/application/execution"
 	"github.com/arkade-os/delegatee/internal/core/application/health"
 	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
+	"github.com/arkade-os/delegatee/internal/core/domain/execution"
 	"github.com/arkade-os/delegatee/internal/core/ports"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -133,6 +134,8 @@ func TestListDelegations(t *testing.T) {
 		summary(1, time.Time{}, 0, 0, delegation.Failed), summary(2, time.Time{}, 0, 0, ""), summary(4, time.Time{}, 0, 0, ""),
 	}
 	rows[3].Status = delegation.StatusCancelled
+	rows[1].StreamID, rows[4].StreamID = 9, 9
+	rows[2].TemplateID = "other"
 	admin := NewAdmin(nil, nil, &summaryStub{rows: rows}, nil)
 
 	all, err := admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{})
@@ -162,6 +165,12 @@ func TestListDelegations(t *testing.T) {
 	cancelled, err := admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{Status: "cancelled"})
 	require.NoError(t, err)
 	require.Equal(t, []int64{2}, delegationIDs(cancelled))
+	spawned, err := admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{StreamId: 9})
+	require.NoError(t, err)
+	require.Equal(t, []int64{5, 4}, delegationIDs(spawned))
+	other, err := admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{TemplateId: "other"})
+	require.NoError(t, err)
+	require.Equal(t, []int64{1}, delegationIDs(other))
 
 	_, err = admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{Cursor: "not a cursor"})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
@@ -266,6 +275,8 @@ func TestGetStatus(t *testing.T) {
 	soon := time.Unix(1_800_000_100, 0)
 	stub := &statusStub{status: executionapp.Status{
 		Active: 5, Queued: 3, Registered: 2, Late: 1, NextDue: soon, Tip: delegation.Tip{Height: 812}, Coins: 7, Amount: 70_000,
+		Succeeded: 11, Failed: 4, TemplateFailures: 2, Reserve: 15 * time.Minute,
+		Session: execution.Session{Duration: time.Minute, MaxIntents: 64},
 		Batches: []executionapp.BatchForecast{
 			{At: soon, Intents: 2, Coins: 3, Amount: 30_000, Entries: []executionapp.ForecastEntry{{DelegationID: 4, Coins: 3, Amount: 30_000, Due: soon, Deadline: soon.Add(time.Hour)}}}, {At: soon.Add(time.Minute), Intents: 1, Coins: 1, Amount: 10_000},
 		},
@@ -281,6 +292,12 @@ func TestGetStatus(t *testing.T) {
 	require.Equal(t, int64(812), resp.GetTipHeight())
 	require.Equal(t, int64(7), resp.GetCoins())
 	require.Equal(t, uint64(70_000), resp.GetAmount())
+	require.Equal(t, uint64(11), resp.GetSucceeded())
+	require.Equal(t, uint64(4), resp.GetFailed())
+	require.Equal(t, uint64(2), resp.GetTemplateFailures())
+	require.Equal(t, int64(900), resp.GetReserveSeconds())
+	require.Equal(t, int64(60), resp.GetSessionSeconds())
+	require.Equal(t, int64(64), resp.GetMaxIntents())
 	require.Len(t, resp.GetBatches(), 2)
 	require.Equal(t, soon.Unix(), resp.GetBatches()[0].GetAt())
 	require.Equal(t, int64(2), resp.GetBatches()[0].GetIntents())
@@ -352,7 +369,9 @@ func (s *summaryStub) Summaries(_ context.Context, f ports.SummaryFilter) ([]por
 	var out []ports.Summary
 	after := f.After.ID == 0
 	for _, row := range s.rows {
-		if after && (f.Status == "" || row.Status == f.Status) && len(out) < f.Limit {
+		matches := (f.Status == "" || row.Status == f.Status) && (f.StreamID == 0 || row.StreamID == f.StreamID) &&
+			(f.TemplateID == "" || row.TemplateID == f.TemplateID)
+		if after && matches && len(out) < f.Limit {
 			out = append(out, row)
 		}
 		after = after || row.ID == f.After.ID

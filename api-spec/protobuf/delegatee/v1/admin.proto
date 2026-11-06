@@ -117,6 +117,10 @@ message ListDelegationsRequest {
   string cursor = 2;
   // limit is the page size: 100 when 0, at most 1000.
   int32 limit = 3;
+  // stream_id lists only the delegations the stream spawned; 0 lists all.
+  int64 stream_id = 4;
+  // template_id lists only the delegations of the template; empty lists all.
+  string template_id = 5;
 }
 message ListDelegationsResponse {
   repeated DelegationSummary delegations = 1;
@@ -196,6 +200,11 @@ message Stream {
   string status = 4;
   // created_at is unix seconds.
   int64 created_at = 5;
+  // spawned is how many delegations the stream spawned, active how many of them are still active.
+  int64 spawned = 6;
+  int64 active = 7;
+  // last_spawned_at is unix seconds, 0 before the first one.
+  int64 last_spawned_at = 8;
 }
 message GetHealthRequest {}
 message GetHealthResponse {
@@ -233,6 +242,16 @@ message GetStatusResponse {
   int64 coins = 8;
   // amount is the sum of those coins, in sats.
   uint64 amount = 9;
+  // succeeded and failed count the attempts ended since the daemon started.
+  uint64 succeeded = 10;
+  uint64 failed = 11;
+  // template_failures counts the failed attempts charged to their template since the daemon started.
+  uint64 template_failures = 12;
+  // reserve_seconds is how long before expiry a coin enters a batch at the latest.
+  int64 reserve_seconds = 13;
+  // session_seconds is how often arkd runs a batch, max_intents how many of ours one batch takes.
+  int64 session_seconds = 14;
+  int64 max_intents = 15;
 }
 // BatchForecast is what a coming batch is expected to carry of ours.
 message BatchForecast {

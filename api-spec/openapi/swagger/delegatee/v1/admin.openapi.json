@@ -275,6 +275,23 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "streamId",
+            "in": "query",
+            "description": "stream_id lists only the delegations the stream spawned; 0 lists all.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "templateId",
+            "in": "query",
+            "description": "template_id lists only the delegations of the template; empty lists all.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -924,9 +941,17 @@
             "description": "coins is how many present coins the daemon watches.",
             "format": "int64"
           },
+          "failed": {
+            "type": "integer",
+            "format": "uint64"
+          },
           "late": {
             "type": "integer",
             "description": "late is how many coins are forecast to miss their deadline.",
+            "format": "int64"
+          },
+          "maxIntents": {
+            "type": "integer",
             "format": "int64"
           },
           "nextDue": {
@@ -943,6 +968,26 @@
             "type": "integer",
             "description": "registered is how many entries are registered at arkd, waiting for a batch.",
             "format": "int64"
+          },
+          "reserveSeconds": {
+            "type": "integer",
+            "description": "reserve_seconds is how long before expiry a coin enters a batch at the latest.",
+            "format": "int64"
+          },
+          "sessionSeconds": {
+            "type": "integer",
+            "description": "session_seconds is how often arkd runs a batch, max_intents how many of ours one batch takes.",
+            "format": "int64"
+          },
+          "succeeded": {
+            "type": "integer",
+            "description": "succeeded and failed count the attempts ended since the daemon started.",
+            "format": "uint64"
+          },
+          "templateFailures": {
+            "type": "integer",
+            "description": "template_failures counts the failed attempts charged to their template since the daemon started.",
+            "format": "uint64"
           },
           "tipHeight": {
             "type": "integer",
@@ -1065,6 +1110,15 @@
           "status": {
             "type": "string",
             "description": "status filters on active, cancelled, expired or done; empty lists all."
+          },
+          "streamId": {
+            "type": "integer",
+            "description": "stream_id lists only the delegations the stream spawned; 0 lists all.",
+            "format": "int64"
+          },
+          "templateId": {
+            "type": "string",
+            "description": "template_id lists only the delegations of the template; empty lists all."
           }
         }
       },
@@ -1163,6 +1217,10 @@
         "type": "object",
         "description": "Stream is an operator's standing rule: a template's trigger run against arkd's transactions.",
         "properties": {
+          "active": {
+            "type": "integer",
+            "format": "int64"
+          },
           "createdAt": {
             "type": "integer",
             "description": "created_at is unix seconds.",
@@ -1170,6 +1228,16 @@
           },
           "id": {
             "type": "integer",
+            "format": "int64"
+          },
+          "lastSpawnedAt": {
+            "type": "integer",
+            "description": "last_spawned_at is unix seconds, 0 before the first one.",
+            "format": "int64"
+          },
+          "spawned": {
+            "type": "integer",
+            "description": "spawned is how many delegations the stream spawned, active how many of them are still active.",
             "format": "int64"
           },
           "status": {

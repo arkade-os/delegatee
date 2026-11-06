@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	delegationapp "github.com/arkade-os/delegatee/internal/core/application/delegation"
+	"github.com/arkade-os/delegatee/internal/core/ports"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -31,6 +33,16 @@ func TestRegisterListCancelStream(t *testing.T) {
 	list, err := admin.ListStreams(t.Context(), &delegateev1.ListStreamsRequest{})
 	require.NoError(t, err)
 	require.Len(t, list.GetStreams(), 1)
+	require.Zero(t, list.GetStreams()[0].GetSpawned(), "nothing spawned yet")
+	require.Zero(t, list.GetStreams()[0].GetLastSpawnedAt())
+
+	last := time.Unix(1_800_000_000, 0)
+	admin.execution.(*spawnedStub).by[st.GetId()] = ports.Spawned{Delegations: 3, Active: 1, Last: last}
+	list, err = admin.ListStreams(t.Context(), &delegateev1.ListStreamsRequest{})
+	require.NoError(t, err)
+	require.Equal(t, int64(3), list.GetStreams()[0].GetSpawned())
+	require.Equal(t, int64(1), list.GetStreams()[0].GetActive())
+	require.Equal(t, last.Unix(), list.GetStreams()[0].GetLastSpawnedAt())
 
 	_, err = admin.CancelStream(t.Context(), &delegateev1.CancelStreamRequest{Id: st.GetId()})
 	require.NoError(t, err)
@@ -80,5 +92,13 @@ func testStreamAdmin(t *testing.T) (*Admin, string) {
 	)
 	stored, err := reg.RegisterTemplate(t.Context(), []byte(testTemplateDocument(t, "noninteractiveclaim.json")))
 	require.NoError(t, err)
-	return NewAdmin(reg, svc, nil, nil), stored.ID
+	return NewAdmin(reg, svc, &spawnedStub{by: map[int64]ports.Spawned{}}, nil), stored.ID
 }
+
+// spawnedStub reports what it was told each stream spawned.
+type spawnedStub struct {
+	Executor
+	by map[int64]ports.Spawned
+}
+
+func (s *spawnedStub) Spawned(context.Context) (map[int64]ports.Spawned, error) { return s.by, nil }

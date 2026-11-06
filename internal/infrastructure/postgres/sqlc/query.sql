@@ -92,12 +92,14 @@ WITH held AS (
 ), with_coins AS (
     SELECT d.id, h.coins, h.amount, h.next_due FROM held h JOIN delegations d ON d.id = h.delegation_id
     WHERE NOT @skip_held::boolean AND (@status::text = '' OR d.status = @status::text)
+      AND (@stream_id::bigint = 0 OR d.stream_id = @stream_id::bigint) AND (@template_id::text = '' OR d.template_id = @template_id::text)
       AND (h.next_due, d.id) > (@after_due::timestamptz, @after_id::bigint)
     ORDER BY h.next_due, d.id
     LIMIT @max_count::int
 ), idle AS (
     SELECT d.id, 0::bigint AS coins, 0::bigint AS amount, NULL::timestamptz AS next_due FROM delegations d
     WHERE d.id > @idle_after::bigint AND (@status::text = '' OR d.status = @status::text)
+      AND (@stream_id::bigint = 0 OR d.stream_id = @stream_id::bigint) AND (@template_id::text = '' OR d.template_id = @template_id::text)
       AND NOT EXISTS (SELECT 1 FROM coins c WHERE c.delegation_id = d.id AND c.status = 'present')
     ORDER BY d.id
     LIMIT @max_count::int
@@ -127,6 +129,12 @@ SELECT * FROM streams WHERE id = @id;
 
 -- name: ListStreams :many
 SELECT * FROM streams WHERE @status::text = '' OR status = @status::text ORDER BY id;
+
+-- name: ListSpawned :many
+-- what each stream spawned: delegations, the active ones and when the last one was
+SELECT stream_id::bigint AS stream_id, COUNT(*)::bigint AS spawned, COUNT(*) FILTER (WHERE status = 'active')::bigint AS active,
+    MAX(created_at)::timestamptz AS last_at
+FROM delegations WHERE stream_id IS NOT NULL GROUP BY stream_id;
 
 -- name: UpdateStreamStatus :execrows
 UPDATE streams SET status = @status WHERE id = @id;

@@ -15,7 +15,7 @@ func (d *DB) Summaries() *SummaryRepository { return &SummaryRepository{db: d} }
 
 func (r *SummaryRepository) List(ctx context.Context, f ports.SummaryFilter) ([]ports.Summary, error) {
 	params := queries.ListDelegationSummariesParams{
-		Status: f.Status, MaxCount: int32(f.Limit), AfterDue: time.Unix(0, 0), AfterID: f.After.ID,
+		Status: f.Status, StreamID: f.StreamID, TemplateID: f.TemplateID, MaxCount: int32(f.Limit), AfterDue: time.Unix(0, 0), AfterID: f.After.ID,
 	}
 	switch {
 	case f.After.ID == 0:
@@ -45,6 +45,18 @@ func (r *SummaryRepository) List(ctx context.Context, f ports.SummaryFilter) ([]
 			s.NextDue = row.NextDue.UTC()
 		}
 		out = append(out, s)
+	}
+	return out, nil
+}
+
+func (r *SummaryRepository) Spawned(ctx context.Context) (map[int64]ports.Spawned, error) {
+	rows, err := r.db.querier.ListSpawned(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]ports.Spawned, len(rows))
+	for _, row := range rows {
+		out[row.StreamID] = ports.Spawned{Delegations: int(row.Spawned), Active: int(row.Active), Last: row.LastAt.UTC()}
 	}
 	return out, nil
 }

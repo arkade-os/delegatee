@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>delegateed operator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%235b4bdb'/%3E%3Cpath d='M20 7v18m0-4.5a6.5 6.5 0 1 1 0-5' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
 :root {
   color-scheme: light dark;
   --paper: #f4f5f7; --surface: #ffffff; --ink: #16181d; --muted: #5f636d; --faint: #989ba4; --line: #e3e5e9; --hover: #f5f6f8;
   --ok: #18794e; --ok-soft: #e3f4ea; --warn: #a35f00; --warn-soft: #fbefd6; --bad: #c4321f; --bad-soft: #fcebe8;
-  --accent: #5b4bdb; --accent-soft: #e9e6fc;
+  --accent: #5b4bdb; --accent-soft: #e9e6fc; --wait: #c9ccd3;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
@@ -17,66 +18,141 @@
   :root {
     --paper: #0d0e11; --surface: #15161a; --ink: #ececf0; --muted: #9a9ca6; --faint: #686a73; --line: #26272d; --hover: #1c1d22;
     --ok: #4cc38a; --ok-soft: #12291d; --warn: #e9a83b; --warn-soft: #33270f; --bad: #f2735f; --bad-soft: #36160f;
-    --accent: #a99bff; --accent-soft: #29254a;
+    --accent: #a99bff; --accent-soft: #29254a; --wait: #3a3c44;
   }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.5 var(--sans); }
-h2 { margin: 0 0 .75rem; font-size: 1rem; font-weight: 600; line-height: 1.25; }
+h2 { margin: 0; font-size: 1.1rem; font-weight: 650; line-height: 1.3; }
+h3 { margin: 0 0 .6rem; font-size: .95rem; font-weight: 600; }
+h4 { margin: .9rem 0 .3rem; font-size: .85rem; font-weight: 600; }
+p { margin: .3rem 0; }
 a { color: var(--accent); }
 [hidden] { display: none !important; }
 .mono { font-family: var(--mono); font-size: .86em; word-break: break-all; }
 .n { font-variant-numeric: tabular-nums; }
 .muted { color: var(--muted); }
+.small { font-size: .8rem; }
+.bad-text { color: var(--bad); }
+.spacer { flex: 1; }
+dd { margin: 0; min-width: 0; }
 
-button, select { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: .25rem .7rem; }
+button, select, input, textarea { font: inherit; color: inherit; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: .25rem .7rem; }
+button, select { cursor: pointer; }
 button:hover, select:hover { background: var(--hover); border-color: var(--faint); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 button.danger { color: var(--bad); }
 button:disabled { opacity: .5; cursor: default; }
-button.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
+button.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+button.mini { padding: 0 .4rem; font-size: .72rem; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: .15rem .6rem; }
+.seg button[aria-pressed=true] { background: var(--accent-soft); color: var(--accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 1.5rem; padding: 0 clamp(1rem, 3vw, 2rem); height: 3.25rem; background: var(--surface); border-bottom: 1px solid var(--line); }
 .brand { font-weight: 650; }
-nav { display: flex; align-self: stretch; gap: .25rem; }
-nav a { display: flex; align-items: center; padding: 0 .75rem; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; }
+nav { display: flex; align-self: stretch; gap: .25rem; overflow-x: auto; }
+nav a { display: flex; align-items: center; padding: 0 .75rem; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; }
 nav a:hover { color: var(--ink); }
 nav a[aria-current=page] { color: var(--ink); border-bottom-color: var(--accent); }
-#pulse { margin-left: auto; font-size: .8rem; padding: .1rem .7rem; border-radius: 99px; background: var(--ok-soft); color: var(--ok); }
+#pulse { margin-left: auto; font-size: .8rem; padding: .1rem .75rem; border-radius: 99px; background: var(--ok-soft); color: var(--ok); white-space: nowrap; }
 #pulse.down { background: var(--bad-soft); color: var(--bad); }
-main { max-width: 72rem; margin: 0 auto; padding: 1.5rem clamp(1rem, 3vw, 2rem) 3rem; }
+main { max-width: 76rem; margin: 0 auto; padding: 1.25rem clamp(1rem, 3vw, 2rem) 3rem; }
 #error { margin-bottom: 1rem; padding: .6rem .9rem; border-radius: 6px; background: var(--bad-soft); color: var(--bad); }
 
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: .75rem 1rem; }
-.card .label { color: var(--muted); font-size: .78rem; }
-.card .value { font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.card.alert .value { color: var(--bad); }
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; margin-bottom: 1rem; }
+.crumb { margin-bottom: .5rem; }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(11rem, 40%), 1fr)); gap: .75rem; margin-bottom: 1rem; }
+a.stat { color: inherit; text-decoration: none; }
+a.stat:hover { border-color: var(--faint); }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: .7rem 1rem; }
+.stat .label { color: var(--muted); font-size: .78rem; }
+.stat .fig { display: block; font-size: 1.4rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.stat .fig small { font-size: .75rem; font-weight: 400; color: var(--muted); margin-left: .25rem; }
+.stat .sub { font-size: .78rem; color: var(--muted); }
+.stat.alert { border-color: var(--bad); }
+.stat.alert .fig { color: var(--bad); }
 
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin-bottom: 1.5rem; overflow-x: auto; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; overflow-x: auto; }
+.panel .ph { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem 1rem; margin-bottom: .6rem; }
+.panel .ph h3 { margin: 0; }
+.panel .ph .aside { color: var(--muted); font-size: .8rem; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr)); gap: 0 1rem; }
+.note { padding: .55rem .8rem; border-radius: 6px; background: var(--warn-soft); color: var(--warn); margin-bottom: 1rem; }
+.note.bad { background: var(--bad-soft); color: var(--bad); }
+.note.ok { background: var(--ok-soft); color: var(--ok); }
+.explain { color: var(--muted); font-size: .82rem; margin: 0 0 .6rem; }
+
 table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: baseline; }
-th { color: var(--muted); font-size: .78rem; font-weight: 500; white-space: nowrap; }
+th, td { text-align: left; padding: .4rem .55rem; border-bottom: 1px solid var(--line); vertical-align: baseline; }
+th { color: var(--muted); font-size: .76rem; font-weight: 500; white-space: nowrap; }
 tr:last-child td { border-bottom: 0; }
 td.num, th.num { text-align: right; }
 tr.row { cursor: pointer; }
 tr.row:hover { background: var(--hover); }
-.empty { color: var(--muted); padding: .5rem 0; }
+.empty { color: var(--muted); padding: .4rem 0; }
+td details summary { cursor: pointer; }
+td details > table { margin: .4rem 0 .2rem; background: var(--paper); border-radius: 6px; }
 
-.tag { display: inline-block; padding: 0 .45rem; border-radius: 4px; font-size: .74rem; background: var(--hover); color: var(--muted); }
+.tag { display: inline-block; padding: 0 .45rem; border-radius: 4px; font-size: .74rem; background: var(--hover); color: var(--muted); white-space: nowrap; }
 .tag.ok { background: var(--ok-soft); color: var(--ok); }
 .tag.warn { background: var(--warn-soft); color: var(--warn); }
 .tag.bad { background: var(--bad-soft); color: var(--bad); }
 .tag.accent { background: var(--accent-soft); color: var(--accent); }
+.chips { display: flex; flex-wrap: wrap; gap: .3rem; }
 
-.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .75rem; }
-.toolbar .spacer { flex: 1; }
-dl { display: grid; grid-template-columns: max-content 1fr; gap: .3rem 1.25rem; margin: 0; }
-dt { color: var(--muted); }
-dd { margin: 0; min-width: 0; }
-dialog { width: min(60rem, 94vw); max-height: 88vh; padding: 1rem; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; margin-bottom: .75rem; }
+.toolbar label { display: inline-flex; align-items: center; gap: .35rem; color: var(--muted); font-size: .85rem; }
+dl.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: .6rem 1.5rem; margin: 0; }
+dl.facts dt { color: var(--muted); font-size: .76rem; }
+dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: .3rem 1.25rem; margin: 0; }
+dl.kv dt { color: var(--muted); }
+pre.doc { margin: .5rem 0 0; padding: .75rem; max-height: 32rem; overflow: auto; background: var(--paper); border-radius: 6px; font: .8rem/1.45 var(--mono); }
+.asm { font: .8rem/1.6 var(--mono); word-break: break-word; }
+
+/* forecast timeline: log scale from now */
+.tl { position: relative; height: 4.2rem; margin: .4rem .8rem 1rem; }
+.tl .rail { position: absolute; left: 0; right: 0; top: 1.6rem; height: 2px; background: var(--line); }
+.tl .m { position: absolute; top: 1.6rem; transform: translate(-50%, -50%); width: var(--s); height: var(--s); padding: 0; border-radius: 50%; background: var(--accent-soft); border: 2px solid var(--accent); }
+.tl .m.late { border-color: var(--bad); background: var(--bad-soft); }
+.tl .m span { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); font-size: .7rem; color: var(--muted); padding-bottom: .1rem; }
+.tl .tick { position: absolute; top: 2.3rem; transform: translateX(-50%); font-size: .7rem; color: var(--faint); white-space: nowrap; }
+.tl .tick::before { content: ""; position: absolute; left: 50%; top: -.45rem; height: .3rem; border-left: 1px solid var(--line); }
+
+/* a coin's life from now to its expiry */
+.life { position: relative; height: .55rem; border-radius: 99px; background: var(--wait); overflow: hidden; min-width: 8rem; }
+.life i { position: absolute; top: 0; bottom: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: .25rem 1rem; font-size: .75rem; color: var(--muted); margin-top: .5rem; }
+.legend i { display: inline-block; width: .8rem; height: .5rem; border-radius: 2px; margin-right: .3rem; background: var(--wait); }
+.life .win, .legend .win { background: var(--ok); opacity: .55; }
+.life .res, .legend .res { background: var(--bad); opacity: .55; }
+.life .b, .legend .b { width: 3px; background: var(--accent); }
+
+.stream { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .6rem 1rem; }
+.stream > :first-child { flex: 1 1 24rem; min-width: 0; }
+.stream + .stream { border-top: 1px solid var(--line); padding-top: .9rem; margin-top: .9rem; }
+.listen { margin: .2rem 0 0; padding-left: 1.1rem; }
+.listen li { margin: .15rem 0; }
+.spawn { min-width: 10rem; }
+.spawn .fig { font-size: 1.3rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+dialog { width: min(46rem, 94vw); max-height: 90vh; padding: 1.1rem; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; }
 dialog::backdrop { background: rgba(0, 0, 0, .5); }
-dialog pre { margin: .75rem 0 0; padding: .75rem; max-height: 60vh; overflow: auto; background: var(--paper); border-radius: 6px; font: .85em/1.45 var(--mono); }
+dialog form { display: grid; gap: .7rem; }
+dialog label { display: grid; gap: .25rem; font-size: .85rem; color: var(--muted); }
+dialog textarea { min-height: 14rem; font: .8rem/1.4 var(--mono); }
+dialog .actions { display: flex; justify-content: flex-end; gap: .5rem; }
+dialog .msg { color: var(--bad); font-size: .85rem; }
+
+/* phones: the nav takes its own row under the brand and the health pill */
+@media (max-width: 640px) {
+  header { flex-wrap: wrap; height: auto; gap: 0 1rem; padding-top: .45rem; }
+  nav { order: 3; flex-basis: 100%; }
+  nav a { padding: .45rem .6rem; }
+  #pulse { max-width: 65vw; overflow: hidden; text-overflow: ellipsis; }
+  .panel { padding: .75rem; }
+}
 </style>
 </head>
 <body>
@@ -85,41 +161,71 @@ dialog pre { margin: .75rem 0 0; padding: .75rem; max-height: 60vh; overflow: au
   <nav id="nav">
     <a href="#overview" data-view="overview">Overview</a>
     <a href="#delegations" data-view="delegations">Delegations</a>
-    <a href="#templates" data-view="templates">Templates</a>
     <a href="#streams" data-view="streams">Streams</a>
+    <a href="#registry" data-view="registry">Registry</a>
   </nav>
-  <span id="pulse">health</span>
+  <span id="pulse">…</span>
 </header>
 <main>
   <div id="error" role="alert" hidden></div>
   <div id="view"></div>
 </main>
-<dialog id="doc"></dialog>
+<dialog id="modal"></dialog>
 
 <script>
-const $ = (selector) => document.querySelector(selector);
+const $ = (selector, root = document) => root.querySelector(selector);
 const view = $('#view');
-let timer;
+const HORIZONS = [[86400, '24h'], [259200, '3d'], [604800, '7d']];
+const WEEK = 604800;
 
+// formatting
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const sats = (value) => Number(value || 0).toLocaleString();
-const when = (seconds) => (Number(seconds) ? new Date(Number(seconds) * 1000).toLocaleString() : '-');
-const short = (text, n = 14) => (text.length > n * 2 + 1 ? `${text.slice(0, n)}…${text.slice(-n)}` : text);
-const vars = (variables) => Object.entries(variables || {}).map(([k, v]) => `${esc(k)}=${esc(v)}`).join('<br>') || '-';
-const tag = (text, kind = '') => (text ? `<span class="tag ${kind}">${esc(text)}</span>` : '');
-
-function until(seconds) {
-  if (!Number(seconds)) return '-';
-  const delta = Number(seconds) - Date.now() / 1000;
-  const magnitude = Math.abs(delta);
-  const text = magnitude < 90 ? `${Math.round(magnitude)}s` : magnitude < 5400 ? `${Math.round(magnitude / 60)}m`
-    : magnitude < 129600 ? `${Math.round(magnitude / 3600)}h` : `${Math.round(magnitude / 86400)}d`;
-  return delta < 0 ? `${text} ago` : `in ${text}`;
+const num = (value) => Number(value || 0);
+const now = () => Date.now() / 1000;
+const sats = (value) => `${num(value).toLocaleString()} sats`;
+const count = (n, word, plural = `${word}s`) => `${num(n).toLocaleString()} ${num(n) === 1 ? word : plural}`;
+const short = (text, n = 10) => { text = String(text || ''); return text.length > n * 2 + 1 ? `${text.slice(0, n)}…${text.slice(-n)}` : text; };
+const date = (ts) => (num(ts) ? new Date(num(ts) * 1000).toLocaleString() : '');
+function span(seconds) {
+  const s = Math.abs(num(seconds));
+  if (s < 90) return `${Math.round(s)}s`;
+  if (s < 3570) return `${Math.round(s / 60)}m`;
+  if (s < 129600) { const mins = Math.round(s / 60), h = Math.floor(mins / 60), m = mins % 60; return m && h < 6 ? `${h}h ${m}m` : `${Math.round(s / 3600)}h`; }
+  return `${(s / 86400).toFixed(s < 864000 ? 1 : 0).replace(/\.0$/, '')}d`;
 }
+const rel = (ts) => (!num(ts) ? '-' : num(ts) - now() >= 0 ? `in ${span(num(ts) - now())}` : `${span(now() - num(ts))} ago`);
+// rel with the date on hover
+const at = (ts) => (num(ts) ? `<span title="${esc(date(ts))}">${esc(rel(ts))}</span>` : '<span class="muted">-</span>');
+const tag = (text, kind = '') => (text ? `<span class="tag ${kind}">${esc(text)}</span>` : '');
+// copy shows a value shortened, linked when href is set, with a copy button
+const copy = (text, n = 10, href = '') => (!text ? '<span class="muted">-</span>'
+  : `${href ? `<a class="mono" href="${esc(href)}" target="_blank" rel="noopener" title="Open ${esc(text)} in the explorer">${esc(short(text, n))}</a>` : `<span class="mono" title="${esc(text)}">${esc(short(text, n))}</span>`} <button class="mini" data-copy="${esc(text)}">copy</button>`);
+// explorers by network: ark addresses and transactions on arkade's, onchain ones on mempool's
+const EXPLORERS = {
+  bitcoin: { ark: 'https://arkade.space', chain: 'https://mempool.space' },
+  mutinynet: { ark: 'https://explorer.mutinynet.arkade.sh', chain: 'https://mutinynet.com' },
+};
+function explorer(value, onchain = false) {
+  const e = EXPLORERS[state.info?.network];
+  if (!e || !value) return '';
+  if (/^t?ark1/.test(value)) return `${e.ark}/address/${value}`;
+  if (!/^[0-9a-f]{64}(:\d+)?$/.test(value)) return `${e.chain}/address/${value}`;
+  return `${onchain ? e.chain : e.ark}/tx/${value.split(':')[0]}`;
+}
+const tx = (value, n = 8, onchain = false) => copy(value, n, explorer(value, onchain));
+const go = (hash, label) => `<a href="#${esc(hash)}">${label}</a>`;
 
-const attemptKind = { succeeded: 'ok', failed: 'bad' };
-const statusKind = { active: 'ok', cancelled: 'bad', expired: 'warn', done: 'accent' };
-const copy = (text) => `<span class="mono">${esc(short(text || '', 12))}</span> ${text ? `<button class="link" data-copy="${esc(text)}">copy</button>` : ''}`;
+// health checks by API name: the name shown and what it watches
+const CHECKS = {
+  db: ['db', 'Postgres'], arkd: ['arkd', 'the Ark server'], electrum: ['electrum', 'the chain indexer, for onchain coins'],
+  emulator: ['emulator', 'the covenant signer'], loop: ['scheduler', 'runs coins as they come due; fails when work is due and nothing ran'],
+};
+const checkName = (name) => CHECKS[name]?.[0] || name;
+const statusKind = { active: 'ok', cancelled: 'bad', expired: 'warn', done: 'accent', disabled: 'bad', present: 'ok', spent: '' };
+const attemptKind = { succeeded: 'ok', failed: 'bad', submitted: 'warn' };
+
+// state shared by the views
+const state = { info: null, status: null, templates: [], artifacts: [], streams: [], health: [], horizon: 86400, open: new Set() };
 
 async function api(path, options = {}) {
   const response = await fetch(`/v1/${path}`, {
@@ -129,31 +235,637 @@ async function api(path, options = {}) {
   if (!response.ok) throw new Error(body.message || response.statusText);
   return body;
 }
+const loaders = {
+  info: async () => { state.info = await api('info'); },
+  status: async () => { state.status = await api(`admin/status?horizonSeconds=${state.horizon}`); },
+  // the list leaves documents out: each is fetched once, a template never changes
+  templates: async () => {
+    state.templates = (await api('templates')).templates || [];
+    await Promise.all(state.templates.filter((t) => !parsed.has(t.id)).map(async (t) => {
+      const { template } = await api(`template/${encodeURIComponent(t.id)}`);
+      try { parsed.set(t.id, JSON.parse(template.document || '{}')); } catch { parsed.set(t.id, {}); }
+      documents.set(t.id, template.document || '');
+    }));
+  },
+  artifacts: async () => { state.artifacts = (await api('admin/artifacts')).artifacts || []; },
+  streams: async () => { state.streams = (await api('admin/streams')).streams || []; },
+  health: async () => { state.health = (await api('admin/health')).entries || []; },
+};
+const load = (...names) => Promise.all(names.map((n) => loaders[n]()));
 
 function fail(error) {
   $('#error').textContent = error.message;
   $('#error').hidden = false;
 }
 
-// openDoc shows a template or artifact document in the dialog
-async function openDoc(kind, id) {
+// template documents by id, raw and parsed
+const parsed = new Map(), documents = new Map();
+const doc = (t) => (t && parsed.get(t.id)) || {};
+const templateOf = (id) => state.templates.find((t) => t.id === id);
+const artifactName = (a) => { try { return JSON.parse(a.document || '{}').contractName || ''; } catch { return ''; } };
+// what a template does, from its document
+function templateKind(t) {
+  const d = doc(t);
+  if (d.trigger) return 'stream claim';
+  if ((d.inputs || []).some((i) => i.type === 'onchain')) return 'boarding';
+  return t?.type === 'intent' ? 'renewal' : t?.type === 'offchain' ? 'spend' : 'unknown';
+}
+// what a delegation does: a stream spawned it, it boards a deposit, or its template's kind
+function kindOf(d) {
+  if (num(d.streamId)) return 'stream claim';
+  if ((d.inputs || []).some((i) => i.onchain)) return 'boarding';
+  return templateKind(templateOf(d.templateId));
+}
+const templateLabel = (id) => { const t = templateOf(id); return `${t ? templateKind(t) : 'template'} <span class="mono muted">${esc(short(id, 6))}</span>`; };
+const templateLink = (id) => go(`registry/template/${id}`, templateLabel(id));
+
+// scripts, decoded for reading
+const OPS = { 0x75: 'DROP', 0x76: 'DUP', 0x87: 'EQUAL', 0x88: 'EQUALVERIFY', 0x82: 'SIZE', 0x69: 'VERIFY', 0xa8: 'SHA256', 0xa9: 'HASH160', 0xac: 'CHECKSIG',
+  0xad: 'CHECKSIGVERIFY', 0xae: 'CHECKMULTISIG', 0xb1: 'CHECKLOCKTIMEVERIFY', 0xb2: 'CHECKSEQUENCEVERIFY', 0xba: 'CHECKSIGADD', 0xa2: 'GREATERTHANOREQUAL' };
+const bytes = (hex) => Uint8Array.from(String(hex).match(/../g) ?? [], (h) => parseInt(h, 16));
+function scriptNum(b) {
+  if (!b.length) return 0;
+  const v = b.reduceRight((a, x, i) => a * 256 + (i === b.length - 1 ? x & 0x7f : x), 0);
+  return b[b.length - 1] & 0x80 ? -v : v;
+}
+const bip68 = (v) => (v & (1 << 22) ? span((v & 0xffff) * 512) : `${(v & 0xffff).toLocaleString()} blocks`);
+// a 32-byte push is a key: named when it is one of the daemon's or a variable
+function keyName(x, variables) {
+  const i = state.info || {};
+  const known = [['server', i.serverPubkey], ['emulator', i.emulatorPubkey], ['cosigner', i.cosignerPubkey], ...Object.entries(variables || {})];
+  return known.find(([, k]) => k && (k.length === 64 || k.length === 66) && k.slice(-64) === x)?.[0] ?? `key·${x.slice(0, 6)}`;
+}
+function scriptWords(hex, variables) {
+  const b = bytes(hex), out = [];
+  for (let i = 0; i < b.length;) {
+    const op = b[i++];
+    let n = op > 0 && op <= 0x4b ? op : op === 0x4c ? b[i++] : op === 0x4d ? b[i] | (b[i + 1] << 8) : -1;
+    if (op === 0x4d) i += 2;
+    if (n < 0) { out.push(op === 0 ? '0' : op >= 0x51 && op <= 0x60 ? String(op - 0x50) : OPS[op] ?? `OP_${op.toString(16)}`); continue; }
+    const data = Array.from(b.slice(i, i + n), (x) => x.toString(16).padStart(2, '0')).join(''); i += n;
+    if (n === 32) { out.push(keyName(data, variables)); continue; }
+    const next = b[i], v = scriptNum(b.slice(i - n, i));
+    if (next === 0xb2) out.push(`after ${bip68(v)}`);
+    else if (next === 0xb1) out.push(v < 500_000_000 ? `from block ${v.toLocaleString()}` : `from ${new Date(v * 1000).toLocaleDateString()}`);
+    else out.push(n <= 8 ? String(v) : short(data, 6));
+  }
+  return out.join(' ');
+}
+// a variable's value, read by its type and name
+function variable(name, type, hex) {
+  if (type !== 'int') return copy(hex, 12);
+  const n = scriptNum(bytes(hex));
+  const text = /delay/.test(name) ? bip68(n) : /window/.test(name) ? span(n) : /fee/.test(name) ? sats(n) : n.toLocaleString();
+  return `<span class="n" title="script number 0x${esc(hex) || '(empty)'}">${esc(text)}</span>`;
+}
+function variablesList(variables, templateId) {
+  const types = Object.fromEntries((templateOf(templateId)?.params || []).map((p) => [p.name, p.type]));
+  const entries = Object.entries(variables || {});
+  return entries.length ? `<dl class="kv">${entries.map(([k, v]) => `<dt class="mono">${esc(k)}</dt><dd>${variable(k, types[k], v)}</dd>`).join('')}</dl>` : '<p class="empty">No variable.</p>';
+}
+
+// triggers, described in words
+const DAEMON_KEYS = { ENCRYPTION_KEY: "this daemon's encryption key", SERVER_KEY: "arkd's server key", EMULATOR_KEY: "the emulator's key", COSIGNER_KEY: "this daemon's cosigner key" };
+function source(s) {
+  if (s === 'output:taptree') return "the matched output's taptree";
+  const m = /^tlv:(\d+)$/.exec(s);
+  return m ? `TLV record ${m[1]}` : s === 'body' ? 'the packet body' : s;
+}
+function value(v, variables) {
+  const m = /^<([A-Za-z_]+)>$/.exec(v || '');
+  if (!m) return `<span class="mono">${esc(short(v, 10))}</span>`;
+  if (DAEMON_KEYS[m[1]]) return esc(DAEMON_KEYS[m[1]]);
+  return variables?.[m[1]] !== undefined ? `<span class="mono">${esc(m[1])}</span> = ${copy(variables[m[1]], 8)}` : `the variable <span class="mono">${esc(m[1])}</span>`;
+}
+function describeTrigger(trigger, variables) {
+  if (!trigger) return '<p class="empty">No trigger.</p>';
+  const lines = [`arkd transactions carrying extension packet <b>${esc(trigger.packet)}</b>, read as ${trigger.decode === 'tlv' ? 'TLV records' : 'raw bytes'}`];
+  for (const [s, v] of Object.entries(trigger.require || {})) lines.push(`where ${esc(source(s))} equals ${value(v, variables)}`);
+  if (num(trigger.min_value)) lines.push(`with an output of at least ${esc(sats(trigger.min_value))}`);
+  const captures = Object.entries(trigger.capture || {}).map(([name, c]) => {
+    const from = typeof c === 'string' ? c : c.from;
+    return `<span class="mono">${esc(name)}</span> from ${esc(source(from))}${typeof c === 'object' && c.asm ? ', matched against a script pattern' : ''}`;
+  });
+  return `<ul class="listen">${lines.map((l) => `<li>${l}</li>`).join('')}</ul>
+    ${captures.length ? `<p class="small muted" style="margin-top:.4rem">Each match captures ${captures.join(', ')}${num(trigger.expires_after_seconds) ? `, and spawns a delegation that lives ${esc(span(trigger.expires_after_seconds))}` : ''}.</p>` : ''}`;
+}
+
+function table(columns, rows, rowAttributes = () => '') {
+  if (!rows.length) return '<p class="empty">Nothing here.</p>';
+  const head = columns.map((c) => `<th class="${c.num ? 'num' : ''}">${c.title}</th>`).join('');
+  const body = rows.map((row) => `<tr ${rowAttributes(row)}>${columns.map((c) => `<td class="${c.num ? 'num n' : ''}">${c.cell(row)}</td>`).join('')}</tr>`).join('');
+  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+const stat = (label, fig, sub = '', alert = false, hash = '') => `<${hash ? `a href="#${hash}"` : 'div'} class="stat ${alert ? 'alert' : ''}">
+  <span class="label">${label}</span><span class="fig">${fig}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</${hash ? 'a' : 'div'}>`;
+
+// the header pill: health first, then the next batch
+function renderPulse() {
+  const down = state.health.filter((e) => !e.healthy), next = (state.status?.batches || [])[0];
+  $('#pulse').className = down.length ? 'down' : '';
+  $('#pulse').textContent = down.length ? `down: ${down.map((e) => checkName(e.name)).join(', ')}`
+    : next ? `healthy · next batch ${rel(next.at)}, ${count(next.coins, 'coin')}` : 'healthy · no batch planned';
+}
+
+// forecast time scale: log from now, a minute a unit
+function logScale(far) {
+  const k = Math.log1p(far / 60);
+  return (seconds) => Math.max(0, Math.min(100, (Math.log1p(Math.max(seconds, 0) / 60) / k) * 100));
+}
+const TICKS = [[60, '1m'], [600, '10m'], [3600, '1h'], [21600, '6h'], [86400, '1d'], [259200, '3d'], [604800, '7d']];
+function timeline(batches) {
+  if (!batches.length) return '';
+  const t = now(), far = Math.max(num(batches[batches.length - 1].at) - t, 7200), pct = logScale(far);
+  const big = Math.max(...batches.map((b) => num(b.coins)), 1);
+  let labelled = -Infinity;
+  const marks = batches.map((b) => {
+    const x = pct(num(b.at) - t), size = 10 + 16 * Math.sqrt(num(b.coins) / big), show = x - labelled >= 6;
+    if (show) labelled = x;
+    const late = (b.entries || []).some((e) => num(e.deadline) < num(b.at));
+    return `<button class="m ${late ? 'late' : ''}" style="left:${x}%;--s:${size.toFixed(1)}px" data-batch="${esc(b.at)}" title="${esc(`${rel(b.at)}: ${count(b.coins, 'coin')}, ${sats(b.amount)}`)}">${show ? `<span>${num(b.coins).toLocaleString()}</span>` : ''}</button>`;
+  }).join('');
+  const ticks = [[0, 'now'], ...TICKS.filter(([s]) => s < far * 1.05)].map(([s, l]) => `<span class="tick" style="left:${pct(s)}%">${l}</span>`).join('');
+  return `<div class="tl" role="img" aria-label="${esc(count(batches.length, 'batch', 'batches'))}"><div class="rail"></div>${marks}${ticks}</div>`;
+}
+function forecastTable(batches) {
+  return table([
+    { title: 'When', cell: (b) => `<details data-at="${esc(b.at)}" ${state.open.has(String(b.at)) ? 'open' : ''}><summary>${at(b.at)} <span class="muted small">${esc(date(b.at))}</span></summary>${table([
+      { title: 'Delegation', cell: (e) => go(`delegations/${e.delegationId}`, `#${esc(e.delegationId)}`) },
+      { title: 'Coins', num: true, cell: (e) => num(e.coins).toLocaleString() },
+      { title: 'Amount', num: true, cell: (e) => esc(sats(e.amount)) },
+      { title: 'Due', cell: (e) => at(e.due) },
+      { title: 'Deadline', cell: (e) => `${at(e.deadline)}${num(e.deadline) < num(b.at) ? ' ' + tag('late', 'bad') : ''}` },
+    ], b.entries || [])}${num(b.intents) > (b.entries || []).length ? `<p class="small muted">The first ${(b.entries || []).length} of ${num(b.intents).toLocaleString()} are listed.</p>` : ''}</details>` },
+    { title: 'Delegations', num: true, cell: (b) => num(b.intents).toLocaleString() },
+    { title: 'Coins', num: true, cell: (b) => num(b.coins).toLocaleString() },
+    { title: 'Amount', num: true, cell: (b) => esc(sats(b.amount)) },
+    { title: 'Earliest deadline', cell: (b) => { const d = Math.min(...(b.entries || []).map((e) => num(e.deadline)).filter(Boolean)); return Number.isFinite(d) ? `${at(d)}${d < num(b.at) ? ' ' + tag('late', 'bad') : ''}` : '-'; } },
+  ], batches);
+}
+
+const views = {
+  async overview() {
+    const [{ delegations: rows = [] }] = await Promise.all([
+      api('admin/delegations?status=active&limit=200'), load('status', 'health', 'info', 'templates', 'streams'),
+    ]);
+    const s = state.status, batches = s.batches || [], next = batches[0];
+    const failing = rows.filter((r) => r.lastAttempt === 'failed');
+    const comingDue = rows.filter((r) => num(r.coins)).slice(0, 8);
+    const down = state.health.filter((e) => !e.healthy);
+    const forecastAmount = batches.reduce((a, b) => a + num(b.amount), 0), forecastCoins = batches.reduce((a, b) => a + num(b.coins), 0);
+    const activeStreams = state.streams.filter((x) => x.status === 'active');
+    const disabled = state.templates.filter((t) => t.status !== 'active');
+
+    view.innerHTML = `
+      ${down.length ? `<div class="note bad">Down: ${down.map((e) => `<b>${esc(checkName(e.name))}</b> ${esc(e.error)}`).join('; ')}</div>` : ''}
+      ${num(s.late) ? `<div class="note bad"><b>${esc(count(s.late, 'coin'))}</b> forecast to miss their deadline: they enter a batch after expiry minus the reserve.</div>` : ''}
+      <div class="stats">
+        ${stat('Under watch', `${num(s.amount).toLocaleString()}<small>sats</small>`, count(s.coins, 'coin'))}
+        ${stat('Active delegations', num(s.active).toLocaleString(), `${count(activeStreams.length, 'stream')} spawning`, false, 'delegations')}
+        ${stat('Next batch', next ? esc(rel(next.at)) : 'none', next ? `${esc(count(next.coins, 'coin'))}, ${esc(sats(next.amount))}` : 'no coin due yet')}
+        ${stat('Since start', `${num(s.succeeded).toLocaleString()}<small>ok</small> ${num(s.failed).toLocaleString()}<small>failed</small>`, num(s.templateFailures) ? `${num(s.templateFailures)} charged to templates` : 'attempts ended', num(s.failed) > 0 && num(s.succeeded) === 0)}
+        ${stat('In hand', `${num(s.queued).toLocaleString()}<small>queued</small> ${num(s.registered).toLocaleString()}<small>at arkd</small>`, 'coins due, waiting for their batch')}
+        ${stat('Late', num(s.late).toLocaleString(), 'forecast to miss a deadline', num(s.late) > 0)}
+      </div>
+
+      <section class="panel"><div class="ph"><h3>Batch forecast</h3>
+        <span class="aside">${batches.length ? `${esc(count(batches.length, 'batch', 'batches'))}, ${esc(count(forecastCoins, 'coin'))}, ${esc(sats(forecastAmount))}` : ''}</span>
+        <span class="spacer"></span>
+        <span class="seg">${HORIZONS.map(([v, l]) => `<button data-horizon="${v}" aria-pressed="${v === state.horizon}">${l}</button>`).join('')}</span></div>
+        <p class="explain">Coins becoming due within the horizon, grouped as the loop will batch them: a group runs at its earliest deadline,
+          ${esc(span(s.reserveSeconds))} before that coin expires, and takes every coin due by then. arkd runs a batch every ${esc(span(s.sessionSeconds))}, taking at most ${num(s.maxIntents).toLocaleString()} of our intents.</p>
+        ${batches.length ? `${timeline(batches)}${forecastTable(batches)}` : `<p class="empty">No coin becomes due within ${esc(HORIZONS.find(([v]) => v === state.horizon)?.[1])}.${num(s.nextDue) ? ` The next one is due ${at(s.nextDue)}.` : ''}</p>`}
+      </section>
+
+      <div class="cols">
+        <section class="panel"><div class="ph"><h3>Needs attention</h3><span class="aside">among the ${rows.length} active delegations due soonest</span></div>
+          ${failing.length ? table([
+            { title: 'Delegation', cell: (r) => go(`delegations/${r.delegation.id}`, `#${esc(r.delegation.id)}`) },
+            { title: 'Kind', cell: (r) => esc(kindOf(r.delegation)) },
+            { title: 'Coins', num: true, cell: (r) => esc(sats(r.amount)) },
+            { title: 'Last attempt', cell: () => tag('failed', 'bad') },
+          ], failing.slice(0, 10)) : '<p class="note ok" style="margin:0">No active delegation is failing.</p>'}
+          ${disabled.length ? `<p class="small">${go('registry', esc(count(disabled.length, 'template')))} disabled: their delegations run nothing.</p>` : ''}
+        </section>
+        <section class="panel"><div class="ph"><h3>Coming due</h3><span class="aside">${go('delegations', 'all delegations')}</span></div>
+          ${table([
+            { title: 'Delegation', cell: (r) => go(`delegations/${r.delegation.id}`, `#${esc(r.delegation.id)}`) },
+            { title: 'Kind', cell: (r) => esc(kindOf(r.delegation)) },
+            { title: 'Coins', num: true, cell: (r) => num(r.coins).toLocaleString() },
+            { title: 'Amount', num: true, cell: (r) => esc(sats(r.amount)) },
+            { title: 'Due', cell: (r) => at(r.nextDue) },
+          ], comingDue)}
+        </section>
+      </div>
+
+      <section class="panel"><div class="ph"><h3>Daemon</h3><span class="aside">${esc(state.info?.network)} · ${esc(state.info?.version)} · tip ${num(s.tipHeight).toLocaleString()}</span></div>
+        <div class="cols">
+          <dl class="kv">
+            <dt>Batch session</dt><dd>every ${esc(span(s.sessionSeconds))}, at most ${num(s.maxIntents).toLocaleString()} intents</dd>
+            <dt>Expiry reserve</dt><dd>${esc(span(s.reserveSeconds))}</dd>
+            <dt>Cosigner key</dt><dd>${copy(state.info?.cosignerPubkey)}</dd>
+            <dt>Server key</dt><dd>${copy(state.info?.serverPubkey)}</dd>
+            <dt>Emulator key</dt><dd>${copy(state.info?.emulatorPubkey)}</dd>
+            <dt>Encryption key</dt><dd>${copy(state.info?.encryptionPubkey)}</dd>
+          </dl>
+          ${table([
+            { title: 'Dependency', cell: (e) => `${esc(checkName(e.name))}<div class="small muted">${esc(CHECKS[e.name]?.[1] || '')}</div>` },
+            { title: 'State', cell: (e) => (e.healthy ? tag('ok', 'ok') : tag('down', 'bad')) },
+            { title: 'Error', cell: (e) => `<span class="mono">${esc(e.error)}</span>` },
+          ], state.health)}
+        </div>
+      </section>`;
+  },
+
+  async delegations(id) {
+    return id ? delegationDetail(id) : delegationList();
+  },
+
+  async streams(id) {
+    await load('streams', 'templates', 'info');
+    return id ? streamDetail(id) : streamList();
+  },
+
+  async registry(kind, id) {
+    await load('templates', 'artifacts', 'streams');
+    if (kind === 'template' && id) return templateDetail(id);
+    if (kind === 'artifact' && id) return artifactDetail(id);
+    return registryHome();
+  },
+};
+
+// delegations
+const listState = { status: 'active', templateId: '', streamId: '', rows: [], cursor: '' };
+async function delegationList() {
+  await load('templates', 'streams', 'info');
+  const st = listState;
+  view.innerHTML = `
+    <div class="head"><h2>Delegations</h2><span class="spacer"></span>
+      <form id="find" class="toolbar" style="margin:0"><input name="q" placeholder="#id or address" size="28"><button>Open</button></form></div>
+    <div class="toolbar">
+      <label>Status <select id="f-status">${['', 'active', 'cancelled', 'expired', 'done'].map((s) => `<option value="${s}" ${s === st.status ? 'selected' : ''}>${s || 'any'}</option>`).join('')}</select></label>
+      <label>Template <select id="f-template"><option value="">any</option>${state.templates.map((t) => `<option value="${esc(t.id)}" ${t.id === st.templateId ? 'selected' : ''}>${esc(templateKind(t))} ${esc(short(t.id, 6))}</option>`).join('')}</select></label>
+      <label>Spawned by <select id="f-stream"><option value="">any</option>${state.streams.map((x) => `<option value="${esc(x.id)}" ${String(x.id) === st.streamId ? 'selected' : ''}>stream #${esc(x.id)}</option>`).join('')}</select></label>
+      <span class="spacer"></span><span class="muted small" id="shown"></span>
+    </div>
+    <div class="panel" id="rows"></div>
+    <div class="toolbar"><button id="more" hidden>Load more</button></div>`;
+  const refilter = () => { st.status = $('#f-status').value; st.templateId = $('#f-template').value; st.streamId = $('#f-stream').value; delegationList(); };
+  ['#f-status', '#f-template', '#f-stream'].forEach((s) => { $(s).onchange = refilter; });
+  $('#find').onsubmit = (event) => {
+    event.preventDefault();
+    const q = event.target.q.value.trim();
+    if (q) location.hash = /^#?\d+$/.test(q) ? `delegations/${q.replace('#', '')}` : `delegations/${encodeURIComponent(q)}`;
+  };
+  st.rows = []; st.cursor = '';
+  const fill = async () => {
+    try {
+      const query = new URLSearchParams({ status: st.status, cursor: st.cursor, limit: 100, templateId: st.templateId, streamId: st.streamId || 0 });
+      const page = await api(`admin/delegations?${query}`);
+      st.rows = st.rows.concat(page.delegations || []);
+      st.cursor = page.nextCursor || '';
+      $('#shown').textContent = `${st.rows.length.toLocaleString()}${st.cursor ? '+' : ''} shown, by earliest due coin, those without coins last`;
+      $('#rows').innerHTML = table([
+        { title: 'ID', cell: (s) => `#${esc(s.delegation.id)}` },
+        { title: 'Kind', cell: (s) => esc(kindOf(s.delegation)) },
+        { title: 'Address', cell: (s) => tx(s.delegation.address, 6) },
+        { title: 'Status', cell: (s) => tag(s.delegation.status, statusKind[s.delegation.status]) },
+        { title: 'Coins', num: true, cell: (s) => num(s.coins).toLocaleString() },
+        { title: 'Amount', num: true, cell: (s) => (num(s.coins) ? esc(sats(s.amount)) : '') },
+        { title: 'Next due', cell: (s) => (num(s.coins) ? at(s.nextDue) : '<span class="muted">-</span>') },
+        { title: 'Last attempt', cell: (s) => tag(s.lastAttempt, attemptKind[s.lastAttempt]) },
+        { title: 'Origin', cell: (s) => (num(s.delegation.streamId) ? `stream #${esc(s.delegation.streamId)}` : 'client') },
+        { title: 'Registered', cell: (s) => at(s.delegation.createdAt) },
+      ], st.rows, (s) => `class="row" data-go="delegations/${s.delegation.id}"`);
+      $('#more').hidden = !st.cursor;
+    } catch (error) {
+      fail(error);
+    }
+  };
+  $('#more').onclick = fill;
+  await fill();
+}
+
+// a coin's life from now: waiting until due, eligible until its deadline, then the reserve until expiry
+function lifeBar(c, batchAt, reserve) {
+  const t = now(), dies = num(c.expiresAt);
+  if (!dies) return `<span class="muted small">onchain, ${esc(count(c.confirmations, 'confirmation'))}</span>`;
+  if (dies <= t) return tag('expired', 'bad');
+  const life = dies - t, pct = (x) => Math.min(100, Math.max(0, ((x - t) / life) * 100));
+  const deadline = Math.max(num(c.due), dies - reserve);
+  return `<div class="life" title="${esc(`due ${rel(c.due)}, deadline ${rel(deadline)}, expires ${rel(dies)}`)}">
+    <i class="win" style="left:${pct(num(c.due))}%;width:${pct(deadline) - pct(num(c.due))}%"></i>
+    <i class="res" style="left:${pct(deadline)}%;right:0"></i>
+    ${batchAt ? `<i class="b" style="left:${pct(batchAt)}%"></i>` : ''}</div>`;
+}
+
+async function delegationDetail(key) {
+  const lookup = /^\d+$/.test(key) ? `id=${key}` : `address=${encodeURIComponent(decodeURIComponent(key))}`;
+  const detail = await api(`delegation?${lookup}`);
+  const d = detail.delegation;
+  const [{ attempts = [], nextCursor = 0 }, forecast] = await Promise.all([
+    api(`admin/delegation/${d.id}/attempts?limit=100`), api(`admin/status?horizonSeconds=${WEEK}`), load('templates', 'info'),
+  ]);
+  const reserve = num(forecast.reserveSeconds);
+  const mine = (forecast.batches || []).flatMap((b) => (b.entries || []).filter((e) => e.delegationId === d.id).map((e) => ({ ...e, at: b.at, batch: b })));
+  const coins = (detail.coins || []).slice().sort((a, b) => (a.status === b.status ? num(a.due) - num(b.due) : a.status === 'present' ? -1 : 1));
+  const present = coins.filter((c) => c.status === 'present');
+  const onchain = new Set(coins.filter((c) => !num(c.expiresAt)).map((c) => c.outpoint));
+  const held = present.reduce((a, c) => a + num(c.amount), 0);
+  // a coin rides the first forecast batch of its delegation at or after its due
+  const batchOf = (c) => (num(c.expiresAt) ? mine.find((e) => num(e.at) >= num(c.due))?.at : 0);
+  const kind = kindOf(d), failed = attempts.filter((a) => a.status === 'failed');
+  const actions = d.status === 'active' ? `<button class="danger" data-cancel="${d.id}">Cancel</button>`
+    : d.status === 'cancelled' ? `<button data-resume="${d.id}">Resume</button>` : '';
+
+  let story;
+  if (d.status !== 'active') story = `It is ${esc(d.status)}: the daemon runs nothing for it.`;
+  else if (mine.length) story = `${esc(count(mine.reduce((a, e) => a + num(e.coins), 0), 'coin'))} (${esc(sats(mine.reduce((a, e) => a + num(e.amount), 0)))}) join the batch ${at(mine[0].at)}${num(mine[0].batch.intents) > 1 ? `, with ${esc(count(num(mine[0].batch.intents) - 1, 'other delegation'))}` : ''}.`;
+  else if (present.length) story = `${esc(count(present.length, 'coin'))} watched; the next becomes due ${at(Math.min(...present.map((c) => num(c.due))))}, beyond the 7-day forecast.`;
+  else story = 'No coin is watched at its address yet.';
+
+  view.innerHTML = `
+    <div class="crumb">${go('delegations', '&larr; Delegations')}</div>
+    <div class="head"><h2>Delegation #${esc(d.id)}</h2>${tag(d.status, statusKind[d.status])} ${tag(kind, 'accent')}<span class="spacer"></span>
+      ${d.address ? `<button data-copy="${esc(d.address)}">Copy address</button>` : ''}${actions}</div>
+    <div class="note ${failed.length && attempts[0]?.status === 'failed' ? 'bad' : 'ok'}">${story}${attempts[0]?.status === 'failed' ? ` Its last attempt failed: <span class="mono">${esc(attempts[0].error)}</span>` : ''}</div>
+    <section class="panel"><dl class="facts">
+      <div><dt>Address</dt><dd>${tx(d.address, 12)}</dd></div>
+      <div><dt>Template</dt><dd>${templateLink(d.templateId)}</dd></div>
+      <div><dt>Origin</dt><dd>${num(d.streamId) ? go(`streams/${d.streamId}`, `stream #${esc(d.streamId)}`) : 'a client registered it'}</dd></div>
+      <div><dt>Registered</dt><dd>${at(d.createdAt)}</dd></div>
+      <div><dt>Expires</dt><dd>${num(d.expiresAt) ? at(d.expiresAt) : 'never'}</dd></div>
+      <div><dt>Holding</dt><dd>${esc(sats(held))} in ${esc(count(present.length, 'coin'))}</dd></div>
+      <div><dt>Fingerprint</dt><dd>${copy(d.fingerprint, 8)}</dd></div>
+    </dl>
+    <h4>Variables</h4>${variablesList(d.variables, d.templateId)}</section>
+
+    <section class="panel"><div class="ph"><h3>Coins</h3><span class="aside">${esc(count(present.length, 'present coin'))}, ${esc(count(coins.length - present.length, 'spent coin'))}</span></div>
+      ${table([
+        { title: 'Outpoint', cell: (c) => tx(c.outpoint, 8, !num(c.expiresAt)) },
+        { title: 'Status', cell: (c) => tag(c.status, statusKind[c.status]) },
+        { title: 'Amount', num: true, cell: (c) => esc(sats(c.amount)) },
+        { title: 'Due', cell: (c) => (c.status === 'present' ? at(c.due) : '<span class="muted">-</span>') },
+        { title: 'Life from now', cell: (c) => (c.status === 'present' ? lifeBar(c, batchOf(c), reserve) : '') },
+        { title: 'Expires', cell: (c) => (num(c.expiresAt) ? at(c.expiresAt) : '<span class="muted">onchain</span>') },
+        { title: 'Spent by', cell: (c) => (c.status === 'spent' ? tx(c.spentBy, 8, !num(c.expiresAt)) : '') },
+      ], coins)}
+      ${present.some((c) => num(c.expiresAt)) ? `<div class="legend"><span><i></i>waiting until due</span><span><i class="win"></i>due, can join a batch</span><span><i class="res"></i>reserve: never enters a batch here</span><span><i class="b"></i>forecast batch</span></div>` : ''}
+    </section>
+
+    <section class="panel"><div class="ph"><h3>Attempts</h3><span class="aside">newest first${nextCursor ? ', the first 100' : ''}${failed.length ? `, ${esc(count(failed.length, 'failure'))}` : ''}</span></div>
+      ${table([
+        { title: 'ID', cell: (a) => esc(a.id) },
+        { title: 'When', cell: (a) => at(a.createdAt) },
+        { title: 'Result', cell: (a) => tag(a.status, attemptKind[a.status]) },
+        { title: 'Coins', cell: (a) => (a.coins || []).map((o) => tx(o, 6, onchain.has(o))).join('<br>') || '-' },
+        { title: 'Transaction or reason', cell: (a) => (a.status === 'failed' ? `<span class="mono bad-text">${esc(a.error)}</span>` : tx(a.txid, 10)) },
+        { title: 'Updated', cell: (a) => at(a.updatedAt) },
+      ], attempts)}</section>
+
+    <section class="panel"><div class="ph"><h3>Inputs</h3><span class="aside">what the daemon watches and the paths that spend it</span></div>
+      ${(d.inputs || []).map((i) => `<h4>${esc(i.name)} ${tag(i.onchain ? 'onchain' : 'offchain')}${num(i.locktime) ? ` ${tag(`locktime ${num(i.locktime).toLocaleString()}`)}` : ''}</h4>
+        <p class="small">script ${copy(i.script, 12)}</p>
+        <ul class="listen">${(i.tapscripts || []).map((t) => `<li class="asm">${esc(scriptWords(t, d.variables))} <button class="mini" data-copy="${esc(t)}">hex</button></li>`).join('')}</ul>`).join('') || '<p class="empty">No input.</p>'}
+    </section>`;
+}
+
+// streams
+function streamCard(x, detailed) {
+  const t = templateOf(x.templateId), trigger = doc(t).trigger;
+  return `<div class="stream">
+    <div>
+      <div class="head" style="margin:0 0 .3rem">${detailed ? `<h2>Stream #${esc(x.id)}</h2>` : `<h3 style="margin:0">${go(`streams/${x.id}`, `Stream #${esc(x.id)}`)}</h3>`}
+        ${tag(x.status, statusKind[x.status])} <span class="small muted">${templateLink(x.templateId)} · registered ${at(x.createdAt)}</span></div>
+      <div class="small muted">Listens for</div>
+      ${describeTrigger(trigger, x.variables)}
+    </div>
+    <div class="spawn">
+      <div class="small muted">Spawned</div>
+      <div class="fig">${num(x.spawned).toLocaleString()}</div>
+      <div class="small">${num(x.active).toLocaleString()} active</div>
+      <div class="small muted">${num(x.lastSpawnedAt) ? `last ${at(x.lastSpawnedAt)}` : 'nothing yet'}</div>
+      ${!detailed && num(x.spawned) ? `<div class="small">${go(`streams/${x.id}`, 'see what it spawned')}</div>` : ''}
+    </div>
+  </div>`;
+}
+function streamList() {
+  const active = state.streams.filter((x) => x.status === 'active');
+  view.innerHTML = `
+    <div class="head"><h2>Streams</h2><span class="muted small">standing rules that read arkd's transactions and spawn a delegation for each match</span>
+      <span class="spacer"></span><button data-register="stream">Register a stream</button></div>
+    <section class="panel">${state.streams.length ? [...active, ...state.streams.filter((x) => x.status !== 'active')].map((x) => streamCard(x, false)).join('') : '<p class="empty">No stream registered.</p>'}</section>`;
+}
+async function streamDetail(id) {
+  const x = state.streams.find((s) => String(s.id) === String(id));
+  if (!x) throw new Error(`no stream ${id}`);
+  view.innerHTML = `
+    <div class="crumb">${go('streams', '&larr; Streams')}</div>
+    <section class="panel">${streamCard(x, true)}
+      <div class="toolbar" style="margin:.8rem 0 0">${x.status === 'active' ? `<button class="danger" data-stream="${esc(x.id)}">Cancel stream</button>` : ''}</div></section>
+    <section class="panel"><h3>Bound variables</h3>${variablesList(x.variables, x.templateId)}</section>
+    <section class="panel"><div class="ph"><h3>What it spawned</h3><span class="aside" id="spawn-count"></span></div><div id="spawned"></div>
+      <div class="toolbar"><button id="more" hidden>Load more</button></div></section>`;
+  let rows = [], cursor = '';
+  const fill = async () => {
+    const page = await api(`admin/delegations?${new URLSearchParams({ streamId: x.id, cursor, limit: 100 })}`);
+    rows = rows.concat(page.delegations || []); cursor = page.nextCursor || '';
+    $('#spawn-count').textContent = `${rows.length.toLocaleString()}${cursor ? '+' : ''} shown, by earliest due coin`;
+    $('#spawned').innerHTML = table([
+      { title: 'ID', cell: (s) => `#${esc(s.delegation.id)}` },
+      { title: 'Spawned', cell: (s) => at(s.delegation.createdAt) },
+      { title: 'Status', cell: (s) => tag(s.delegation.status, statusKind[s.delegation.status]) },
+      { title: 'Captured', cell: (s) => Object.entries(s.delegation.variables || {}).filter(([k]) => !(k in (x.variables || {}))).map(([k, v]) => `<span class="mono small">${esc(k)}=${esc(short(v, 5))}</span>`).join('<br>') },
+      { title: 'Coins', num: true, cell: (s) => (num(s.coins) ? esc(sats(s.amount)) : '') },
+      { title: 'Last attempt', cell: (s) => tag(s.lastAttempt, attemptKind[s.lastAttempt]) },
+      { title: 'Expires', cell: (s) => (num(s.delegation.expiresAt) ? at(s.delegation.expiresAt) : 'never') },
+    ], rows, (s) => `class="row" data-go="delegations/${s.delegation.id}"`);
+    $('#more').hidden = !cursor;
+  };
+  $('#more').onclick = () => fill().catch(fail);
+  await fill();
+}
+
+// registry
+function registryHome() {
+  const usedBy = {};
+  for (const t of state.templates) for (const a of t.artifactIds || []) (usedBy[a] ||= []).push(t.id);
+  view.innerHTML = `
+    <div class="head"><h2>Registry</h2><span class="muted small">the templates delegations run and the contract artifacts they reference</span>
+      <span class="spacer"></span><button data-register="template">Register a document</button></div>
+    <section class="panel"><div class="ph"><h3>Templates</h3><span class="aside">${state.templates.length}</span></div>${table([
+      { title: 'ID', cell: (t) => `<span class="mono" title="${esc(t.id)}">${esc(short(t.id, 8))}</span>` },
+      { title: 'Kind', cell: (t) => esc(templateKind(t)) },
+      { title: 'Status', cell: (t) => tag(t.status, statusKind[t.status]) },
+      { title: 'Variables', cell: (t) => (t.params || []).map((p) => `<span class="mono small">${esc(p.name)}</span>`).join(', ') || '-' },
+      { title: 'Inputs', cell: (t) => (doc(t).inputs || []).map((i) => esc(i.name)).join(', ') || '-' },
+      { title: 'Streams', num: true, cell: (t) => state.streams.filter((x) => x.templateId === t.id && x.status === 'active').length || '' },
+      { title: 'Registered', cell: (t) => at(t.createdAt) },
+    ], state.templates, (t) => `class="row" data-go="registry/template/${esc(t.id)}"`)}</section>
+    <section class="panel"><div class="ph"><h3>Artifacts</h3><span class="aside">${state.artifacts.length}</span></div>${table([
+      { title: 'ID', cell: (a) => `<span class="mono" title="${esc(a.id)}">${esc(short(a.id, 8))}</span>` },
+      { title: 'Contract', cell: (a) => esc(artifactName(a)) },
+      { title: 'Used by', cell: (a) => esc(count((usedBy[a.id] || []).length, 'template')) },
+      { title: 'Registered', cell: (a) => at(a.createdAt) },
+    ], state.artifacts, (a) => `class="row" data-go="registry/artifact/${esc(a.id)}"`)}</section>`;
+}
+
+async function templateDetail(id) {
+  const t = templateOf(id);
+  if (!t) throw new Error(`no template ${id}`);
+  const d = doc(t), streams = state.streams.filter((x) => x.templateId === id);
+  const captured = new Set(Object.keys(d.trigger?.capture || {}));
+  const { delegations: used = [], nextCursor } = await api(`admin/delegations?${new URLSearchParams({ templateId: id, limit: 20 })}`);
+  const on = t.status === 'active';
+  view.innerHTML = `
+    <div class="crumb">${go('registry', '&larr; Registry')}</div>
+    <div class="head"><h2>Template</h2>${tag(t.status, statusKind[t.status])} ${tag(templateKind(t), 'accent')} ${tag(t.type)}<span class="spacer"></span>
+      <button data-copy="${esc(t.id)}">Copy id</button>
+      <button class="${on ? 'danger' : ''}" data-template="${esc(t.id)}" data-status="${on ? 'disabled' : 'active'}">${on ? 'Disable' : 'Enable'}</button>
+      ${used.length || streams.length ? '' : `<button class="danger" data-deltemplate="${esc(t.id)}">Delete</button>`}</div>
+    ${on ? '' : '<div class="note">Disabled: it accepts no registration and its delegations run nothing.</div>'}
+    <section class="panel"><dl class="facts">
+      <div><dt>ID</dt><dd>${copy(t.id, 12)}</dd></div>
+      <div><dt>Registered</dt><dd>${at(t.createdAt)}</dd></div>
+      <div><dt>Format</dt><dd class="mono">${esc(d.format)}</dd></div>
+    </dl>
+    <div class="cols">
+      <div><h4>Variables</h4>${table([
+        { title: 'Name', cell: (p) => `<span class="mono">${esc(p.name)}</span>` },
+        { title: 'Type', cell: (p) => esc(p.type) },
+        { title: 'Set by', cell: (p) => (captured.has(p.name) ? 'the trigger' : d.trigger ? 'the stream' : 'the client') },
+      ], t.params || [])}</div>
+      <div><h4>Inputs</h4>${table([
+        { title: 'Name', cell: (i) => esc(i.name) },
+        { title: 'Contract', cell: (i) => { const def = i.contract?.definition || {}; return def.artifact ? go(`registry/artifact/${def.artifact}`, `artifact ${esc(short(def.artifact, 5))}`) : esc(def.contractName || '-'); } },
+        { title: 'Spends by', cell: (i) => `<span class="mono small">${esc([i.spend?.function, i.spend?.leaf].filter(Boolean).join(' / '))}</span>` },
+        { title: '', cell: (i) => tag(i.type === 'onchain' ? 'onchain' : 'offchain') },
+      ], d.inputs || [])}
+      <h4>Outputs</h4>${table([
+        { title: 'Name', cell: (o) => esc(o.name) },
+        { title: 'Locked by', cell: (o) => { const def = o.locking?.contract?.definition; return def?.artifact ? go(`registry/artifact/${def.artifact}`, `artifact ${esc(short(def.artifact, 5))}`) : o.locking?.from ? `same as ${esc(o.locking.from)}` : esc(def?.contractName || '-'); } },
+        { title: 'Value', cell: (o) => (o.value?.from ? `from ${esc(o.value.from)}` : `<span class="mono small">${esc(JSON.stringify(o.value ?? ''))}</span>`) },
+      ], d.outputs || [])}</div>
+    </div></section>
+    ${d.trigger ? `<section class="panel"><h3>Trigger</h3>${describeTrigger(d.trigger)}</section>` : ''}
+    <section class="panel"><div class="ph"><h3>Used by</h3></div>
+      ${d.trigger ? `<h4>Streams</h4>${streams.length ? `<div class="chips">${streams.map((x) => go(`streams/${x.id}`, `stream #${esc(x.id)} (${esc(x.status)})`)).join(' ')}</div>` : '<p class="empty">No stream runs it.</p>'}` : ''}
+      <h4>Delegations ${nextCursor ? '<span class="muted small">the 20 due soonest</span>' : ''}</h4>
+      ${table([
+        { title: 'ID', cell: (s) => `#${esc(s.delegation.id)}` },
+        { title: 'Status', cell: (s) => tag(s.delegation.status, statusKind[s.delegation.status]) },
+        { title: 'Coins', num: true, cell: (s) => (num(s.coins) ? esc(sats(s.amount)) : '') },
+        { title: 'Next due', cell: (s) => (num(s.coins) ? at(s.nextDue) : '') },
+        { title: 'Last attempt', cell: (s) => tag(s.lastAttempt, attemptKind[s.lastAttempt]) },
+      ], used, (s) => `class="row" data-go="delegations/${s.delegation.id}"`)}
+      ${nextCursor ? `<p><a href="#delegations" data-tfilter="${esc(id)}">All of them in Delegations</a></p>` : ''}
+      <h4>Artifacts</h4>${(t.artifactIds || []).length ? `<div class="chips">${t.artifactIds.map((a) => go(`registry/artifact/${a}`, `<span class="mono">${esc(short(a, 6))}</span>`)).join(' ')}</div>` : '<p class="empty">References no artifact.</p>'}
+    </section>
+    ${documentPanel(documents.get(t.id))}`;
+}
+
+function artifactDetail(id) {
+  const a = state.artifacts.find((x) => x.id === id);
+  if (!a) throw new Error(`no artifact ${id}`);
+  let d = {};
+  try { d = JSON.parse(a.document || '{}'); } catch { /* shown raw below */ }
+  const users = state.templates.filter((t) => (t.artifactIds || []).includes(id));
+  view.innerHTML = `
+    <div class="crumb">${go('registry', '&larr; Registry')}</div>
+    <div class="head"><h2>${esc(d.contractName || 'Artifact')}</h2>${tag(users.length ? 'in use' : 'unused', users.length ? 'ok' : '')}<span class="spacer"></span>
+      <button data-copy="${esc(a.id)}">Copy id</button>${users.length ? '' : `<button class="danger" data-delartifact="${esc(a.id)}">Delete</button>`}</div>
+    <section class="panel"><dl class="facts">
+      <div><dt>ID</dt><dd>${copy(a.id, 12)}</dd></div>
+      <div><dt>Registered</dt><dd>${at(a.createdAt)}</dd></div>
+      <div><dt>Used by</dt><dd>${users.length ? users.map((t) => templateLink(t.id)).join('<br>') : 'no template'}</dd></div>
+    </dl>
+    <div class="cols">
+      <div><h4>Constructor inputs</h4>${table([
+        { title: 'Name', cell: (p) => `<span class="mono">${esc(p.name)}</span>` }, { title: 'Type', cell: (p) => esc(p.type) },
+      ], d.constructorInputs || [])}</div>
+      <div><h4>Functions</h4>${table([
+        { title: 'Name', cell: (f) => `<span class="mono">${esc(f.name)}</span>` },
+        { title: 'Leaves', cell: (f) => (f.leaves || []).map((l) => `<span class="mono small" title="${esc((l.asm || []).join(' '))}">${esc(l.name)}</span>`).join(', ') || '-' },
+        { title: 'Covenant', cell: (f) => (f.arkade ? tag('arkade', 'accent') : '') },
+      ], d.functions || [])}</div>
+    </div></section>
+    ${documentPanel(a.document)}`;
+}
+
+function documentPanel(text) {
+  let pretty = text || '';
+  try { pretty = JSON.stringify(JSON.parse(pretty), null, 2); } catch { /* raw */ }
+  return `<section class="panel"><details><summary><b>Document</b> <span class="muted small">${esc((text || '').length.toLocaleString())} bytes</span></summary>
+    <div class="toolbar" style="margin:.5rem 0 0"><button data-copy="${esc(pretty)}">Copy JSON</button></div><pre class="doc">${esc(pretty)}</pre></details></section>`;
+}
+
+// registration: kept out of the way, in a modal
+function openRegister(kind) {
+  const triggers = state.templates.filter((t) => doc(t).trigger && t.status === 'active');
+  const modal = $('#modal');
+  const tabs = [['template', 'Template'], ['artifact', 'Artifact'], ['stream', 'Stream']];
+  modal.innerHTML = `<form method="dialog" id="reg">
+    <div class="head" style="margin:0"><h2>Register</h2><span class="spacer"></span>
+      <span class="seg">${tabs.map(([k, l]) => `<button type="button" data-tab="${k}" aria-pressed="${k === kind}">${l}</button>`).join('')}</span></div>
+    ${kind === 'stream' ? `
+      <p class="explain">A stream runs a trigger template against arkd's transactions. Set the variables the trigger does not capture.</p>
+      ${triggers.length ? `<label>Template <select name="t">${triggers.map((t) => `<option value="${esc(t.id)}">${esc(templateKind(t))} ${esc(short(t.id, 8))}</option>`).join('')}</select></label><div id="vars"></div>`
+        : '<p class="empty">No active template has a trigger.</p>'}`
+    : `<p class="explain">The public endpoint developers use, POST /v1/${kind}. The id is the hash of the document.</p>
+      <label>${kind === 'template' ? 'Template' : 'Artifact'} JSON<textarea name="document" required spellcheck="false"></textarea></label>`}
+    <div class="msg" id="reg-msg"></div>
+    <div class="actions"><button type="button" id="reg-cancel">Cancel</button><button class="primary" ${kind === 'stream' && !triggers.length ? 'disabled' : ''}>Register</button></div>
+  </form>`;
+  const form = $('#reg');
+  const varFields = () => {
+    const t = templateOf(form.t.value), captured = new Set(Object.keys(doc(t).trigger?.capture || {}));
+    $('#vars').innerHTML = (t?.params || []).filter((p) => !captured.has(p.name)).map((p) => `<label><span><span class="mono">${esc(p.name)}</span> (${esc(p.type)}, hex)</span><input name="v-${esc(p.name)}" required pattern="[0-9a-f]*" spellcheck="false"></label>`).join('')
+      || '<p class="small muted">The trigger captures every variable.</p>';
+  };
+  if (kind === 'stream' && triggers.length) { varFields(); form.t.onchange = varFields; }
+  modal.querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => openRegister(b.dataset.tab); });
+  $('#reg-cancel').onclick = () => modal.close();
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    try {
+      let target;
+      if (kind === 'stream') {
+        const variables = Object.fromEntries([...form.querySelectorAll('[name^="v-"]')].map((i) => [i.name.slice(2), i.value.trim()]));
+        const { stream } = await api('admin/stream', { method: 'POST', body: { templateId: form.t.value, variables } });
+        target = `streams/${stream.id}`;
+      } else {
+        const body = await api(kind, { method: 'POST', body: { document: form.document.value } });
+        target = `registry/${kind}/${body[kind].id}`;
+      }
+      modal.close();
+      if (location.hash.slice(1) === target) show(); else location.hash = target;
+    } catch (error) {
+      $('#reg-msg').textContent = error.message;
+    }
+  };
+  if (!modal.open) modal.showModal();
+}
+
+// routing and actions
+let timer;
+async function show() {
+  clearTimeout(timer);
+  $('#error').hidden = true;
+  const [name, ...args] = (location.hash.slice(1) || 'overview').split('/');
+  const current = views[name] ? name : 'overview';
+  document.querySelectorAll('#nav a').forEach((a) => (a.dataset.view === current ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
   try {
-    const item = (await api(`${kind}/${encodeURIComponent(id)}`))[kind];
-    let text = item.document || '';
-    try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (e) { /* show raw */ }
-    const links = (item.artifactIds || []).map((a) => `<button class="link mono" data-viewartifact="${esc(a)}">${esc(short(a, 12))}</button>`).join(' ');
-    $('#doc').innerHTML = `<div class="toolbar"><h2>${esc(kind)} <span class="mono">${esc(id)}</span></h2><span class="spacer"></span>
-      <button id="doccopy">Copy</button><button id="docclose">Close</button></div>
-      ${links ? `<div>Artifacts: ${links}</div>` : ''}<pre>${esc(text)}</pre>`;
-    $('#doccopy').onclick = (event) => navigator.clipboard.writeText(text).then(() => { event.target.textContent = 'copied'; });
-    $('#docclose').onclick = () => $('#doc').close();
-    if (!$('#doc').open) $('#doc').showModal();
+    await views[current](...args);
   } catch (error) {
     fail(error);
   }
+  if (current !== 'overview') await load('status', 'health').catch(() => {});
+  renderPulse();
+  // the overview follows the loop; the other views refresh on demand
+  if (current === 'overview' && !$('#modal').open) timer = setTimeout(show, 5000);
+  else timer = setTimeout(() => load('status', 'health').then(renderPulse).catch(() => {}), 15000);
 }
 
-// act runs a change and shows the view again
 async function act(change) {
   try {
     await change();
@@ -163,221 +875,29 @@ async function act(change) {
   }
 }
 
-function table(columns, rows, rowAttributes = () => '') {
-  if (!rows.length) return '<p class="empty">Nothing here.</p>';
-  const head = columns.map((c) => `<th class="${c.num ? 'num' : ''}">${esc(c.title)}</th>`).join('');
-  const body = rows.map((row) => `<tr ${rowAttributes(row)}>${columns.map((c) => `<td class="${c.num ? 'num n' : ''}">${c.cell(row)}</td>`).join('')}</tr>`).join('');
-  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
-}
-
-async function showHealth() {
-  const health = await api('admin/health');
-  const down = (health.entries || []).filter((e) => !e.healthy);
-  const pulse = $('#pulse');
-  pulse.className = down.length ? 'down' : '';
-  pulse.textContent = down.length ? `down: ${down.map((e) => e.name).join(', ')}` : 'healthy';
-  return health.entries || [];
-}
-
-const views = {
-  async overview() {
-    const [status, entries] = await Promise.all([api(`admin/status?horizonSeconds=${views.horizon}`), showHealth()]);
-    const card = (label, value, alert) => `<div class="card ${alert ? 'alert' : ''}"><div class="label">${label}</div><div class="value">${value}</div></div>`;
-    view.innerHTML = `
-      <div class="cards">
-        ${card('Active delegations', sats(status.active))}
-        ${card('Queued', sats(status.queued))}
-        ${card('Registered', sats(status.registered))}
-        ${card('Late', sats(status.late), Number(status.late) > 0)}
-        ${card('Coins watched', sats(status.coins))}
-        ${card('Amount watched (sats)', sats(status.amount))}
-        ${card('Next due', esc(until(status.nextDue)))}
-        ${card('Chain tip', sats(status.tipHeight))}
-      </div>
-      <div class="panel"><h2>Batch forecast</h2>
-        <label>Horizon <select id="horizon">${[[86400, '24h'], [259200, '3d'], [604800, '7d']].map(([v, l]) => `<option value="${v}" ${v === views.horizon ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-        ${table([
-        { title: 'At', cell: (r) => `<details data-at="${esc(r.at)}" ${views.openBatches.has(String(r.at)) ? 'open' : ''}><summary>${esc(when(r.at))} <span class="muted">${esc(until(r.at))}</span></summary>${table([
-          { title: 'Delegation', cell: (e) => `<button class="link" data-go="delegations/${esc(e.delegationId)}">${esc(e.delegationId)}</button>` },
-          { title: 'Coins', num: true, cell: (e) => sats(e.coins) },
-          { title: 'Amount (sats)', num: true, cell: (e) => sats(e.amount) },
-          { title: 'Due', cell: (e) => `${esc(when(e.due))} <span class="muted">${esc(until(e.due))}</span>` },
-          { title: 'Deadline', cell: (e) => `${esc(when(e.deadline))} <span class="muted">${esc(until(e.deadline))}</span>` },
-        ], r.entries || [])}</details>` },
-        { title: 'Intents', num: true, cell: (r) => sats(r.intents) },
-        { title: 'Coins', num: true, cell: (r) => sats(r.coins) },
-        { title: 'Amount (sats)', num: true, cell: (r) => sats(r.amount) },
-      ], status.batches || [])}</div>
-      <div class="panel"><h2>Health</h2>${table([
-        { title: 'Dependency', cell: (e) => esc(e.name) },
-        { title: 'State', cell: (e) => (e.healthy ? tag('ok', 'ok') : tag('down', 'bad')) },
-        { title: 'Error', cell: (e) => `<span class="mono">${esc(e.error)}</span>` },
-      ], entries)}</div>`;
-    $('#horizon').onchange = (event) => { views.horizon = Number(event.target.value); views.overview(); };
-    view.querySelectorAll('details[data-at]').forEach((d) => d.addEventListener('toggle', () => {
-      views.openBatches[d.open ? 'add' : 'delete'](d.dataset.at);
-    }));
-  },
-  horizon: 86400,
-  openBatches: new Set(),
-
-  async delegations(arg) {
-    return arg ? this.detail(arg) : this.list();
-  },
-
-  async list() {
-    const state = views.listState;
-    state.rows = [];
-    state.cursor = '';
-    view.innerHTML = `
-      <div class="toolbar">
-        <label>Status
-          <select id="filter">${['', 'active', 'cancelled', 'expired', 'done'].map((s) => `<option value="${s}" ${s === state.status ? 'selected' : ''}>${s || 'all'}</option>`).join('')}</select>
-        </label>
-        <span class="spacer"></span>
-        <span class="muted">ordered by the earliest due coin, those without coins last</span>
-      </div>
-      <div class="panel" id="rows"></div>
-      <div class="toolbar"><button id="more" hidden>Load more</button></div>`;
-    $('#filter').onchange = (event) => { state.status = event.target.value; views.list(); };
-    $('#more').onclick = () => fill();
-    const rows = $('#rows');
-    const fill = async () => {
-      try {
-        const query = new URLSearchParams({ status: state.status, cursor: state.cursor, limit: 50 });
-        const page = await api(`admin/delegations?${query}`);
-        state.rows = state.rows.concat(page.delegations || []);
-        state.cursor = page.nextCursor || '';
-        rows.innerHTML = table([
-          { title: 'ID', cell: (s) => s.delegation.id },
-          { title: 'Address', cell: (s) => `<span class="mono">${esc(short(s.delegation.address || '', 10))}</span>` },
-          { title: 'Origin', cell: (s) => Number(s.delegation.streamId) ? tag('stream', 'accent') : tag('client', '') },
-          { title: 'Status', cell: (s) => tag(s.delegation.status, statusKind[s.delegation.status]) },
-          { title: 'Coins', num: true, cell: (s) => sats(s.coins) },
-          { title: 'Amount (sats)', num: true, cell: (s) => sats(s.amount) },
-          { title: 'Next due', cell: (s) => esc(Number(s.coins) ? until(s.nextDue) : '-') },
-          { title: 'Last attempt', cell: (s) => tag(s.lastAttempt, attemptKind[s.lastAttempt]) },
-        ], state.rows, (s) => `class="row" data-go="delegations/${s.delegation.id}"`);
-        $('#more').hidden = !state.cursor;
-      } catch (error) {
-        fail(error);
-      }
-    };
-    await fill();
-  },
-  listState: { status: '', rows: [], cursor: '' },
-
-  async detail(id) {
-    const [detail, { attempts = [], nextCursor = '' }] = await Promise.all([
-      api(`delegation?id=${encodeURIComponent(id)}`), api(`admin/delegation/${encodeURIComponent(id)}/attempts?limit=100`),
-    ]);
-    const d = detail.delegation;
-    const actions = d.status === 'active' ? `<button class="danger" data-cancel="${d.id}">Cancel</button>`
-      : d.status === 'cancelled' ? `<button data-resume="${d.id}">Resume</button>` : '';
-    view.innerHTML = `
-      <div class="toolbar"><button class="link" data-go="delegations">&larr; Delegations</button><span class="spacer"></span>${actions}</div>
-      <div class="panel"><h2>Delegation ${esc(d.id)} ${tag(d.status, statusKind[d.status])}</h2><dl>
-        <dt>Address</dt><dd class="mono">${esc(d.address)}</dd>
-        <dt>Fingerprint</dt><dd class="mono">${esc(d.fingerprint)}</dd>
-        <dt>Template</dt><dd class="mono">${esc(d.templateId)}</dd>
-        <dt>Origin</dt><dd>${Number(d.streamId) ? `stream ${esc(d.streamId)}` : 'client'}</dd>
-        <dt>Expires</dt><dd>${esc(when(d.expiresAt))}</dd>
-        <dt>Created</dt><dd>${esc(when(d.createdAt))}</dd>
-        <dt>Variables</dt><dd class="mono">${vars(d.variables)}</dd>
-      </dl></div>
-      <div class="panel"><h2>Coins</h2>${table([
-        { title: 'Outpoint', cell: (c) => copy(c.outpoint) },
-        { title: 'Status', cell: (c) => tag(c.status, c.status === 'present' ? 'ok' : '') },
-        { title: 'Amount (sats)', num: true, cell: (c) => sats(c.amount) },
-        { title: 'Due', cell: (c) => esc(when(c.due)) },
-        { title: 'Expires', cell: (c) => esc(when(c.expiresAt)) },
-        { title: 'Spent by', cell: (c) => copy(c.spentBy) },
-      ], detail.coins || [])}</div>
-      <div class="panel"><h2>Attempts (newest first${nextCursor ? ', first 100' : ''})</h2>${table([
-        { title: 'ID', cell: (a) => a.id },
-        { title: 'Status', cell: (a) => tag(a.status, attemptKind[a.status] || 'warn') },
-        { title: 'Txid', cell: (a) => copy(a.txid) },
-        { title: 'Coins', cell: (a) => (a.coins || []).map((o) => `<span class="mono">${esc(short(o, 8))}</span>`).join('<br>') || '-' },
-        { title: 'Error', cell: (a) => `<span class="mono">${esc(a.error)}</span>` },
-        { title: 'Updated', cell: (a) => esc(when(a.updatedAt)) },
-      ], attempts)}</div>`;
-  },
-
-  async templates() {
-    const [{ templates = [] }, { artifacts = [] }] = await Promise.all([api('templates'), api('admin/artifacts')]);
-    view.innerHTML = `<div class="panel"><h2>Templates</h2>${table([
-      { title: 'ID', cell: (t) => copy(t.id) },
-      { title: 'Type', cell: (t) => esc(t.type) },
-      { title: 'Status', cell: (t) => tag(t.status, t.status === 'active' ? 'ok' : 'bad') },
-      { title: 'Artifacts', num: true, cell: (t) => (t.artifactIds || []).length },
-      { title: 'Created', cell: (t) => esc(when(t.createdAt)) },
-      { title: '', cell: (t) => `
-        <button data-viewtemplate="${esc(t.id)}">View</button>
-        <button data-template="${esc(t.id)}" data-status="${t.status === 'active' ? 'disabled' : 'active'}">${t.status === 'active' ? 'Disable' : 'Enable'}</button>
-        <button class="danger" data-deltemplate="${esc(t.id)}">Delete</button>` },
-    ], templates)}</div>
-    <div class="panel"><h2>Artifacts</h2>${table([
-      { title: 'ID', cell: (a) => copy(a.id) },
-      { title: 'Created', cell: (a) => esc(when(a.createdAt)) },
-      { title: '', cell: (a) => `<button data-viewartifact="${esc(a.id)}">View</button> <button class="danger" data-delartifact="${esc(a.id)}">Delete</button>` },
-    ], artifacts)}</div>`;
-  },
-
-  async streams() {
-    const { streams = [] } = await api('admin/streams');
-    const { templates = [] } = await api('templates');
-    view.innerHTML = `<div class="panel"><h2>Register a stream</h2>
-      <form id="reg" class="toolbar">
-        <select name="t">${templates.filter((t) => t.status === 'active').map((t) => `<option value="${esc(t.id)}">${esc(short(t.id, 10))} (${esc(t.type)})</option>`).join('')}</select>
-        <textarea name="v" rows="2" cols="50" placeholder="variables, one name=hex per line"></textarea>
-        <button>Register</button>
-      </form></div>
-      <div class="panel"><h2>Streams</h2>${table([
-      { title: 'ID', cell: (s) => s.id },
-      { title: 'Template', cell: (s) => copy(s.templateId) },
-      { title: 'Variables', cell: (s) => `<span class="mono">${vars(s.variables)}</span>` },
-      { title: 'Status', cell: (s) => tag(s.status, s.status === 'active' ? 'ok' : 'bad') },
-      { title: 'Created', cell: (s) => esc(when(s.createdAt)) },
-      { title: '', cell: (s) => (s.status === 'active' ? `<button class="danger" data-stream="${s.id}">Cancel</button>` : '') },
-    ], streams)}</div>`;
-    $('#reg').onsubmit = (event) => {
-      event.preventDefault();
-      const f = event.target;
-      const variables = Object.fromEntries(f.v.value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => l.split('=').map((x) => x.trim())));
-      act(() => api('admin/stream', { method: 'POST', body: { templateId: f.t.value, variables } }));
-    };
-  },
-};
-
-async function show() {
-  clearTimeout(timer);
-  $('#error').hidden = true;
-  const [name, arg] = (location.hash.slice(1) || 'overview').split('/');
-  const current = views[name] ? name : 'overview';
-  document.querySelectorAll('#nav a').forEach((a) => (a.dataset.view === current ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
-  try {
-    await views[current](arg);
-    if (current === 'overview') timer = setTimeout(show, 5000);
-    else await showHealth();
-  } catch (error) {
-    fail(error);
-  }
-}
+document.addEventListener('toggle', (event) => {
+  const at = event.target.dataset?.at;
+  if (at) state.open[event.target.open ? 'add' : 'delete'](at);
+}, true);
 
 document.addEventListener('click', (event) => {
-  const el = event.target.closest('[data-go], [data-cancel], [data-resume], [data-template], [data-stream], [data-copy], [data-deltemplate], [data-delartifact], [data-viewtemplate], [data-viewartifact]');
+  const link = event.target.closest('a[href]');
+  if (link?.dataset.tfilter) Object.assign(listState, { status: '', templateId: link.dataset.tfilter, streamId: '' });
+  if (link) return; // links route themselves; a row is a link only where none is clicked
+  const el = event.target.closest('[data-go], [data-copy], [data-cancel], [data-resume], [data-template], [data-stream], [data-deltemplate], [data-delartifact], [data-horizon], [data-register], [data-batch]');
   if (!el) return;
-  const { go, cancel, resume, template, status, stream, deltemplate, delartifact } = el.dataset;
-  if (el.dataset.viewtemplate) openDoc('template', el.dataset.viewtemplate);
-  else if (el.dataset.viewartifact) openDoc('artifact', el.dataset.viewartifact);
-  else if (el.dataset.copy) navigator.clipboard.writeText(el.dataset.copy).then(() => { el.textContent = 'copied'; });
-  else if (deltemplate && confirm(`Delete template ${deltemplate}?`)) act(() => api(`admin/template/${deltemplate}`, { method: 'DELETE' }));
-  else if (delartifact && confirm(`Delete artifact ${delartifact}?`)) act(() => api(`admin/artifact/${delartifact}`, { method: 'DELETE' }));
-  else if (go) location.hash = go;
-  else if (cancel && confirm(`Cancel delegation ${cancel}?`)) act(() => api(`admin/delegation/${cancel}/cancel`, { method: 'POST', body: {} }));
-  else if (resume) act(() => api(`admin/delegation/${resume}/resume`, { method: 'POST', body: {} }));
-  else if (template && status) act(() => api(`admin/template/${template}`, { method: 'POST', body: { status } }));
-  else if (stream && confirm(`Cancel stream ${stream}?`)) act(() => api(`admin/stream/${stream}/cancel`, { method: 'POST', body: {} }));
+  const d = el.dataset;
+  if (d.copy !== undefined) navigator.clipboard.writeText(d.copy).then(() => { const was = el.textContent; el.textContent = 'copied'; setTimeout(() => { el.textContent = was; }, 1200); });
+  else if (d.go !== undefined) location.hash = d.go;
+  else if (d.horizon) { state.horizon = Number(d.horizon); show(); }
+  else if (d.batch) { const row = $(`details[data-at="${d.batch}"]`); row.open = true; row.scrollIntoView({ block: 'center' }); }
+  else if (d.register) openRegister(d.register);
+  else if (d.cancel && confirm(`Cancel delegation #${d.cancel}? Its coins are no longer renewed or spent until it is resumed.`)) act(() => api(`admin/delegation/${d.cancel}/cancel`, { method: 'POST', body: {} }));
+  else if (d.resume) act(() => api(`admin/delegation/${d.resume}/resume`, { method: 'POST', body: {} }));
+  else if (d.template && d.status) act(() => api(`admin/template/${d.template}`, { method: 'POST', body: { status: d.status } }));
+  else if (d.stream && confirm(`Cancel stream #${d.stream}? It spawns nothing more; what it spawned keeps running.`)) act(() => api(`admin/stream/${d.stream}/cancel`, { method: 'POST', body: {} }));
+  else if (d.deltemplate && confirm('Delete this template?')) act(async () => { await api(`admin/template/${d.deltemplate}`, { method: 'DELETE' }); location.hash = 'registry'; });
+  else if (d.delartifact && confirm('Delete this artifact?')) act(async () => { await api(`admin/artifact/${d.delartifact}`, { method: 'DELETE' }); location.hash = 'registry'; });
 });
 
 window.addEventListener('hashchange', show);
