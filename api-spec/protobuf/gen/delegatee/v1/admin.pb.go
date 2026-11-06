@@ -1424,9 +1424,11 @@ func (x *HealthEntry) GetError() string {
 }
 
 type GetStatusRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// horizon_seconds is how far ahead the batches are forecast, 0 for 24 hours, at most 7 days.
+	HorizonSeconds int64 `protobuf:"varint,1,opt,name=horizon_seconds,json=horizonSeconds,proto3" json:"horizon_seconds,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetStatusRequest) Reset() {
@@ -1457,6 +1459,13 @@ func (x *GetStatusRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetStatusRequest) Descriptor() ([]byte, []int) {
 	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *GetStatusRequest) GetHorizonSeconds() int64 {
+	if x != nil {
+		return x.HorizonSeconds
+	}
+	return 0
 }
 
 type GetStatusResponse struct {
@@ -1580,10 +1589,12 @@ func (x *GetStatusResponse) GetAmount() uint64 {
 type BatchForecast struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// at is unix seconds.
-	At            int64  `protobuf:"varint,1,opt,name=at,proto3" json:"at,omitempty"`
-	Intents       int64  `protobuf:"varint,2,opt,name=intents,proto3" json:"intents,omitempty"`
-	Coins         int64  `protobuf:"varint,3,opt,name=coins,proto3" json:"coins,omitempty"`
-	Amount        uint64 `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
+	At      int64  `protobuf:"varint,1,opt,name=at,proto3" json:"at,omitempty"`
+	Intents int64  `protobuf:"varint,2,opt,name=intents,proto3" json:"intents,omitempty"`
+	Coins   int64  `protobuf:"varint,3,opt,name=coins,proto3" json:"coins,omitempty"`
+	Amount  uint64 `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
+	// entries are the delegations in the batch, the first 100 at most.
+	Entries       []*ForecastEntry `protobuf:"bytes,5,rep,name=entries,proto3" json:"entries,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1642,6 +1653,91 @@ func (x *BatchForecast) GetCoins() int64 {
 func (x *BatchForecast) GetAmount() uint64 {
 	if x != nil {
 		return x.Amount
+	}
+	return 0
+}
+
+func (x *BatchForecast) GetEntries() []*ForecastEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+// ForecastEntry is a delegation's coins in a forecast batch.
+type ForecastEntry struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	DelegationId int64                  `protobuf:"varint,1,opt,name=delegation_id,json=delegationId,proto3" json:"delegation_id,omitempty"`
+	Coins        int64                  `protobuf:"varint,2,opt,name=coins,proto3" json:"coins,omitempty"`
+	Amount       uint64                 `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	// due and deadline are unix seconds.
+	Due           int64 `protobuf:"varint,4,opt,name=due,proto3" json:"due,omitempty"`
+	Deadline      int64 `protobuf:"varint,5,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ForecastEntry) Reset() {
+	*x = ForecastEntry{}
+	mi := &file_delegatee_v1_admin_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ForecastEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ForecastEntry) ProtoMessage() {}
+
+func (x *ForecastEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_delegatee_v1_admin_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ForecastEntry.ProtoReflect.Descriptor instead.
+func (*ForecastEntry) Descriptor() ([]byte, []int) {
+	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ForecastEntry) GetDelegationId() int64 {
+	if x != nil {
+		return x.DelegationId
+	}
+	return 0
+}
+
+func (x *ForecastEntry) GetCoins() int64 {
+	if x != nil {
+		return x.Coins
+	}
+	return 0
+}
+
+func (x *ForecastEntry) GetAmount() uint64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *ForecastEntry) GetDue() int64 {
+	if x != nil {
+		return x.Due
+	}
+	return 0
+}
+
+func (x *ForecastEntry) GetDeadline() int64 {
+	if x != nil {
+		return x.Deadline
 	}
 	return 0
 }
@@ -1739,8 +1835,9 @@ const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"\vHealthEntry\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\ahealthy\x18\x02 \x01(\bR\ahealthy\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error\"\x12\n" +
-	"\x10GetStatusRequest\"\x96\x02\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\";\n" +
+	"\x10GetStatusRequest\x12'\n" +
+	"\x0fhorizon_seconds\x18\x01 \x01(\x03R\x0ehorizonSeconds\"\x96\x02\n" +
 	"\x11GetStatusResponse\x12\x16\n" +
 	"\x06active\x18\x01 \x01(\x03R\x06active\x12\x16\n" +
 	"\x06queued\x18\x02 \x01(\x03R\x06queued\x12\x1e\n" +
@@ -1753,12 +1850,19 @@ const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"\n" +
 	"tip_height\x18\a \x01(\x03R\ttipHeight\x12\x14\n" +
 	"\x05coins\x18\b \x01(\x03R\x05coins\x12\x16\n" +
-	"\x06amount\x18\t \x01(\x04R\x06amount\"g\n" +
+	"\x06amount\x18\t \x01(\x04R\x06amount\"\x9e\x01\n" +
 	"\rBatchForecast\x12\x0e\n" +
 	"\x02at\x18\x01 \x01(\x03R\x02at\x12\x18\n" +
 	"\aintents\x18\x02 \x01(\x03R\aintents\x12\x14\n" +
 	"\x05coins\x18\x03 \x01(\x03R\x05coins\x12\x16\n" +
-	"\x06amount\x18\x04 \x01(\x04R\x06amount2\xb8\f\n" +
+	"\x06amount\x18\x04 \x01(\x04R\x06amount\x125\n" +
+	"\aentries\x18\x05 \x03(\v2\x1b.delegatee.v1.ForecastEntryR\aentries\"\x90\x01\n" +
+	"\rForecastEntry\x12#\n" +
+	"\rdelegation_id\x18\x01 \x01(\x03R\fdelegationId\x12\x14\n" +
+	"\x05coins\x18\x02 \x01(\x03R\x05coins\x12\x16\n" +
+	"\x06amount\x18\x03 \x01(\x04R\x06amount\x12\x10\n" +
+	"\x03due\x18\x04 \x01(\x03R\x03due\x12\x1a\n" +
+	"\bdeadline\x18\x05 \x01(\x03R\bdeadline2\xb8\f\n" +
 	"\fAdminService\x12|\n" +
 	"\x0eUpdateTemplate\x12#.delegatee.v1.UpdateTemplateRequest\x1a$.delegatee.v1.UpdateTemplateResponse\"\x1f\xb2J\x1cB\x01*\"\x17/v1/admin/template/{id}\x12y\n" +
 	"\x0eDeleteTemplate\x12#.delegatee.v1.DeleteTemplateRequest\x1a$.delegatee.v1.DeleteTemplateResponse\"\x1c\xb2J\x19*\x17/v1/admin/template/{id}\x12r\n" +
@@ -1788,7 +1892,7 @@ func file_delegatee_v1_admin_proto_rawDescGZIP() []byte {
 	return file_delegatee_v1_admin_proto_rawDescData
 }
 
-var file_delegatee_v1_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_delegatee_v1_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_delegatee_v1_admin_proto_goTypes = []any{
 	(*UpdateTemplateRequest)(nil),    // 0: delegatee.v1.UpdateTemplateRequest
 	(*UpdateTemplateResponse)(nil),   // 1: delegatee.v1.UpdateTemplateResponse
@@ -1821,53 +1925,55 @@ var file_delegatee_v1_admin_proto_goTypes = []any{
 	(*GetStatusRequest)(nil),         // 28: delegatee.v1.GetStatusRequest
 	(*GetStatusResponse)(nil),        // 29: delegatee.v1.GetStatusResponse
 	(*BatchForecast)(nil),            // 30: delegatee.v1.BatchForecast
-	nil,                              // 31: delegatee.v1.RegisterStreamRequest.VariablesEntry
-	nil,                              // 32: delegatee.v1.Stream.VariablesEntry
-	(*Artifact)(nil),                 // 33: delegatee.v1.Artifact
-	(*Delegation)(nil),               // 34: delegatee.v1.Delegation
+	(*ForecastEntry)(nil),            // 31: delegatee.v1.ForecastEntry
+	nil,                              // 32: delegatee.v1.RegisterStreamRequest.VariablesEntry
+	nil,                              // 33: delegatee.v1.Stream.VariablesEntry
+	(*Artifact)(nil),                 // 34: delegatee.v1.Artifact
+	(*Delegation)(nil),               // 35: delegatee.v1.Delegation
 }
 var file_delegatee_v1_admin_proto_depIdxs = []int32{
-	33, // 0: delegatee.v1.ListArtifactsResponse.artifacts:type_name -> delegatee.v1.Artifact
+	34, // 0: delegatee.v1.ListArtifactsResponse.artifacts:type_name -> delegatee.v1.Artifact
 	10, // 1: delegatee.v1.ListDelegationsResponse.delegations:type_name -> delegatee.v1.DelegationSummary
-	34, // 2: delegatee.v1.DelegationSummary.delegation:type_name -> delegatee.v1.Delegation
+	35, // 2: delegatee.v1.DelegationSummary.delegation:type_name -> delegatee.v1.Delegation
 	17, // 3: delegatee.v1.ListAttemptsResponse.attempts:type_name -> delegatee.v1.Attempt
-	31, // 4: delegatee.v1.RegisterStreamRequest.variables:type_name -> delegatee.v1.RegisterStreamRequest.VariablesEntry
+	32, // 4: delegatee.v1.RegisterStreamRequest.variables:type_name -> delegatee.v1.RegisterStreamRequest.VariablesEntry
 	24, // 5: delegatee.v1.RegisterStreamResponse.stream:type_name -> delegatee.v1.Stream
 	24, // 6: delegatee.v1.ListStreamsResponse.streams:type_name -> delegatee.v1.Stream
-	32, // 7: delegatee.v1.Stream.variables:type_name -> delegatee.v1.Stream.VariablesEntry
+	33, // 7: delegatee.v1.Stream.variables:type_name -> delegatee.v1.Stream.VariablesEntry
 	27, // 8: delegatee.v1.GetHealthResponse.entries:type_name -> delegatee.v1.HealthEntry
 	30, // 9: delegatee.v1.GetStatusResponse.batches:type_name -> delegatee.v1.BatchForecast
-	0,  // 10: delegatee.v1.AdminService.UpdateTemplate:input_type -> delegatee.v1.UpdateTemplateRequest
-	2,  // 11: delegatee.v1.AdminService.DeleteTemplate:input_type -> delegatee.v1.DeleteTemplateRequest
-	4,  // 12: delegatee.v1.AdminService.ListArtifacts:input_type -> delegatee.v1.ListArtifactsRequest
-	6,  // 13: delegatee.v1.AdminService.DeleteArtifact:input_type -> delegatee.v1.DeleteArtifactRequest
-	8,  // 14: delegatee.v1.AdminService.ListDelegations:input_type -> delegatee.v1.ListDelegationsRequest
-	11, // 15: delegatee.v1.AdminService.CancelDelegation:input_type -> delegatee.v1.CancelDelegationRequest
-	13, // 16: delegatee.v1.AdminService.ResumeDelegation:input_type -> delegatee.v1.ResumeDelegationRequest
-	15, // 17: delegatee.v1.AdminService.ListAttempts:input_type -> delegatee.v1.ListAttemptsRequest
-	18, // 18: delegatee.v1.AdminService.RegisterStream:input_type -> delegatee.v1.RegisterStreamRequest
-	20, // 19: delegatee.v1.AdminService.ListStreams:input_type -> delegatee.v1.ListStreamsRequest
-	22, // 20: delegatee.v1.AdminService.CancelStream:input_type -> delegatee.v1.CancelStreamRequest
-	25, // 21: delegatee.v1.AdminService.GetHealth:input_type -> delegatee.v1.GetHealthRequest
-	28, // 22: delegatee.v1.AdminService.GetStatus:input_type -> delegatee.v1.GetStatusRequest
-	1,  // 23: delegatee.v1.AdminService.UpdateTemplate:output_type -> delegatee.v1.UpdateTemplateResponse
-	3,  // 24: delegatee.v1.AdminService.DeleteTemplate:output_type -> delegatee.v1.DeleteTemplateResponse
-	5,  // 25: delegatee.v1.AdminService.ListArtifacts:output_type -> delegatee.v1.ListArtifactsResponse
-	7,  // 26: delegatee.v1.AdminService.DeleteArtifact:output_type -> delegatee.v1.DeleteArtifactResponse
-	9,  // 27: delegatee.v1.AdminService.ListDelegations:output_type -> delegatee.v1.ListDelegationsResponse
-	12, // 28: delegatee.v1.AdminService.CancelDelegation:output_type -> delegatee.v1.CancelDelegationResponse
-	14, // 29: delegatee.v1.AdminService.ResumeDelegation:output_type -> delegatee.v1.ResumeDelegationResponse
-	16, // 30: delegatee.v1.AdminService.ListAttempts:output_type -> delegatee.v1.ListAttemptsResponse
-	19, // 31: delegatee.v1.AdminService.RegisterStream:output_type -> delegatee.v1.RegisterStreamResponse
-	21, // 32: delegatee.v1.AdminService.ListStreams:output_type -> delegatee.v1.ListStreamsResponse
-	23, // 33: delegatee.v1.AdminService.CancelStream:output_type -> delegatee.v1.CancelStreamResponse
-	26, // 34: delegatee.v1.AdminService.GetHealth:output_type -> delegatee.v1.GetHealthResponse
-	29, // 35: delegatee.v1.AdminService.GetStatus:output_type -> delegatee.v1.GetStatusResponse
-	23, // [23:36] is the sub-list for method output_type
-	10, // [10:23] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	31, // 10: delegatee.v1.BatchForecast.entries:type_name -> delegatee.v1.ForecastEntry
+	0,  // 11: delegatee.v1.AdminService.UpdateTemplate:input_type -> delegatee.v1.UpdateTemplateRequest
+	2,  // 12: delegatee.v1.AdminService.DeleteTemplate:input_type -> delegatee.v1.DeleteTemplateRequest
+	4,  // 13: delegatee.v1.AdminService.ListArtifacts:input_type -> delegatee.v1.ListArtifactsRequest
+	6,  // 14: delegatee.v1.AdminService.DeleteArtifact:input_type -> delegatee.v1.DeleteArtifactRequest
+	8,  // 15: delegatee.v1.AdminService.ListDelegations:input_type -> delegatee.v1.ListDelegationsRequest
+	11, // 16: delegatee.v1.AdminService.CancelDelegation:input_type -> delegatee.v1.CancelDelegationRequest
+	13, // 17: delegatee.v1.AdminService.ResumeDelegation:input_type -> delegatee.v1.ResumeDelegationRequest
+	15, // 18: delegatee.v1.AdminService.ListAttempts:input_type -> delegatee.v1.ListAttemptsRequest
+	18, // 19: delegatee.v1.AdminService.RegisterStream:input_type -> delegatee.v1.RegisterStreamRequest
+	20, // 20: delegatee.v1.AdminService.ListStreams:input_type -> delegatee.v1.ListStreamsRequest
+	22, // 21: delegatee.v1.AdminService.CancelStream:input_type -> delegatee.v1.CancelStreamRequest
+	25, // 22: delegatee.v1.AdminService.GetHealth:input_type -> delegatee.v1.GetHealthRequest
+	28, // 23: delegatee.v1.AdminService.GetStatus:input_type -> delegatee.v1.GetStatusRequest
+	1,  // 24: delegatee.v1.AdminService.UpdateTemplate:output_type -> delegatee.v1.UpdateTemplateResponse
+	3,  // 25: delegatee.v1.AdminService.DeleteTemplate:output_type -> delegatee.v1.DeleteTemplateResponse
+	5,  // 26: delegatee.v1.AdminService.ListArtifacts:output_type -> delegatee.v1.ListArtifactsResponse
+	7,  // 27: delegatee.v1.AdminService.DeleteArtifact:output_type -> delegatee.v1.DeleteArtifactResponse
+	9,  // 28: delegatee.v1.AdminService.ListDelegations:output_type -> delegatee.v1.ListDelegationsResponse
+	12, // 29: delegatee.v1.AdminService.CancelDelegation:output_type -> delegatee.v1.CancelDelegationResponse
+	14, // 30: delegatee.v1.AdminService.ResumeDelegation:output_type -> delegatee.v1.ResumeDelegationResponse
+	16, // 31: delegatee.v1.AdminService.ListAttempts:output_type -> delegatee.v1.ListAttemptsResponse
+	19, // 32: delegatee.v1.AdminService.RegisterStream:output_type -> delegatee.v1.RegisterStreamResponse
+	21, // 33: delegatee.v1.AdminService.ListStreams:output_type -> delegatee.v1.ListStreamsResponse
+	23, // 34: delegatee.v1.AdminService.CancelStream:output_type -> delegatee.v1.CancelStreamResponse
+	26, // 35: delegatee.v1.AdminService.GetHealth:output_type -> delegatee.v1.GetHealthResponse
+	29, // 36: delegatee.v1.AdminService.GetStatus:output_type -> delegatee.v1.GetStatusResponse
+	24, // [24:37] is the sub-list for method output_type
+	11, // [11:24] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_delegatee_v1_admin_proto_init() }
@@ -1882,7 +1988,7 @@ func file_delegatee_v1_admin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_delegatee_v1_admin_proto_rawDesc), len(file_delegatee_v1_admin_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   33,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

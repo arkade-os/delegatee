@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	executionapp "github.com/arkade-os/delegatee/internal/core/application/execution"
 	"github.com/arkade-os/delegatee/internal/core/application/health"
@@ -62,7 +63,9 @@ func get(h http.Handler, path string) *httptest.ResponseRecorder {
 
 type statusStub struct{ status executionapp.Status }
 
-func (s statusStub) Status(context.Context) (executionapp.Status, error) { return s.status, nil }
+func (s statusStub) Status(context.Context, time.Duration) (executionapp.Status, error) {
+	return s.status, nil
+}
 
 type healthStub struct{ entries []health.Entry }
 

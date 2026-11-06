@@ -21,10 +21,12 @@ type Status struct {
 	NextDue    time.Time
 	Tip        delegation.Tip
 	Batches    []BatchForecast
-	Coins      int    // present coins watched
-	Amount     uint64 // of those coins
-	Succeeded  uint64 // attempts ended since the daemon started
-	Failed     uint64
+	// entries are the queued entries the forecast starts from.
+	entries   []execution.Entry
+	Coins     int    // present coins watched
+	Amount    uint64 // of those coins
+	Succeeded uint64 // attempts ended since the daemon started
+	Failed    uint64
 	// TemplateFailures counts the failed attempts charged to their template since the daemon started.
 	TemplateFailures uint64
 }
@@ -35,10 +37,26 @@ type BatchForecast struct {
 	Intents int
 	Coins   int
 	Amount  uint64
+	Entries []ForecastEntry
 }
 
+// ForecastEntry is a delegation's coins in a forecast batch.
+type ForecastEntry struct {
+	DelegationID int64
+	Coins        int
+	Amount       uint64
+	Due          time.Time
+	Deadline     time.Time
+}
+
+const (
+	forecastLimit      = 10000
+	maxForecastEntries = 100
+)
+
 // Status reads the last published aggregates and counts the active delegations and their coins.
-func (s *Service) Status(ctx context.Context) (Status, error) {
+// With a horizon it forecasts the batches again, with the coins that become due within it.
+func (s *Service) Status(ctx context.Context, horizon time.Duration) (Status, error) {
 	var out Status
 	if p := s.status.Load(); p != nil {
 		out = *p
@@ -47,8 +65,30 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 	if out.Active, err = s.delegations.CountActive(ctx); err != nil {
 		return out, err
 	}
-	out.Coins, out.Amount, err = s.coins.Totals(ctx)
+	if out.Coins, out.Amount, err = s.coins.Totals(ctx); err != nil {
+		return out, err
+	}
+	if horizon > 0 {
+		err = s.forecast(ctx, &out, horizon)
+	}
 	return out, err
+}
+
+// forecast plans the published entries with the coins due within the horizon.
+func (s *Service) forecast(ctx context.Context, st *Status, horizon time.Duration) error {
+	now := time.Now()
+	entries := slices.Clone(st.entries)
+	upcoming, err := s.coins.Ready(ctx, now.Add(horizon), st.Tip, forecastLimit)
+	if err != nil {
+		return err
+	}
+	for _, coins := range upcoming {
+		entries = append(entries, execution.NewEntry(coins, s.limits.Reserve))
+	}
+	plan := execution.NewPlan(entries, s.session, now)
+	st.Late = len(plan.Late)
+	st.Batches = forecastBatches(plan)
+	return nil
 }
 
 // plan lays out the queued entries.
@@ -72,18 +112,30 @@ func (s *Service) publish(now time.Time) {
 	plan := s.plan(now)
 	reserved, queued := s.counts()
 	st := Status{
-		Queued: queued, Registered: reserved, Late: len(plan.Late),
-		NextDue: s.nextDue, Tip: s.tip, Batches: make([]BatchForecast, len(plan.Batches)),
+		entries: slices.Collect(maps.Values(s.entries)),
+		Queued:  queued, Registered: reserved, Late: len(plan.Late),
+		NextDue: s.nextDue, Tip: s.tip,
 		Succeeded: s.attemptsSucceeded, Failed: s.attemptsFailed, TemplateFailures: s.templateFailures,
 	}
+	st.Batches = forecastBatches(plan)
+	s.status.Store(&st)
+}
+
+func forecastBatches(plan execution.Plan) []BatchForecast {
+	out := make([]BatchForecast, len(plan.Batches))
 	for i, b := range plan.Batches {
-		st.Batches[i] = BatchForecast{At: b.At, Intents: len(b.Entries)}
-		for _, e := range b.Entries {
-			st.Batches[i].Coins += len(e.Coins)
-			st.Batches[i].Amount += e.Amount()
+		out[i] = BatchForecast{At: b.At, Intents: len(b.Entries)}
+		for j, e := range b.Entries {
+			out[i].Coins += len(e.Coins)
+			out[i].Amount += e.Amount()
+			if j < maxForecastEntries {
+				out[i].Entries = append(out[i].Entries, ForecastEntry{
+					DelegationID: e.DelegationID, Coins: len(e.Coins), Amount: e.Amount(), Due: e.Due, Deadline: e.Deadline,
+				})
+			}
 		}
 	}
-	s.status.Store(&st)
+	return out
 }
 
 // Alive fails when the loop has been silent for LoopStall past the time its timer should have fired.

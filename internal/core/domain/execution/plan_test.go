@@ -179,6 +179,41 @@ func TestEntryListsItsCoinOutpointsAndSumsTheirAmounts(t *testing.T) {
 	require.Equal(t, uint64(7), e.Amount())
 }
 
+func TestPlanOfFutureRenewalsFormsAGroupPerFarApartDeadline(t *testing.T) {
+	r := Session{Duration: 30 * time.Second, MaxIntents: 10}
+	first, second := entry(1, 2*time.Hour), entry(2, 5*time.Hour)
+	first.Due, second.Due = now.Add(time.Hour), now.Add(4*time.Hour)
+	p := NewPlan([]Entry{second, first}, r, now)
+	require.Len(t, p.Batches, 2)
+	require.Equal(t, now.Add(2*time.Hour), p.Batches[0].At)
+	require.Equal(t, []int64{1}, delegations(p.Batches[0].Entries))
+	require.Equal(t, now.Add(5*time.Hour), p.Batches[1].At)
+	require.Equal(t, []int64{2}, delegations(p.Batches[1].Entries))
+	require.Empty(t, p.Late)
+}
+
+func TestPlanOfAFutureRenewalDueBeforeTheEarliestDeadlineJoinsItsGroup(t *testing.T) {
+	r := Session{Duration: 30 * time.Second, MaxIntents: 10}
+	first, second := entry(1, 2*time.Hour), entry(2, 5*time.Hour)
+	second.Due = now.Add(time.Hour)
+	p := NewPlan([]Entry{first, second}, r, now)
+	require.Len(t, p.Batches, 1)
+	require.Equal(t, now.Add(2*time.Hour), p.Batches[0].At)
+	require.Equal(t, []int64{1, 2}, delegations(p.Batches[0].Entries))
+}
+
+func TestPlanPutsAFutureBoardingAtItsDueTime(t *testing.T) {
+	r := Session{Duration: 30 * time.Second, MaxIntents: 10}
+	boarding := Entry{DelegationID: 9, Coins: []delegation.Coin{{Outpoint: "dep:0", Onchain: true, Amount: 500}}, Due: now.Add(3 * time.Hour), Deadline: now.Add(3 * time.Hour)}
+	renewal := entry(1, 6*time.Hour)
+	p := NewPlan([]Entry{renewal, boarding}, r, now)
+	require.Len(t, p.Batches, 2)
+	require.Equal(t, now.Add(3*time.Hour), p.Batches[0].At)
+	require.Equal(t, []int64{9}, delegations(p.Batches[0].Entries))
+	require.Equal(t, now.Add(6*time.Hour), p.Batches[1].At)
+	require.Empty(t, p.Late)
+}
+
 func entry(id int64, deadline time.Duration) Entry {
 	return Entry{
 		DelegationID: id, Coins: []delegation.Coin{{Outpoint: "op" + string(rune('0'+id)), DelegationID: id, Amount: 1000}},

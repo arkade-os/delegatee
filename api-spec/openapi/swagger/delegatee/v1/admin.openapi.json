@@ -339,6 +339,17 @@
         ],
         "description": "GetStatus reports what the loop holds: the queue, what is registered at arkd and the forecast batches.",
         "operationId": "AdminService_GetStatus",
+        "parameters": [
+          {
+            "name": "horizonSeconds",
+            "in": "query",
+            "description": "horizon_seconds is how far ahead the batches are forecast, 0 for 24 hours, at most 7 days.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "a successful response.",
@@ -680,6 +691,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "entries": {
+            "type": "array",
+            "description": "entries are the delegations in the batch, the first 100 at most.",
+            "items": {
+              "$ref": "#/components/schemas/ForecastEntry"
+            }
+          },
           "intents": {
             "type": "integer",
             "format": "int64"
@@ -821,6 +839,34 @@
         "title": "DeleteTemplateResponse",
         "type": "object"
       },
+      "ForecastEntry": {
+        "title": "ForecastEntry",
+        "type": "object",
+        "description": "ForecastEntry is a delegation's coins in a forecast batch.",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "coins": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deadline": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "delegationId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "due": {
+            "type": "integer",
+            "description": "due and deadline are unix seconds.",
+            "format": "int64"
+          }
+        }
+      },
       "GetHealthRequest": {
         "title": "GetHealthRequest",
         "type": "object"
@@ -843,7 +889,14 @@
       },
       "GetStatusRequest": {
         "title": "GetStatusRequest",
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "horizonSeconds": {
+            "type": "integer",
+            "description": "horizon_seconds is how far ahead the batches are forecast, 0 for 24 hours, at most 7 days.",
+            "format": "int64"
+          }
+        }
       },
       "GetStatusResponse": {
         "title": "GetStatusResponse",

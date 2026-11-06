@@ -287,9 +287,22 @@ func request_AdminService_GetHealth_0(ctx context.Context, marshaler gateway.Mar
 
 }
 
+var (
+	query_params_AdminService_GetStatus_0 = gateway.QueryParameterParseOptions{
+		Filter: trie.New(),
+	}
+)
+
 func request_AdminService_GetStatus_0(ctx context.Context, marshaler gateway.Marshaler, mux *gateway.ServeMux, client AdminServiceClient, req *http.Request, pathParams gateway.Params) (proto.Message, gateway.ServerMetadata, error) {
 	var protoReq GetStatusRequest
 	var metadata gateway.ServerMetadata
+
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, gateway.ErrInvalidQueryParameters{Err: err}
+	}
+	if err := mux.PopulateQueryParameters(&protoReq, req.Form, query_params_AdminService_GetStatus_0); err != nil {
+		return nil, metadata, gateway.ErrInvalidQueryParameters{Err: err}
+	}
 
 	msg, err := client.GetStatus(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err

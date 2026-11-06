@@ -267,7 +267,7 @@ func TestGetStatus(t *testing.T) {
 	stub := &statusStub{status: executionapp.Status{
 		Active: 5, Queued: 3, Registered: 2, Late: 1, NextDue: soon, Tip: delegation.Tip{Height: 812}, Coins: 7, Amount: 70_000,
 		Batches: []executionapp.BatchForecast{
-			{At: soon, Intents: 2, Coins: 3, Amount: 30_000}, {At: soon.Add(time.Minute), Intents: 1, Coins: 1, Amount: 10_000},
+			{At: soon, Intents: 2, Coins: 3, Amount: 30_000, Entries: []executionapp.ForecastEntry{{DelegationID: 4, Coins: 3, Amount: 30_000, Due: soon, Deadline: soon.Add(time.Hour)}}}, {At: soon.Add(time.Minute), Intents: 1, Coins: 1, Amount: 10_000},
 		},
 	}}
 	admin := NewAdmin(nil, nil, stub, nil)
@@ -286,6 +286,17 @@ func TestGetStatus(t *testing.T) {
 	require.Equal(t, int64(2), resp.GetBatches()[0].GetIntents())
 	require.Equal(t, int64(3), resp.GetBatches()[0].GetCoins())
 	require.Equal(t, uint64(30_000), resp.GetBatches()[0].GetAmount())
+	require.Len(t, resp.GetBatches()[0].GetEntries(), 1)
+	require.Equal(t, int64(4), resp.GetBatches()[0].GetEntries()[0].GetDelegationId())
+	require.Equal(t, soon.Add(time.Hour).Unix(), resp.GetBatches()[0].GetEntries()[0].GetDeadline())
+	require.Equal(t, 24*time.Hour, stub.horizon, "the default horizon")
+
+	_, err = admin.GetStatus(t.Context(), &delegateev1.GetStatusRequest{HorizonSeconds: 3600})
+	require.NoError(t, err)
+	require.Equal(t, time.Hour, stub.horizon)
+	_, err = admin.GetStatus(t.Context(), &delegateev1.GetStatusRequest{HorizonSeconds: 365 * 86400})
+	require.NoError(t, err)
+	require.Equal(t, 7*24*time.Hour, stub.horizon, "clamped")
 
 	stub.status = executionapp.Status{}
 	resp, err = admin.GetStatus(t.Context(), &delegateev1.GetStatusRequest{})
@@ -321,11 +332,15 @@ func TestParseCursorRefusesWhatItDidNotWrite(t *testing.T) {
 
 type statusStub struct {
 	Executor
-	status executionapp.Status
-	err    error
+	status  executionapp.Status
+	err     error
+	horizon time.Duration
 }
 
-func (s *statusStub) Status(context.Context) (executionapp.Status, error) { return s.status, s.err }
+func (s *statusStub) Status(_ context.Context, horizon time.Duration) (executionapp.Status, error) {
+	s.horizon = horizon
+	return s.status, s.err
+}
 
 // summaryStub lists the summaries it was given, in that order.
 type summaryStub struct {

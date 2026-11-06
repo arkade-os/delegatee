@@ -90,9 +90,10 @@ func (p Plan) NextRegistration(now time.Time) time.Time {
 	return time.Time{}
 }
 
-// NewPlan puts the entries in batches. The renewals are all due: the earliest deadline forces the group
-// and every renewal rides in it, split into batches of at most MaxIntents, the earliest deadlines first and
-// the last at the group's time. Boarding coins form a group of their own, now, ahead of it.
+// NewPlan puts the entries in batches. The earliest remaining deadline forces a group: every renewal due by
+// then rides in it, split into batches of at most MaxIntents, the earliest deadlines first and the last at the
+// group's time. Entries not due yet are those due by a later deadline's group. Boarding coins go at their due
+// time, or now, those sharing a time in one group.
 func NewPlan(entries []Entry, s Session, now time.Time) Plan {
 	var boardings, renewals []Entry
 	for _, e := range slices.Clone(entries) {
@@ -109,14 +110,44 @@ func NewPlan(entries []Entry, s Session, now time.Time) Plan {
 		return cmp.Or(a.Due.Compare(b.Due), cmp.Compare(a.DelegationID, b.DelegationID))
 	})
 
+	type group struct {
+		entries []Entry
+		at      time.Time
+	}
+	var groups []group
+	for len(boardings) > 0 {
+		at := latest(boardings[0].Due, now)
+		n := 1
+		for n < len(boardings) && latest(boardings[n].Due, now).Equal(at) {
+			n++
+		}
+		groups = append(groups, group{boardings[:n], at})
+		boardings = boardings[n:]
+	}
+	for len(renewals) > 0 {
+		// the head always rides, even overdue or due past its deadline
+		at := latest(renewals[0].Deadline, now, renewals[0].Due)
+		var in, rest []Entry
+		for _, e := range renewals {
+			if e.Due.After(at) {
+				rest = append(rest, e)
+			} else {
+				in = append(in, e)
+			}
+		}
+		groups = append(groups, group{in, at})
+		renewals = rest
+	}
+	slices.SortStableFunc(groups, func(a, b group) int { return a.at.Compare(b.at) })
+
 	var p Plan
 	perBatch := max(s.MaxIntents, 1)
 	previous := now.Add(-s.Duration)
-	place := func(group []Entry, groupAt time.Time) {
-		n := (len(group) + perBatch - 1) / perBatch
+	for _, g := range groups {
+		n := (len(g.entries) + perBatch - 1) / perBatch
 		for i := range n {
-			chunk := group[i*perBatch : min((i+1)*perBatch, len(group))]
-			desired := groupAt.Add(-time.Duration(n-1-i) * s.Duration)
+			chunk := g.entries[i*perBatch : min((i+1)*perBatch, len(g.entries))]
+			desired := g.at.Add(-time.Duration(n-1-i) * s.Duration)
 			earliest := now
 			if slices.ContainsFunc(chunk, func(e Entry) bool { return !e.Reserved }) {
 				earliest = now.Add(s.Duration)
@@ -130,12 +161,6 @@ func NewPlan(entries []Entry, s Session, now time.Time) Plan {
 				}
 			}
 		}
-	}
-	if len(boardings) > 0 {
-		place(boardings, now)
-	}
-	if len(renewals) > 0 {
-		place(renewals, latest(renewals[0].Deadline, now))
 	}
 	slices.Sort(p.Late)
 	return p

@@ -24,13 +24,16 @@ import (
 const (
 	defaultListLimit = 100
 	maxListLimit     = 1000
+
+	defaultHorizon = 24 * time.Hour
+	maxHorizon     = 7 * 24 * time.Hour
 )
 
 type Executor interface {
 	Attempts(ctx context.Context, delegationID, cursor int64, limit int) ([]delegation.Attempt, error)
 	Coins(ctx context.Context, delegationID int64) ([]delegation.Coin, error)
 	Summaries(ctx context.Context, f ports.SummaryFilter) ([]ports.Summary, error)
-	Status(ctx context.Context) (executionapp.Status, error)
+	Status(ctx context.Context, horizon time.Duration) (executionapp.Status, error)
 }
 
 type Health interface {
@@ -238,8 +241,12 @@ func (h *Admin) GetHealth(ctx context.Context, _ *delegateev1.GetHealthRequest) 
 	return resp, nil
 }
 
-func (h *Admin) GetStatus(ctx context.Context, _ *delegateev1.GetStatusRequest) (*delegateev1.GetStatusResponse, error) {
-	st, err := h.execution.Status(ctx)
+func (h *Admin) GetStatus(ctx context.Context, req *delegateev1.GetStatusRequest) (*delegateev1.GetStatusResponse, error) {
+	horizon := defaultHorizon
+	if secs := req.GetHorizonSeconds(); secs > 0 {
+		horizon = time.Duration(min(secs, int64(maxHorizon/time.Second))) * time.Second
+	}
+	st, err := h.execution.Status(ctx, horizon)
 	if err != nil {
 		return nil, toStatus(err)
 	}
@@ -252,9 +259,13 @@ func (h *Admin) GetStatus(ctx context.Context, _ *delegateev1.GetStatusRequest) 
 		resp.NextDue = st.NextDue.Unix()
 	}
 	for _, r := range st.Batches {
-		resp.Batches = append(resp.Batches, &delegateev1.BatchForecast{
-			At: r.At.Unix(), Intents: int64(r.Intents), Coins: int64(r.Coins), Amount: r.Amount,
-		})
+		b := &delegateev1.BatchForecast{At: r.At.Unix(), Intents: int64(r.Intents), Coins: int64(r.Coins), Amount: r.Amount}
+		for _, e := range r.Entries {
+			b.Entries = append(b.Entries, &delegateev1.ForecastEntry{
+				DelegationId: e.DelegationID, Coins: int64(e.Coins), Amount: e.Amount, Due: e.Due.Unix(), Deadline: e.Deadline.Unix(),
+			})
+		}
+		resp.Batches = append(resp.Batches, b)
 	}
 	return resp, nil
 }

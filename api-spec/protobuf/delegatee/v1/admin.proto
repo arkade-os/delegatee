@@ -210,7 +210,10 @@ message HealthEntry {
   // error says why the dependency is not healthy.
   string error = 3;
 }
-message GetStatusRequest {}
+message GetStatusRequest {
+  // horizon_seconds is how far ahead the batches are forecast, 0 for 24 hours, at most 7 days.
+  int64 horizon_seconds = 1;
+}
 message GetStatusResponse {
   // active is how many delegations are being served.
   int64 active = 1;
@@ -238,4 +241,15 @@ message BatchForecast {
   int64 intents = 2;
   int64 coins = 3;
   uint64 amount = 4;
+  // entries are the delegations in the batch, the first 100 at most.
+  repeated ForecastEntry entries = 5;
+}
+// ForecastEntry is a delegation's coins in a forecast batch.
+message ForecastEntry {
+  int64 delegation_id = 1;
+  int64 coins = 2;
+  uint64 amount = 3;
+  // due and deadline are unix seconds.
+  int64 due = 4;
+  int64 deadline = 5;
 }

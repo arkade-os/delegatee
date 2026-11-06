@@ -74,6 +74,9 @@ tr.row:hover { background: var(--hover); }
 dl { display: grid; grid-template-columns: max-content 1fr; gap: .3rem 1.25rem; margin: 0; }
 dt { color: var(--muted); }
 dd { margin: 0; min-width: 0; }
+dialog { width: min(60rem, 94vw); max-height: 88vh; padding: 1rem; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; }
+dialog::backdrop { background: rgba(0, 0, 0, .5); }
+dialog pre { margin: .75rem 0 0; padding: .75rem; max-height: 60vh; overflow: auto; background: var(--paper); border-radius: 6px; font: .85em/1.45 var(--mono); }
 </style>
 </head>
 <body>
@@ -91,6 +94,7 @@ dd { margin: 0; min-width: 0; }
   <div id="error" role="alert" hidden></div>
   <div id="view"></div>
 </main>
+<dialog id="doc"></dialog>
 
 <script>
 const $ = (selector) => document.querySelector(selector);
@@ -131,6 +135,24 @@ function fail(error) {
   $('#error').hidden = false;
 }
 
+// openDoc shows a template or artifact document in the dialog
+async function openDoc(kind, id) {
+  try {
+    const item = (await api(`${kind}/${encodeURIComponent(id)}`))[kind];
+    let text = item.document || '';
+    try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (e) { /* show raw */ }
+    const links = (item.artifactIds || []).map((a) => `<button class="link mono" data-viewartifact="${esc(a)}">${esc(short(a, 12))}</button>`).join(' ');
+    $('#doc').innerHTML = `<div class="toolbar"><h2>${esc(kind)} <span class="mono">${esc(id)}</span></h2><span class="spacer"></span>
+      <button id="doccopy">Copy</button><button id="docclose">Close</button></div>
+      ${links ? `<div>Artifacts: ${links}</div>` : ''}<pre>${esc(text)}</pre>`;
+    $('#doccopy').onclick = (event) => navigator.clipboard.writeText(text).then(() => { event.target.textContent = 'copied'; });
+    $('#docclose').onclick = () => $('#doc').close();
+    if (!$('#doc').open) $('#doc').showModal();
+  } catch (error) {
+    fail(error);
+  }
+}
+
 // act runs a change and shows the view again
 async function act(change) {
   try {
@@ -159,7 +181,7 @@ async function showHealth() {
 
 const views = {
   async overview() {
-    const [status, entries] = await Promise.all([api('admin/status'), showHealth()]);
+    const [status, entries] = await Promise.all([api(`admin/status?horizonSeconds=${views.horizon}`), showHealth()]);
     const card = (label, value, alert) => `<div class="card ${alert ? 'alert' : ''}"><div class="label">${label}</div><div class="value">${value}</div></div>`;
     view.innerHTML = `
       <div class="cards">
@@ -172,8 +194,16 @@ const views = {
         ${card('Next due', esc(until(status.nextDue)))}
         ${card('Chain tip', sats(status.tipHeight))}
       </div>
-      <div class="panel"><h2>Batch forecast</h2>${table([
-        { title: 'At', cell: (r) => `${esc(when(r.at))} <span class="muted">${esc(until(r.at))}</span>` },
+      <div class="panel"><h2>Batch forecast</h2>
+        <label>Horizon <select id="horizon">${[[86400, '24h'], [259200, '3d'], [604800, '7d']].map(([v, l]) => `<option value="${v}" ${v === views.horizon ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        ${table([
+        { title: 'At', cell: (r) => `<details data-at="${esc(r.at)}" ${views.openBatches.has(String(r.at)) ? 'open' : ''}><summary>${esc(when(r.at))} <span class="muted">${esc(until(r.at))}</span></summary>${table([
+          { title: 'Delegation', cell: (e) => `<button class="link" data-go="delegations/${esc(e.delegationId)}">${esc(e.delegationId)}</button>` },
+          { title: 'Coins', num: true, cell: (e) => sats(e.coins) },
+          { title: 'Amount (sats)', num: true, cell: (e) => sats(e.amount) },
+          { title: 'Due', cell: (e) => `${esc(when(e.due))} <span class="muted">${esc(until(e.due))}</span>` },
+          { title: 'Deadline', cell: (e) => `${esc(when(e.deadline))} <span class="muted">${esc(until(e.deadline))}</span>` },
+        ], r.entries || [])}</details>` },
         { title: 'Intents', num: true, cell: (r) => sats(r.intents) },
         { title: 'Coins', num: true, cell: (r) => sats(r.coins) },
         { title: 'Amount (sats)', num: true, cell: (r) => sats(r.amount) },
@@ -183,7 +213,13 @@ const views = {
         { title: 'State', cell: (e) => (e.healthy ? tag('ok', 'ok') : tag('down', 'bad')) },
         { title: 'Error', cell: (e) => `<span class="mono">${esc(e.error)}</span>` },
       ], entries)}</div>`;
+    $('#horizon').onchange = (event) => { views.horizon = Number(event.target.value); views.overview(); };
+    view.querySelectorAll('details[data-at]').forEach((d) => d.addEventListener('toggle', () => {
+      views.openBatches[d.open ? 'add' : 'delete'](d.dataset.at);
+    }));
   },
+  horizon: 86400,
+  openBatches: new Set(),
 
   async delegations(arg) {
     return arg ? this.detail(arg) : this.list();
@@ -276,13 +312,14 @@ const views = {
       { title: 'Artifacts', num: true, cell: (t) => (t.artifactIds || []).length },
       { title: 'Created', cell: (t) => esc(when(t.createdAt)) },
       { title: '', cell: (t) => `
+        <button data-viewtemplate="${esc(t.id)}">View</button>
         <button data-template="${esc(t.id)}" data-status="${t.status === 'active' ? 'disabled' : 'active'}">${t.status === 'active' ? 'Disable' : 'Enable'}</button>
         <button class="danger" data-deltemplate="${esc(t.id)}">Delete</button>` },
     ], templates)}</div>
     <div class="panel"><h2>Artifacts</h2>${table([
       { title: 'ID', cell: (a) => copy(a.id) },
       { title: 'Created', cell: (a) => esc(when(a.createdAt)) },
-      { title: '', cell: (a) => `<button class="danger" data-delartifact="${esc(a.id)}">Delete</button>` },
+      { title: '', cell: (a) => `<button data-viewartifact="${esc(a.id)}">View</button> <button class="danger" data-delartifact="${esc(a.id)}">Delete</button>` },
     ], artifacts)}</div>`;
   },
 
@@ -328,10 +365,12 @@ async function show() {
 }
 
 document.addEventListener('click', (event) => {
-  const el = event.target.closest('[data-go], [data-cancel], [data-resume], [data-template], [data-stream], [data-copy], [data-deltemplate], [data-delartifact]');
+  const el = event.target.closest('[data-go], [data-cancel], [data-resume], [data-template], [data-stream], [data-copy], [data-deltemplate], [data-delartifact], [data-viewtemplate], [data-viewartifact]');
   if (!el) return;
   const { go, cancel, resume, template, status, stream, deltemplate, delartifact } = el.dataset;
-  if (el.dataset.copy) navigator.clipboard.writeText(el.dataset.copy).then(() => { el.textContent = 'copied'; });
+  if (el.dataset.viewtemplate) openDoc('template', el.dataset.viewtemplate);
+  else if (el.dataset.viewartifact) openDoc('artifact', el.dataset.viewartifact);
+  else if (el.dataset.copy) navigator.clipboard.writeText(el.dataset.copy).then(() => { el.textContent = 'copied'; });
   else if (deltemplate && confirm(`Delete template ${deltemplate}?`)) act(() => api(`admin/template/${deltemplate}`, { method: 'DELETE' }));
   else if (delartifact && confirm(`Delete artifact ${delartifact}?`)) act(() => api(`admin/artifact/${delartifact}`, { method: 'DELETE' }));
   else if (go) location.hash = go;
