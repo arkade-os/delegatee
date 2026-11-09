@@ -13,7 +13,7 @@ import (
 const scrapeTimeout = 5 * time.Second
 
 type StatusSource interface {
-	Status(ctx context.Context, horizon time.Duration) (executionapp.Status, error)
+	Status(ctx context.Context, forecast bool) (executionapp.Status, error)
 }
 
 // collector reads the status and the health on every scrape, so there is nothing to keep in sync.
@@ -44,7 +44,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 	metric := func(d *prometheus.Desc, kind prometheus.ValueType, v float64, labels ...string) {
 		ch <- prometheus.MustNewConstMetric(d, kind, v, labels...)
 	}
-	if st, err := c.status.Status(ctx, 0); err == nil {
+	if st, err := c.status.Status(ctx, false); err == nil {
 		metric(descActive, prometheus.GaugeValue, float64(st.Active))
 		metric(descQueued, prometheus.GaugeValue, float64(st.Queued))
 		metric(descRegistered, prometheus.GaugeValue, float64(st.Registered))

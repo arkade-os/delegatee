@@ -306,14 +306,7 @@ func TestGetStatus(t *testing.T) {
 	require.Len(t, resp.GetBatches()[0].GetEntries(), 1)
 	require.Equal(t, int64(4), resp.GetBatches()[0].GetEntries()[0].GetDelegationId())
 	require.Equal(t, soon.Add(time.Hour).Unix(), resp.GetBatches()[0].GetEntries()[0].GetDeadline())
-	require.Equal(t, 24*time.Hour, stub.horizon, "the default horizon")
-
-	_, err = admin.GetStatus(t.Context(), &delegateev1.GetStatusRequest{HorizonSeconds: 3600})
-	require.NoError(t, err)
-	require.Equal(t, time.Hour, stub.horizon)
-	_, err = admin.GetStatus(t.Context(), &delegateev1.GetStatusRequest{HorizonSeconds: 365 * 86400})
-	require.NoError(t, err)
-	require.Equal(t, 7*24*time.Hour, stub.horizon, "clamped")
+	require.True(t, stub.forecast)
 
 	stub.status = executionapp.Status{}
 	resp, err = admin.GetStatus(t.Context(), &delegateev1.GetStatusRequest{})
@@ -349,13 +342,13 @@ func TestParseCursorRefusesWhatItDidNotWrite(t *testing.T) {
 
 type statusStub struct {
 	Executor
-	status  executionapp.Status
-	err     error
-	horizon time.Duration
+	status   executionapp.Status
+	err      error
+	forecast bool
 }
 
-func (s *statusStub) Status(_ context.Context, horizon time.Duration) (executionapp.Status, error) {
-	s.horizon = horizon
+func (s *statusStub) Status(_ context.Context, forecast bool) (executionapp.Status, error) {
+	s.forecast = forecast
 	return s.status, s.err
 }
 

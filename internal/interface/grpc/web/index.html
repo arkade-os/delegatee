@@ -175,8 +175,6 @@ dialog .msg { color: var(--bad); font-size: .85rem; }
 <script>
 const $ = (selector, root = document) => root.querySelector(selector);
 const view = $('#view');
-const HORIZONS = [[86400, '24h'], [259200, '3d'], [604800, '7d']];
-const WEEK = 604800;
 
 // formatting
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -225,7 +223,7 @@ const statusKind = { active: 'ok', cancelled: 'bad', expired: 'warn', done: 'acc
 const attemptKind = { succeeded: 'ok', failed: 'bad', submitted: 'warn' };
 
 // state shared by the views
-const state = { info: null, status: null, templates: [], artifacts: [], streams: [], health: [], horizon: 86400, open: new Set() };
+const state = { info: null, status: null, templates: [], artifacts: [], streams: [], health: [], open: new Set() };
 
 async function api(path, options = {}) {
   const response = await fetch(`/v1/${path}`, {
@@ -237,7 +235,7 @@ async function api(path, options = {}) {
 }
 const loaders = {
   info: async () => { state.info = await api('info'); },
-  status: async () => { state.status = await api(`admin/status?horizonSeconds=${state.horizon}`); },
+  status: async () => { state.status = await api(`admin/status`); },
   // the list leaves documents out: each is fetched once, a template never changes
   templates: async () => {
     state.templates = (await api('templates')).templates || [];
@@ -429,12 +427,10 @@ const views = {
       </div>
 
       <section class="panel"><div class="ph"><h3>Batch forecast</h3>
-        <span class="aside">${batches.length ? `${esc(count(batches.length, 'batch', 'batches'))}, ${esc(count(forecastCoins, 'coin'))}, ${esc(sats(forecastAmount))}` : ''}</span>
-        <span class="spacer"></span>
-        <span class="seg">${HORIZONS.map(([v, l]) => `<button data-horizon="${v}" aria-pressed="${v === state.horizon}">${l}</button>`).join('')}</span></div>
-        <p class="explain">Coins becoming due within the horizon, grouped as the loop will batch them: a group runs at its earliest deadline,
+        <span class="aside">${batches.length ? `${esc(count(batches.length, 'batch', 'batches'))}, ${esc(count(forecastCoins, 'coin'))}, ${esc(sats(forecastAmount))}` : ''}</span></div>
+        <p class="explain">Every coin not yet due, grouped as the loop will batch them: a group runs at its earliest deadline,
           ${esc(span(s.reserveSeconds))} before that coin expires, and takes every coin due by then. arkd runs a batch every ${esc(span(s.sessionSeconds))}, taking at most ${num(s.maxIntents).toLocaleString()} of our intents.</p>
-        ${batches.length ? `${timeline(batches)}${forecastTable(batches)}` : `<p class="empty">No coin becomes due within ${esc(HORIZONS.find(([v]) => v === state.horizon)?.[1])}.${num(s.nextDue) ? ` The next one is due ${at(s.nextDue)}.` : ''}</p>`}
+        ${batches.length ? `${timeline(batches)}${forecastTable(batches)}` : `<p class="empty">No coin is waiting to become due.${num(s.nextDue) ? ` The next one is due ${at(s.nextDue)}.` : ''}</p>`}
       </section>
 
       <div class="cols">
@@ -564,7 +560,7 @@ async function delegationDetail(key) {
   const detail = await api(`delegation?${lookup}`);
   const d = detail.delegation;
   const [{ attempts = [], nextCursor = 0 }, forecast] = await Promise.all([
-    api(`admin/delegation/${d.id}/attempts?limit=100`), api(`admin/status?horizonSeconds=${WEEK}`), load('templates', 'info'),
+    api(`admin/delegation/${d.id}/attempts?limit=100`), api(`admin/status`), load('templates', 'info'),
   ]);
   const reserve = num(forecast.reserveSeconds);
   const mine = (forecast.batches || []).flatMap((b) => (b.entries || []).filter((e) => e.delegationId === d.id).map((e) => ({ ...e, at: b.at, batch: b })));
@@ -884,12 +880,11 @@ document.addEventListener('click', (event) => {
   const link = event.target.closest('a[href]');
   if (link?.dataset.tfilter) Object.assign(listState, { status: '', templateId: link.dataset.tfilter, streamId: '' });
   if (link) return; // links route themselves; a row is a link only where none is clicked
-  const el = event.target.closest('[data-go], [data-copy], [data-cancel], [data-resume], [data-template], [data-stream], [data-deltemplate], [data-delartifact], [data-horizon], [data-register], [data-batch]');
+  const el = event.target.closest('[data-go], [data-copy], [data-cancel], [data-resume], [data-template], [data-stream], [data-deltemplate], [data-delartifact], [data-register], [data-batch]');
   if (!el) return;
   const d = el.dataset;
   if (d.copy !== undefined) navigator.clipboard.writeText(d.copy).then(() => { const was = el.textContent; el.textContent = 'copied'; setTimeout(() => { el.textContent = was; }, 1200); });
   else if (d.go !== undefined) location.hash = d.go;
-  else if (d.horizon) { state.horizon = Number(d.horizon); show(); }
   else if (d.batch) { const row = $(`details[data-at="${d.batch}"]`); row.open = true; row.scrollIntoView({ block: 'center' }); }
   else if (d.register) openRegister(d.register);
   else if (d.cancel && confirm(`Cancel delegation #${d.cancel}? Its coins are no longer renewed or spent until it is resumed.`)) act(() => api(`admin/delegation/${d.cancel}/cancel`, { method: 'POST', body: {} }));

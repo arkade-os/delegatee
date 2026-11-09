@@ -1468,11 +1468,9 @@ func (x *HealthEntry) GetError() string {
 }
 
 type GetStatusRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// horizon_seconds is how far ahead the batches are forecast, 0 for 24 hours, at most 7 days.
-	HorizonSeconds int64 `protobuf:"varint,1,opt,name=horizon_seconds,json=horizonSeconds,proto3" json:"horizon_seconds,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetStatusRequest) Reset() {
@@ -1503,13 +1501,6 @@ func (x *GetStatusRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetStatusRequest) Descriptor() ([]byte, []int) {
 	return file_delegatee_v1_admin_proto_rawDescGZIP(), []int{28}
-}
-
-func (x *GetStatusRequest) GetHorizonSeconds() int64 {
-	if x != nil {
-		return x.HorizonSeconds
-	}
-	return 0
 }
 
 type GetStatusResponse struct {
@@ -1937,9 +1928,8 @@ const file_delegatee_v1_admin_proto_rawDesc = "" +
 	"\vHealthEntry\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\ahealthy\x18\x02 \x01(\bR\ahealthy\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error\";\n" +
-	"\x10GetStatusRequest\x12'\n" +
-	"\x0fhorizon_seconds\x18\x01 \x01(\x03R\x0ehorizonSeconds\"\xec\x03\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\x12\n" +
+	"\x10GetStatusRequest\"\xec\x03\n" +
 	"\x11GetStatusResponse\x12\x16\n" +
 	"\x06active\x18\x01 \x01(\x03R\x06active\x12\x16\n" +
 	"\x06queued\x18\x02 \x01(\x03R\x06queued\x12\x1e\n" +

@@ -52,13 +52,15 @@ type ForecastEntry struct {
 }
 
 const (
-	forecastLimit      = 10000
+	forecastLimit = 10000
+	// forecastSpan outlasts any expiry or locktime, so the forecast takes every present coin.
+	forecastSpan       = 100 * 365 * 24 * time.Hour
 	maxForecastEntries = 100
 )
 
 // Status reads the last published aggregates and counts the active delegations and their coins.
-// With a horizon it forecasts the batches again, with the coins that become due within it.
-func (s *Service) Status(ctx context.Context, horizon time.Duration) (Status, error) {
+// With forecast it plans the batches again, with every present coin whenever it becomes due.
+func (s *Service) Status(ctx context.Context, forecast bool) (Status, error) {
 	var out Status
 	if p := s.status.Load(); p != nil {
 		out = *p
@@ -70,17 +72,17 @@ func (s *Service) Status(ctx context.Context, horizon time.Duration) (Status, er
 	if out.Coins, out.Amount, err = s.coins.Totals(ctx); err != nil {
 		return out, err
 	}
-	if horizon > 0 {
-		err = s.forecast(ctx, &out, horizon)
+	if forecast {
+		err = s.forecast(ctx, &out)
 	}
 	return out, err
 }
 
-// forecast plans the published entries with the coins due within the horizon.
-func (s *Service) forecast(ctx context.Context, st *Status, horizon time.Duration) error {
+// forecast plans the published entries with every present coin not yet due.
+func (s *Service) forecast(ctx context.Context, st *Status) error {
 	now := time.Now()
 	entries := slices.Clone(st.entries)
-	upcoming, err := s.coins.Ready(ctx, now.Add(horizon), st.Tip, forecastLimit)
+	upcoming, err := s.coins.Ready(ctx, now.Add(forecastSpan), st.Tip, forecastLimit)
 	if err != nil {
 		return err
 	}

@@ -356,17 +356,6 @@
         ],
         "description": "GetStatus reports what the loop holds: the queue, what is registered at arkd and the forecast batches.",
         "operationId": "AdminService_GetStatus",
-        "parameters": [
-          {
-            "name": "horizonSeconds",
-            "in": "query",
-            "description": "horizon_seconds is how far ahead the batches are forecast, 0 for 24 hours, at most 7 days.",
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "a successful response.",
@@ -906,14 +895,7 @@
       },
       "GetStatusRequest": {
         "title": "GetStatusRequest",
-        "type": "object",
-        "properties": {
-          "horizonSeconds": {
-            "type": "integer",
-            "description": "horizon_seconds is how far ahead the batches are forecast, 0 for 24 hours, at most 7 days.",
-            "format": "int64"
-          }
-        }
+        "type": "object"
       },
       "GetStatusResponse": {
         "title": "GetStatusResponse",

@@ -24,9 +24,6 @@ import (
 const (
 	defaultListLimit = 100
 	maxListLimit     = 1000
-
-	defaultHorizon = 24 * time.Hour
-	maxHorizon     = 7 * 24 * time.Hour
 )
 
 type Executor interface {
@@ -34,7 +31,7 @@ type Executor interface {
 	Coins(ctx context.Context, delegationID int64) ([]delegation.Coin, error)
 	Summaries(ctx context.Context, f ports.SummaryFilter) ([]ports.Summary, error)
 	Spawned(ctx context.Context) (map[int64]ports.Spawned, error)
-	Status(ctx context.Context, horizon time.Duration) (executionapp.Status, error)
+	Status(ctx context.Context, forecast bool) (executionapp.Status, error)
 }
 
 type Health interface {
@@ -252,12 +249,8 @@ func (h *Admin) GetHealth(ctx context.Context, _ *delegateev1.GetHealthRequest) 
 	return resp, nil
 }
 
-func (h *Admin) GetStatus(ctx context.Context, req *delegateev1.GetStatusRequest) (*delegateev1.GetStatusResponse, error) {
-	horizon := defaultHorizon
-	if secs := req.GetHorizonSeconds(); secs > 0 {
-		horizon = time.Duration(min(secs, int64(maxHorizon/time.Second))) * time.Second
-	}
-	st, err := h.execution.Status(ctx, horizon)
+func (h *Admin) GetStatus(ctx context.Context, _ *delegateev1.GetStatusRequest) (*delegateev1.GetStatusResponse, error) {
+	st, err := h.execution.Status(ctx, true)
 	if err != nil {
 		return nil, toStatus(err)
 	}

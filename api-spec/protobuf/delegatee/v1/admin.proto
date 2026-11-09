@@ -219,10 +219,7 @@ message HealthEntry {
   // error says why the dependency is not healthy.
   string error = 3;
 }
-message GetStatusRequest {
-  // horizon_seconds is how far ahead the batches are forecast, 0 for 24 hours, at most 7 days.
-  int64 horizon_seconds = 1;
-}
+message GetStatusRequest {}
 message GetStatusResponse {
   // active is how many delegations are being served.
   int64 active = 1;
