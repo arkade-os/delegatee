@@ -188,7 +188,7 @@ func newService(t *testing.T) (*Service, *countingArtifacts, *storedTemplate, re
 		artifacts.docs[a.ID] = *a
 		docs[a.ID] = a.Document
 	}
-	tpl, err := registry.NewTemplate(templates.Templates["renewal.json"], 0, docs)
+	tpl, err := registry.NewTemplate(templates.Templates["renew.json"], 0, docs)
 	require.NoError(t, err)
 	repo := &storedTemplate{t: *tpl}
 	return NewService(artifacts, repo, Limits{}), artifacts, repo, *tpl

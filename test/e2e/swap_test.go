@@ -33,7 +33,7 @@ func TestVHTLCClaimIsPrompt(t *testing.T) {
 // the funding transaction carries the sealed preimage and nobody registers anything
 func TestStreamClaim(t *testing.T) {
 	d := start(t)
-	claim := registerTemplate(t, d, "noninteractiveclaim.json")
+	claim := registerTemplate(t, d, "claim.json")
 	streamActive(t, d, claim)
 
 	swap := newSwap(t, d, claim)
@@ -47,7 +47,7 @@ func TestStreamClaim(t *testing.T) {
 // a secret sealed to another template is not opened by the stream
 func TestStreamClaimRefusesASecretSealedToAnotherTemplate(t *testing.T) {
 	d := start(t)
-	claim := registerTemplate(t, d, "noninteractiveclaim.json")
+	claim := registerTemplate(t, d, "claim.json")
 	streamActive(t, d, claim)
 	alice := fundedWallet(t)
 

@@ -91,7 +91,7 @@ func TestNewDelegationRefusesSeveralInputs(t *testing.T) {
 
 func TestNewDelegationRefusesStreamTriggerTemplates(t *testing.T) {
 	p := renewalParams(t)
-	p.Template = parseDoc(t, templates.Templates["noninteractiveclaim.json"])
+	p.Template = parseDoc(t, templates.Templates["claim.json"])
 	_, err := NewDelegation(p)
 	require.ErrorIs(t, err, ErrStreamOnly)
 }
@@ -132,7 +132,7 @@ func TestNewDelegationRefusesLeafSignedByTheCosignerKey(t *testing.T) {
 
 func TestNewDelegationAcceptsCosignerKeyUsedOnlyInsideACovenant(t *testing.T) {
 	p := renewalParams(t)
-	p.Template = parseDoc(t, templates.Templates["boarding.json"])
+	p.Template = parseDoc(t, templates.Templates["board.json"])
 	p.Variables["boarding_exit_delay"] = scriptNum(1<<22 | 2)
 	_, err := NewDelegation(p)
 	require.NoError(t, err)
@@ -208,7 +208,7 @@ func TestInstantiateRebuildsTheStoredScriptAndRejectsBadVariables(t *testing.T) 
 
 func renewalParams(t *testing.T) DelegationParams {
 	t.Helper()
-	tmpl := parseDoc(t, templates.Templates["renewal.json"])
+	tmpl := parseDoc(t, templates.Templates["renew.json"])
 	owner, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
 	return DelegationParams{

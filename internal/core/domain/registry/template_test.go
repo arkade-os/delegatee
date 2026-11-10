@@ -13,7 +13,7 @@ import (
 )
 
 func TestNewTemplateDerivesFieldsFromDocument(t *testing.T) {
-	doc := testTemplate(t, "renewal.json")
+	doc := testTemplate(t, "renew.json")
 	tpl, err := NewTemplate(doc, 0, testArtifacts(t))
 	require.NoError(t, err)
 	require.Len(t, tpl.ID, 64)
@@ -78,7 +78,7 @@ func TestNewTemplateRefusesAnOffchainTemplateWithoutAnArkadePacket(t *testing.T)
 }
 
 func TestNewTemplateRejectsAReferencedArtifactThatIsNotStored(t *testing.T) {
-	_, err := NewTemplate(testTemplate(t, "renewal.json"), 0, nil)
+	_, err := NewTemplate(testTemplate(t, "renew.json"), 0, nil)
 	require.ErrorIs(t, err, ErrInvalidDocument)
 }
 

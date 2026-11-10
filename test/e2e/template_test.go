@@ -16,11 +16,11 @@ import (
 func TestTemplateRegistry(t *testing.T) {
 	ctx := t.Context()
 	d := start(t)
-	require.Equal(t, registerTemplate(t, d, "renewal.json"), registerTemplate(t, d, "renewal.json"))
+	require.Equal(t, registerTemplate(t, d, "renew.json"), registerTemplate(t, d, "renew.json"))
 	_, err := d.client.RegisterTemplate(ctx, &delegateev1.RegisterTemplateRequest{Document: `{"format":"template/v1"}`})
 	require.Equal(t, codes.InvalidArgument, status.Code(err), "%v", err)
 
-	boarding := registerTemplate(t, d, "boarding.json")
+	boarding := registerTemplate(t, d, "board.json")
 	registerDelegation(t, d, boarding, newOwner(t, d).boardingVariables())
 	_, err = d.admin.UpdateTemplate(ctx, &delegateev1.UpdateTemplateRequest{Id: boarding, Status: "disabled"})
 	require.NoError(t, err)
@@ -46,7 +46,7 @@ func TestTemplateCannotNameTheCosignerKey(t *testing.T) {
 
 func TestWalletFlowOverREST(t *testing.T) {
 	d := start(t)
-	boarding := registerTemplate(t, d, "boarding.json")
+	boarding := registerTemplate(t, d, "board.json")
 	var list struct{ Templates []struct{ Id string } }
 	getJSON(t, d.url+"/v1/templates", &list)
 	require.True(t, slices.ContainsFunc(list.Templates, func(tpl struct{ Id string }) bool { return tpl.Id == boarding }))

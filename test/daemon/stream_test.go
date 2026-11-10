@@ -263,7 +263,7 @@ func waitDelegations(t *testing.T, d *Daemon, n int) []delegation {
 
 func claimStreamTemplate(t *testing.T, d *Daemon) string {
 	t.Helper()
-	code, body := post(t, d.RestURL+"/v1/template", map[string]string{"document": string(templates.Templates["noninteractiveclaim.json"])})
+	code, body := post(t, d.RestURL+"/v1/template", map[string]string{"document": string(templates.Templates["claim.json"])})
 	require.Equal(t, http.StatusOK, code, string(body))
 	return decodeTemplate(t, body).ID
 }
@@ -284,7 +284,7 @@ func registerUntriggeredClaim(t *testing.T, d *Daemon) string {
 func editClaim(t *testing.T, edit func(map[string]any)) []byte {
 	t.Helper()
 	var doc map[string]any
-	require.NoError(t, json.Unmarshal(templates.Templates["noninteractiveclaim.json"], &doc))
+	require.NoError(t, json.Unmarshal(templates.Templates["claim.json"], &doc))
 	edit(doc)
 	raw, err := json.Marshal(doc)
 	require.NoError(t, err)

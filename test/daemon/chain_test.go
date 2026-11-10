@@ -15,7 +15,7 @@ import (
 func TestFundedUtxoAppearsThenConfirms(t *testing.T) {
 	d := Start(t)
 	d.Arkd.PauseBatches(true)
-	_, templateID := registerShipped(t, d, "boarding.json")
+	_, templateID := registerShipped(t, d, "board.json")
 	w := boardingDelegation(t, d, templateID)
 	require.True(t, w.Inputs[0].Onchain)
 
@@ -38,7 +38,7 @@ func TestFundedUtxoAppearsThenConfirms(t *testing.T) {
 
 func TestRestartListsOnlyTheScriptsThatChanged(t *testing.T) {
 	d := Start(t)
-	_, templateID := registerShipped(t, d, "boarding.json")
+	_, templateID := registerShipped(t, d, "board.json")
 	a, b := boardingDelegation(t, d, templateID), boardingDelegation(t, d, templateID)
 	scriptA, scriptB := a.Inputs[0].Script, b.Inputs[0].Script
 	d.Chain.Fund(scriptA, 1000)
@@ -59,7 +59,7 @@ func TestRestartListsOnlyTheScriptsThatChanged(t *testing.T) {
 func TestReconnectListsOnlyTheScriptsThatChanged(t *testing.T) {
 	d := Start(t)
 	d.Arkd.PauseBatches(true)
-	_, templateID := registerShipped(t, d, "boarding.json")
+	_, templateID := registerShipped(t, d, "board.json")
 	a, b := boardingDelegation(t, d, templateID), boardingDelegation(t, d, templateID)
 	scriptA, scriptB := a.Inputs[0].Script, b.Inputs[0].Script
 	d.Chain.Fund(scriptA, 1000)
@@ -202,7 +202,7 @@ func boardingAndRenewal(t *testing.T, d *Daemon, window int64) (board, renewal d
 	variables := boardingVariables(t)
 	variables["renewal_window"] = ScriptNum(window)
 	_, renewalID := registerRenewal(t, d)
-	_, boardingID := registerShipped(t, d, "boarding.json")
+	_, boardingID := registerShipped(t, d, "board.json")
 	renewing := maps.Clone(variables)
 	delete(renewing, "boarding_exit_delay")
 	return registerDelegationWith(t, d, boardingID, variables), registerDelegationWith(t, d, renewalID, renewing)

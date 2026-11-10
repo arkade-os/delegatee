@@ -389,7 +389,7 @@ func TestPushOpcodesRefused(t *testing.T) {
 }
 
 func TestParseRefusesUnbuildable(t *testing.T) {
-	_, err := Parse(edited(t, fixture(t, "renewal.json"), func(m map[string]any) { delete(m, "packets") }), nil)
+	_, err := Parse(edited(t, fixture(t, "renew.json"), func(m map[string]any) { delete(m, "packets") }), nil)
 	require.ErrorIs(t, err, ErrInvalidTemplate, "a covenant without packets")
 
 	_, err = Parse(edited(t, mixedPaymentDoc(t, false), func(m map[string]any) {

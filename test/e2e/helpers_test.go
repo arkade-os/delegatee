@@ -76,7 +76,9 @@ func artifacts(t *testing.T) map[string][]byte {
 	t.Helper()
 	paths, err := filepath.Glob(filepath.Join("..", "..", "pkg", "template", "testdata", "artifacts", "*.json"))
 	require.NoError(t, err)
-	paths = append(paths, filepath.Join("..", "..", "templates", "artifacts", "delegated_vtxo.json"))
+	defaults, err := filepath.Glob(filepath.Join("..", "..", "templates", "artifacts", "*.json"))
+	require.NoError(t, err)
+	paths = append(paths, defaults...)
 	docs := map[string][]byte{}
 	for _, p := range paths {
 		doc, err := os.ReadFile(p)
@@ -98,13 +100,13 @@ func registerDelegation(t *testing.T, d delegatee, templateID string, variables 
 // renewalDelegation registers a delegation on o's address at the default renewal paying up to maxFee.
 func renewalDelegation(t *testing.T, d delegatee, o owner, maxFee int64) *delegateev1.Delegation {
 	t.Helper()
-	return registerDelegation(t, d, registerTemplate(t, d, "renewal.json"), o.variables(maxFee))
+	return registerDelegation(t, d, registerTemplate(t, d, "renew.json"), o.variables(maxFee))
 }
 
 // boardingDelegations registers delegations on o's boarding address and on the renewal address it boards into.
 func boardingDelegations(t *testing.T, d delegatee, o owner) (boarding, renewal *delegateev1.Delegation) {
 	t.Helper()
-	return registerDelegation(t, d, registerTemplate(t, d, "boarding.json"), o.boardingVariables()), renewalDelegation(t, d, o, 0)
+	return registerDelegation(t, d, registerTemplate(t, d, "board.json"), o.boardingVariables()), renewalDelegation(t, d, o, 0)
 }
 
 func attemptsOf(t *testing.T, d delegatee, id int64) []*delegateev1.Attempt {
@@ -285,7 +287,7 @@ func (o owner) boardingVariables() map[string]string {
 // boardingAddress derives the address of o's boarding delegation the way a wallet does.
 func (o owner) boardingAddress(t *testing.T) string {
 	t.Helper()
-	inst := instantiate(t, "boarding.json", o.keys, o.boardingVariables(), nil)
+	inst := instantiate(t, "board.json", o.keys, o.boardingVariables(), nil)
 	addr, err := address.NewAddressTaproot(inst.PkScript(0)[2:], &chaincfg.RegressionNetParams)
 	require.NoError(t, err)
 	return addr.EncodeAddress()

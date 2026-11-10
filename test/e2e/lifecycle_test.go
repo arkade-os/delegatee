@@ -27,7 +27,7 @@ func TestCancelStopsRenewals(t *testing.T) {
 	neverSpent(t, d, boarded.Outpoint.String())
 
 	_, err = d.client.RegisterDelegation(t.Context(), &delegateev1.RegisterDelegationRequest{
-		TemplateId: registerTemplate(t, d, "renewal.json"), Variables: owner.variables(0),
+		TemplateId: registerTemplate(t, d, "renew.json"), Variables: owner.variables(0),
 	})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err), "the owner cannot undo an operator cancel")
 	_, err = d.admin.ResumeDelegation(t.Context(), &delegateev1.ResumeDelegationRequest{Id: renewal.Id})

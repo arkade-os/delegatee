@@ -118,7 +118,7 @@ func TestCanonicalKeepsForms(t *testing.T) {
 	require.Contains(t, c, `"before_expiry_seconds":10`)
 	require.NotContains(t, c, "unmatched")
 
-	claim := fixture(t, "noninteractiveclaim.json")
+	claim := fixture(t, "claim.json")
 	zero := edited(t, claim, func(m map[string]any) { m["trigger"].(map[string]any)["min_value"] = 0 })
 	none := edited(t, claim, func(m map[string]any) { delete(m["trigger"].(map[string]any), "min_value") })
 	require.Equal(t, canonicalOf(t, none), canonicalOf(t, zero))

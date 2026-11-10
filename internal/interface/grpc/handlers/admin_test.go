@@ -409,7 +409,7 @@ func registerDefault(t *testing.T, public *Delegatee) string {
 	_, err := public.RegisterArtifact(t.Context(), &delegateev1.RegisterArtifactRequest{Document: testDocument(t)})
 	require.NoError(t, err)
 	reg, err := public.RegisterTemplate(t.Context(), &delegateev1.RegisterTemplateRequest{
-		Document: testTemplateDocument(t, "renewal.json"),
+		Document: testTemplateDocument(t, "renew.json"),
 	})
 	require.NoError(t, err)
 	return reg.GetTemplate().GetId()

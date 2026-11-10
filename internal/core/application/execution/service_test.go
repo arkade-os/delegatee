@@ -54,7 +54,7 @@ func TestTrack(t *testing.T) {
 func TestDueAt(t *testing.T) {
 	owner, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
-	inst := instance(t, templates.Templates["renewal.json"], map[string]string{
+	inst := instance(t, templates.Templates["renew.json"], map[string]string{
 		"owner": hex.EncodeToString(owner.PubKey().SerializeCompressed()), "exit_delay": scriptNum(1<<22 | 1),
 		"renewal_window": scriptNum(1024), "max_fee": scriptNum(1000),
 	})
@@ -80,7 +80,7 @@ func TestDueAt(t *testing.T) {
 func TestDueAtOnchainWaitsForConfirmations(t *testing.T) {
 	owner, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
-	inst := instance(t, templates.Templates["boarding.json"], map[string]string{
+	inst := instance(t, templates.Templates["board.json"], map[string]string{
 		"owner": hex.EncodeToString(owner.PubKey().SerializeCompressed()), "boarding_exit_delay": scriptNum(1<<22 | 2),
 		"exit_delay": scriptNum(1<<22 | 1), "renewal_window": scriptNum(1024), "max_fee": scriptNum(1000),
 	})

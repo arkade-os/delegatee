@@ -34,7 +34,7 @@ func TestFixtures(t *testing.T) {
 	var ids map[string]string
 	require.NoError(t, json.Unmarshal(fixture(t, "ids.json"), &ids))
 	docs := artifacts(t)
-	for _, name := range []string{"renewal.json", "boarding.json", "counter.json", "vhtlc_claim.json", "vhtlc_refund.json", "noninteractiveclaim.json", "offline_receive.json", "onchain_release.json", "counter_seed.json", "minimal.json"} {
+	for _, name := range []string{"renew.json", "board.json", "counter.json", "vhtlc_claim.json", "vhtlc_refund.json", "claim.json", "offline_receive.json", "onchain_release.json", "counter_seed.json", "minimal.json"} {
 		t.Run(name, func(t *testing.T) {
 			tmpl, err := Parse(fixture(t, name), docs)
 			require.NoError(t, err)
@@ -44,23 +44,24 @@ func TestFixtures(t *testing.T) {
 }
 
 func TestDefaults(t *testing.T) {
-	renewal := parseFixture(t, "renewal.json")
+	renewal := parseFixture(t, "renew.json")
 	require.Equal(t, Intent, renewal.Type())
 	require.Equal(t, []Slot{{Name: "funds"}}, renewal.Inputs())
 	require.Equal(t, []Field{{Name: "exit_delay", Type: "int"}, {Name: "max_fee", Type: "int"}, {Name: "owner", Type: "pubkey"}, {Name: "renewal_window", Type: "int"}}, renewal.Variables())
 	require.True(t, renewal.ContextFree())
 
-	boarding := parseFixture(t, "boarding.json")
+	boarding := parseFixture(t, "board.json")
 	require.Equal(t, []Slot{{Name: "deposit", Onchain: true, Schedule: Schedule{MinConfirmations: 1}}}, boarding.Inputs())
 	require.Equal(t, []Field{
 		{Name: "boarding_exit_delay", Type: "int"}, {Name: "exit_delay", Type: "int"}, {Name: "max_fee", Type: "int"}, {Name: "owner", Type: "pubkey"}, {Name: "renewal_window", Type: "int"},
 	}, boarding.Variables())
 	require.True(t, boarding.ContextFree())
-	require.Equal(t, renewal.Artifacts(), boarding.Artifacts(), "one DelegatedVtxo definition")
+	require.Len(t, boarding.Artifacts(), 2)
+	require.Subset(t, boarding.Artifacts(), renewal.Artifacts(), "boards into the DelegatedVtxo definition")
 }
 
 func TestProgramBinding(t *testing.T) {
-	doc := fixture(t, "boarding.json")
+	doc := fixture(t, "board.json")
 	args := func(m map[string]any) map[string]any {
 		return m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)["arguments"].(map[string]any)
 	}
@@ -97,7 +98,7 @@ func TestRenewalAddress(t *testing.T) {
 		{owner: testKey(t, 5), exit: arklib.RelativeLocktime{Type: arklib.LocktimeTypeBlock, Value: 144}, window: 86_400, maxFee: 0},
 		{owner: testKey(t, 6), exit: arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: 1024}, window: 1, maxFee: 1_000_000},
 	} {
-		inst, err := parseFixture(t, "renewal.json").Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t)})
+		inst, err := parseFixture(t, "renew.json").Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t)})
 		require.NoError(t, err)
 		require.Equal(t, masterPkScript(t, testKeys(t), p), inst.PkScript(0))
 	}
@@ -105,7 +106,7 @@ func TestRenewalAddress(t *testing.T) {
 
 func TestRenewalDueAt(t *testing.T) {
 	p := defaultParams(t)
-	inst, err := parseFixture(t, "renewal.json").Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t)})
+	inst, err := parseFixture(t, "renew.json").Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t)})
 	require.NoError(t, err)
 	now := time.Now()
 	expiry := now.Add(time.Hour)
@@ -114,13 +115,13 @@ func TestRenewalDueAt(t *testing.T) {
 	require.Equal(t, expiry.Add(-5*time.Minute), inst.DueAt(0, &Source{Expiry: expiry, CreatedAt: expiry.Add(-10 * time.Minute)}, now))
 
 	p.maxFee = 0
-	free, err := parseFixture(t, "renewal.json").Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t)})
+	free, err := parseFixture(t, "renew.json").Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t)})
 	require.NoError(t, err)
 	require.Equal(t, expiry.Add(-1024*time.Second), free.DueAt(0, &Source{Expiry: expiry, CreatedAt: expiry.Add(-10 * time.Minute)}, now))
 }
 
 func TestRenewalVariableRanges(t *testing.T) {
-	renewal := parseFixture(t, "renewal.json")
+	renewal := parseFixture(t, "renew.json")
 	for name, edit := range map[string]func(map[string][]byte){
 		"zero window":     func(v map[string][]byte) { v["renewal_window"] = asm.ScriptNum(0) },
 		"negative window": func(v map[string][]byte) { v["renewal_window"] = asm.ScriptNum(-1) },
@@ -136,7 +137,7 @@ func TestRenewalVariableRanges(t *testing.T) {
 
 func TestRenewalCovenant(t *testing.T) {
 	p := defaultParams(t)
-	renewal := parseFixture(t, "renewal.json")
+	renewal := parseFixture(t, "renew.json")
 	watch, err := renewal.Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t)})
 	require.NoError(t, err)
 	vtxo := sourceWith(t, 100_000)
@@ -197,7 +198,7 @@ func TestBoardingThenRenewal(t *testing.T) {
 	// the settlement leaf keeps output 0: the renewal watch finds it, renewal after renewal
 	for generation := range 2 {
 		vtxo := &Source{Outpoint: wire.OutPoint{Hash: tx.TxHash()}, Tx: tx, Amount: uint64(tx.TxOut[0].Value), Expiry: time.Now().Add(time.Minute)}
-		inst, err := parseFixture(t, "renewal.json").Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t), Sources: []*Source{vtxo}})
+		inst, err := parseFixture(t, "renew.json").Instantiate(Context{Keys: testKeys(t), Variables: p.vars(t), Sources: []*Source{vtxo}})
 		require.NoError(t, err, "generation %d", generation)
 		act, err := inst.Build([]*Source{vtxo}, Fee{Dust: 330})
 		require.NoError(t, err)
@@ -348,14 +349,14 @@ func TestNonInteractiveClaimTrigger(t *testing.T) {
 	ptx, _ := streamed(t, tlv(1, []byte{1, 2, 3}, 2, cov, 3, enc.PubKey().SerializeCompressed()))
 	ptx.UnsignedTx.TxOut[0].PkScript = pkScript
 	ptx.Outputs[0].TaprootTapTree = tree
-	got, err := parseFixture(t, "noninteractiveclaim.json").Trigger().Match(ptx, TriggerKeys{Encryption: enc.PubKey()})
+	got, err := parseFixture(t, "claim.json").Trigger().Match(ptx, TriggerKeys{Encryption: enc.PubKey()})
 	require.NoError(t, err)
 	require.Equal(t, []Capture{{Output: 0, Variables: map[string]string{
 		"ciphertext": "010203", "receiver_program": v.ReceiverProgram, "taptree": hex.EncodeToString(tree),
 	}}}, got)
 
 	ptx.UnsignedTx.TxOut[0].Value = 999
-	_, err = parseFixture(t, "noninteractiveclaim.json").Trigger().Match(ptx, TriggerKeys{Encryption: enc.PubKey()})
+	_, err = parseFixture(t, "claim.json").Trigger().Match(ptx, TriggerKeys{Encryption: enc.PubKey()})
 	require.ErrorIs(t, err, ErrNoMatch, "a coin below 1000 sats is not claimed")
 }
 
@@ -428,8 +429,8 @@ func (p renewalParams) vars(t *testing.T) map[string][]byte {
 	}
 }
 
-// masterCovenant is master's buildArkadeScript in its fee-check form, the only one renewal.json keeps.
-func masterCovenant(t *testing.T, cosignerHex string, window, maxFee int64) []byte {
+// masterCovenant is master's buildArkadeScript in its fee-check form, the only one renew.json keeps, without the cosigner check.
+func masterCovenant(t *testing.T, window, maxFee int64) []byte {
 	t.Helper()
 	s, err := txscript.NewScriptBuilder().
 		AddOp(arkade.OP_PUSHEXPIRY).AddInt64(window).AddOp(arkade.OP_SUB).AddOp(arkade.OP_CHECKTIME).AddOp(txscript.OP_VERIFY).
@@ -437,9 +438,6 @@ func masterCovenant(t *testing.T, cosignerHex string, window, maxFee int64) []by
 		AddData([]byte(intent.IntentMessageTypeRegister)).AddOp(arkade.OP_EQUALVERIFY).
 		AddData([]byte("onchain_output_indexes")).AddOp(arkade.OP_INSPECTINTENTMESSAGE).AddOp(txscript.OP_VERIFY).
 		AddData([]byte("[]")).AddOp(arkade.OP_EQUALVERIFY).
-		AddData([]byte("cosigners_public_keys.0")).AddOp(arkade.OP_INSPECTINTENTMESSAGE).AddOp(txscript.OP_VERIFY).
-		AddData([]byte(cosignerHex)).AddOp(arkade.OP_EQUALVERIFY).
-		AddData([]byte("cosigners_public_keys.1")).AddOp(arkade.OP_INSPECTINTENTMESSAGE).AddOp(txscript.OP_NOT).AddOp(txscript.OP_VERIFY).AddOp(txscript.OP_DROP).
 		AddOp(arkade.OP_PUSHCURRENTINPUTINDEX).AddOp(arkade.OP_1SUB).AddOp(arkade.OP_INSPECTOUTPUTVALUE).AddInt64(maxFee).AddOp(arkade.OP_ADD).
 		AddOp(arkade.OP_PUSHCURRENTINPUTINDEX).AddOp(arkade.OP_INSPECTINPUTVALUE).AddOp(arkade.OP_GREATERTHANOREQUAL).AddOp(txscript.OP_VERIFY).
 		AddOp(arkade.OP_PUSHCURRENTINPUTINDEX).AddOp(arkade.OP_1SUB).AddInt64(arkade.TunnelScriptPubKey | arkade.TunnelAssets).AddInt64(0).AddOp(arkade.OP_TUNNEL).
@@ -451,7 +449,7 @@ func masterCovenant(t *testing.T, cosignerHex string, window, maxFee int64) []by
 // masterPkScript is master's tree around the cosigner leaf, with the forfeit leaf of ark's default vtxo script first.
 func masterPkScript(t *testing.T, keys Keys, p renewalParams) []byte {
 	t.Helper()
-	cov := masterCovenant(t, hex.EncodeToString(keys.Cosigner.SerializeCompressed()), p.window, p.maxFee)
+	cov := masterCovenant(t, p.window, p.maxFee)
 	tweaked := arkade.ComputeArkadeScriptPublicKey(keys.Emulator, arkade.ArkadeScriptHash(cov))
 	vtxo := script.TapscriptsVtxoScript{Closures: []script.Closure{
 		&script.MultisigClosure{PubKeys: []*btcec.PublicKey{p.owner, keys.Server}},
@@ -469,7 +467,9 @@ func artifacts(t testing.TB) map[string][]byte {
 	t.Helper()
 	paths, err := filepath.Glob(filepath.Join("testdata", "artifacts", "*.json"))
 	require.NoError(t, err)
-	paths = append(paths, filepath.Join("..", "..", "templates", "artifacts", "delegated_vtxo.json"))
+	defaults, err := filepath.Glob(filepath.Join("..", "..", "templates", "artifacts", "*.json"))
+	require.NoError(t, err)
+	paths = append(paths, defaults...)
 	docs := map[string][]byte{}
 	for _, p := range paths {
 		doc, err := os.ReadFile(p)
@@ -554,7 +554,7 @@ func boarded(t *testing.T) boundInstance {
 	keys := testKeys(t)
 	vars := defaultParams(t).vars(t)
 	vars["boarding_exit_delay"] = asm.ScriptNum(1<<22 | 2) // 1024 seconds, in BIP 68
-	boarding := parseFixture(t, "boarding.json")
+	boarding := parseFixture(t, "board.json")
 	watch, err := boarding.Instantiate(Context{Keys: keys, Variables: vars})
 	require.NoError(t, err)
 	deposit := sourceWith(t, 100_000)
@@ -585,11 +585,6 @@ type tamper struct {
 func intentTampers(t *testing.T, out int) []tamper {
 	return []tamper{
 		{"script", func(c *intentCheck) { c.tx.TxOut[out].PkScript = otherScript }, "source script"},
-		{"second cosigner", func(c *intentCheck) { c.msg.CosignersPublicKeys = append(c.msg.CosignersPublicKeys, cosignerHex) }, "OP_VERIFY failed"},
-		{"other cosigner", func(c *intentCheck) {
-			c.msg.CosignersPublicKeys = []string{hex.EncodeToString(testKey(t, 7).SerializeCompressed())}
-		}, "OP_EQUALVERIFY failed"},
-		{"no cosigner", func(c *intentCheck) { c.msg.CosignersPublicKeys = []string{} }, "OP_VERIFY failed"},
 		{"delete intent", func(c *intentCheck) { c.msg.Type = intent.IntentMessageTypeDelete }, "OP_EQUALVERIFY failed"},
 		{"onchain output", func(c *intentCheck) { c.msg.OnchainOutputIndexes = []int{out} }, "OP_EQUALVERIFY failed"},
 		{"too early", func(c *intentCheck) { c.expiry = time.Now().Add(2 * time.Hour) }, "OP_VERIFY failed"},
@@ -773,7 +768,7 @@ func vhtlcVector(t *testing.T) vhtlcVec {
 	return v
 }
 
-// instantiateNonInteractiveClaim builds noninteractiveclaim.json for a funding output whose tree is leaves; the ciphertext is the preimage itself.
+// instantiateNonInteractiveClaim builds claim.json for a funding output whose tree is leaves; the ciphertext is the preimage itself.
 func instantiateNonInteractiveClaim(t *testing.T, v vhtlcVec, leaves []string, sources ...*Source) (*Instance, error) {
 	t.Helper()
 	tree, err := txutils.TapTree(leaves).Encode()
@@ -785,7 +780,7 @@ func instantiateNonInteractiveClaim(t *testing.T, v vhtlcVec, leaves []string, s
 	}
 	server, err := btcec.ParsePubKey(unhex(v.Server))
 	require.NoError(t, err)
-	return parseFixture(t, "noninteractiveclaim.json").Instantiate(Context{
+	return parseFixture(t, "claim.json").Instantiate(Context{
 		Keys:      Keys{Server: server, Emulator: testKey(t, 3)},
 		Variables: map[string][]byte{"taptree": tree, "receiver_program": unhex(v.ReceiverProgram), "ciphertext": unhex(v.Preimage)},
 		Decrypt:   func(ciphertext []byte) ([]byte, error) { return ciphertext, nil },

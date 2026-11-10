@@ -16,7 +16,7 @@ func TestRegisterTemplateThenGetAndList(t *testing.T) {
 	h := testHandler(t, 10)
 	art, err := h.RegisterArtifact(t.Context(), &delegateev1.RegisterArtifactRequest{Document: testDocument(t)})
 	require.NoError(t, err)
-	doc := testTemplateDocument(t, "renewal.json")
+	doc := testTemplateDocument(t, "renew.json")
 
 	reg, err := h.RegisterTemplate(t.Context(), &delegateev1.RegisterTemplateRequest{Document: doc})
 	require.NoError(t, err)
@@ -56,7 +56,7 @@ func TestRegisterTemplateErrors(t *testing.T) {
 	_, err = h.RegisterTemplate(t.Context(), &delegateev1.RegisterTemplateRequest{Document: string(onchain)})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err), "unsupported")
 
-	renewal := testTemplateDocument(t, "renewal.json")
+	renewal := testTemplateDocument(t, "renew.json")
 	_, err = h.RegisterTemplate(t.Context(), &delegateev1.RegisterTemplateRequest{Document: renewal})
 	require.Equal(t, codes.NotFound, status.Code(err))
 

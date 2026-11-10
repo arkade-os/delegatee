@@ -1,17 +1,21 @@
 package daemon
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
 	"io/fs"
+	"maps"
 	"net/http"
 	"os"
+	"slices"
 	"testing"
 
 	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
 	"github.com/arkade-os/delegatee/internal/config"
+	tpl "github.com/arkade-os/delegatee/pkg/template"
 	"github.com/arkade-os/delegatee/templates"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -150,21 +154,30 @@ func TestAdminAuthentication(t *testing.T) {
 
 func registerRenewal(t *testing.T, d *Daemon) (artifactID, templateID string) {
 	t.Helper()
-	return registerShipped(t, d, "renewal.json")
+	return registerShipped(t, d, "renew.json")
 }
 
-// registerShipped registers a template of templates/ with its artifact.
+// registerShipped registers a template of templates/ with the artifacts it references; artifactID is the DelegatedVtxo one.
 func registerShipped(t *testing.T, d *Daemon, name string) (artifactID, templateID string) {
 	t.Helper()
-	code, body := post(t, d.RestURL+"/v1/artifact", map[string]string{"document": artifactDocument(t)})
-	require.Equal(t, http.StatusOK, code, string(body))
-	artifactID = decodeArtifact(t, body).ID
 	doc, err := os.ReadFile("../../pkg/template/testdata/" + name)
 	if errors.Is(err, fs.ErrNotExist) {
 		doc, err = os.ReadFile("../../templates/" + name)
 	}
 	require.NoError(t, err)
-	code, body = post(t, d.RestURL+"/v1/template", map[string]string{"document": string(doc)})
+	for _, file := range slices.Sorted(maps.Keys(templates.Artifacts)) {
+		a, err := tpl.ParseArtifact(templates.Artifacts[file])
+		require.NoError(t, err)
+		if !bytes.Contains(doc, []byte(a.ID)) {
+			continue
+		}
+		code, body := post(t, d.RestURL+"/v1/artifact", map[string]string{"document": string(templates.Artifacts[file])})
+		require.Equal(t, http.StatusOK, code, string(body))
+		if file == "delegated_vtxo.json" {
+			artifactID = decodeArtifact(t, body).ID
+		}
+	}
+	code, body := post(t, d.RestURL+"/v1/template", map[string]string{"document": string(doc)})
 	require.Equal(t, http.StatusOK, code, string(body))
 	return artifactID, decodeTemplate(t, body).ID
 }

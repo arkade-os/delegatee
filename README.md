@@ -7,7 +7,7 @@ owner is offline. A wallet registers a delegation on its address; every spend is
 co-signed by the [emulator](https://github.com/arkade-os/emulator) only if it
 satisfies the template's covenant.
 
-The default templates in [`templates/`](templates) (renewal, non-interactive boarding, and the VHTLC claim stream `noninteractiveclaim`) are registered at startup.
+The default templates in [`templates/`](templates) (`renew`, `board` for non-interactive boarding, and the VHTLC claim stream `claim`) are registered at startup.
 
 ## Run
 

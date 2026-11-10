@@ -67,7 +67,7 @@ func TestRegisterStreamErrors(t *testing.T) {
 
 	_, err = admin.registry.RegisterArtifact(t.Context(), []byte(testDocument(t)))
 	require.NoError(t, err)
-	stored, err := admin.registry.RegisterTemplate(t.Context(), []byte(testTemplateDocument(t, "renewal.json")))
+	stored, err := admin.registry.RegisterTemplate(t.Context(), []byte(testTemplateDocument(t, "renew.json")))
 	require.NoError(t, err)
 	renewal := stored.ID
 	_, err = admin.RegisterStream(t.Context(), &delegateev1.RegisterStreamRequest{TemplateId: renewal})
@@ -90,7 +90,7 @@ func testStreamAdmin(t *testing.T) (*Admin, string) {
 		reg, newDelegations(), newStreams(), nil, cosigner.PubKey(), encryption, server.PubKey(), emulator.PubKey(),
 		arklib.BitcoinRegTest, delegationapp.Limits{MinDelegationExpiry: time.Hour},
 	)
-	stored, err := reg.RegisterTemplate(t.Context(), []byte(testTemplateDocument(t, "noninteractiveclaim.json")))
+	stored, err := reg.RegisterTemplate(t.Context(), []byte(testTemplateDocument(t, "claim.json")))
 	require.NoError(t, err)
 	return NewAdmin(reg, svc, &spawnedStub{by: map[int64]ports.Spawned{}}, nil), stored.ID
 }

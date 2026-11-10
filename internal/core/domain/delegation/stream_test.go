@@ -26,7 +26,7 @@ func TestNewStreamRefusesInvalidTemplateKeyTTLOrVariables(t *testing.T) {
 		edit func(*StreamParams)
 		want error
 	}{
-		"no trigger": {func(p *StreamParams) { p.Template = parseDoc(t, templates.Templates["renewal.json"]) }, ErrNotStream},
+		"no trigger": {func(p *StreamParams) { p.Template = parseDoc(t, templates.Templates["renew.json"]) }, ErrNotStream},
 		"no key":     {func(p *StreamParams) { p.Encryption = false }, ErrNoEncryptionKey},
 		"short ttl":  {func(p *StreamParams) { p.MinExpiry = 48 * time.Hour }, ErrInvalidArgs},
 		"given and captured": {func(p *StreamParams) {
@@ -111,7 +111,7 @@ func TestSpawnAddsTheStreamsVariables(t *testing.T) {
 
 func streamParams(t *testing.T) StreamParams {
 	t.Helper()
-	tmpl := parseDoc(t, templates.Templates["noninteractiveclaim.json"])
+	tmpl := parseDoc(t, templates.Templates["claim.json"])
 	return StreamParams{Template: tmpl, MinExpiry: time.Hour, Encryption: true}
 }
 
@@ -119,7 +119,7 @@ func streamParams(t *testing.T) StreamParams {
 func unboundTrigger(t *testing.T) *template.Template {
 	t.Helper()
 	var doc map[string]any
-	require.NoError(t, json.Unmarshal(templates.Templates["noninteractiveclaim.json"], &doc))
+	require.NoError(t, json.Unmarshal(templates.Templates["claim.json"], &doc))
 	delete(doc["trigger"].(map[string]any)["capture"].(map[string]any), "receiver_program")
 	raw, err := json.Marshal(doc)
 	require.NoError(t, err)
@@ -139,7 +139,7 @@ func spawnParams(t *testing.T) SpawnParams {
 	require.NoError(t, err)
 	output, err := hex.DecodeString(v.PkScript)
 	require.NoError(t, err)
-	tmpl := parseDoc(t, templates.Templates["noninteractiveclaim.json"])
+	tmpl := parseDoc(t, templates.Templates["claim.json"])
 	return SpawnParams{
 		Stream: Stream{ID: 7, TemplateID: tmpl.ID(), Variables: map[string]string{}}, Template: tmpl, Output: output,
 		Captured: map[string]string{"taptree": hex.EncodeToString(tree), "receiver_program": v.ReceiverProgram, "ciphertext": v.Preimage},
