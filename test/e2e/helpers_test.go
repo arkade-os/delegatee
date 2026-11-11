@@ -179,7 +179,8 @@ func neverSpent(t *testing.T, d executor, outpoint string) {
 		resp, err := d.indexer.GetVtxos(t.Context(), clientlib.WithOutpoints([]clientlib.Outpoint{{Txid: op.Hash.String(), VOut: op.Index}}))
 		return err != nil || len(resp.Vtxos) != 1 || resp.Vtxos[0].Spent
 	}
-	require.False(t, spent())
+	// the indexer learns of a fresh funding a moment after the wallet sent it
+	require.Eventually(t, func() bool { return !spent() }, time.Minute, time.Second, "%s never showed up unspent", outpoint)
 	require.Never(t, spent, 25*time.Second, time.Second, "%s was spent or unreadable", outpoint)
 }
 
