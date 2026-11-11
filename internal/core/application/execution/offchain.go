@@ -84,7 +84,7 @@ func (s *Service) build(ctx context.Context, inst *delegationapp.Instance, coins
 	fee := template.Fee{Intent: s.info.IntentFees, Dust: s.info.Dust}
 	built, err := execution.BuildOffchain(inst.Template, inst.Delegation.Inputs, coins, txs, fee, s.info.CheckpointTapscript)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, localBuildError(inst, err)
 	}
 	sources := make([]*wire.MsgTx, len(coins))
 	for i, c := range coins {
@@ -157,11 +157,25 @@ func (r refused) Unwrap() error { return r.error }
 
 func (refused) Is(target error) bool { return target == errRefused }
 
+type streamIneligible struct{ error }
+
+func (e streamIneligible) Unwrap() error { return e.error }
+
+func localBuildError(inst *delegationapp.Instance, err error) error {
+	if inst.Delegation.StreamID != 0 && errors.Is(err, template.ErrIneligible) {
+		return streamIneligible{err}
+	}
+	return err
+}
+
 // chargesTemplate says a failed attempt counts against its template: the template could not build
 // it, or arkd or the emulator refused it. Outages, the daemon's own shutdown and sources fees or dust refuse do not.
 func chargesTemplate(err error) bool {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, template.ErrUnaffordable) {
 		return false
 	}
-	return errors.Is(err, template.ErrIneligible) || errors.Is(err, execution.ErrBadTx) || errors.Is(err, errRefused)
+	// Stream inputs are untrusted; local ineligibility does not indict their shared template.
+	var streamed streamIneligible
+	return errors.Is(err, execution.ErrBadTx) || errors.Is(err, errRefused) ||
+		errors.Is(err, template.ErrIneligible) && !errors.As(err, &streamed)
 }

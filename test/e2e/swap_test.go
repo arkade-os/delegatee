@@ -87,6 +87,13 @@ func TestStreamClaimEnforcesTheSealedTerms(t *testing.T) {
 	redirected.sealTerms(t, d, claim, swap.variables["receiver_program"], 10_000)
 	neverSpent(t, d, streamFunding(t, d, alice, short)+":0")
 	neverSpent(t, d, streamFunding(t, d, alice, redirected)+":0")
+
+	control := newSwap(t, d, claim)
+	control.sealTerms(t, d, claim, control.variables["receiver_program"], 10_000)
+	controlFunding := streamFunding(t, d, alice, control)
+	controlPaid := waitForVtxo(t, d, hex.EncodeToString(control.receiverScript), controlFunding)
+	require.EqualValues(t, 10_000, controlPaid.Amount)
+	requirePreimage(t, d, controlPaid, control)
 }
 
 func TestStreamClaimEnforcesAnAuthenticatedPredicate(t *testing.T) {

@@ -230,7 +230,7 @@ func (b *batchWorker) intentOf(ctx context.Context, inst *delegationapp.Instance
 	}
 	in, err := execution.BuildIntent(inst.Template, inst.Delegation.Inputs, e.Coins, txs, template.Fee{Intent: info.IntentFees, Dust: info.Dust}, s.cosignerKey.PubKey())
 	if err != nil {
-		return nil, err
+		return nil, localBuildError(inst, err)
 	}
 	if in.HasArkadePacket {
 		if in.Proof, err = s.emulator.SubmitIntent(ctx, *in); err != nil {
