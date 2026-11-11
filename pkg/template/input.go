@@ -31,6 +31,7 @@ type input struct {
 	function, leaf string
 	arguments      []byteTemplate          // covenant inputs, ABI order
 	witness        map[string]byteTemplate // non-signature witness items
+	predicate      *byteTemplate
 }
 
 func (c *compiler) input(s *schema.Input) error {
@@ -54,6 +55,13 @@ func (c *compiler) input(s *schema.Input) error {
 	in.contract = *ct
 	if err := c.spend(&in, &s.Spend); err != nil {
 		return err
+	}
+	if s.Predicate != nil {
+		b, err := c.bind(*s.Predicate, "bytes", true)
+		if err != nil {
+			return err
+		}
+		in.predicate = &b
 	}
 	c.t.inputs = append(c.t.inputs, in)
 	return nil

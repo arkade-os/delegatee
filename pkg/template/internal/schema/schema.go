@@ -52,11 +52,12 @@ type Secret struct {
 }
 
 type Input struct {
-	Name     string       `json:"name"`                            // identifier
-	Type     string       `json:"type,omitempty" schema:"opt"`     // offchain or onchain; defaults to the template's kind
-	Schedule *Schedule    `json:"schedule,omitempty" schema:"opt"` // defaults to immediate
-	Contract Construction `json:"contract"`
-	Spend    Spend        `json:"spend"`
+	Name      string       `json:"name"`                            // identifier
+	Type      string       `json:"type,omitempty" schema:"opt"`     // offchain or onchain; defaults to the template's kind
+	Schedule  *Schedule    `json:"schedule,omitempty" schema:"opt"` // defaults to immediate
+	Contract  Construction `json:"contract"`
+	Spend     Spend        `json:"spend"`
+	Predicate *Binding     `json:"predicate,omitempty" schema:"opt"`
 }
 
 // Schedule is when an input becomes eligible; exactly one field is set.

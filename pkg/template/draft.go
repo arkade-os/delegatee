@@ -32,10 +32,11 @@ type Source struct {
 
 // draft is the transaction expressions see: inputs at their final position, no output; not safe for concurrent use.
 type draft struct {
-	tx      *wire.MsgTx
-	sources []*Source         // aligned with tx.TxIn; nil for an intent's message input
-	bound   []bool            // aligned with tx.TxIn; false for a source whose Tx is not its outpoint's
-	secrets map[string][]byte // plaintexts opened for this draft
+	tx              *wire.MsgTx
+	sources         []*Source         // aligned with tx.TxIn; nil for an intent's message input
+	bound           []bool            // aligned with tx.TxIn; false for a source whose Tx is not its outpoint's
+	secrets         map[string][]byte // plaintexts opened for this draft
+	predicateBudget *predicateBudget
 }
 
 func newDraft(typ Type, sources []*Source) *draft {
@@ -65,6 +66,12 @@ func (d *draft) index(slot int) int {
 }
 
 func (d *draft) eval(tokens []string, input int, lookup asm.Lookup) ([]byte, error) {
+	// Assembly may resolve secrets whose ciphertext bindings evaluate further expressions.
+	if d.predicateBudget != nil {
+		if err := d.predicateBudget.expression(tokens); err != nil {
+			return nil, err
+		}
+	}
 	script, err := asm.Assemble(tokens, lookup)
 	if err != nil {
 		return nil, fmt.Errorf("%w: expression: %v", ErrIneligible, err)

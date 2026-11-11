@@ -56,6 +56,9 @@ func (i *Instance) Build(sources []*Source, fee Fee) (*Action, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := i.predicates(d); err != nil {
+		return nil, err
+	}
 
 	charged := uint64(0)
 	if t.typ == Intent {

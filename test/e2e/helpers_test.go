@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -34,6 +36,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -175,12 +178,65 @@ func neverSpent(t *testing.T, d executor, outpoint string) {
 	t.Helper()
 	op, err := wire.NewOutPointFromString(outpoint)
 	require.NoError(t, err)
-	spent := func() bool {
+	read := func() (clientlib.Vtxo, error) {
 		resp, err := d.indexer.GetVtxos(t.Context(), clientlib.WithOutpoints([]clientlib.Outpoint{{Txid: op.Hash.String(), VOut: op.Index}}))
-		return err != nil || len(resp.Vtxos) != 1 || resp.Vtxos[0].Spent
+		if err != nil {
+			return clientlib.Vtxo{}, fmt.Errorf("read funding output %s: %w", outpoint, err)
+		}
+		if len(resp.Vtxos) != 1 {
+			return clientlib.Vtxo{}, fmt.Errorf("funding output %s: expected one vtxo, got %d", outpoint, len(resp.Vtxos))
+		}
+		v := resp.Vtxos[0]
+		if v.Txid != op.Hash.String() || v.VOut != op.Index {
+			return clientlib.Vtxo{}, fmt.Errorf("funding output %s: indexer returned %s:%d", outpoint, v.Txid, v.VOut)
+		}
+		return v, nil
 	}
-	require.False(t, spent())
-	require.Never(t, spent, 25*time.Second, time.Second, "%s was spent or unreadable", outpoint)
+	var initial clientlib.Vtxo
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		var err error
+		initial, err = read()
+		require.NoError(c, err)
+	}, 30*time.Second, 200*time.Millisecond, "funding output %s never became readable", outpoint)
+	require.False(t, initial.Spent, "funding output %s was already spent when first indexed", outpoint)
+	require.Never(t, func() bool {
+		v, err := read()
+		if err != nil {
+			t.Log(err)
+			return true
+		}
+		if v.Spent {
+			t.Logf("funding output %s became spent", outpoint)
+			return true
+		}
+		return false
+	}, 25*time.Second, time.Second, "funding output %s was spent or became unreadable", outpoint)
+}
+
+type fundingProjectionIndexer struct {
+	clientlib.Indexer
+	read func() (*clientlib.VtxosResponse, error)
+}
+
+func (i fundingProjectionIndexer) GetVtxos(context.Context, ...clientlib.GetVtxosOption) (*clientlib.VtxosResponse, error) {
+	return i.read()
+}
+
+func TestNeverSpentWaitsForFundingProjection(t *testing.T) {
+	var reads atomic.Int32
+	v := clientlib.Vtxo{Outpoint: clientlib.Outpoint{Txid: strings.Repeat("01", 32)}, Amount: 10_000}
+	indexer := fundingProjectionIndexer{read: func() (*clientlib.VtxosResponse, error) {
+		switch reads.Add(1) {
+		case 1:
+			return &clientlib.VtxosResponse{}, nil
+		case 2:
+			return nil, errors.New("indexer temporarily unavailable")
+		default:
+			return &clientlib.VtxosResponse{Vtxos: []clientlib.Vtxo{v}}, nil
+		}
+	}}
+	neverSpent(t, executor{indexer: indexer}, v.Txid+":0")
+	require.Greater(t, reads.Load(), int32(3), "the output must remain under observation after becoming readable")
 }
 
 func faucet(t *testing.T, address string, sats int64) {
