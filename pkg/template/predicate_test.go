@@ -261,18 +261,18 @@ func TestInputPredicateFrozenPolicy(t *testing.T) {
 		arkade.OP_INSPECTOUTPUTVALUE, arkade.OP_INSPECTOUTPUTSCRIPTPUBKEY, arkade.OP_INSPECTNUMOUTPUTS,
 		arkade.OP_INSPECTINPUTARKADESCRIPTHASH, arkade.OP_INSPECTINPUTARKADEWITNESSHASH, arkade.OP_INSPECTINTENTMESSAGE,
 		arkade.OP_CHECKMULTISIG, arkade.OP_CHECKMULTISIGVERIFY, arkade.OP_CODESEPARATOR} {
-		require.Error(t, checkPredicate([]byte{0, arkade.OP_IF, op, arkade.OP_ENDIF, arkade.OP_1}, map[byte]int{}))
+		require.Error(t, checkPredicate([]byte{0, arkade.OP_IF, op, arkade.OP_ENDIF, arkade.OP_1}, &predicateBudget{}))
 	}
 	for op := byte(arkade.OP_INSPECTNUMASSETGROUPS); op <= arkade.OP_INSPECTINASSETLOOKUP; op++ {
 		require.False(t, predicateOpcode(op))
 	}
 	for _, badPush := range [][]byte{{0x4c, 0}, {1, 1}, {1, 0x81}, {0x4d, 1, 0, 0x11}, {0x4e, 1, 0, 0, 0, 0x11}} {
 		program := append(append([]byte{0, arkade.OP_IF}, badPush...), arkade.OP_ENDIF, arkade.OP_1)
-		require.Error(t, checkPredicate(program, map[byte]int{}))
+		require.Error(t, checkPredicate(program, &predicateBudget{}))
 	}
 	for _, op := range []byte{arkade.OP_CHECKSIGFROMSTACK, arkade.OP_ECMUL, arkade.OP_ECMULSCALARVERIFY, arkade.OP_TWEAKVERIFY, arkade.OP_ECPAIRING, arkade.OP_MODEXP} {
 		program := append(append([]byte{0, arkade.OP_IF}, bytes.Repeat([]byte{op}, predicateComputeLimit(op)+1)...), arkade.OP_ENDIF, arkade.OP_1)
-		require.ErrorContains(t, checkPredicate(program, map[byte]int{}), "predicate compute limit")
+		require.ErrorContains(t, checkPredicate(program, &predicateBudget{}), "predicate compute limit")
 	}
 }
 
@@ -300,7 +300,7 @@ func TestInputPredicateSignature(t *testing.T) {
 }
 
 func TestInputPredicateConcurrentBuildBudgets(t *testing.T) {
-	program := hex.EncodeToString(append(bytes.Repeat([]byte{0x51, 0x51, 0x51, 0xda, 0x75}, 50), 0x51))
+	program := predicateWork(16) + hex.EncodeToString(append(bytes.Repeat([]byte{0x51, 0x51, 0x51, 0xda, 0x75}, 48), 0x51))
 	inst, sources := predicateBuild(t, "onchain", program, program, program, program)
 	errors := make(chan error, 8)
 	var wg sync.WaitGroup
@@ -347,5 +347,100 @@ func TestInputPredicateBudget(t *testing.T) {
 		} else {
 			require.ErrorIs(t, err, ErrIneligible)
 		}
+	}
+}
+
+func predicateWork(n int) string {
+	return "$(" + strings.Repeat("1 1 1 OP_MODEXP OP_DROP ", n) + "0)"
+}
+
+func TestPredicateResolutionBudget(t *testing.T) {
+	raw := func(n int) string {
+		return hex.EncodeToString(append(bytes.Repeat([]byte{0x51, 0x51, 0x51, 0xda, 0x75}, n), 0x51))
+	}
+	for _, tc := range []struct {
+		name, binding string
+		inputs        int
+		accepted      bool
+	}{
+		{"empty expressions at limit", strings.Repeat(predicateWork(32), 2) + "51", 1, true},
+		{"empty expressions over limit", strings.Repeat(predicateWork(32), 3) + "51", 1, false},
+		{"combined at limit", predicateWork(32) + raw(32), 1, true},
+		{"combined over limit", predicateWork(33) + raw(32), 1, false},
+		{"aggregate at limit", predicateWork(64) + "51", 4, true},
+		{"aggregate over limit", predicateWork(52) + "51", 5, false},
+		{"opcode bytes are data", predicateWork(64) + "$(0xda OP_DROP 0)51", 1, true},
+		{"inactive resolution over limit", predicateWork(64) + "$(0 OP_IF 1 1 1 OP_MODEXP OP_DROP OP_ENDIF 0)51", 1, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			programs := make([]string, tc.inputs)
+			for k := range programs {
+				programs[k] = tc.binding
+			}
+			inst, sources := predicateBuild(t, "onchain", programs...)
+			act, err := inst.Build(sources, Fee{Dust: 330, Onchain: func(int) uint64 { return 0 }})
+			if tc.accepted {
+				require.NoError(t, err)
+				require.NotNil(t, act)
+			} else {
+				require.ErrorIs(t, err, ErrIneligible, "action returned: %v", act != nil)
+				require.Nil(t, act)
+			}
+		})
+	}
+}
+
+func TestPredicateResolutionNestedBudget(t *testing.T) {
+	for _, tc := range []struct {
+		name, predicate, ciphertext string
+		accepted                    bool
+	}{
+		{"nested ciphertext at limit", "<program>", predicateWork(64) + "51", true},
+		{"nested ciphertext over limit", "<program>", predicateWork(32) + predicateWork(33) + "51", false},
+		{"nested combined over limit", predicateWork(32) + "<program>", predicateWork(33) + "51", false},
+		{"reject before assembly lookup", predicateWork(64) + "$(<program> OP_DROP 1 1 1 OP_MODEXP OP_DROP 0)51", "51", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := edited(t, fixture(t, "minimal.json"), func(m map[string]any) {
+				m["secrets"] = map[string]any{"program": map[string]any{"type": "bytes", "from": "funds", "ciphertext": tc.ciphertext}}
+				in := m["inputs"].([]any)[0].(map[string]any)
+				in["predicate"] = predicateWork(64) + "51"
+				m["inputs"] = append(m["inputs"].([]any), map[string]any{"name": "other", "contract": in["contract"], "spend": in["spend"], "predicate": tc.predicate})
+				out := m["outputs"].([]any)[0].(map[string]any)
+				m["outputs"] = append(m["outputs"].([]any), map[string]any{"name": "other", "index": 1, "value": map[string]any{"from": "other"}, "locking": out["locking"]})
+			})
+			_, sources := predicateBuild(t, "onchain", "51", "51")
+			opened := 0
+			inst, err := parseDoc(t, doc).Instantiate(Context{Keys: testKeys(t), Sources: sources, Decrypt: func(ct []byte) ([]byte, error) { opened++; return ct, nil }})
+			require.NoError(t, err)
+			act, err := inst.Build(sources, Fee{Dust: 330, Onchain: func(int) uint64 { return 0 }})
+			if tc.accepted {
+				require.NoError(t, err)
+				require.NotNil(t, act)
+				require.Equal(t, 1, opened)
+			} else {
+				require.ErrorIs(t, err, ErrIneligible, "action returned: %v", act != nil)
+				require.Nil(t, act)
+				require.Zero(t, opened)
+			}
+		})
+	}
+}
+
+func TestPredicateResolutionPhaseEnds(t *testing.T) {
+	for _, result := range []string{"51", "00"} {
+		inst, sources := predicateBuild(t, "onchain", predicateWork(64)+result)
+		d := newDraft(Onchain, sources)
+		err := inst.predicates(d)
+		if result == "51" {
+			require.NoError(t, err)
+		} else {
+			require.ErrorIs(t, err, ErrIneligible)
+		}
+		ordinary, err := parseByteTemplate(predicateWork(64) + predicateWork(64))
+		require.NoError(t, err)
+		value, err := inst.resolve(ordinary, d, 0)
+		require.NoError(t, err)
+		require.Empty(t, value)
 	}
 }

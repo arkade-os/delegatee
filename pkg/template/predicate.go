@@ -5,21 +5,25 @@ import (
 	"fmt"
 
 	"github.com/arkade-os/emulator/pkg/arkade"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
 	"github.com/btcsuite/btcd/txscript/v2"
 )
 
 func (i *Instance) predicates(d *draft) error {
 	programs := make([][]byte, len(i.tmpl.inputs))
 	total := map[byte]int{}
+	previous := d.predicateBudget
+	defer func() { d.predicateBudget = previous }()
 	for slot, in := range i.tmpl.inputs {
 		if in.predicate == nil {
 			continue
 		}
+		d.predicateBudget = &predicateBudget{total: total}
 		program, err := i.resolve(*in.predicate, d, d.index(slot))
 		if err != nil {
 			return fmt.Errorf("%w: input %q predicate binding failed", ErrIneligible, in.name)
 		}
-		if err := checkPredicate(program, total); err != nil {
+		if err := checkPredicate(program, d.predicateBudget); err != nil {
 			return err
 		}
 		programs[slot] = program
@@ -56,13 +60,54 @@ func predicateError(err error) error {
 	return fmt.Errorf("%w: predicate: %s", ErrIneligible, vmError(err))
 }
 
-func checkPredicate(program []byte, total map[byte]int) error {
+type predicateBudget struct {
+	input, total map[byte]int
+}
+
+func (b *predicateBudget) charge(op byte) error {
+	limit := predicateComputeLimit(op)
+	if limit == 0 {
+		return nil
+	}
+	if b.input == nil {
+		b.input = map[byte]int{}
+	}
+	if b.total == nil {
+		b.total = map[byte]int{}
+	}
+	b.input[op]++
+	b.total[op]++
+	if b.input[op] > limit {
+		return fmt.Errorf("%w: predicate compute limit", ErrIneligible)
+	}
+	if b.total[op] > 4*limit {
+		return fmt.Errorf("%w: predicate aggregate compute limit", ErrIneligible)
+	}
+	return nil
+}
+
+func (b *predicateBudget) expression(tokens []string) error {
+	for _, token := range tokens {
+		if asm.DecimalTok.MatchString(token) || asm.HexTok.MatchString(token) || asm.Placeholder.MatchString(token) {
+			continue
+		}
+		op, err := asm.Opcode(token)
+		if err != nil {
+			return fmt.Errorf("%w: predicate expression opcode", ErrIneligible)
+		}
+		if err := b.charge(op); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkPredicate(program []byte, budget *predicateBudget) error {
 	if len(program) < 1 || len(program) > 520 {
 		return fmt.Errorf("%w: predicate size outside 1..520", ErrIneligible)
 	}
-	counts := map[byte]int{}
 	// Raw engines have no taproot context: the pinned VM's compute budget does not charge them.
-	// Loopless programs permit conservative counting of every branch before any predicate runs.
+	// Resolution expressions and returned programs share conservative counts of every branch.
 	ops := 0
 	tokens := txscript.MakeScriptTokenizer(0, program)
 	for tokens.Next() {
@@ -82,14 +127,8 @@ func checkPredicate(program []byte, total map[byte]int) error {
 		if ops > 201 {
 			return fmt.Errorf("%w: predicate opcode limit", ErrIneligible)
 		}
-		counts[op]++
-		total[op]++
-		limit := predicateComputeLimit(op)
-		if limit > 0 && counts[op] > limit {
-			return fmt.Errorf("%w: predicate compute limit", ErrIneligible)
-		}
-		if limit > 0 && total[op] > 4*limit {
-			return fmt.Errorf("%w: predicate aggregate compute limit", ErrIneligible)
+		if err := budget.charge(op); err != nil {
+			return err
 		}
 	}
 	if err := tokens.Err(); err != nil {
