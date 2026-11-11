@@ -1,7 +1,7 @@
 package template
 
 import (
-	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
+	"github.com/arkade-os/executor/pkg/template/internal/abi"
 )
 
 // Field is a named, typed value: a constructor input, a struct field or a covenant input.

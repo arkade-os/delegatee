@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
-	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
+	"github.com/arkade-os/executor/pkg/template/internal/contract"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
@@ -21,8 +21,8 @@ import (
 	"github.com/arkade-os/arkd/pkg/ark-lib/intent"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
 	"github.com/arkade-os/arkd/pkg/ark-lib/txutils"
-	"github.com/arkade-os/delegatee/pkg/template/packets"
 	"github.com/arkade-os/emulator/pkg/arkade"
+	"github.com/arkade-os/executor/pkg/template/packets"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/psbt/v2"
 	"github.com/btcsuite/btcd/txscript/v2"

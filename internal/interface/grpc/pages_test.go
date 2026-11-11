@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	executionapp "github.com/arkade-os/delegatee/internal/core/application/execution"
-	"github.com/arkade-os/delegatee/internal/core/application/health"
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
+	executionapp "github.com/arkade-os/executor/internal/core/application/execution"
+	"github.com/arkade-os/executor/internal/core/application/health"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,10 +36,10 @@ func TestMetricsExposeTheStatusAndTheHealth(t *testing.T) {
 
 	body := get(adminPages(status, checks), "/metrics").Body.String()
 	for _, line := range []string{
-		"delegatee_delegations_active 4", "delegatee_entries_queued 2", "delegatee_entries_registered 1", "delegatee_coins_late 3",
-		"delegatee_coins_watched 6", "delegatee_sats_watched 60000", "delegatee_chain_tip_height 812",
-		`delegatee_attempts_total{status="succeeded"} 5`, `delegatee_attempts_total{status="failed"} 2`,
-		"delegatee_template_failures_total 1", `delegatee_dependency_up{name="db"} 1`, `delegatee_dependency_up{name="arkd"} 0`,
+		"executor_delegations_active 4", "executor_entries_queued 2", "executor_entries_registered 1", "executor_coins_late 3",
+		"executor_coins_watched 6", "executor_sats_watched 60000", "executor_chain_tip_height 812",
+		`executor_attempts_total{status="succeeded"} 5`, `executor_attempts_total{status="failed"} 2`,
+		"executor_template_failures_total 1", `executor_dependency_up{name="db"} 1`, `executor_dependency_up{name="arkd"} 0`,
 	} {
 		require.Contains(t, body, line+"\n")
 	}

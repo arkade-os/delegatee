@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/internal/core/domain/execution"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/core/domain/execution"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/psbt/v2"

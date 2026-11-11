@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,21 +17,21 @@ func TestTemplateRegistry(t *testing.T) {
 	ctx := t.Context()
 	d := start(t)
 	require.Equal(t, registerTemplate(t, d, "renew.json"), registerTemplate(t, d, "renew.json"))
-	_, err := d.client.RegisterTemplate(ctx, &delegateev1.RegisterTemplateRequest{Document: `{"format":"template/v1"}`})
+	_, err := d.client.RegisterTemplate(ctx, &executorv1.RegisterTemplateRequest{Document: `{"format":"template/v1"}`})
 	require.Equal(t, codes.InvalidArgument, status.Code(err), "%v", err)
 
 	boarding := registerTemplate(t, d, "board.json")
 	registerDelegation(t, d, boarding, newOwner(t, d).boardingVariables())
-	_, err = d.admin.UpdateTemplate(ctx, &delegateev1.UpdateTemplateRequest{Id: boarding, Status: "disabled"})
+	_, err = d.admin.UpdateTemplate(ctx, &executorv1.UpdateTemplateRequest{Id: boarding, Status: "disabled"})
 	require.NoError(t, err)
 
-	_, err = d.client.RegisterDelegation(ctx, &delegateev1.RegisterDelegationRequest{TemplateId: boarding, Variables: newOwner(t, d).boardingVariables()})
+	_, err = d.client.RegisterDelegation(ctx, &executorv1.RegisterDelegationRequest{TemplateId: boarding, Variables: newOwner(t, d).boardingVariables()})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err), "%v", err)
-	_, err = d.admin.DeleteTemplate(ctx, &delegateev1.DeleteTemplateRequest{Id: boarding})
+	_, err = d.admin.DeleteTemplate(ctx, &executorv1.DeleteTemplateRequest{Id: boarding})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err), "%v", err)
-	listed, err := d.client.ListTemplates(ctx, &delegateev1.ListTemplatesRequest{})
+	listed, err := d.client.ListTemplates(ctx, &executorv1.ListTemplatesRequest{})
 	require.NoError(t, err)
-	require.True(t, slices.ContainsFunc(listed.Templates, func(tpl *delegateev1.Template) bool {
+	require.True(t, slices.ContainsFunc(listed.Templates, func(tpl *executorv1.Template) bool {
 		return tpl.Id == boarding && tpl.Status == "disabled"
 	}), "the disabled template is listed")
 }
@@ -40,7 +40,7 @@ func TestTemplateCannotNameTheCosignerKey(t *testing.T) {
 	d := start(t)
 	release := registerTemplate(t, d, "delegate_release.json")
 
-	_, err := d.client.RegisterDelegation(t.Context(), &delegateev1.RegisterDelegationRequest{TemplateId: release})
+	_, err := d.client.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: release})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err), "%v", err)
 }
 

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	"github.com/arkade-os/delegatee/internal/core/application/health"
-	"github.com/arkade-os/delegatee/internal/interface/grpc/handlers"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
+	"github.com/arkade-os/executor/internal/core/application/health"
+	"github.com/arkade-os/executor/internal/interface/grpc/handlers"
 	"github.com/meshapi/grpc-api-gateway/gateway"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -52,15 +52,15 @@ type Options struct {
 
 // Listen binds both ports. The admin port serves AdminService as well, the operator UI, /metrics and /healthz,
 // and, when there are users, checks their credentials on every call.
-func Listen(ctx context.Context, opts Options, delegatee *handlers.Delegatee, admin *handlers.Admin) (*Server, error) {
+func Listen(ctx context.Context, opts Options, executor *handlers.Executor, admin *handlers.Admin) (*Server, error) {
 	publicServices := func(s *grpc.Server, mux *gateway.ServeMux, conn *grpc.ClientConn) {
-		delegateev1.RegisterDelegateeServiceServer(s, delegatee)
-		delegateev1.RegisterDelegateeServiceHandler(ctx, mux, conn)
+		executorv1.RegisterExecutorServiceServer(s, executor)
+		executorv1.RegisterExecutorServiceHandler(ctx, mux, conn)
 	}
 	adminServices := func(s *grpc.Server, mux *gateway.ServeMux, conn *grpc.ClientConn) {
 		publicServices(s, mux, conn)
-		delegateev1.RegisterAdminServiceServer(s, admin)
-		delegateev1.RegisterAdminServiceHandler(ctx, mux, conn)
+		executorv1.RegisterAdminServiceServer(s, admin)
+		executorv1.RegisterAdminServiceHandler(ctx, mux, conn)
 	}
 	interceptors := []grpc.UnaryServerInterceptor{logUnary}
 	pages := adminPages(opts.Status, opts.Health)

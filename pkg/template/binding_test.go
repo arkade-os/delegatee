@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/schema"
+	"github.com/arkade-os/executor/pkg/template/internal/schema"
 
 	"github.com/stretchr/testify/require"
 )

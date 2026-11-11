@@ -1,19 +1,19 @@
-module github.com/arkade-os/delegatee
+module github.com/arkade-os/executor
 
 go 1.26.10
 
-replace github.com/arkade-os/delegatee/api-spec => ./api-spec
+replace github.com/arkade-os/executor/api-spec => ./api-spec
 
-replace github.com/arkade-os/delegatee/pkg/template => ./pkg/template
+replace github.com/arkade-os/executor/pkg/template => ./pkg/template
 
 require (
 	github.com/arkade-os/arkd/pkg/ark-lib v0.8.1-0.20260901090427-f863e4847193
 	github.com/arkade-os/arkd/pkg/client-lib v0.0.0-20260901090427-f863e4847193
 	github.com/arkade-os/arkd/pkg/client-wallet v0.0.0-20260901090427-f863e4847193
-	github.com/arkade-os/delegatee/api-spec v0.0.0-00010101000000-000000000000
-	github.com/arkade-os/delegatee/pkg/template v0.0.0
 	github.com/arkade-os/emulator/pkg/arkade v0.1.0
 	github.com/arkade-os/emulator/pkg/client v0.1.0
+	github.com/arkade-os/executor/api-spec v0.0.0-00010101000000-000000000000
+	github.com/arkade-os/executor/pkg/template v0.0.0
 	github.com/btcsuite/btcd/address/v2 v2.0.0
 	github.com/btcsuite/btcd/btcec/v2 v2.5.0
 	github.com/btcsuite/btcd/btcutil/v2 v2.0.1
@@ -32,7 +32,6 @@ require (
 	golang.org/x/sync v0.23.0
 	golang.org/x/time v0.15.0
 	google.golang.org/grpc v1.83.2
-	google.golang.org/protobuf v1.36.11
 )
 
 require (
@@ -112,5 +111,6 @@ require (
 	google.golang.org/genproto v0.0.0-20241118233622-e639e219e697 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	modernc.org/libc v1.61.0 // indirect
 )

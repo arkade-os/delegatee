@@ -14,8 +14,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
-	"github.com/arkade-os/delegatee/pkg/template/internal/schema"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
+	"github.com/arkade-os/executor/pkg/template/internal/schema"
 )
 
 // Type is the kind of transaction a template builds.

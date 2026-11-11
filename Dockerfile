@@ -7,11 +7,11 @@ COPY pkg/template/go.mod pkg/template/go.sum ./pkg/template/
 RUN go mod download
 COPY . .
 ARG VERSION=docker
-RUN go build -o /delegateed -ldflags "-s -w -X main.Version=$VERSION" ./cmd/delegateed
+RUN go build -o /executord -ldflags "-s -w -X main.Version=$VERSION" ./cmd/executord
 
 FROM alpine:3.22
-RUN apk --no-cache upgrade && apk --no-cache add ca-certificates && adduser -D delegatee
-COPY --from=builder /delegateed /usr/local/bin/delegateed
-USER delegatee
+RUN apk --no-cache upgrade && apk --no-cache add ca-certificates && adduser -D executor
+COPY --from=builder /executord /usr/local/bin/executord
+USER executor
 EXPOSE 7080 7081
-ENTRYPOINT ["/usr/local/bin/delegateed"]
+ENTRYPOINT ["/usr/local/bin/executord"]

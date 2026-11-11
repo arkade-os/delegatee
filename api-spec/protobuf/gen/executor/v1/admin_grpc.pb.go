@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             (unknown)
-// source: delegatee/v1/admin.proto
+// source: executor/v1/admin.proto
 
-package delegateev1
+package executorv1
 
 import (
 	context "context"
@@ -19,26 +19,26 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AdminService_UpdateTemplate_FullMethodName   = "/delegatee.v1.AdminService/UpdateTemplate"
-	AdminService_DeleteTemplate_FullMethodName   = "/delegatee.v1.AdminService/DeleteTemplate"
-	AdminService_ListArtifacts_FullMethodName    = "/delegatee.v1.AdminService/ListArtifacts"
-	AdminService_DeleteArtifact_FullMethodName   = "/delegatee.v1.AdminService/DeleteArtifact"
-	AdminService_ListDelegations_FullMethodName  = "/delegatee.v1.AdminService/ListDelegations"
-	AdminService_CancelDelegation_FullMethodName = "/delegatee.v1.AdminService/CancelDelegation"
-	AdminService_ResumeDelegation_FullMethodName = "/delegatee.v1.AdminService/ResumeDelegation"
-	AdminService_ListAttempts_FullMethodName     = "/delegatee.v1.AdminService/ListAttempts"
-	AdminService_RegisterStream_FullMethodName   = "/delegatee.v1.AdminService/RegisterStream"
-	AdminService_ListStreams_FullMethodName      = "/delegatee.v1.AdminService/ListStreams"
-	AdminService_CancelStream_FullMethodName     = "/delegatee.v1.AdminService/CancelStream"
-	AdminService_GetHealth_FullMethodName        = "/delegatee.v1.AdminService/GetHealth"
-	AdminService_GetStatus_FullMethodName        = "/delegatee.v1.AdminService/GetStatus"
+	AdminService_UpdateTemplate_FullMethodName   = "/executor.v1.AdminService/UpdateTemplate"
+	AdminService_DeleteTemplate_FullMethodName   = "/executor.v1.AdminService/DeleteTemplate"
+	AdminService_ListArtifacts_FullMethodName    = "/executor.v1.AdminService/ListArtifacts"
+	AdminService_DeleteArtifact_FullMethodName   = "/executor.v1.AdminService/DeleteArtifact"
+	AdminService_ListDelegations_FullMethodName  = "/executor.v1.AdminService/ListDelegations"
+	AdminService_CancelDelegation_FullMethodName = "/executor.v1.AdminService/CancelDelegation"
+	AdminService_ResumeDelegation_FullMethodName = "/executor.v1.AdminService/ResumeDelegation"
+	AdminService_ListAttempts_FullMethodName     = "/executor.v1.AdminService/ListAttempts"
+	AdminService_RegisterStream_FullMethodName   = "/executor.v1.AdminService/RegisterStream"
+	AdminService_ListStreams_FullMethodName      = "/executor.v1.AdminService/ListStreams"
+	AdminService_CancelStream_FullMethodName     = "/executor.v1.AdminService/CancelStream"
+	AdminService_GetHealth_FullMethodName        = "/executor.v1.AdminService/GetHealth"
+	AdminService_GetStatus_FullMethodName        = "/executor.v1.AdminService/GetStatus"
 )
 
 // AdminServiceClient is the client API for AdminService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// AdminService is served on the admin port only, next to DelegateeService.
+// AdminService is served on the admin port only, next to ExecutorService.
 type AdminServiceClient interface {
 	// UpdateTemplate sets a template's status; activating resets its failures.
 	UpdateTemplate(ctx context.Context, in *UpdateTemplateRequest, opts ...grpc.CallOption) (*UpdateTemplateResponse, error)
@@ -210,7 +210,7 @@ func (c *adminServiceClient) GetStatus(ctx context.Context, in *GetStatusRequest
 // All implementations should embed UnimplementedAdminServiceServer
 // for forward compatibility.
 //
-// AdminService is served on the admin port only, next to DelegateeService.
+// AdminService is served on the admin port only, next to ExecutorService.
 type AdminServiceServer interface {
 	// UpdateTemplate sets a template's status; activating resets its failures.
 	UpdateTemplate(context.Context, *UpdateTemplateRequest) (*UpdateTemplateResponse, error)
@@ -544,7 +544,7 @@ func _AdminService_GetStatus_Handler(srv interface{}, ctx context.Context, dec f
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var AdminService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "delegatee.v1.AdminService",
+	ServiceName: "executor.v1.AdminService",
 	HandlerType: (*AdminServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -601,5 +601,5 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "delegatee/v1/admin.proto",
+	Metadata: "executor/v1/admin.proto",
 }

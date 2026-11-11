@@ -1,4 +1,4 @@
-module github.com/arkade-os/delegatee/pkg/template
+module github.com/arkade-os/executor/pkg/template
 
 go 1.26.10
 

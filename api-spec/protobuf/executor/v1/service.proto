@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package delegatee.v1;
+package executor.v1;
 
 import "meshapi/gateway/annotations.proto";
 
-service DelegateeService {
+service ExecutorService {
   // GetInfo tells the daemon's version, network and keys.
   rpc GetInfo(GetInfoRequest) returns (GetInfoResponse) {
     option (meshapi.gateway.http) = {

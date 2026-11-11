@@ -9,7 +9,7 @@ import (
 
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 	"github.com/arkade-os/arkd/pkg/client-lib/client"
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -19,18 +19,18 @@ func TestCancelStopsRenewals(t *testing.T) {
 	d := start(t)
 	owner := newOwner(t, d)
 	w, renewal := boardingDelegations(t, d, owner)
-	_, err := d.admin.CancelDelegation(t.Context(), &delegateev1.CancelDelegationRequest{Id: renewal.Id})
+	_, err := d.admin.CancelDelegation(t.Context(), &executorv1.CancelDelegationRequest{Id: renewal.Id})
 	require.NoError(t, err)
 	faucet(t, w.Address, 20_000)
 
 	boarded := landed(t, d, w, renewal, 1)[0]
 	neverSpent(t, d, boarded.Outpoint.String())
 
-	_, err = d.client.RegisterDelegation(t.Context(), &delegateev1.RegisterDelegationRequest{
+	_, err = d.client.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{
 		TemplateId: registerTemplate(t, d, "renew.json"), Variables: owner.variables(0),
 	})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err), "the owner cannot undo an operator cancel")
-	_, err = d.admin.ResumeDelegation(t.Context(), &delegateev1.ResumeDelegationRequest{Id: renewal.Id})
+	_, err = d.admin.ResumeDelegation(t.Context(), &executorv1.ResumeDelegationRequest{Id: renewal.Id})
 	require.NoError(t, err)
 	require.Equal(t, renewal.Id, renewalDelegation(t, d, owner, 0).Id, "the cancelled delegation renews again")
 	landed(t, d, renewal, renewal, 1)

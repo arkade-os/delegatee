@@ -9,8 +9,8 @@ import (
 
 	"github.com/arkade-os/arkd/pkg/ark-lib/asset"
 	"github.com/arkade-os/arkd/pkg/ark-lib/extension"
-	"github.com/arkade-os/delegatee/pkg/template/packets"
 	"github.com/arkade-os/emulator/pkg/arkade"
+	"github.com/arkade-os/executor/pkg/template/packets"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
 )

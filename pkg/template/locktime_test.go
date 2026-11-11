@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"

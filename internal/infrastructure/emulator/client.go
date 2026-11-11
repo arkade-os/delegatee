@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/arkade-os/arkd/pkg/ark-lib/tree"
-	"github.com/arkade-os/delegatee/internal/core/domain/execution"
-	"github.com/arkade-os/delegatee/internal/core/ports"
 	emulatorclient "github.com/arkade-os/emulator/pkg/client"
+	"github.com/arkade-os/executor/internal/core/domain/execution"
+	"github.com/arkade-os/executor/internal/core/ports"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"

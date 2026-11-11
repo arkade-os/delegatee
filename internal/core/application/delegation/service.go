@@ -8,12 +8,12 @@ import (
 	"time"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
-	"github.com/arkade-os/delegatee/internal/core/application/registry"
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	registrydomain "github.com/arkade-os/delegatee/internal/core/domain/registry"
-	"github.com/arkade-os/delegatee/internal/core/ports"
-	"github.com/arkade-os/delegatee/pkg/template"
-	"github.com/arkade-os/delegatee/pkg/template/ecies"
+	"github.com/arkade-os/executor/internal/core/application/registry"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	registrydomain "github.com/arkade-os/executor/internal/core/domain/registry"
+	"github.com/arkade-os/executor/internal/core/ports"
+	"github.com/arkade-os/executor/pkg/template"
+	"github.com/arkade-os/executor/pkg/template/ecies"
 	"github.com/btcsuite/btcd/btcec/v2"
 	log "github.com/sirupsen/logrus"
 )

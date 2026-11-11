@@ -8,8 +8,8 @@ import (
 	"maps"
 	"testing"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
-	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
+	"github.com/arkade-os/executor/pkg/template/internal/contract"
 
 	"github.com/stretchr/testify/require"
 )

@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/pkg/template"
-	"github.com/arkade-os/delegatee/templates"
 	"github.com/arkade-os/emulator/pkg/arkade"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/pkg/template"
+	"github.com/arkade-os/executor/templates"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/stretchr/testify/require"
 )

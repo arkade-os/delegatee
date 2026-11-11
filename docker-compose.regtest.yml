@@ -119,27 +119,27 @@ services:
   pg:
     restart: unless-stopped
     image: postgres:17.8
-    container_name: delegatee-pg
+    container_name: executor-pg
     ports:
       - 5432:5432
     environment:
       - POSTGRES_HOST_AUTH_METHOD=trust
       - POSTGRES_USER=postgres
-      - POSTGRES_DB=delegatee
+      - POSTGRES_DB=executor
     volumes:
       - type: tmpfs
         target: /var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d delegatee -h 127.0.0.1 -p 5432"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d executor -h 127.0.0.1 -p 5432"]
       interval: 2s
       timeout: 2s
       retries: 30
 
-  # the service itself, opt-in: `docker compose --profile delegatee up -d`
-  delegatee:
-    profiles: [delegatee]
+  # the service itself, opt-in: `docker compose --profile executor up -d`
+  executor:
+    profiles: [executor]
     build: .
-    container_name: delegatee
+    container_name: executor
     restart: unless-stopped
     depends_on:
       pg:
@@ -152,15 +152,15 @@ services:
       - "7080:7080"
       - "127.0.0.1:7081:7081"
     environment:
-      - DELEGATEE_LOG_LEVEL=5
-      - DELEGATEE_DATABASE_URL=postgres://postgres@pg:5432/delegatee?sslmode=disable
-      - DELEGATEE_ARK_URL=arkd:7070
-      - DELEGATEE_EMULATOR_URL=emulator:7073
-      - DELEGATEE_ELECTRUM_URL=tcp://fulcrum:50001
-      - DELEGATEE_COSIGNER_KEY=${DELEGATEE_COSIGNER_KEY:-0000000000000000000000000000000000000000000000000000000000000001}
-      - DELEGATEE_EXPLORER_URL=http://chopsticks:3000
-      - DELEGATEE_ADMIN_AUTH=disabled
-      - DELEGATEE_MIN_DELEGATION_EXPIRY=0
+      - EXECUTOR_LOG_LEVEL=5
+      - EXECUTOR_DATABASE_URL=postgres://postgres@pg:5432/executor?sslmode=disable
+      - EXECUTOR_ARK_URL=arkd:7070
+      - EXECUTOR_EMULATOR_URL=emulator:7073
+      - EXECUTOR_ELECTRUM_URL=tcp://fulcrum:50001
+      - EXECUTOR_COSIGNER_KEY=${EXECUTOR_COSIGNER_KEY:-0000000000000000000000000000000000000000000000000000000000000001}
+      - EXECUTOR_EXPLORER_URL=http://chopsticks:3000
+      - EXECUTOR_ADMIN_AUTH=disabled
+      - EXECUTOR_MIN_DELEGATION_EXPIRY=0
 
 configs:
   fulcrum:

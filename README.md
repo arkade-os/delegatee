@@ -1,8 +1,8 @@
-# delegateed
+# executord
 
 Alpha software: use at your own risk.
 
-`delegateed` renews Arkade VTXOs and boards bitcoin while their
+`executord` renews Arkade VTXOs and boards bitcoin while their
 owner is offline. A wallet registers a delegation on its address; every spend is
 co-signed by the [emulator](https://github.com/arkade-os/emulator) only if it
 satisfies the template's covenant.
@@ -19,41 +19,41 @@ make test-e2e     # end-to-end tests on the regtest stack
 make regtest-down
 ```
 
-In production use `ghcr.io/arkade-os/delegatee` with the variables below.
+In production use `ghcr.io/arkade-os/executor` with the variables below.
 Port 7080 is the public API
-([service.proto](api-spec/protobuf/delegatee/v1/service.proto)), 7081 the
+([service.proto](api-spec/protobuf/executor/v1/service.proto)), 7081 the
 admin API and UI: keep it private. Back up the cosigner and encryption keys.
 
 ## Configuration
 
 | Variable | | Default |
 |---|---|---|
-| `DELEGATEE_ARK_URL` | arkd gRPC address | required |
-| `DELEGATEE_EMULATOR_URL` | emulator gRPC address | required |
-| `DELEGATEE_ELECTRUM_URL` | Electrum server, `tcp://host:port` or `ssl://host:port` | required |
-| `DELEGATEE_DATABASE_URL` | postgres DSN | required |
-| `DELEGATEE_COSIGNER_KEY` | private key cosigning arkd's vtxo trees, 32 bytes hex | required |
-| `DELEGATEE_ADMIN_AUTH` | `file` or `disabled` | required |
-| `DELEGATEE_ADMIN_USERS_FILE` | `user:bcrypt` lines | with `file` |
-| `DELEGATEE_ENCRYPTION_KEY` | ECIES key for template secrets, hex; a secret is sealed to the key and the id of its template | unset |
-| `DELEGATEE_DEFAULT_TEMPLATES` | register the default templates at startup | `true` |
-| `DELEGATEE_MIN_DELEGATION_EXPIRY` | minimum lead of a delegation's expiry | `24h` |
-| `DELEGATEE_EXPIRY_INTERVAL` | how often delegations past their expiry are marked | `1m` |
-| `DELEGATEE_OFFCHAIN_CONCURRENCY` | offchain attempts in flight at once | `8` |
-| `DELEGATEE_ATTEMPT_TIMEOUT` | building and signing an offchain attempt, before arkd is called | `1m` |
-| `DELEGATEE_RETRY_DELAY` | before the coins of a failed attempt are tried again | `1m` |
-| `DELEGATEE_INTENTS_PER_BATCH` | intents arkd takes per batch: at most that many are kept registered | `128` |
-| `DELEGATEE_INTENT_TIMEOUT` | an intent no batch selected by then is deleted from arkd and queued again | `5m` |
-| `DELEGATEE_BAN_DURATION` | how long the coins of an intent a batch failed on keep out of the queue | `5m` |
-| `DELEGATEE_LANDING_WINDOW` | after a restart, how long an attempt whose forfeits may have reached arkd waits to see its coins spent before it is failed | `5m` |
-| `DELEGATEE_RESERVE` | latest a coin enters a batch, before its vtxo expires | `15m` |
-| `DELEGATEE_TEMPLATE_MAX_FAILURES` | consecutive failed attempts that disable a template | `10` |
-| `DELEGATEE_LOOP_STALL` | how long the loop may stay silent past a due time before `/healthz` reports it | `2m` |
-| `DELEGATEE_PUBLIC_RATE_LIMIT` | requests per second per client address on the public port, loopback exempt; `0` disables | `5` |
-| `DELEGATEE_MAX_DELEGATIONS` | active delegations cap | `50000` |
-| `DELEGATEE_MAX_STREAM_CHILDREN` | active spawned delegations cap, apart from `MAX_DELEGATIONS` | `10000` |
-| `DELEGATEE_PRUNE_AFTER` | how long after expiry a delegation a stream spawned is deleted | `720h` |
-| `DELEGATEE_LOG_LEVEL` | logrus level | `4` |
+| `EXECUTOR_ARK_URL` | arkd gRPC address | required |
+| `EXECUTOR_EMULATOR_URL` | emulator gRPC address | required |
+| `EXECUTOR_ELECTRUM_URL` | Electrum server, `tcp://host:port` or `ssl://host:port` | required |
+| `EXECUTOR_DATABASE_URL` | postgres DSN | required |
+| `EXECUTOR_COSIGNER_KEY` | private key cosigning arkd's vtxo trees, 32 bytes hex | required |
+| `EXECUTOR_ADMIN_AUTH` | `file` or `disabled` | required |
+| `EXECUTOR_ADMIN_USERS_FILE` | `user:bcrypt` lines | with `file` |
+| `EXECUTOR_ENCRYPTION_KEY` | ECIES key for template secrets, hex; a secret is sealed to the key and the id of its template | unset |
+| `EXECUTOR_DEFAULT_TEMPLATES` | register the default templates at startup | `true` |
+| `EXECUTOR_MIN_DELEGATION_EXPIRY` | minimum lead of a delegation's expiry | `24h` |
+| `EXECUTOR_EXPIRY_INTERVAL` | how often delegations past their expiry are marked | `1m` |
+| `EXECUTOR_OFFCHAIN_CONCURRENCY` | offchain attempts in flight at once | `8` |
+| `EXECUTOR_ATTEMPT_TIMEOUT` | building and signing an offchain attempt, before arkd is called | `1m` |
+| `EXECUTOR_RETRY_DELAY` | before the coins of a failed attempt are tried again | `1m` |
+| `EXECUTOR_INTENTS_PER_BATCH` | intents arkd takes per batch: at most that many are kept registered | `128` |
+| `EXECUTOR_INTENT_TIMEOUT` | an intent no batch selected by then is deleted from arkd and queued again | `5m` |
+| `EXECUTOR_BAN_DURATION` | how long the coins of an intent a batch failed on keep out of the queue | `5m` |
+| `EXECUTOR_LANDING_WINDOW` | after a restart, how long an attempt whose forfeits may have reached arkd waits to see its coins spent before it is failed | `5m` |
+| `EXECUTOR_RESERVE` | latest a coin enters a batch, before its vtxo expires | `15m` |
+| `EXECUTOR_TEMPLATE_MAX_FAILURES` | consecutive failed attempts that disable a template | `10` |
+| `EXECUTOR_LOOP_STALL` | how long the loop may stay silent past a due time before `/healthz` reports it | `2m` |
+| `EXECUTOR_PUBLIC_RATE_LIMIT` | requests per second per client address on the public port, loopback exempt; `0` disables | `5` |
+| `EXECUTOR_MAX_DELEGATIONS` | active delegations cap | `50000` |
+| `EXECUTOR_MAX_STREAM_CHILDREN` | active spawned delegations cap, apart from `MAX_DELEGATIONS` | `10000` |
+| `EXECUTOR_PRUNE_AFTER` | how long after expiry a delegation a stream spawned is deleted | `720h` |
+| `EXECUTOR_LOG_LEVEL` | logrus level | `4` |
 
 The delegations a stream spawns count only toward `MAX_STREAM_CHILDREN`, the others toward `MAX_DELEGATIONS`.
 

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	"github.com/arkade-os/delegatee/internal/config"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
+	"github.com/arkade-os/executor/internal/config"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/stretchr/testify/require"
@@ -56,7 +56,7 @@ func TestRegisterDelegationOverREST(t *testing.T) {
 	require.Equal(t, first.ID, decodeDelegation(t, body).ID)
 	require.Equal(t, 1, tableRows(t, d, "delegations"))
 
-	got, err := d.Client.GetDelegation(t.Context(), &delegateev1.GetDelegationRequest{Address: first.Address})
+	got, err := d.Client.GetDelegation(t.Context(), &executorv1.GetDelegationRequest{Address: first.Address})
 	require.NoError(t, err)
 	require.Equal(t, first.Fingerprint, got.GetDelegation().GetFingerprint())
 	code, _ = get(t, d.RestURL+"/v1/delegation?id=404")
@@ -86,7 +86,7 @@ func TestRegisterDelegationRefused(t *testing.T) {
 	release := registerFixture(t, d, "delegate_release.json")
 	code, body = register(release, nil, 0)
 	require.Equal(t, http.StatusPreconditionFailed, code, string(body))
-	_, err := d.Client.RegisterDelegation(t.Context(), &delegateev1.RegisterDelegationRequest{TemplateId: release})
+	_, err := d.Client.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: release})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
 
 	code, body = register(templateID, renewalVariables(t), time.Now().Add(time.Hour).Unix())
@@ -102,7 +102,7 @@ func TestRegisterDelegationRefused(t *testing.T) {
 
 	code, body = register(templateID, renewalVariables(t), 0)
 	require.Equal(t, http.StatusTooManyRequests, code, string(body))
-	_, err = d.Client.RegisterDelegation(t.Context(), &delegateev1.RegisterDelegationRequest{TemplateId: templateID, Variables: renewalVariables(t)})
+	_, err = d.Client.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: templateID, Variables: renewalVariables(t)})
 	require.Equal(t, codes.ResourceExhausted, status.Code(err))
 	require.Equal(t, 1, tableRows(t, d, "delegations"))
 }
@@ -163,7 +163,7 @@ func TestCancelThenResumeDelegation(t *testing.T) {
 	require.Equal(t, http.StatusPreconditionFailed, code, string(body))
 	require.Equal(t, 1, tableRows(t, d, "delegations"))
 
-	_, err := d.Admin.CancelDelegation(t.Context(), &delegateev1.CancelDelegationRequest{Id: 404})
+	_, err := d.Admin.CancelDelegation(t.Context(), &executorv1.CancelDelegationRequest{Id: 404})
 	require.Equal(t, codes.NotFound, status.Code(err))
 	code, _ = post(t, d.RestURL+"/v1/admin/delegation/"+dlg.ID+"/cancel", map[string]any{})
 	require.Equal(t, http.StatusNotFound, code, "admin routes stay off the public port")
@@ -214,7 +214,7 @@ func TestExpireAndListDelegations(t *testing.T) {
 
 	code, body = get(t, d.AdminURL+"/v1/admin/delegations?limit=1001")
 	require.Equal(t, http.StatusBadRequest, code, string(body))
-	list, err := d.Admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{})
+	list, err := d.Admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{})
 	require.NoError(t, err)
 	require.Len(t, list.GetDelegations(), 5)
 }

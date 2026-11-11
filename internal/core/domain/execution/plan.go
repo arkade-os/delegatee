@@ -5,7 +5,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
 )
 
 // Session is how arkd runs its batches: one per Duration, taking at most MaxIntents intents.

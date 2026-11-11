@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
-	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
-	"github.com/arkade-os/delegatee/pkg/template/packets"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
+	"github.com/arkade-os/executor/pkg/template/internal/contract"
+	"github.com/arkade-os/executor/pkg/template/packets"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/psbt/v2"
 	"github.com/btcsuite/btcd/txscript/v2"

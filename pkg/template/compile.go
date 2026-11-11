@@ -3,7 +3,7 @@ package template
 import (
 	"slices"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/schema"
+	"github.com/arkade-os/executor/pkg/template/internal/schema"
 )
 
 // compiler turns a typed document into a Template: names become indexes, bindings are typed and

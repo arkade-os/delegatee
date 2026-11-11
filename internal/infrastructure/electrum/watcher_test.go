@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/ports"
+	"github.com/arkade-os/executor/internal/core/ports"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
 )

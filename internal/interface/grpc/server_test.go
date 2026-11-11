@@ -5,12 +5,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/arkade-os/delegatee/internal/interface/grpc/handlers"
+	"github.com/arkade-os/executor/internal/interface/grpc/handlers"
 	"github.com/stretchr/testify/require"
 )
 
 func TestOnlyThePublicPortIsRateLimited(t *testing.T) {
-	s, err := Listen(t.Context(), Options{PublicRateLimit: 1, Status: statusStub{}, Health: &healthStub{}}, &handlers.Delegatee{}, &handlers.Admin{})
+	s, err := Listen(t.Context(), Options{PublicRateLimit: 1, Status: statusStub{}, Health: &healthStub{}}, &handlers.Executor{}, &handlers.Admin{})
 	require.NoError(t, err)
 	t.Cleanup(s.Stop)
 

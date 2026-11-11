@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
 	"github.com/btcsuite/btcd/wire/v2"
 )
 

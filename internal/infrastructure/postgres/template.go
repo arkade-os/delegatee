@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/registry"
-	"github.com/arkade-os/delegatee/internal/infrastructure/postgres/sqlc/queries"
-	"github.com/arkade-os/delegatee/pkg/template"
+	"github.com/arkade-os/executor/internal/core/domain/registry"
+	"github.com/arkade-os/executor/internal/infrastructure/postgres/sqlc/queries"
+	"github.com/arkade-os/executor/pkg/template"
 )
 
 type TemplateRepository struct{ db *DB }

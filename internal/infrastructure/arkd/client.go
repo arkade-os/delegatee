@@ -13,7 +13,7 @@ import (
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 	"github.com/arkade-os/arkd/pkg/client-lib/client"
 	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
-	"github.com/arkade-os/delegatee/internal/core/ports"
+	"github.com/arkade-os/executor/internal/core/ports"
 	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/psbt/v2"
@@ -43,7 +43,7 @@ func NewIndexer(indexer clientlib.Indexer, stream TransactionStream) *Indexer {
 
 func NewClient(url string) (*Client, error) {
 	url = strings.TrimSuffix(url, "/")
-	ark, err := client.NewClient(url, "delegateed")
+	ark, err := client.NewClient(url, "executord")
 	if err != nil {
 		return nil, fmt.Errorf("connect to arkd: %w", err)
 	}

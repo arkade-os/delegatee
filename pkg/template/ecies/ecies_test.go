@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/arkade-os/delegatee/pkg/template/ecies"
+	"github.com/arkade-os/executor/pkg/template/ecies"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/stretchr/testify/require"
 )

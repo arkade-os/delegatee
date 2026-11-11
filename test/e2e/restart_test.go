@@ -11,10 +11,10 @@ import (
 
 	"github.com/arkade-os/arkd/pkg/ark-lib/tree"
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	"github.com/arkade-os/delegatee/internal/config"
-	"github.com/arkade-os/delegatee/internal/core/ports"
-	"github.com/arkade-os/delegatee/internal/infrastructure/arkd"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
+	"github.com/arkade-os/executor/internal/config"
+	"github.com/arkade-os/executor/internal/core/ports"
+	"github.com/arkade-os/executor/internal/infrastructure/arkd"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -44,7 +44,7 @@ func TestRestartMidRenewal(t *testing.T) {
 	d := start(t)
 	w, renewal := boardingDelegations(t, d, newOwner(t, d))
 	// cancelled, the renewal leaves the boarded coin alone until the daemon is ready to crash
-	_, err := d.admin.CancelDelegation(t.Context(), &delegateev1.CancelDelegationRequest{Id: renewal.Id})
+	_, err := d.admin.CancelDelegation(t.Context(), &executorv1.CancelDelegationRequest{Id: renewal.Id})
 	require.NoError(t, err)
 	faucet(t, w.Address, 20_000)
 	boarded := landed(t, d, w, renewal, 1)[0]
@@ -52,7 +52,7 @@ func TestRestartMidRenewal(t *testing.T) {
 
 	crash := &crashingArk{afterForfeits: true}
 	mid := d.restart(t, crash.dial(t))
-	_, err = mid.admin.ResumeDelegation(t.Context(), &delegateev1.ResumeDelegationRequest{Id: renewal.Id})
+	_, err = mid.admin.ResumeDelegation(t.Context(), &executorv1.ResumeDelegationRequest{Id: renewal.Id})
 	require.NoError(t, err)
 	crash.wait(t)
 	mid.stop()

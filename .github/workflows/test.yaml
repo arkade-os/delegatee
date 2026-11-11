@@ -22,11 +22,11 @@ jobs:
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_USER: postgres
-          POSTGRES_DB: delegatee
+          POSTGRES_DB: executor
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d delegatee -h 127.0.0.1 -p 5432"
+          --health-cmd "pg_isready -U postgres -d executor -h 127.0.0.1 -p 5432"
           --health-interval 2s
           --health-timeout 2s
           --health-retries 30
@@ -38,7 +38,7 @@ jobs:
 
       - name: Run unit tests
         env:
-          DELEGATEE_DATABASE_URL: postgres://postgres@127.0.0.1:5432/delegatee?sslmode=disable
+          EXECUTOR_DATABASE_URL: postgres://postgres@127.0.0.1:5432/executor?sslmode=disable
         run: make test
 
   lint:
@@ -88,8 +88,8 @@ jobs:
         if: failure()
         run: |
           mkdir -p logs
-          mv e2e.log logs/delegateed.log || true
-          for c in arkd arkd-wallet emulator nbxplorer delegatee-pg; do
+          mv e2e.log logs/executord.log || true
+          for c in arkd arkd-wallet emulator nbxplorer executor-pg; do
             docker logs "$c" > "logs/$c.log" 2>&1 || true
           done
 

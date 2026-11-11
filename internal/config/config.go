@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/ports"
-	grpcserver "github.com/arkade-os/delegatee/internal/interface/grpc"
+	"github.com/arkade-os/executor/internal/core/ports"
+	grpcserver "github.com/arkade-os/executor/internal/interface/grpc"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"golang.org/x/crypto/bcrypt"
 )
 
-const envPrefix = "DELEGATEE_"
+const envPrefix = "EXECUTOR_"
 
 type Config struct {
 	Version             string

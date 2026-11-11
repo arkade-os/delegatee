@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
 )
 
 const (

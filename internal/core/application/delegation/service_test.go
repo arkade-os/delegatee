@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/pkg/template/ecies"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/pkg/template/ecies"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/stretchr/testify/require"
 )

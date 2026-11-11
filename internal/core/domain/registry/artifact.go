@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/arkade-os/delegatee/pkg/template"
+	"github.com/arkade-os/executor/pkg/template"
 )
 
 // Artifact is a compiled contract definition, stored under the hash of its canonical document.

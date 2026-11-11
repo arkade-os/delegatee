@@ -8,10 +8,10 @@
     "/v1/artifact": {
       "post": {
         "tags": [
-          "DelegateeService"
+          "ExecutorService"
         ],
         "description": "RegisterArtifact stores a compiler artifact under its content id. Idempotent.",
-        "operationId": "DelegateeService_RegisterArtifact",
+        "operationId": "ExecutorService_RegisterArtifact",
         "requestBody": {
           "content": {
             "application/json": {
@@ -49,9 +49,9 @@
     "/v1/artifact/{id}": {
       "get": {
         "tags": [
-          "DelegateeService"
+          "ExecutorService"
         ],
-        "operationId": "DelegateeService_GetArtifact",
+        "operationId": "ExecutorService_GetArtifact",
         "parameters": [
           {
             "name": "id",
@@ -89,10 +89,10 @@
     "/v1/delegation": {
       "get": {
         "tags": [
-          "DelegateeService"
+          "ExecutorService"
         ],
         "description": "GetDelegation returns a delegation with its coins, by ?id= or by ?address=.",
-        "operationId": "DelegateeService_GetDelegation",
+        "operationId": "ExecutorService_GetDelegation",
         "parameters": [
           {
             "name": "id",
@@ -135,10 +135,10 @@
       },
       "post": {
         "tags": [
-          "DelegateeService"
+          "ExecutorService"
         ],
         "description": "RegisterDelegation binds a one-input template to variables: the daemon acts on every coin landing at\nthe derived address until expires_at. Registering an active delegation again returns it unchanged.",
-        "operationId": "DelegateeService_RegisterDelegation",
+        "operationId": "ExecutorService_RegisterDelegation",
         "requestBody": {
           "content": {
             "application/json": {
@@ -176,10 +176,10 @@
     "/v1/info": {
       "get": {
         "tags": [
-          "DelegateeService"
+          "ExecutorService"
         ],
         "description": "GetInfo tells the daemon's version, network and keys.",
-        "operationId": "DelegateeService_GetInfo",
+        "operationId": "ExecutorService_GetInfo",
         "responses": {
           "200": {
             "description": "a successful response.",
@@ -207,10 +207,10 @@
     "/v1/template": {
       "post": {
         "tags": [
-          "DelegateeService"
+          "ExecutorService"
         ],
         "description": "RegisterTemplate stores a template under its content id once its artifacts are registered. Idempotent.",
-        "operationId": "DelegateeService_RegisterTemplate",
+        "operationId": "ExecutorService_RegisterTemplate",
         "requestBody": {
           "content": {
             "application/json": {
@@ -248,9 +248,9 @@
     "/v1/template/{id}": {
       "get": {
         "tags": [
-          "DelegateeService"
+          "ExecutorService"
         ],
-        "operationId": "DelegateeService_GetTemplate",
+        "operationId": "ExecutorService_GetTemplate",
         "parameters": [
           {
             "name": "id",
@@ -288,10 +288,10 @@
     "/v1/templates": {
       "get": {
         "tags": [
-          "DelegateeService"
+          "ExecutorService"
         ],
         "description": "ListTemplates lists templates without their documents, newest first.",
-        "operationId": "DelegateeService_ListTemplates",
+        "operationId": "ExecutorService_ListTemplates",
         "parameters": [
           {
             "name": "status",
@@ -739,7 +739,7 @@
   },
   "tags": [
     {
-      "name": "DelegateeService"
+      "name": "ExecutorService"
     }
   ]
 }

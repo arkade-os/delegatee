@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,16 +22,16 @@ func TestStatusAnswersWhileArkdIsUnreachable(t *testing.T) {
 	code, body := post(t, d.RestURL+"/v1/delegation", map[string]any{"templateId": templateID, "variables": renewalVariables(t)})
 	require.Equal(t, http.StatusOK, code, string(body))
 
-	health, err := d.Admin.GetHealth(t.Context(), &delegateev1.GetHealthRequest{})
+	health, err := d.Admin.GetHealth(t.Context(), &executorv1.GetHealthRequest{})
 	require.NoError(t, err)
 	require.True(t, health.GetHealthy())
 	require.Equal(t, []string{"db", "arkd", "electrum", "emulator", "loop"}, healthNames(health))
 
 	d.Arkd.Unreachable(true)
-	st, err := d.Admin.GetStatus(t.Context(), &delegateev1.GetStatusRequest{})
+	st, err := d.Admin.GetStatus(t.Context(), &executorv1.GetStatusRequest{})
 	require.NoError(t, err)
 	require.Equal(t, int64(1), st.GetActive())
-	health, err = d.Admin.GetHealth(t.Context(), &delegateev1.GetHealthRequest{})
+	health, err = d.Admin.GetHealth(t.Context(), &executorv1.GetHealthRequest{})
 	require.NoError(t, err)
 	require.False(t, health.GetHealthy())
 	for _, e := range health.GetEntries() {
@@ -47,7 +47,7 @@ func TestStatusAnswersWhileArkdIsUnreachable(t *testing.T) {
 	require.Contains(t, string(body), "connection refused")
 
 	d.Chain.Drop()
-	health, err = d.Admin.GetHealth(t.Context(), &delegateev1.GetHealthRequest{})
+	health, err = d.Admin.GetHealth(t.Context(), &executorv1.GetHealthRequest{})
 	require.NoError(t, err)
 	require.Equal(t, "electrum", unhealthy(health)[1])
 }
@@ -133,29 +133,29 @@ func TestMetricsFollowACoin(t *testing.T) {
 	_, templateID := registerRenewal(t, d)
 	w := registerDelegationWith(t, d, templateID, renewalVariables(t))
 
-	require.Equal(t, "1", metric(t, d, "delegatee_delegations_active"))
-	require.Equal(t, "0", metric(t, d, "delegatee_coins_watched"))
-	require.Equal(t, "1", metric(t, d, `delegatee_dependency_up{name="arkd"}`))
-	require.Equal(t, "1", metric(t, d, `delegatee_dependency_up{name="loop"}`))
-	require.NotEmpty(t, metric(t, d, "delegatee_chain_tip_height"))
-	require.Equal(t, "0", metric(t, d, `delegatee_entries_queued`))
-	require.Equal(t, "0", metric(t, d, `delegatee_coins_late`))
+	require.Equal(t, "1", metric(t, d, "executor_delegations_active"))
+	require.Equal(t, "0", metric(t, d, "executor_coins_watched"))
+	require.Equal(t, "1", metric(t, d, `executor_dependency_up{name="arkd"}`))
+	require.Equal(t, "1", metric(t, d, `executor_dependency_up{name="loop"}`))
+	require.NotEmpty(t, metric(t, d, "executor_chain_tip_height"))
+	require.Equal(t, "0", metric(t, d, `executor_entries_queued`))
+	require.Equal(t, "0", metric(t, d, `executor_coins_late`))
 
 	outpoint := strings.Repeat("aa", 32) + ":0"
 	d.Arkd.Land(w.Inputs[0].Script, outpoint, 10_000, time.Now().Add(time.Hour))
 	require.Eventually(t, func() bool {
-		return metric(t, d, "delegatee_coins_watched") == "1" && metric(t, d, "delegatee_sats_watched") == "10000"
+		return metric(t, d, "executor_coins_watched") == "1" && metric(t, d, "executor_sats_watched") == "10000"
 	}, 5*time.Second, 50*time.Millisecond)
 
 	d.Arkd.Spend(outpoint, strings.Repeat("bb", 32))
 	require.Eventually(t, func() bool {
-		return metric(t, d, "delegatee_coins_watched") == "0" && metric(t, d, "delegatee_sats_watched") == "0"
+		return metric(t, d, "executor_coins_watched") == "0" && metric(t, d, "executor_sats_watched") == "0"
 	}, 5*time.Second, 50*time.Millisecond)
 
 	d.Arkd.Unreachable(true)
-	require.Equal(t, "0", metric(t, d, `delegatee_dependency_up{name="arkd"}`))
-	require.Equal(t, "1", metric(t, d, `delegatee_dependency_up{name="db"}`))
-	require.Equal(t, "1", metric(t, d, "delegatee_delegations_active"), "the gauges do not need arkd")
+	require.Equal(t, "0", metric(t, d, `executor_dependency_up{name="arkd"}`))
+	require.Equal(t, "1", metric(t, d, `executor_dependency_up{name="db"}`))
+	require.Equal(t, "1", metric(t, d, "executor_delegations_active"), "the gauges do not need arkd")
 }
 
 func TestMetricsCountAFailedAttempt(t *testing.T) {
@@ -165,11 +165,11 @@ func TestMetricsCountAFailedAttempt(t *testing.T) {
 	d.Emu.Refuse(status.Error(codes.InvalidArgument, "no preimage"))
 	d.Arkd.Fund(w.Inputs[0].Script, 10_000, time.Now().Add(time.Hour))
 	require.Eventually(t, func() bool {
-		return metric(t, d, `delegatee_attempts_total{status="failed"}`) == "1"
+		return metric(t, d, `executor_attempts_total{status="failed"}`) == "1"
 	}, 5*time.Second, 50*time.Millisecond)
-	require.Equal(t, "1", metric(t, d, "delegatee_template_failures_total"))
-	require.Equal(t, "0", metric(t, d, `delegatee_attempts_total{status="succeeded"}`))
-	require.Equal(t, "1", metric(t, d, "delegatee_coins_watched"))
+	require.Equal(t, "1", metric(t, d, "executor_template_failures_total"))
+	require.Equal(t, "0", metric(t, d, `executor_attempts_total{status="succeeded"}`))
+	require.Equal(t, "1", metric(t, d, "executor_coins_watched"))
 }
 
 func TestMetricsCountASucceededAttempt(t *testing.T) {
@@ -180,10 +180,10 @@ func TestMetricsCountASucceededAttempt(t *testing.T) {
 	require.Eventually(t, func() bool { return len(listAttempts(t, d, w.ID)) == 1 }, 5*time.Second, 50*time.Millisecond)
 	d.Arkd.Spend(outpoint, listAttempts(t, d, w.ID)[0].Txid)
 	require.Eventually(t, func() bool {
-		return metric(t, d, `delegatee_attempts_total{status="succeeded"}`) == "1"
+		return metric(t, d, `executor_attempts_total{status="succeeded"}`) == "1"
 	}, 5*time.Second, 50*time.Millisecond)
-	require.Equal(t, "0", metric(t, d, `delegatee_attempts_total{status="failed"}`))
-	require.Equal(t, "0", metric(t, d, "delegatee_coins_watched"))
+	require.Equal(t, "0", metric(t, d, `executor_attempts_total{status="failed"}`))
+	require.Equal(t, "0", metric(t, d, "executor_coins_watched"))
 
 	code, body := get(t, d.AdminURL+"/v1/admin/delegation/"+w.ID+"/attempts")
 	require.Equal(t, http.StatusOK, code, string(body))
@@ -218,7 +218,7 @@ func TestUIIsServedBehindAuth(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Contains(t, resp.Header.Get("Content-Type"), "text/html")
-	require.Contains(t, string(page), "<title>delegateed operator</title>")
+	require.Contains(t, string(page), "<title>executord operator</title>")
 
 	code, _ := get(t, d.RestURL+"/")
 	require.Equal(t, http.StatusNotFound, code, "the public port has no UI")
@@ -279,7 +279,7 @@ func metric(t *testing.T, d *Daemon, series string) string {
 	return ""
 }
 
-func healthNames(resp *delegateev1.GetHealthResponse) []string {
+func healthNames(resp *executorv1.GetHealthResponse) []string {
 	names := make([]string, 0, len(resp.GetEntries()))
 	for _, e := range resp.GetEntries() {
 		names = append(names, e.GetName())
@@ -287,7 +287,7 @@ func healthNames(resp *delegateev1.GetHealthResponse) []string {
 	return names
 }
 
-func unhealthy(resp *delegateev1.GetHealthResponse) []string {
+func unhealthy(resp *executorv1.GetHealthResponse) []string {
 	var names []string
 	for _, e := range resp.GetEntries() {
 		if !e.GetHealthy() {

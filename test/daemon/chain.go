@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	delegationdomain "github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/internal/core/ports"
+	delegationdomain "github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/core/ports"
 	"github.com/btcsuite/btcd/wire/v2"
 )
 

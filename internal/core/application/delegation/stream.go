@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/pkg/template"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/pkg/template"
 	"github.com/btcsuite/btcd/psbt/v2"
 	log "github.com/sirupsen/logrus"
 )

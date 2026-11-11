@@ -1,4 +1,4 @@
-// Package daemon boots delegateed in-process against the real postgres, with stand-ins for arkd, electrum and
+// Package daemon boots executord in-process against the real postgres, with stand-ins for arkd, electrum and
 // the emulator; it is the gate every slice passes.
 package daemon
 
@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	"github.com/arkade-os/delegatee/internal/config"
-	"github.com/arkade-os/delegatee/internal/infrastructure/arkd"
 	"github.com/arkade-os/emulator/pkg/arkade"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
+	"github.com/arkade-os/executor/internal/config"
+	"github.com/arkade-os/executor/internal/infrastructure/arkd"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/txscript/v2"
 	_ "github.com/lib/pq"
@@ -28,8 +28,8 @@ import (
 )
 
 type Daemon struct {
-	Client   delegateev1.DelegateeServiceClient
-	Admin    delegateev1.AdminServiceClient
+	Client   executorv1.ExecutorServiceClient
+	Admin    executorv1.AdminServiceClient
 	RestURL  string
 	AdminURL string
 	DB       *sql.DB
@@ -55,10 +55,10 @@ func Start(t *testing.T, opts ...func(*config.Config)) *Daemon {
 
 // DatabaseURL is the postgres the suites run against.
 func DatabaseURL() string {
-	if dsn := os.Getenv("DELEGATEE_DATABASE_URL"); dsn != "" {
+	if dsn := os.Getenv("EXECUTOR_DATABASE_URL"); dsn != "" {
 		return dsn
 	}
-	return "postgres://postgres@localhost:5432/delegatee?sslmode=disable"
+	return "postgres://postgres@localhost:5432/executor?sslmode=disable"
 }
 
 // ResetDatabase empties the database at dsn and keeps it open until the test ends.
@@ -172,8 +172,8 @@ func boot(t *testing.T, dsn string, db *sql.DB, standin *ark, chain *chain, emu 
 	conn := Dial(t, d.Server.PublicAddr())
 	adminConn := Dial(t, d.Server.AdminAddr())
 	return &Daemon{
-		Client:   delegateev1.NewDelegateeServiceClient(conn),
-		Admin:    delegateev1.NewAdminServiceClient(adminConn),
+		Client:   executorv1.NewExecutorServiceClient(conn),
+		Admin:    executorv1.NewAdminServiceClient(adminConn),
 		RestURL:  "http://127.0.0.1:" + strconv.Itoa(cfg.Port),
 		AdminURL: "http://127.0.0.1:" + strconv.Itoa(cfg.AdminPort),
 		DB:       db,

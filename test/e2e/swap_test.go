@@ -15,10 +15,10 @@ import (
 	"github.com/arkade-os/arkd/pkg/ark-lib/txutils"
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 	offchaintx "github.com/arkade-os/arkd/pkg/client-lib/offchain-tx"
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	"github.com/arkade-os/delegatee/pkg/template/ecies"
-	"github.com/arkade-os/delegatee/pkg/template/packets"
-	"github.com/arkade-os/delegatee/test/daemon"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
+	"github.com/arkade-os/executor/pkg/template/ecies"
+	"github.com/arkade-os/executor/pkg/template/packets"
+	"github.com/arkade-os/executor/test/daemon"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/stretchr/testify/require"
 )
@@ -67,7 +67,7 @@ func TestStreamClaimRefusesASecretSealedToAnotherTemplate(t *testing.T) {
 func TestStreamClaimEnforcesTheSealedTerms(t *testing.T) {
 	d := start(t)
 	claim := registerTemplate(t, d, "offline_receive.json")
-	_, err := d.admin.RegisterStream(t.Context(), &delegateev1.RegisterStreamRequest{TemplateId: claim})
+	_, err := d.admin.RegisterStream(t.Context(), &executorv1.RegisterStreamRequest{TemplateId: claim})
 	require.NoError(t, err)
 	alice := fundedWallet(t)
 
@@ -112,7 +112,7 @@ type swap struct {
 }
 
 // newSwap seals the preimage of a new swap for the template templateID.
-func newSwap(t *testing.T, d delegatee, templateID string) swap {
+func newSwap(t *testing.T, d executor, templateID string) swap {
 	t.Helper()
 	preimage := make([]byte, 32)
 	_, err := rand.Read(preimage)
@@ -137,9 +137,9 @@ func newSwap(t *testing.T, d delegatee, templateID string) swap {
 }
 
 // seal encrypts plaintext to the daemon for the template templateID.
-func seal(t *testing.T, d delegatee, templateID string, plaintext []byte) string {
+func seal(t *testing.T, d executor, templateID string, plaintext []byte) string {
 	t.Helper()
-	info, err := d.client.GetInfo(t.Context(), &delegateev1.GetInfoRequest{})
+	info, err := d.client.GetInfo(t.Context(), &executorv1.GetInfoRequest{})
 	require.NoError(t, err)
 	ciphertext, err := ecies.Encrypt(parseKey(t, info.EncryptionPubkey), plaintext, templateID)
 	require.NoError(t, err)
@@ -147,7 +147,7 @@ func seal(t *testing.T, d delegatee, templateID string, plaintext []byte) string
 }
 
 // sealTerms seals the preimage with the program to pay and the least amount to pay it.
-func (s swap) sealTerms(t *testing.T, d delegatee, templateID, program string, least int64) {
+func (s swap) sealTerms(t *testing.T, d executor, templateID, program string, least int64) {
 	t.Helper()
 	terms, err := hex.DecodeString(program + daemon.ScriptNum(least))
 	require.NoError(t, err)
@@ -155,7 +155,7 @@ func (s swap) sealTerms(t *testing.T, d delegatee, templateID, program string, l
 }
 
 // swapClaim funds a VHTLC watched under the claim template and waits for its claim.
-func swapClaim(t *testing.T, d delegatee) (clientlib.Vtxo, time.Duration) {
+func swapClaim(t *testing.T, d executor) (clientlib.Vtxo, time.Duration) {
 	t.Helper()
 	claim := registerTemplate(t, d, "vhtlc_claim.json")
 	swap := newSwap(t, d, claim)
@@ -172,10 +172,10 @@ func swapClaim(t *testing.T, d delegatee) (clientlib.Vtxo, time.Duration) {
 }
 
 // streamFunding pays swap from alice in a transaction its stream matches.
-func streamFunding(t *testing.T, d delegatee, alice testWallet, swap swap) string {
+func streamFunding(t *testing.T, d executor, alice testWallet, swap swap) string {
 	t.Helper()
 	addr, pkScript, tree := swapOutput(t, d, swap)
-	info, err := d.client.GetInfo(t.Context(), &delegateev1.GetInfoRequest{})
+	info, err := d.client.GetInfo(t.Context(), &executorv1.GetInfoRequest{})
 	require.NoError(t, err)
 	key, err := hex.DecodeString(info.EncryptionPubkey)
 	require.NoError(t, err)
@@ -190,26 +190,26 @@ func streamFunding(t *testing.T, d delegatee, alice testWallet, swap swap) strin
 	return funding
 }
 
-func streamActive(t *testing.T, d delegatee, templateID string) {
+func streamActive(t *testing.T, d executor, templateID string) {
 	t.Helper()
 	require.Eventually(t, func() bool {
-		resp, err := d.admin.ListStreams(t.Context(), &delegateev1.ListStreamsRequest{})
-		return err == nil && slices.ContainsFunc(resp.Streams, func(s *delegateev1.Stream) bool {
+		resp, err := d.admin.ListStreams(t.Context(), &executorv1.ListStreamsRequest{})
+		return err == nil && slices.ContainsFunc(resp.Streams, func(s *executorv1.Stream) bool {
 			return s.TemplateId == templateID && s.Status == "active"
 		})
 	}, 30*time.Second, time.Second, "the stream is not active")
 }
 
 // streamChild waits for the only delegation a stream spawned.
-func streamChild(t *testing.T, d delegatee) *delegateev1.Delegation {
+func streamChild(t *testing.T, d executor) *executorv1.Delegation {
 	t.Helper()
-	var child *delegateev1.Delegation
+	var child *executorv1.Delegation
 	require.Eventually(t, func() bool {
-		resp, err := d.admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{Limit: 1000})
+		resp, err := d.admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{Limit: 1000})
 		if err != nil {
 			return false
 		}
-		var spawned []*delegateev1.Delegation
+		var spawned []*executorv1.Delegation
 		for _, s := range resp.Delegations {
 			if s.Delegation.StreamId != 0 {
 				spawned = append(spawned, s.Delegation)
@@ -225,7 +225,7 @@ func streamChild(t *testing.T, d delegatee) *delegateev1.Delegation {
 }
 
 // requirePreimage checks that the transaction making paid reveals the preimage of swap.
-func requirePreimage(t *testing.T, d delegatee, paid clientlib.Vtxo, swap swap) {
+func requirePreimage(t *testing.T, d executor, paid clientlib.Vtxo, swap swap) {
 	t.Helper()
 	claimTx, err := d.indexer.GetVirtualTxs(t.Context(), []string{paid.Txid})
 	require.NoError(t, err)
@@ -236,20 +236,20 @@ func requirePreimage(t *testing.T, d delegatee, paid clientlib.Vtxo, swap swap) 
 }
 
 // oneSucceeded waits for exactly one succeeded attempt of the delegation.
-func oneSucceeded(t *testing.T, d delegatee, id int64) {
+func oneSucceeded(t *testing.T, d executor, id int64) {
 	t.Helper()
 	require.Eventually(t, func() bool {
 		return len(succeededOf(t, d, id)) == 1
 	}, time.Minute, time.Second, "delegation %d has not one succeeded attempt", id)
 }
 
-func succeededOf(t *testing.T, d delegatee, id int64) []*delegateev1.Attempt {
+func succeededOf(t *testing.T, d executor, id int64) []*executorv1.Attempt {
 	t.Helper()
-	return slices.DeleteFunc(attemptsOf(t, d, id), func(a *delegateev1.Attempt) bool { return a.Status != "succeeded" })
+	return slices.DeleteFunc(attemptsOf(t, d, id), func(a *executorv1.Attempt) bool { return a.Status != "succeeded" })
 }
 
 // swapOutput is the Ark address of swap, its script and its BIP-371 tree, derived as a funder does.
-func swapOutput(t *testing.T, d delegatee, swap swap) (string, []byte, []byte) {
+func swapOutput(t *testing.T, d executor, swap swap) (string, []byte, []byte) {
 	t.Helper()
 	keys := keysOf(t, d)
 	inst := instantiate(t, "vhtlc_claim.json", keys, swap.variables, func([]byte) ([]byte, error) { return swap.preimage, nil })

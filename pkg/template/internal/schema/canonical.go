@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/jcs"
+	"github.com/arkade-os/executor/pkg/template/internal/jcs"
 )
 
 // jcsDecode decodes strictly; a number the canonical form cannot carry is refused up front.

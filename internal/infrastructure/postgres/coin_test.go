@@ -5,7 +5,7 @@ import (
 	"time"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
 	"github.com/stretchr/testify/require"
 )
 

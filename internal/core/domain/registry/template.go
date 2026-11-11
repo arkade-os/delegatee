@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/arkade-os/delegatee/pkg/template"
+	"github.com/arkade-os/executor/pkg/template"
 )
 
 const (

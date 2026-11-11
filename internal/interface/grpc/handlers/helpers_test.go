@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/internal/core/domain/registry"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/core/domain/registry"
 )
 
 // artifacts is an in-memory registry.ArtifactRepository; Delete checks the references held by templates.

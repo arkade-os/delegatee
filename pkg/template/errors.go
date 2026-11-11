@@ -3,8 +3,8 @@ package template
 import (
 	"errors"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
-	"github.com/arkade-os/delegatee/pkg/template/internal/schema"
+	"github.com/arkade-os/executor/pkg/template/internal/abi"
+	"github.com/arkade-os/executor/pkg/template/internal/schema"
 )
 
 var (

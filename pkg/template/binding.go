@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
-	"github.com/arkade-os/delegatee/pkg/template/internal/schema"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
+	"github.com/arkade-os/executor/pkg/template/internal/schema"
 )
 
 // hashOps are the opcodes a secret may appear under in a script.

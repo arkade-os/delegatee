@@ -22,9 +22,9 @@ type AdminUser struct {
 }
 
 // the gateway sends the Unauthenticated message as the WWW-Authenticate header
-const challenge = `Basic realm="delegatee admin"`
+const challenge = `Basic realm="executor admin"`
 
-var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("delegatee-invalid-password"), bcrypt.DefaultCost)
+var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("executor-invalid-password"), bcrypt.DefaultCost)
 
 // basicAuth checks the authorization metadata, which the gateway forwards from the HTTP header.
 type basicAuth struct {

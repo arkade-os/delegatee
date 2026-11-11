@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	"github.com/arkade-os/delegatee/test/daemon"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
+	"github.com/arkade-os/executor/test/daemon"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/lib/pq"
 	log "github.com/sirupsen/logrus"
@@ -49,9 +49,9 @@ func TestScale(t *testing.T) {
 	log.AddHook(&reconcileHook{done: reconciled})
 	started := time.Now()
 	d = d.Restart(t, daemon.WithDefaultTemplates)
-	status, err := d.Admin.GetStatus(t.Context(), &delegateev1.GetStatusRequest{})
+	status, err := d.Admin.GetStatus(t.Context(), &executorv1.GetStatusRequest{})
 	require.NoError(t, err)
-	_, err = d.Client.GetDelegation(t.Context(), &delegateev1.GetDelegationRequest{Id: delegations / 2})
+	_, err = d.Client.GetDelegation(t.Context(), &executorv1.GetDelegationRequest{Id: delegations / 2})
 	require.NoError(t, err)
 	toAPI := time.Since(started)
 	afterStart := sample()

@@ -6,8 +6,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 	"github.com/arkade-os/emulator/pkg/arkade"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 )

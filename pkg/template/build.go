@@ -7,8 +7,8 @@ import (
 
 	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
 	"github.com/arkade-os/arkd/pkg/ark-lib/txutils"
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
 	"github.com/arkade-os/emulator/pkg/arkade"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
 	"github.com/btcsuite/btcd/psbt/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 )

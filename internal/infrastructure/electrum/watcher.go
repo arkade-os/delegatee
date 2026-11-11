@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/internal/core/ports"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/core/ports"
 	"github.com/btcsuite/btcd/wire/v2"
 	log "github.com/sirupsen/logrus"
 )

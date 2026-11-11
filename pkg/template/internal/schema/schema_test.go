@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
+	"github.com/arkade-os/executor/pkg/template/internal/abi"
 	"github.com/stretchr/testify/require"
 )
 

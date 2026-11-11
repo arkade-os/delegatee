@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	"github.com/arkade-os/delegatee/internal/config"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
+	"github.com/arkade-os/executor/internal/config"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -36,7 +36,7 @@ func TestRegisterArtifactOverREST(t *testing.T) {
 	require.Equal(t, first.ID, decodeArtifact(t, body).ID)
 	require.Equal(t, 1, tableRows(t, d, "artifacts"))
 
-	got, err := d.Client.GetArtifact(t.Context(), &delegateev1.GetArtifactRequest{Id: first.ID})
+	got, err := d.Client.GetArtifact(t.Context(), &executorv1.GetArtifactRequest{Id: first.ID})
 	require.NoError(t, err)
 	require.Equal(t, doc, got.GetArtifact().GetDocument())
 }
@@ -49,12 +49,12 @@ func TestRegisterArtifactRefused(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, code, string(body))
 	require.Equal(t, 0, tableRows(t, d, "artifacts"))
 
-	_, err := d.Client.RegisterArtifact(t.Context(), &delegateev1.RegisterArtifactRequest{Document: doc})
+	_, err := d.Client.RegisterArtifact(t.Context(), &executorv1.RegisterArtifactRequest{Document: doc})
 	require.NoError(t, err)
 	other := strings.Replace(doc, `"DelegatedVtxo"`, `"Other"`, 1)
 	code, body = post(t, d.RestURL+"/v1/artifact", map[string]string{"document": other})
 	require.Equal(t, http.StatusTooManyRequests, code, string(body))
-	_, err = d.Client.RegisterArtifact(t.Context(), &delegateev1.RegisterArtifactRequest{Document: other})
+	_, err = d.Client.RegisterArtifact(t.Context(), &executorv1.RegisterArtifactRequest{Document: other})
 	require.Equal(t, codes.ResourceExhausted, status.Code(err))
 	require.Equal(t, 1, tableRows(t, d, "artifacts"))
 

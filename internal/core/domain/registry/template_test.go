@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/arkade-os/delegatee/pkg/template"
+	"github.com/arkade-os/executor/pkg/template"
 	"github.com/stretchr/testify/require"
 )
 

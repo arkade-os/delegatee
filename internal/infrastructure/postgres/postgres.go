@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/infrastructure/postgres/sqlc/queries"
+	"github.com/arkade-os/executor/internal/infrastructure/postgres/sqlc/queries"
 	"github.com/golang-migrate/migrate/v4"
 	migratepg "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"

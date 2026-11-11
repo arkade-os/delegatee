@@ -14,13 +14,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/ports"
+	"github.com/arkade-os/executor/internal/core/ports"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
 	protocolVersion = "1.4"
-	clientName      = "delegateed"
+	clientName      = "executord"
 	maxBackoff      = 30 * time.Second
 )
 

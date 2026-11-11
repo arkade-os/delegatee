@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkade-os/delegatee/pkg/template/ecies"
+	"github.com/arkade-os/executor/pkg/template/ecies"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/psbt/v2"

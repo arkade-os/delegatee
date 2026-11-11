@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	executionapp "github.com/arkade-os/delegatee/internal/core/application/execution"
-	"github.com/arkade-os/delegatee/internal/core/ports"
+	executionapp "github.com/arkade-os/executor/internal/core/application/execution"
+	"github.com/arkade-os/executor/internal/core/ports"
 	"github.com/stretchr/testify/require"
 )
 

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
+	"github.com/arkade-os/executor/pkg/template/internal/abi"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"

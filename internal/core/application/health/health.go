@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	executionapp "github.com/arkade-os/delegatee/internal/core/application/execution"
-	"github.com/arkade-os/delegatee/internal/core/ports"
+	executionapp "github.com/arkade-os/executor/internal/core/application/execution"
+	"github.com/arkade-os/executor/internal/core/ports"
 )
 
 const defaultTimeout = 3 * time.Second

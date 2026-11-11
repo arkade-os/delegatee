@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
-	"github.com/arkade-os/delegatee/pkg/template/internal/contract"
+	"github.com/arkade-os/executor/pkg/template/internal/abi"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
+	"github.com/arkade-os/executor/pkg/template/internal/contract"
 
-	"github.com/arkade-os/delegatee/pkg/template/packets"
+	"github.com/arkade-os/executor/pkg/template/packets"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"

@@ -25,9 +25,9 @@ import (
 	inmemorystore "github.com/arkade-os/arkd/pkg/client-wallet/identity/store/inmemory"
 	walletstore "github.com/arkade-os/arkd/pkg/client-wallet/store/inmemory"
 	wallettypes "github.com/arkade-os/arkd/pkg/client-wallet/types"
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	template "github.com/arkade-os/delegatee/pkg/template"
-	"github.com/arkade-os/delegatee/test/daemon"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
+	template "github.com/arkade-os/executor/pkg/template"
+	"github.com/arkade-os/executor/test/daemon"
 	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil/v2"
@@ -43,21 +43,21 @@ const (
 )
 
 // registerTemplate registers the template file of pkg/template/testdata, else of templates/, with its artifacts.
-func registerTemplate(t *testing.T, d delegatee, file string) string {
+func registerTemplate(t *testing.T, d executor, file string) string {
 	t.Helper()
 	doc := fixture(t, file)
 	for id, artifact := range artifacts(t) {
 		if bytes.Contains(doc, []byte(id)) {
-			_, err := d.client.RegisterArtifact(t.Context(), &delegateev1.RegisterArtifactRequest{Document: string(artifact)})
+			_, err := d.client.RegisterArtifact(t.Context(), &executorv1.RegisterArtifactRequest{Document: string(artifact)})
 			require.NoError(t, err)
 		}
 	}
 	return registerDocument(t, d, doc)
 }
 
-func registerDocument(t *testing.T, d delegatee, doc []byte) string {
+func registerDocument(t *testing.T, d executor, doc []byte) string {
 	t.Helper()
-	resp, err := d.client.RegisterTemplate(t.Context(), &delegateev1.RegisterTemplateRequest{Document: string(doc)})
+	resp, err := d.client.RegisterTemplate(t.Context(), &executorv1.RegisterTemplateRequest{Document: string(doc)})
 	require.NoError(t, err)
 	return resp.Template.Id
 }
@@ -90,34 +90,34 @@ func artifacts(t *testing.T) map[string][]byte {
 	return docs
 }
 
-func registerDelegation(t *testing.T, d delegatee, templateID string, variables map[string]string) *delegateev1.Delegation {
+func registerDelegation(t *testing.T, d executor, templateID string, variables map[string]string) *executorv1.Delegation {
 	t.Helper()
-	resp, err := d.client.RegisterDelegation(t.Context(), &delegateev1.RegisterDelegationRequest{TemplateId: templateID, Variables: variables})
+	resp, err := d.client.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: templateID, Variables: variables})
 	require.NoError(t, err)
 	return resp.Delegation
 }
 
 // renewalDelegation registers a delegation on o's address at the default renewal paying up to maxFee.
-func renewalDelegation(t *testing.T, d delegatee, o owner, maxFee int64) *delegateev1.Delegation {
+func renewalDelegation(t *testing.T, d executor, o owner, maxFee int64) *executorv1.Delegation {
 	t.Helper()
 	return registerDelegation(t, d, registerTemplate(t, d, "renew.json"), o.variables(maxFee))
 }
 
 // boardingDelegations registers delegations on o's boarding address and on the renewal address it boards into.
-func boardingDelegations(t *testing.T, d delegatee, o owner) (boarding, renewal *delegateev1.Delegation) {
+func boardingDelegations(t *testing.T, d executor, o owner) (boarding, renewal *executorv1.Delegation) {
 	t.Helper()
 	return registerDelegation(t, d, registerTemplate(t, d, "board.json"), o.boardingVariables()), renewalDelegation(t, d, o, 0)
 }
 
-func attemptsOf(t *testing.T, d delegatee, id int64) []*delegateev1.Attempt {
+func attemptsOf(t *testing.T, d executor, id int64) []*executorv1.Attempt {
 	t.Helper()
-	resp, err := d.admin.ListAttempts(t.Context(), &delegateev1.ListAttemptsRequest{Id: id, Limit: 1000})
+	resp, err := d.admin.ListAttempts(t.Context(), &executorv1.ListAttemptsRequest{Id: id, Limit: 1000})
 	require.NoError(t, err)
 	return resp.Attempts
 }
 
 // landed waits for n coins at to's script from the batches of by's succeeded attempts, oldest first.
-func landed(t *testing.T, d delegatee, by, to *delegateev1.Delegation, n int) []clientlib.Vtxo {
+func landed(t *testing.T, d executor, by, to *executorv1.Delegation, n int) []clientlib.Vtxo {
 	t.Helper()
 	var coins []clientlib.Vtxo
 	require.Eventually(t, func() bool {
@@ -137,7 +137,7 @@ func landed(t *testing.T, d delegatee, by, to *delegateev1.Delegation, n int) []
 }
 
 // vtxosAt lists the vtxos at the script, spent ones included; none on an indexer error.
-func vtxosAt(t *testing.T, d delegatee, script string) []clientlib.Vtxo {
+func vtxosAt(t *testing.T, d executor, script string) []clientlib.Vtxo {
 	t.Helper()
 	resp, err := d.indexer.GetVtxos(t.Context(), clientlib.WithScripts([]string{script}))
 	if err != nil {
@@ -147,7 +147,7 @@ func vtxosAt(t *testing.T, d delegatee, script string) []clientlib.Vtxo {
 }
 
 // waitForVtxo waits for a spendable vtxo at script not made by funding.
-func waitForVtxo(t *testing.T, d delegatee, script, funding string) clientlib.Vtxo {
+func waitForVtxo(t *testing.T, d executor, script, funding string) clientlib.Vtxo {
 	t.Helper()
 	var found clientlib.Vtxo
 	require.Eventually(t, func() bool {
@@ -162,16 +162,16 @@ func waitForVtxo(t *testing.T, d delegatee, script, funding string) clientlib.Vt
 	return found
 }
 
-func refused(t *testing.T, d delegatee, id int64, reason string) {
+func refused(t *testing.T, d executor, id int64, reason string) {
 	t.Helper()
 	require.Eventually(t, func() bool {
-		return slices.ContainsFunc(attemptsOf(t, d, id), func(a *delegateev1.Attempt) bool {
+		return slices.ContainsFunc(attemptsOf(t, d, id), func(a *executorv1.Attempt) bool {
 			return a.Status == "failed" && strings.Contains(a.Error, reason)
 		})
 	}, 2*time.Minute, time.Second, "no attempt of %d refused with %q", id, reason)
 }
 
-func neverSpent(t *testing.T, d delegatee, outpoint string) {
+func neverSpent(t *testing.T, d executor, outpoint string) {
 	t.Helper()
 	op, err := wire.NewOutPointFromString(outpoint)
 	require.NoError(t, err)
@@ -189,7 +189,7 @@ func faucet(t *testing.T, address string, sats int64) {
 	require.NoError(t, err, string(out))
 }
 
-func fundMany(t *testing.T, delegations []*delegateev1.Delegation, sats int64) {
+func fundMany(t *testing.T, delegations []*executorv1.Delegation, sats int64) {
 	t.Helper()
 	amounts := map[string]string{}
 	for _, w := range delegations {
@@ -257,7 +257,7 @@ type owner struct {
 	keys template.Keys
 }
 
-func newOwner(t *testing.T, d delegatee) owner {
+func newOwner(t *testing.T, d executor) owner {
 	t.Helper()
 	return owner{pubKey(t).SerializeCompressed(), keysOf(t, d)}
 }
@@ -293,9 +293,9 @@ func (o owner) boardingAddress(t *testing.T) string {
 	return addr.EncodeAddress()
 }
 
-func keysOf(t *testing.T, d delegatee) template.Keys {
+func keysOf(t *testing.T, d executor) template.Keys {
 	t.Helper()
-	info, err := d.client.GetInfo(t.Context(), &delegateev1.GetInfoRequest{})
+	info, err := d.client.GetInfo(t.Context(), &executorv1.GetInfoRequest{})
 	require.NoError(t, err)
 	return template.Keys{Server: parseKey(t, info.ServerPubkey), Emulator: parseKey(t, info.EmulatorPubkey), Cosigner: parseKey(t, info.CosignerPubkey)}
 }

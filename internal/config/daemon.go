@@ -4,18 +4,18 @@ import (
 	"context"
 	"fmt"
 
-	delegationapp "github.com/arkade-os/delegatee/internal/core/application/delegation"
-	executionapp "github.com/arkade-os/delegatee/internal/core/application/execution"
-	"github.com/arkade-os/delegatee/internal/core/application/health"
-	"github.com/arkade-os/delegatee/internal/core/application/registry"
-	"github.com/arkade-os/delegatee/internal/core/ports"
-	"github.com/arkade-os/delegatee/internal/infrastructure/arkd"
-	"github.com/arkade-os/delegatee/internal/infrastructure/electrum"
-	"github.com/arkade-os/delegatee/internal/infrastructure/emulator"
-	"github.com/arkade-os/delegatee/internal/infrastructure/postgres"
-	grpcserver "github.com/arkade-os/delegatee/internal/interface/grpc"
-	"github.com/arkade-os/delegatee/internal/interface/grpc/handlers"
-	"github.com/arkade-os/delegatee/templates"
+	delegationapp "github.com/arkade-os/executor/internal/core/application/delegation"
+	executionapp "github.com/arkade-os/executor/internal/core/application/execution"
+	"github.com/arkade-os/executor/internal/core/application/health"
+	"github.com/arkade-os/executor/internal/core/application/registry"
+	"github.com/arkade-os/executor/internal/core/ports"
+	"github.com/arkade-os/executor/internal/infrastructure/arkd"
+	"github.com/arkade-os/executor/internal/infrastructure/electrum"
+	"github.com/arkade-os/executor/internal/infrastructure/emulator"
+	"github.com/arkade-os/executor/internal/infrastructure/postgres"
+	grpcserver "github.com/arkade-os/executor/internal/interface/grpc"
+	"github.com/arkade-os/executor/internal/interface/grpc/handlers"
+	"github.com/arkade-os/executor/templates"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -88,7 +88,7 @@ func NewDaemon(ctx context.Context, cfg Config) (_ *Daemon, err error) {
 			PublicPort: cfg.Port, AdminPort: cfg.AdminPort, PublicRateLimit: cfg.PublicRateLimit, Users: cfg.AdminUsers,
 			Status: execution, Health: checker,
 		},
-		handlers.NewDelegatee(reg, delegations, execution, cfg.Version), handlers.NewAdmin(reg, delegations, execution, checker),
+		handlers.NewExecutor(reg, delegations, execution, cfg.Version), handlers.NewAdmin(reg, delegations, execution, checker),
 	)
 	if err != nil {
 		execution.Stop()

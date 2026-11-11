@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/registry"
+	"github.com/arkade-os/executor/internal/core/domain/registry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -69,7 +69,7 @@ func TestOpenErrors(t *testing.T) {
 	require.Error(t, err)
 }
 
-// testDB opens the database at DELEGATEE_DATABASE_URL on a fresh public schema.
+// testDB opens the database at EXECUTOR_DATABASE_URL on a fresh public schema.
 func testDB(t *testing.T) *DB {
 	t.Helper()
 	dsn := testDSN()
@@ -95,8 +95,8 @@ func count(t *testing.T, repo *ArtifactRepository) int {
 }
 
 func testDSN() string {
-	if dsn := os.Getenv("DELEGATEE_DATABASE_URL"); dsn != "" {
+	if dsn := os.Getenv("EXECUTOR_DATABASE_URL"); dsn != "" {
 		return dsn
 	}
-	return "postgres://postgres@localhost:5432/delegatee?sslmode=disable"
+	return "postgres://postgres@localhost:5432/executor?sslmode=disable"
 }

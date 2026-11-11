@@ -12,9 +12,9 @@ import (
 
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
 	"github.com/arkade-os/arkd/pkg/client-lib/indexer"
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	"github.com/arkade-os/delegatee/internal/config"
-	"github.com/arkade-os/delegatee/test/daemon"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
+	"github.com/arkade-os/executor/internal/config"
+	"github.com/arkade-os/executor/test/daemon"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -28,17 +28,17 @@ const (
 	password     = "password"
 )
 
-type delegatee struct {
+type executor struct {
 	cfg     config.Config
-	client  delegateev1.DelegateeServiceClient
-	admin   delegateev1.AdminServiceClient
+	client  executorv1.ExecutorServiceClient
+	admin   executorv1.AdminServiceClient
 	indexer clientlib.Indexer
 	url     string // public REST base
 	stop    func() // returns once the batch in flight has ended
 }
 
 // start boots a daemon over an empty database; the tweaks adjust its config.
-func start(t *testing.T, tweak ...func(*config.Config)) delegatee {
+func start(t *testing.T, tweak ...func(*config.Config)) executor {
 	t.Helper()
 	cosigner, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
@@ -53,12 +53,12 @@ func start(t *testing.T, tweak ...func(*config.Config)) delegatee {
 }
 
 // restart boots another daemon over the database of d.
-func (d delegatee) restart(t *testing.T, tweak ...func(*config.Config)) delegatee {
+func (d executor) restart(t *testing.T, tweak ...func(*config.Config)) executor {
 	t.Helper()
 	return boot(t, d.cfg, tweak)
 }
 
-func boot(t *testing.T, cfg config.Config, tweak []func(*config.Config)) delegatee {
+func boot(t *testing.T, cfg config.Config, tweak []func(*config.Config)) executor {
 	t.Helper()
 	cfg.Port, cfg.AdminPort = daemon.FreePort(t), daemon.FreePort(t)
 	for _, f := range tweak {
@@ -72,9 +72,9 @@ func boot(t *testing.T, cfg config.Config, tweak []func(*config.Config)) delegat
 	idx, err := indexer.NewClient(arkURL)
 	require.NoError(t, err)
 	t.Cleanup(idx.Close)
-	return delegatee{
+	return executor{
 		cfg: cfg, indexer: idx, stop: d.Stop, url: "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.Port)),
-		client: delegateev1.NewDelegateeServiceClient(daemon.Dial(t, d.Server.PublicAddr())),
-		admin:  delegateev1.NewAdminServiceClient(daemon.Dial(t, d.Server.AdminAddr())),
+		client: executorv1.NewExecutorServiceClient(daemon.Dial(t, d.Server.PublicAddr())),
+		admin:  executorv1.NewAdminServiceClient(daemon.Dial(t, d.Server.AdminAddr())),
 	}
 }

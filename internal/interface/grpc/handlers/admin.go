@@ -9,14 +9,14 @@ import (
 	"strings"
 	"time"
 
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	delegationapp "github.com/arkade-os/delegatee/internal/core/application/delegation"
-	executionapp "github.com/arkade-os/delegatee/internal/core/application/execution"
-	"github.com/arkade-os/delegatee/internal/core/application/health"
-	app "github.com/arkade-os/delegatee/internal/core/application/registry"
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/internal/core/ports"
-	"github.com/arkade-os/delegatee/pkg/template"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
+	delegationapp "github.com/arkade-os/executor/internal/core/application/delegation"
+	executionapp "github.com/arkade-os/executor/internal/core/application/execution"
+	"github.com/arkade-os/executor/internal/core/application/health"
+	app "github.com/arkade-os/executor/internal/core/application/registry"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/core/ports"
+	"github.com/arkade-os/executor/pkg/template"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -26,7 +26,7 @@ const (
 	maxListLimit     = 1000
 )
 
-type Executor interface {
+type Execution interface {
 	Attempts(ctx context.Context, delegationID, cursor int64, limit int) ([]delegation.Attempt, error)
 	Coins(ctx context.Context, delegationID int64) ([]delegation.Coin, error)
 	Summaries(ctx context.Context, f ports.SummaryFilter) ([]ports.Summary, error)
@@ -41,17 +41,17 @@ type Health interface {
 type Admin struct {
 	registry    *app.Service
 	delegations *delegationapp.Service
-	execution   Executor
+	execution   Execution
 	health      Health
 }
 
-func NewAdmin(registry *app.Service, delegations *delegationapp.Service, execution Executor, health Health) *Admin {
+func NewAdmin(registry *app.Service, delegations *delegationapp.Service, execution Execution, health Health) *Admin {
 	return &Admin{registry: registry, delegations: delegations, execution: execution, health: health}
 }
 
 func (h *Admin) UpdateTemplate(
-	ctx context.Context, req *delegateev1.UpdateTemplateRequest,
-) (*delegateev1.UpdateTemplateResponse, error) {
+	ctx context.Context, req *executorv1.UpdateTemplateRequest,
+) (*executorv1.UpdateTemplateResponse, error) {
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing id")
 	}
@@ -61,29 +61,29 @@ func (h *Admin) UpdateTemplate(
 	if err := h.registry.SetTemplateStatus(ctx, req.GetId(), req.GetStatus()); err != nil {
 		return nil, toStatus(err)
 	}
-	return &delegateev1.UpdateTemplateResponse{}, nil
+	return &executorv1.UpdateTemplateResponse{}, nil
 }
 
 func (h *Admin) DeleteTemplate(
-	ctx context.Context, req *delegateev1.DeleteTemplateRequest,
-) (*delegateev1.DeleteTemplateResponse, error) {
+	ctx context.Context, req *executorv1.DeleteTemplateRequest,
+) (*executorv1.DeleteTemplateResponse, error) {
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing id")
 	}
 	if err := h.registry.DeleteTemplate(ctx, req.GetId()); err != nil {
 		return nil, toStatus(err)
 	}
-	return &delegateev1.DeleteTemplateResponse{}, nil
+	return &executorv1.DeleteTemplateResponse{}, nil
 }
 
 func (h *Admin) ListArtifacts(
-	ctx context.Context, _ *delegateev1.ListArtifactsRequest,
-) (*delegateev1.ListArtifactsResponse, error) {
+	ctx context.Context, _ *executorv1.ListArtifactsRequest,
+) (*executorv1.ListArtifactsResponse, error) {
 	list, err := h.registry.ListArtifacts(ctx)
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	resp := &delegateev1.ListArtifactsResponse{Artifacts: make([]*delegateev1.Artifact, 0, len(list))}
+	resp := &executorv1.ListArtifactsResponse{Artifacts: make([]*executorv1.Artifact, 0, len(list))}
 	for _, a := range list {
 		resp.Artifacts = append(resp.Artifacts, toArtifact(&a))
 	}
@@ -91,20 +91,20 @@ func (h *Admin) ListArtifacts(
 }
 
 func (h *Admin) DeleteArtifact(
-	ctx context.Context, req *delegateev1.DeleteArtifactRequest,
-) (*delegateev1.DeleteArtifactResponse, error) {
+	ctx context.Context, req *executorv1.DeleteArtifactRequest,
+) (*executorv1.DeleteArtifactResponse, error) {
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing id")
 	}
 	if err := h.registry.DeleteArtifact(ctx, req.GetId()); err != nil {
 		return nil, toStatus(err)
 	}
-	return &delegateev1.DeleteArtifactResponse{}, nil
+	return &executorv1.DeleteArtifactResponse{}, nil
 }
 
 func (h *Admin) ListDelegations(
-	ctx context.Context, req *delegateev1.ListDelegationsRequest,
-) (*delegateev1.ListDelegationsResponse, error) {
+	ctx context.Context, req *executorv1.ListDelegationsRequest,
+) (*executorv1.ListDelegationsResponse, error) {
 	limit, err := listLimit(req.GetLimit())
 	if err != nil {
 		return nil, err
@@ -119,9 +119,9 @@ func (h *Admin) ListDelegations(
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	resp := &delegateev1.ListDelegationsResponse{Delegations: make([]*delegateev1.DelegationSummary, 0, len(list))}
+	resp := &executorv1.ListDelegationsResponse{Delegations: make([]*executorv1.DelegationSummary, 0, len(list))}
 	for _, s := range list {
-		sum := &delegateev1.DelegationSummary{
+		sum := &executorv1.DelegationSummary{
 			Delegation: toDelegation(&s.Delegation), Coins: int64(s.Coins), Amount: s.Amount, LastAttempt: string(s.LastAttempt),
 		}
 		if !s.NextDue.IsZero() {
@@ -136,32 +136,32 @@ func (h *Admin) ListDelegations(
 }
 
 func (h *Admin) CancelDelegation(
-	ctx context.Context, req *delegateev1.CancelDelegationRequest,
-) (*delegateev1.CancelDelegationResponse, error) {
+	ctx context.Context, req *executorv1.CancelDelegationRequest,
+) (*executorv1.CancelDelegationResponse, error) {
 	if req.GetId() == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing id")
 	}
 	if err := h.delegations.CancelDelegation(ctx, req.GetId()); err != nil {
 		return nil, toStatus(err)
 	}
-	return &delegateev1.CancelDelegationResponse{}, nil
+	return &executorv1.CancelDelegationResponse{}, nil
 }
 
 func (h *Admin) ResumeDelegation(
-	ctx context.Context, req *delegateev1.ResumeDelegationRequest,
-) (*delegateev1.ResumeDelegationResponse, error) {
+	ctx context.Context, req *executorv1.ResumeDelegationRequest,
+) (*executorv1.ResumeDelegationResponse, error) {
 	if req.GetId() == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing id")
 	}
 	if err := h.delegations.ResumeDelegation(ctx, req.GetId()); err != nil {
 		return nil, toStatus(err)
 	}
-	return &delegateev1.ResumeDelegationResponse{}, nil
+	return &executorv1.ResumeDelegationResponse{}, nil
 }
 
 func (h *Admin) RegisterStream(
-	ctx context.Context, req *delegateev1.RegisterStreamRequest,
-) (*delegateev1.RegisterStreamResponse, error) {
+	ctx context.Context, req *executorv1.RegisterStreamRequest,
+) (*executorv1.RegisterStreamResponse, error) {
 	if req.GetTemplateId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing template id")
 	}
@@ -169,10 +169,10 @@ func (h *Admin) RegisterStream(
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	return &delegateev1.RegisterStreamResponse{Stream: toStream(st)}, nil
+	return &executorv1.RegisterStreamResponse{Stream: toStream(st)}, nil
 }
 
-func (h *Admin) ListStreams(ctx context.Context, _ *delegateev1.ListStreamsRequest) (*delegateev1.ListStreamsResponse, error) {
+func (h *Admin) ListStreams(ctx context.Context, _ *executorv1.ListStreamsRequest) (*executorv1.ListStreamsResponse, error) {
 	list, err := h.delegations.ListStreams(ctx)
 	if err != nil {
 		return nil, toStatus(err)
@@ -181,7 +181,7 @@ func (h *Admin) ListStreams(ctx context.Context, _ *delegateev1.ListStreamsReque
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	resp := &delegateev1.ListStreamsResponse{Streams: make([]*delegateev1.Stream, 0, len(list))}
+	resp := &executorv1.ListStreamsResponse{Streams: make([]*executorv1.Stream, 0, len(list))}
 	for _, st := range list {
 		out := toStream(&st)
 		if sp, ok := spawned[st.ID]; ok {
@@ -193,20 +193,20 @@ func (h *Admin) ListStreams(ctx context.Context, _ *delegateev1.ListStreamsReque
 }
 
 func (h *Admin) CancelStream(
-	ctx context.Context, req *delegateev1.CancelStreamRequest,
-) (*delegateev1.CancelStreamResponse, error) {
+	ctx context.Context, req *executorv1.CancelStreamRequest,
+) (*executorv1.CancelStreamResponse, error) {
 	if req.GetId() == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing id")
 	}
 	if err := h.delegations.CancelStream(ctx, req.GetId()); err != nil {
 		return nil, toStatus(err)
 	}
-	return &delegateev1.CancelStreamResponse{}, nil
+	return &executorv1.CancelStreamResponse{}, nil
 }
 
 func (h *Admin) ListAttempts(
-	ctx context.Context, req *delegateev1.ListAttemptsRequest,
-) (*delegateev1.ListAttemptsResponse, error) {
+	ctx context.Context, req *executorv1.ListAttemptsRequest,
+) (*executorv1.ListAttemptsResponse, error) {
 	if req.GetId() == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing id")
 	}
@@ -226,7 +226,7 @@ func (h *Admin) ListAttempts(
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	resp := &delegateev1.ListAttemptsResponse{Attempts: make([]*delegateev1.Attempt, 0, len(list))}
+	resp := &executorv1.ListAttemptsResponse{Attempts: make([]*executorv1.Attempt, 0, len(list))}
 	for _, a := range list {
 		resp.Attempts = append(resp.Attempts, toAttempt(a, tmpl.Type))
 	}
@@ -236,11 +236,11 @@ func (h *Admin) ListAttempts(
 	return resp, nil
 }
 
-func (h *Admin) GetHealth(ctx context.Context, _ *delegateev1.GetHealthRequest) (*delegateev1.GetHealthResponse, error) {
+func (h *Admin) GetHealth(ctx context.Context, _ *executorv1.GetHealthRequest) (*executorv1.GetHealthResponse, error) {
 	entries := h.health.Check(ctx)
-	resp := &delegateev1.GetHealthResponse{Healthy: health.Healthy(entries), Entries: make([]*delegateev1.HealthEntry, 0, len(entries))}
+	resp := &executorv1.GetHealthResponse{Healthy: health.Healthy(entries), Entries: make([]*executorv1.HealthEntry, 0, len(entries))}
 	for _, e := range entries {
-		entry := &delegateev1.HealthEntry{Name: e.Name, Healthy: e.Err == nil}
+		entry := &executorv1.HealthEntry{Name: e.Name, Healthy: e.Err == nil}
 		if e.Err != nil {
 			entry.Error = e.Err.Error()
 		}
@@ -249,25 +249,25 @@ func (h *Admin) GetHealth(ctx context.Context, _ *delegateev1.GetHealthRequest) 
 	return resp, nil
 }
 
-func (h *Admin) GetStatus(ctx context.Context, _ *delegateev1.GetStatusRequest) (*delegateev1.GetStatusResponse, error) {
+func (h *Admin) GetStatus(ctx context.Context, _ *executorv1.GetStatusRequest) (*executorv1.GetStatusResponse, error) {
 	st, err := h.execution.Status(ctx, true)
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	resp := &delegateev1.GetStatusResponse{
+	resp := &executorv1.GetStatusResponse{
 		Active: st.Active, Queued: int64(st.Queued), Registered: int64(st.Registered), Late: int64(st.Late), TipHeight: st.Tip.Height,
 		Coins: int64(st.Coins), Amount: st.Amount, Succeeded: st.Succeeded, Failed: st.Failed, TemplateFailures: st.TemplateFailures,
 		ReserveSeconds: int64(st.Reserve / time.Second), SessionSeconds: int64(st.Session.Duration / time.Second),
 		MaxIntents: int64(st.Session.MaxIntents),
-		Batches:    make([]*delegateev1.BatchForecast, 0, len(st.Batches)),
+		Batches:    make([]*executorv1.BatchForecast, 0, len(st.Batches)),
 	}
 	if !st.NextDue.IsZero() {
 		resp.NextDue = st.NextDue.Unix()
 	}
 	for _, r := range st.Batches {
-		b := &delegateev1.BatchForecast{At: r.At.Unix(), Intents: int64(r.Intents), Coins: int64(r.Coins), Amount: r.Amount}
+		b := &executorv1.BatchForecast{At: r.At.Unix(), Intents: int64(r.Intents), Coins: int64(r.Coins), Amount: r.Amount}
 		for _, e := range r.Entries {
-			b.Entries = append(b.Entries, &delegateev1.ForecastEntry{
+			b.Entries = append(b.Entries, &executorv1.ForecastEntry{
 				DelegationId: e.DelegationID, Coins: int64(e.Coins), Amount: e.Amount, Due: e.Due.Unix(), Deadline: e.Deadline.Unix(),
 			})
 		}
@@ -286,15 +286,15 @@ func listLimit(limit int32) (int, error) {
 	return int(limit), nil
 }
 
-func toStream(s *delegation.Stream) *delegateev1.Stream {
-	return &delegateev1.Stream{
+func toStream(s *delegation.Stream) *executorv1.Stream {
+	return &executorv1.Stream{
 		Id: s.ID, TemplateId: s.TemplateID, Variables: s.Variables, Status: s.Status,
 		CreatedAt: s.CreatedAt.Unix(),
 	}
 }
 
-func toAttempt(a delegation.Attempt, kind template.Type) *delegateev1.Attempt {
-	return &delegateev1.Attempt{
+func toAttempt(a delegation.Attempt, kind template.Type) *executorv1.Attempt {
+	return &executorv1.Attempt{
 		Id: a.ID, DelegationId: a.DelegationID, Kind: string(kind), Coins: a.Coins, Txid: cmp.Or(a.Spenders()...),
 		Status: string(a.Status), Error: a.Error, CreatedAt: a.CreatedAt.Unix(), UpdatedAt: a.UpdatedAt.Unix(),
 	}

@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-package delegatee.v1;
+package executor.v1;
 
-import "delegatee/v1/service.proto";
+import "executor/v1/service.proto";
 import "meshapi/gateway/annotations.proto";
 
-// AdminService is served on the admin port only, next to DelegateeService.
+// AdminService is served on the admin port only, next to ExecutorService.
 service AdminService {
   // UpdateTemplate sets a template's status; activating resets its failures.
   rpc UpdateTemplate(UpdateTemplateRequest) returns (UpdateTemplateResponse) {

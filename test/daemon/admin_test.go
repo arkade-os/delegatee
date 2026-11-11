@@ -13,10 +13,10 @@ import (
 	"slices"
 	"testing"
 
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	"github.com/arkade-os/delegatee/internal/config"
-	tpl "github.com/arkade-os/delegatee/pkg/template"
-	"github.com/arkade-os/delegatee/templates"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
+	"github.com/arkade-os/executor/internal/config"
+	tpl "github.com/arkade-os/executor/pkg/template"
+	"github.com/arkade-os/executor/templates"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -62,7 +62,7 @@ func TestDeleteArtifactRefusedWhileReferenced(t *testing.T) {
 	code, body := del(t, d.AdminURL+"/v1/admin/artifact/"+artifactID)
 	require.Equal(t, http.StatusPreconditionFailed, code, string(body))
 	require.Equal(t, 1, tableRows(t, d, "artifacts"))
-	_, err := d.Admin.DeleteArtifact(t.Context(), &delegateev1.DeleteArtifactRequest{Id: artifactID})
+	_, err := d.Admin.DeleteArtifact(t.Context(), &executorv1.DeleteArtifactRequest{Id: artifactID})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
 
 	code, body = get(t, d.AdminURL+"/v1/admin/artifacts")
@@ -94,7 +94,7 @@ func TestDeleteTemplateRefusedWhileReferenced(t *testing.T) {
 
 	code, body = del(t, d.AdminURL+"/v1/admin/template/"+templateID)
 	require.Equal(t, http.StatusPreconditionFailed, code, string(body))
-	_, err := d.Admin.DeleteTemplate(t.Context(), &delegateev1.DeleteTemplateRequest{Id: templateID})
+	_, err := d.Admin.DeleteTemplate(t.Context(), &executorv1.DeleteTemplateRequest{Id: templateID})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
 	require.Equal(t, 1, tableRows(t, d, "templates"))
 	code, body = get(t, d.RestURL+"/v1/template/"+templateID)
@@ -105,7 +105,7 @@ func TestDefaultTemplates(t *testing.T) {
 	d := Start(t)
 	d = d.Restart(t, func(c *config.Config) { c.DefaultTemplates = true })
 	require.Equal(t, len(templates.Artifacts), tableRows(t, d, "artifacts"))
-	all, err := d.Client.ListTemplates(t.Context(), &delegateev1.ListTemplatesRequest{})
+	all, err := d.Client.ListTemplates(t.Context(), &executorv1.ListTemplatesRequest{})
 	require.NoError(t, err)
 	require.Len(t, all.GetTemplates(), len(templates.Templates))
 	var id string
@@ -115,10 +115,10 @@ func TestDefaultTemplates(t *testing.T) {
 	}
 
 	// the operator's choice survives a restart
-	_, err = d.Admin.UpdateTemplate(t.Context(), &delegateev1.UpdateTemplateRequest{Id: id, Status: "disabled"})
+	_, err = d.Admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Id: id, Status: "disabled"})
 	require.NoError(t, err)
 	d = d.Restart(t, func(c *config.Config) { c.DefaultTemplates = true })
-	got, err := d.Client.GetTemplate(t.Context(), &delegateev1.GetTemplateRequest{Id: id})
+	got, err := d.Client.GetTemplate(t.Context(), &executorv1.GetTemplateRequest{Id: id})
 	require.NoError(t, err)
 	require.Equal(t, "disabled", got.GetTemplate().GetStatus())
 	require.Equal(t, len(templates.Templates), tableRows(t, d, "templates"))
@@ -127,13 +127,13 @@ func TestDefaultTemplates(t *testing.T) {
 func TestAdminAuthentication(t *testing.T) {
 	d := Start(t, WithAdminUser(t, "alice", "secret"))
 
-	_, err := d.Admin.ListArtifacts(t.Context(), &delegateev1.ListArtifactsRequest{})
+	_, err := d.Admin.ListArtifacts(t.Context(), &executorv1.ListArtifactsRequest{})
 	require.Equal(t, codes.Unauthenticated, status.Code(err))
 	ctx := metadata.AppendToOutgoingContext(t.Context(), "authorization", "Basic "+basic("alice", "secret"))
-	_, err = d.Admin.ListArtifacts(ctx, &delegateev1.ListArtifactsRequest{})
+	_, err = d.Admin.ListArtifacts(ctx, &executorv1.ListArtifactsRequest{})
 	require.NoError(t, err)
 	wrong := metadata.AppendToOutgoingContext(t.Context(), "authorization", "Basic "+basic("alice", "nope"))
-	_, err = d.Admin.ListArtifacts(wrong, &delegateev1.ListArtifactsRequest{})
+	_, err = d.Admin.ListArtifacts(wrong, &executorv1.ListArtifactsRequest{})
 	require.Equal(t, codes.Unauthenticated, status.Code(err))
 
 	resp := send(t, d.AdminURL+"/v1/admin/artifacts", "", "")
@@ -148,7 +148,7 @@ func TestAdminAuthentication(t *testing.T) {
 
 	resp = send(t, d.RestURL+"/v1/templates", "", "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	_, err = d.Client.ListTemplates(t.Context(), &delegateev1.ListTemplatesRequest{})
+	_, err = d.Client.ListTemplates(t.Context(), &executorv1.ListTemplatesRequest{})
 	require.NoError(t, err)
 }
 

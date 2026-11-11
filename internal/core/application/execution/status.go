@@ -8,8 +8,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/internal/core/domain/execution"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/core/domain/execution"
 )
 
 // Status is what the loop publishes about the work in hand.

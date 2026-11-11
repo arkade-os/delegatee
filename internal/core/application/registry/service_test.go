@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/registry"
-	"github.com/arkade-os/delegatee/templates"
+	"github.com/arkade-os/executor/internal/core/domain/registry"
+	"github.com/arkade-os/executor/templates"
 	"github.com/stretchr/testify/require"
 )
 

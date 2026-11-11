@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/abi"
+	"github.com/arkade-os/executor/pkg/template/internal/abi"
 )
 
 // Decode parses a document strictly: unknown keys, keys in another case, null where a value is

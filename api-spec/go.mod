@@ -1,4 +1,4 @@
-module github.com/arkade-os/delegatee/api-spec
+module github.com/arkade-os/executor/api-spec
 
 go 1.26.10
 

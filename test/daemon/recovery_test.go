@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/config"
+	"github.com/arkade-os/executor/internal/config"
 	"github.com/stretchr/testify/require"
 )
 

@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             (unknown)
-// source: delegatee/v1/service.proto
+// source: executor/v1/service.proto
 
-package delegateev1
+package executorv1
 
 import (
 	context "context"
@@ -19,20 +19,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DelegateeService_GetInfo_FullMethodName            = "/delegatee.v1.DelegateeService/GetInfo"
-	DelegateeService_RegisterDelegation_FullMethodName = "/delegatee.v1.DelegateeService/RegisterDelegation"
-	DelegateeService_GetDelegation_FullMethodName      = "/delegatee.v1.DelegateeService/GetDelegation"
-	DelegateeService_RegisterArtifact_FullMethodName   = "/delegatee.v1.DelegateeService/RegisterArtifact"
-	DelegateeService_GetArtifact_FullMethodName        = "/delegatee.v1.DelegateeService/GetArtifact"
-	DelegateeService_RegisterTemplate_FullMethodName   = "/delegatee.v1.DelegateeService/RegisterTemplate"
-	DelegateeService_GetTemplate_FullMethodName        = "/delegatee.v1.DelegateeService/GetTemplate"
-	DelegateeService_ListTemplates_FullMethodName      = "/delegatee.v1.DelegateeService/ListTemplates"
+	ExecutorService_GetInfo_FullMethodName            = "/executor.v1.ExecutorService/GetInfo"
+	ExecutorService_RegisterDelegation_FullMethodName = "/executor.v1.ExecutorService/RegisterDelegation"
+	ExecutorService_GetDelegation_FullMethodName      = "/executor.v1.ExecutorService/GetDelegation"
+	ExecutorService_RegisterArtifact_FullMethodName   = "/executor.v1.ExecutorService/RegisterArtifact"
+	ExecutorService_GetArtifact_FullMethodName        = "/executor.v1.ExecutorService/GetArtifact"
+	ExecutorService_RegisterTemplate_FullMethodName   = "/executor.v1.ExecutorService/RegisterTemplate"
+	ExecutorService_GetTemplate_FullMethodName        = "/executor.v1.ExecutorService/GetTemplate"
+	ExecutorService_ListTemplates_FullMethodName      = "/executor.v1.ExecutorService/ListTemplates"
 )
 
-// DelegateeServiceClient is the client API for DelegateeService service.
+// ExecutorServiceClient is the client API for ExecutorService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type DelegateeServiceClient interface {
+type ExecutorServiceClient interface {
 	// GetInfo tells the daemon's version, network and keys.
 	GetInfo(ctx context.Context, in *GetInfoRequest, opts ...grpc.CallOption) (*GetInfoResponse, error)
 	// RegisterDelegation binds a one-input template to variables: the daemon acts on every coin landing at
@@ -50,98 +50,98 @@ type DelegateeServiceClient interface {
 	ListTemplates(ctx context.Context, in *ListTemplatesRequest, opts ...grpc.CallOption) (*ListTemplatesResponse, error)
 }
 
-type delegateeServiceClient struct {
+type executorServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewDelegateeServiceClient(cc grpc.ClientConnInterface) DelegateeServiceClient {
-	return &delegateeServiceClient{cc}
+func NewExecutorServiceClient(cc grpc.ClientConnInterface) ExecutorServiceClient {
+	return &executorServiceClient{cc}
 }
 
-func (c *delegateeServiceClient) GetInfo(ctx context.Context, in *GetInfoRequest, opts ...grpc.CallOption) (*GetInfoResponse, error) {
+func (c *executorServiceClient) GetInfo(ctx context.Context, in *GetInfoRequest, opts ...grpc.CallOption) (*GetInfoResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetInfoResponse)
-	err := c.cc.Invoke(ctx, DelegateeService_GetInfo_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ExecutorService_GetInfo_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *delegateeServiceClient) RegisterDelegation(ctx context.Context, in *RegisterDelegationRequest, opts ...grpc.CallOption) (*RegisterDelegationResponse, error) {
+func (c *executorServiceClient) RegisterDelegation(ctx context.Context, in *RegisterDelegationRequest, opts ...grpc.CallOption) (*RegisterDelegationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RegisterDelegationResponse)
-	err := c.cc.Invoke(ctx, DelegateeService_RegisterDelegation_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ExecutorService_RegisterDelegation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *delegateeServiceClient) GetDelegation(ctx context.Context, in *GetDelegationRequest, opts ...grpc.CallOption) (*GetDelegationResponse, error) {
+func (c *executorServiceClient) GetDelegation(ctx context.Context, in *GetDelegationRequest, opts ...grpc.CallOption) (*GetDelegationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetDelegationResponse)
-	err := c.cc.Invoke(ctx, DelegateeService_GetDelegation_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ExecutorService_GetDelegation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *delegateeServiceClient) RegisterArtifact(ctx context.Context, in *RegisterArtifactRequest, opts ...grpc.CallOption) (*RegisterArtifactResponse, error) {
+func (c *executorServiceClient) RegisterArtifact(ctx context.Context, in *RegisterArtifactRequest, opts ...grpc.CallOption) (*RegisterArtifactResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RegisterArtifactResponse)
-	err := c.cc.Invoke(ctx, DelegateeService_RegisterArtifact_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ExecutorService_RegisterArtifact_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *delegateeServiceClient) GetArtifact(ctx context.Context, in *GetArtifactRequest, opts ...grpc.CallOption) (*GetArtifactResponse, error) {
+func (c *executorServiceClient) GetArtifact(ctx context.Context, in *GetArtifactRequest, opts ...grpc.CallOption) (*GetArtifactResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetArtifactResponse)
-	err := c.cc.Invoke(ctx, DelegateeService_GetArtifact_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ExecutorService_GetArtifact_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *delegateeServiceClient) RegisterTemplate(ctx context.Context, in *RegisterTemplateRequest, opts ...grpc.CallOption) (*RegisterTemplateResponse, error) {
+func (c *executorServiceClient) RegisterTemplate(ctx context.Context, in *RegisterTemplateRequest, opts ...grpc.CallOption) (*RegisterTemplateResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RegisterTemplateResponse)
-	err := c.cc.Invoke(ctx, DelegateeService_RegisterTemplate_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ExecutorService_RegisterTemplate_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *delegateeServiceClient) GetTemplate(ctx context.Context, in *GetTemplateRequest, opts ...grpc.CallOption) (*GetTemplateResponse, error) {
+func (c *executorServiceClient) GetTemplate(ctx context.Context, in *GetTemplateRequest, opts ...grpc.CallOption) (*GetTemplateResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetTemplateResponse)
-	err := c.cc.Invoke(ctx, DelegateeService_GetTemplate_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ExecutorService_GetTemplate_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *delegateeServiceClient) ListTemplates(ctx context.Context, in *ListTemplatesRequest, opts ...grpc.CallOption) (*ListTemplatesResponse, error) {
+func (c *executorServiceClient) ListTemplates(ctx context.Context, in *ListTemplatesRequest, opts ...grpc.CallOption) (*ListTemplatesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListTemplatesResponse)
-	err := c.cc.Invoke(ctx, DelegateeService_ListTemplates_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ExecutorService_ListTemplates_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// DelegateeServiceServer is the server API for DelegateeService service.
-// All implementations should embed UnimplementedDelegateeServiceServer
+// ExecutorServiceServer is the server API for ExecutorService service.
+// All implementations should embed UnimplementedExecutorServiceServer
 // for forward compatibility.
-type DelegateeServiceServer interface {
+type ExecutorServiceServer interface {
 	// GetInfo tells the daemon's version, network and keys.
 	GetInfo(context.Context, *GetInfoRequest) (*GetInfoResponse, error)
 	// RegisterDelegation binds a one-input template to variables: the daemon acts on every coin landing at
@@ -159,241 +159,241 @@ type DelegateeServiceServer interface {
 	ListTemplates(context.Context, *ListTemplatesRequest) (*ListTemplatesResponse, error)
 }
 
-// UnimplementedDelegateeServiceServer should be embedded to have
+// UnimplementedExecutorServiceServer should be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedDelegateeServiceServer struct{}
+type UnimplementedExecutorServiceServer struct{}
 
-func (UnimplementedDelegateeServiceServer) GetInfo(context.Context, *GetInfoRequest) (*GetInfoResponse, error) {
+func (UnimplementedExecutorServiceServer) GetInfo(context.Context, *GetInfoRequest) (*GetInfoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetInfo not implemented")
 }
-func (UnimplementedDelegateeServiceServer) RegisterDelegation(context.Context, *RegisterDelegationRequest) (*RegisterDelegationResponse, error) {
+func (UnimplementedExecutorServiceServer) RegisterDelegation(context.Context, *RegisterDelegationRequest) (*RegisterDelegationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RegisterDelegation not implemented")
 }
-func (UnimplementedDelegateeServiceServer) GetDelegation(context.Context, *GetDelegationRequest) (*GetDelegationResponse, error) {
+func (UnimplementedExecutorServiceServer) GetDelegation(context.Context, *GetDelegationRequest) (*GetDelegationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetDelegation not implemented")
 }
-func (UnimplementedDelegateeServiceServer) RegisterArtifact(context.Context, *RegisterArtifactRequest) (*RegisterArtifactResponse, error) {
+func (UnimplementedExecutorServiceServer) RegisterArtifact(context.Context, *RegisterArtifactRequest) (*RegisterArtifactResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RegisterArtifact not implemented")
 }
-func (UnimplementedDelegateeServiceServer) GetArtifact(context.Context, *GetArtifactRequest) (*GetArtifactResponse, error) {
+func (UnimplementedExecutorServiceServer) GetArtifact(context.Context, *GetArtifactRequest) (*GetArtifactResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetArtifact not implemented")
 }
-func (UnimplementedDelegateeServiceServer) RegisterTemplate(context.Context, *RegisterTemplateRequest) (*RegisterTemplateResponse, error) {
+func (UnimplementedExecutorServiceServer) RegisterTemplate(context.Context, *RegisterTemplateRequest) (*RegisterTemplateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RegisterTemplate not implemented")
 }
-func (UnimplementedDelegateeServiceServer) GetTemplate(context.Context, *GetTemplateRequest) (*GetTemplateResponse, error) {
+func (UnimplementedExecutorServiceServer) GetTemplate(context.Context, *GetTemplateRequest) (*GetTemplateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTemplate not implemented")
 }
-func (UnimplementedDelegateeServiceServer) ListTemplates(context.Context, *ListTemplatesRequest) (*ListTemplatesResponse, error) {
+func (UnimplementedExecutorServiceServer) ListTemplates(context.Context, *ListTemplatesRequest) (*ListTemplatesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListTemplates not implemented")
 }
-func (UnimplementedDelegateeServiceServer) testEmbeddedByValue() {}
+func (UnimplementedExecutorServiceServer) testEmbeddedByValue() {}
 
-// UnsafeDelegateeServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to DelegateeServiceServer will
+// UnsafeExecutorServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ExecutorServiceServer will
 // result in compilation errors.
-type UnsafeDelegateeServiceServer interface {
-	mustEmbedUnimplementedDelegateeServiceServer()
+type UnsafeExecutorServiceServer interface {
+	mustEmbedUnimplementedExecutorServiceServer()
 }
 
-func RegisterDelegateeServiceServer(s grpc.ServiceRegistrar, srv DelegateeServiceServer) {
-	// If the following call panics, it indicates UnimplementedDelegateeServiceServer was
+func RegisterExecutorServiceServer(s grpc.ServiceRegistrar, srv ExecutorServiceServer) {
+	// If the following call panics, it indicates UnimplementedExecutorServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&DelegateeService_ServiceDesc, srv)
+	s.RegisterService(&ExecutorService_ServiceDesc, srv)
 }
 
-func _DelegateeService_GetInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ExecutorService_GetInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetInfoRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DelegateeServiceServer).GetInfo(ctx, in)
+		return srv.(ExecutorServiceServer).GetInfo(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: DelegateeService_GetInfo_FullMethodName,
+		FullMethod: ExecutorService_GetInfo_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DelegateeServiceServer).GetInfo(ctx, req.(*GetInfoRequest))
+		return srv.(ExecutorServiceServer).GetInfo(ctx, req.(*GetInfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DelegateeService_RegisterDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ExecutorService_RegisterDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RegisterDelegationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DelegateeServiceServer).RegisterDelegation(ctx, in)
+		return srv.(ExecutorServiceServer).RegisterDelegation(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: DelegateeService_RegisterDelegation_FullMethodName,
+		FullMethod: ExecutorService_RegisterDelegation_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DelegateeServiceServer).RegisterDelegation(ctx, req.(*RegisterDelegationRequest))
+		return srv.(ExecutorServiceServer).RegisterDelegation(ctx, req.(*RegisterDelegationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DelegateeService_GetDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ExecutorService_GetDelegation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetDelegationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DelegateeServiceServer).GetDelegation(ctx, in)
+		return srv.(ExecutorServiceServer).GetDelegation(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: DelegateeService_GetDelegation_FullMethodName,
+		FullMethod: ExecutorService_GetDelegation_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DelegateeServiceServer).GetDelegation(ctx, req.(*GetDelegationRequest))
+		return srv.(ExecutorServiceServer).GetDelegation(ctx, req.(*GetDelegationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DelegateeService_RegisterArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ExecutorService_RegisterArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RegisterArtifactRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DelegateeServiceServer).RegisterArtifact(ctx, in)
+		return srv.(ExecutorServiceServer).RegisterArtifact(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: DelegateeService_RegisterArtifact_FullMethodName,
+		FullMethod: ExecutorService_RegisterArtifact_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DelegateeServiceServer).RegisterArtifact(ctx, req.(*RegisterArtifactRequest))
+		return srv.(ExecutorServiceServer).RegisterArtifact(ctx, req.(*RegisterArtifactRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DelegateeService_GetArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ExecutorService_GetArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetArtifactRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DelegateeServiceServer).GetArtifact(ctx, in)
+		return srv.(ExecutorServiceServer).GetArtifact(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: DelegateeService_GetArtifact_FullMethodName,
+		FullMethod: ExecutorService_GetArtifact_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DelegateeServiceServer).GetArtifact(ctx, req.(*GetArtifactRequest))
+		return srv.(ExecutorServiceServer).GetArtifact(ctx, req.(*GetArtifactRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DelegateeService_RegisterTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ExecutorService_RegisterTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RegisterTemplateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DelegateeServiceServer).RegisterTemplate(ctx, in)
+		return srv.(ExecutorServiceServer).RegisterTemplate(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: DelegateeService_RegisterTemplate_FullMethodName,
+		FullMethod: ExecutorService_RegisterTemplate_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DelegateeServiceServer).RegisterTemplate(ctx, req.(*RegisterTemplateRequest))
+		return srv.(ExecutorServiceServer).RegisterTemplate(ctx, req.(*RegisterTemplateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DelegateeService_GetTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ExecutorService_GetTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetTemplateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DelegateeServiceServer).GetTemplate(ctx, in)
+		return srv.(ExecutorServiceServer).GetTemplate(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: DelegateeService_GetTemplate_FullMethodName,
+		FullMethod: ExecutorService_GetTemplate_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DelegateeServiceServer).GetTemplate(ctx, req.(*GetTemplateRequest))
+		return srv.(ExecutorServiceServer).GetTemplate(ctx, req.(*GetTemplateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DelegateeService_ListTemplates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ExecutorService_ListTemplates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListTemplatesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DelegateeServiceServer).ListTemplates(ctx, in)
+		return srv.(ExecutorServiceServer).ListTemplates(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: DelegateeService_ListTemplates_FullMethodName,
+		FullMethod: ExecutorService_ListTemplates_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DelegateeServiceServer).ListTemplates(ctx, req.(*ListTemplatesRequest))
+		return srv.(ExecutorServiceServer).ListTemplates(ctx, req.(*ListTemplatesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// DelegateeService_ServiceDesc is the grpc.ServiceDesc for DelegateeService service.
+// ExecutorService_ServiceDesc is the grpc.ServiceDesc for ExecutorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var DelegateeService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "delegatee.v1.DelegateeService",
-	HandlerType: (*DelegateeServiceServer)(nil),
+var ExecutorService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "executor.v1.ExecutorService",
+	HandlerType: (*ExecutorServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetInfo",
-			Handler:    _DelegateeService_GetInfo_Handler,
+			Handler:    _ExecutorService_GetInfo_Handler,
 		},
 		{
 			MethodName: "RegisterDelegation",
-			Handler:    _DelegateeService_RegisterDelegation_Handler,
+			Handler:    _ExecutorService_RegisterDelegation_Handler,
 		},
 		{
 			MethodName: "GetDelegation",
-			Handler:    _DelegateeService_GetDelegation_Handler,
+			Handler:    _ExecutorService_GetDelegation_Handler,
 		},
 		{
 			MethodName: "RegisterArtifact",
-			Handler:    _DelegateeService_RegisterArtifact_Handler,
+			Handler:    _ExecutorService_RegisterArtifact_Handler,
 		},
 		{
 			MethodName: "GetArtifact",
-			Handler:    _DelegateeService_GetArtifact_Handler,
+			Handler:    _ExecutorService_GetArtifact_Handler,
 		},
 		{
 			MethodName: "RegisterTemplate",
-			Handler:    _DelegateeService_RegisterTemplate_Handler,
+			Handler:    _ExecutorService_RegisterTemplate_Handler,
 		},
 		{
 			MethodName: "GetTemplate",
-			Handler:    _DelegateeService_GetTemplate_Handler,
+			Handler:    _ExecutorService_GetTemplate_Handler,
 		},
 		{
 			MethodName: "ListTemplates",
-			Handler:    _DelegateeService_ListTemplates_Handler,
+			Handler:    _ExecutorService_ListTemplates_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "delegatee/v1/service.proto",
+	Metadata: "executor/v1/service.proto",
 }

@@ -1,5 +1,5 @@
 version: v1
-name: buf.build/arkade-os/delegatee
+name: buf.build/arkade-os/executor
 deps:
   - buf.build/meshapi/grpc-api-gateway
 breaking:

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/arkade-os/delegatee/pkg/template"
+	"github.com/arkade-os/executor/pkg/template"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

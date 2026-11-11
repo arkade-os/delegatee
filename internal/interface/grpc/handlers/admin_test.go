@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
-	delegationapp "github.com/arkade-os/delegatee/internal/core/application/delegation"
-	executionapp "github.com/arkade-os/delegatee/internal/core/application/execution"
-	"github.com/arkade-os/delegatee/internal/core/application/health"
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/internal/core/domain/execution"
-	"github.com/arkade-os/delegatee/internal/core/ports"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
+	delegationapp "github.com/arkade-os/executor/internal/core/application/delegation"
+	executionapp "github.com/arkade-os/executor/internal/core/application/execution"
+	"github.com/arkade-os/executor/internal/core/application/health"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/core/domain/execution"
+	"github.com/arkade-os/executor/internal/core/ports"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,20 +22,20 @@ func TestUpdateTemplate(t *testing.T) {
 	admin, public := testAdmin(t)
 	id := registerDefault(t, public)
 
-	_, err := admin.UpdateTemplate(t.Context(), &delegateev1.UpdateTemplateRequest{Id: id, Status: "disabled"})
+	_, err := admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Id: id, Status: "disabled"})
 	require.NoError(t, err)
-	active, err := public.ListTemplates(t.Context(), &delegateev1.ListTemplatesRequest{Status: "active"})
+	active, err := public.ListTemplates(t.Context(), &executorv1.ListTemplatesRequest{Status: "active"})
 	require.NoError(t, err)
 	require.Empty(t, active.GetTemplates())
-	all, err := public.ListTemplates(t.Context(), &delegateev1.ListTemplatesRequest{})
+	all, err := public.ListTemplates(t.Context(), &executorv1.ListTemplatesRequest{})
 	require.NoError(t, err)
 	require.Len(t, all.GetTemplates(), 1)
 	require.Equal(t, "disabled", all.GetTemplates()[0].GetStatus())
 	require.Empty(t, all.GetTemplates()[0].GetDocument())
 
-	_, err = admin.UpdateTemplate(t.Context(), &delegateev1.UpdateTemplateRequest{Id: id, Status: "active"})
+	_, err = admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Id: id, Status: "active"})
 	require.NoError(t, err)
-	got, err := public.GetTemplate(t.Context(), &delegateev1.GetTemplateRequest{Id: id})
+	got, err := public.GetTemplate(t.Context(), &executorv1.GetTemplateRequest{Id: id})
 	require.NoError(t, err)
 	require.Equal(t, "active", got.GetTemplate().GetStatus())
 }
@@ -44,47 +44,47 @@ func TestUpdateTemplateErrors(t *testing.T) {
 	admin, public := testAdmin(t)
 	id := registerDefault(t, public)
 
-	_, err := admin.UpdateTemplate(t.Context(), &delegateev1.UpdateTemplateRequest{Status: "active"})
+	_, err := admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Status: "active"})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.UpdateTemplate(t.Context(), &delegateev1.UpdateTemplateRequest{Id: id})
+	_, err = admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Id: id})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.UpdateTemplate(t.Context(), &delegateev1.UpdateTemplateRequest{Id: id, Status: "paused"})
+	_, err = admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Id: id, Status: "paused"})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.UpdateTemplate(t.Context(), &delegateev1.UpdateTemplateRequest{Id: "missing", Status: "active"})
+	_, err = admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Id: "missing", Status: "active"})
 	require.Equal(t, codes.NotFound, status.Code(err))
 }
 
 func TestDeleteArtifactRefusedWhileReferenced(t *testing.T) {
 	admin, public := testAdmin(t)
 	templateID := registerDefault(t, public)
-	list, err := admin.ListArtifacts(t.Context(), &delegateev1.ListArtifactsRequest{})
+	list, err := admin.ListArtifacts(t.Context(), &executorv1.ListArtifactsRequest{})
 	require.NoError(t, err)
 	require.Len(t, list.GetArtifacts(), 1)
 	require.Empty(t, list.GetArtifacts()[0].GetDocument())
 	artifactID := list.GetArtifacts()[0].GetId()
 
-	_, err = admin.DeleteArtifact(t.Context(), &delegateev1.DeleteArtifactRequest{Id: artifactID})
+	_, err = admin.DeleteArtifact(t.Context(), &executorv1.DeleteArtifactRequest{Id: artifactID})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
-	_, err = public.GetArtifact(t.Context(), &delegateev1.GetArtifactRequest{Id: artifactID})
+	_, err = public.GetArtifact(t.Context(), &executorv1.GetArtifactRequest{Id: artifactID})
 	require.NoError(t, err)
 
-	_, err = admin.DeleteTemplate(t.Context(), &delegateev1.DeleteTemplateRequest{Id: templateID})
+	_, err = admin.DeleteTemplate(t.Context(), &executorv1.DeleteTemplateRequest{Id: templateID})
 	require.NoError(t, err)
-	_, err = admin.DeleteArtifact(t.Context(), &delegateev1.DeleteArtifactRequest{Id: artifactID})
+	_, err = admin.DeleteArtifact(t.Context(), &executorv1.DeleteArtifactRequest{Id: artifactID})
 	require.NoError(t, err)
-	_, err = public.GetArtifact(t.Context(), &delegateev1.GetArtifactRequest{Id: artifactID})
+	_, err = public.GetArtifact(t.Context(), &executorv1.GetArtifactRequest{Id: artifactID})
 	require.Equal(t, codes.NotFound, status.Code(err))
 }
 
 func TestDeleteErrors(t *testing.T) {
 	admin, _ := testAdmin(t)
-	_, err := admin.DeleteArtifact(t.Context(), &delegateev1.DeleteArtifactRequest{})
+	_, err := admin.DeleteArtifact(t.Context(), &executorv1.DeleteArtifactRequest{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.DeleteArtifact(t.Context(), &delegateev1.DeleteArtifactRequest{Id: "missing"})
+	_, err = admin.DeleteArtifact(t.Context(), &executorv1.DeleteArtifactRequest{Id: "missing"})
 	require.Equal(t, codes.NotFound, status.Code(err))
-	_, err = admin.DeleteTemplate(t.Context(), &delegateev1.DeleteTemplateRequest{})
+	_, err = admin.DeleteTemplate(t.Context(), &executorv1.DeleteTemplateRequest{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.DeleteTemplate(t.Context(), &delegateev1.DeleteTemplateRequest{Id: "missing"})
+	_, err = admin.DeleteTemplate(t.Context(), &executorv1.DeleteTemplateRequest{Id: "missing"})
 	require.Equal(t, codes.NotFound, status.Code(err))
 }
 
@@ -92,38 +92,38 @@ func TestCancelThenResumeDelegation(t *testing.T) {
 	admin, public := testAdmin(t)
 	id := registerDefault(t, public)
 	variables := renewalVariables(t)
-	reg, err := public.RegisterDelegation(t.Context(), &delegateev1.RegisterDelegationRequest{TemplateId: id, Variables: variables})
+	reg, err := public.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: variables})
 	require.NoError(t, err)
 	delegationID := reg.GetDelegation().GetId()
 
-	_, err = admin.CancelDelegation(t.Context(), &delegateev1.CancelDelegationRequest{Id: delegationID})
+	_, err = admin.CancelDelegation(t.Context(), &executorv1.CancelDelegationRequest{Id: delegationID})
 	require.NoError(t, err)
-	got, err := public.GetDelegation(t.Context(), &delegateev1.GetDelegationRequest{Id: delegationID})
+	got, err := public.GetDelegation(t.Context(), &executorv1.GetDelegationRequest{Id: delegationID})
 	require.NoError(t, err)
 	require.Equal(t, "cancelled", got.GetDelegation().GetStatus())
-	_, err = public.RegisterDelegation(t.Context(), &delegateev1.RegisterDelegationRequest{TemplateId: id, Variables: variables})
+	_, err = public.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: variables})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
-	_, err = admin.CancelDelegation(t.Context(), &delegateev1.CancelDelegationRequest{Id: delegationID})
+	_, err = admin.CancelDelegation(t.Context(), &executorv1.CancelDelegationRequest{Id: delegationID})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
 
-	_, err = admin.ResumeDelegation(t.Context(), &delegateev1.ResumeDelegationRequest{Id: delegationID})
+	_, err = admin.ResumeDelegation(t.Context(), &executorv1.ResumeDelegationRequest{Id: delegationID})
 	require.NoError(t, err)
-	got, err = public.GetDelegation(t.Context(), &delegateev1.GetDelegationRequest{Id: delegationID})
+	got, err = public.GetDelegation(t.Context(), &executorv1.GetDelegationRequest{Id: delegationID})
 	require.NoError(t, err)
 	require.Equal(t, "active", got.GetDelegation().GetStatus())
-	again, err := public.RegisterDelegation(t.Context(), &delegateev1.RegisterDelegationRequest{TemplateId: id, Variables: variables})
+	again, err := public.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: variables})
 	require.NoError(t, err)
 	require.Equal(t, delegationID, again.GetDelegation().GetId())
-	_, err = admin.ResumeDelegation(t.Context(), &delegateev1.ResumeDelegationRequest{Id: delegationID})
+	_, err = admin.ResumeDelegation(t.Context(), &executorv1.ResumeDelegationRequest{Id: delegationID})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
 
-	_, err = admin.CancelDelegation(t.Context(), &delegateev1.CancelDelegationRequest{})
+	_, err = admin.CancelDelegation(t.Context(), &executorv1.CancelDelegationRequest{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.CancelDelegation(t.Context(), &delegateev1.CancelDelegationRequest{Id: 404})
+	_, err = admin.CancelDelegation(t.Context(), &executorv1.CancelDelegationRequest{Id: 404})
 	require.Equal(t, codes.NotFound, status.Code(err))
-	_, err = admin.ResumeDelegation(t.Context(), &delegateev1.ResumeDelegationRequest{})
+	_, err = admin.ResumeDelegation(t.Context(), &executorv1.ResumeDelegationRequest{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.ResumeDelegation(t.Context(), &delegateev1.ResumeDelegationRequest{Id: 404})
+	_, err = admin.ResumeDelegation(t.Context(), &executorv1.ResumeDelegationRequest{Id: 404})
 	require.Equal(t, codes.NotFound, status.Code(err))
 }
 
@@ -138,7 +138,7 @@ func TestListDelegations(t *testing.T) {
 	rows[2].TemplateID = "other"
 	admin := NewAdmin(nil, nil, &summaryStub{rows: rows}, nil)
 
-	all, err := admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{})
+	all, err := admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{})
 	require.NoError(t, err)
 	require.Equal(t, []int64{3, 5, 1, 2, 4}, delegationIDs(all))
 	require.Empty(t, all.GetNextCursor())
@@ -153,7 +153,7 @@ func TestListDelegations(t *testing.T) {
 	var paged []int64
 	var cursor string
 	for {
-		page, err := admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{Cursor: cursor, Limit: 2})
+		page, err := admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{Cursor: cursor, Limit: 2})
 		require.NoError(t, err)
 		paged = append(paged, delegationIDs(page)...)
 		if cursor = page.GetNextCursor(); cursor == "" {
@@ -162,21 +162,21 @@ func TestListDelegations(t *testing.T) {
 	}
 	require.Equal(t, []int64{3, 5, 1, 2, 4}, paged)
 
-	cancelled, err := admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{Status: "cancelled"})
+	cancelled, err := admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{Status: "cancelled"})
 	require.NoError(t, err)
 	require.Equal(t, []int64{2}, delegationIDs(cancelled))
-	spawned, err := admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{StreamId: 9})
+	spawned, err := admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{StreamId: 9})
 	require.NoError(t, err)
 	require.Equal(t, []int64{5, 4}, delegationIDs(spawned))
-	other, err := admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{TemplateId: "other"})
+	other, err := admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{TemplateId: "other"})
 	require.NoError(t, err)
 	require.Equal(t, []int64{1}, delegationIDs(other))
 
-	_, err = admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{Cursor: "not a cursor"})
+	_, err = admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{Cursor: "not a cursor"})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{Limit: 1001})
+	_, err = admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{Limit: 1001})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.ListDelegations(t.Context(), &delegateev1.ListDelegationsRequest{Limit: -1})
+	_, err = admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{Limit: -1})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
@@ -184,7 +184,7 @@ func TestGetHealth(t *testing.T) {
 	checks := &healthStub{entries: []health.Entry{{Name: "db"}, {Name: "arkd", Err: errors.New("connection refused")}, {Name: "loop"}}}
 	admin := NewAdmin(nil, nil, nil, checks)
 
-	resp, err := admin.GetHealth(t.Context(), &delegateev1.GetHealthRequest{})
+	resp, err := admin.GetHealth(t.Context(), &executorv1.GetHealthRequest{})
 	require.NoError(t, err)
 	require.False(t, resp.GetHealthy())
 	require.Len(t, resp.GetEntries(), 3)
@@ -196,7 +196,7 @@ func TestGetHealth(t *testing.T) {
 	require.Equal(t, "connection refused", resp.GetEntries()[1].GetError())
 
 	checks.entries[1].Err = nil
-	resp, err = admin.GetHealth(t.Context(), &delegateev1.GetHealthRequest{})
+	resp, err = admin.GetHealth(t.Context(), &executorv1.GetHealthRequest{})
 	require.NoError(t, err)
 	require.True(t, resp.GetHealthy())
 }
@@ -204,7 +204,7 @@ func TestGetHealth(t *testing.T) {
 func TestListAttempts(t *testing.T) {
 	admin, public, store := testAdminAndAttempts(t)
 	id := registerDefault(t, public)
-	reg, err := public.RegisterDelegation(t.Context(), &delegateev1.RegisterDelegationRequest{TemplateId: id, Variables: renewalVariables(t)})
+	reg, err := public.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: renewalVariables(t)})
 	require.NoError(t, err)
 	delegationID := reg.GetDelegation().GetId()
 	var ids []int64
@@ -218,7 +218,7 @@ func TestListAttempts(t *testing.T) {
 	require.NoError(t, first[0].Fail(errors.New("emulator: refused")))
 	require.NoError(t, store.AddOrUpdate(t.Context(), &first[0]))
 
-	list, err := admin.ListAttempts(t.Context(), &delegateev1.ListAttemptsRequest{Id: delegationID})
+	list, err := admin.ListAttempts(t.Context(), &executorv1.ListAttemptsRequest{Id: delegationID})
 	require.NoError(t, err)
 	require.Len(t, list.GetAttempts(), 3)
 	require.Equal(t, ids[2], list.GetAttempts()[0].GetId())
@@ -232,17 +232,17 @@ func TestListAttempts(t *testing.T) {
 	require.Equal(t, "emulator: refused", list.GetAttempts()[2].GetError())
 	require.Zero(t, list.GetNextCursor(), "the last page")
 
-	page, err := admin.ListAttempts(t.Context(), &delegateev1.ListAttemptsRequest{Id: delegationID, Cursor: ids[2], Limit: 1})
+	page, err := admin.ListAttempts(t.Context(), &executorv1.ListAttemptsRequest{Id: delegationID, Cursor: ids[2], Limit: 1})
 	require.NoError(t, err)
 	require.Len(t, page.GetAttempts(), 1)
 	require.Equal(t, ids[1], page.GetAttempts()[0].GetId())
 	require.Equal(t, ids[1], page.GetNextCursor())
 
-	_, err = admin.ListAttempts(t.Context(), &delegateev1.ListAttemptsRequest{})
+	_, err = admin.ListAttempts(t.Context(), &executorv1.ListAttemptsRequest{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.ListAttempts(t.Context(), &delegateev1.ListAttemptsRequest{Id: delegationID, Limit: 1001})
+	_, err = admin.ListAttempts(t.Context(), &executorv1.ListAttemptsRequest{Id: delegationID, Limit: 1001})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.ListAttempts(t.Context(), &delegateev1.ListAttemptsRequest{Id: 404})
+	_, err = admin.ListAttempts(t.Context(), &executorv1.ListAttemptsRequest{Id: 404})
 	require.Equal(t, codes.NotFound, status.Code(err))
 }
 
@@ -250,11 +250,11 @@ func TestExpireDelegations(t *testing.T) {
 	admin, public := testAdmin(t)
 	id := registerDefault(t, public)
 	soon := time.Now().Add(48 * time.Hour)
-	reg, err := public.RegisterDelegation(t.Context(), &delegateev1.RegisterDelegationRequest{
+	reg, err := public.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{
 		TemplateId: id, Variables: renewalVariables(t), ExpiresAt: soon.Unix(),
 	})
 	require.NoError(t, err)
-	forever, err := public.RegisterDelegation(t.Context(), &delegateev1.RegisterDelegationRequest{TemplateId: id, Variables: renewalVariables(t, 2)})
+	forever, err := public.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: renewalVariables(t, 2)})
 	require.NoError(t, err)
 
 	n, err := admin.delegations.ExpireDelegations(t.Context(), soon.Add(-time.Second))
@@ -263,10 +263,10 @@ func TestExpireDelegations(t *testing.T) {
 	n, err = admin.delegations.ExpireDelegations(t.Context(), soon)
 	require.NoError(t, err)
 	require.Equal(t, 1, n)
-	gone, err := public.GetDelegation(t.Context(), &delegateev1.GetDelegationRequest{Id: reg.GetDelegation().GetId()})
+	gone, err := public.GetDelegation(t.Context(), &executorv1.GetDelegationRequest{Id: reg.GetDelegation().GetId()})
 	require.NoError(t, err)
 	require.Equal(t, "expired", gone.GetDelegation().GetStatus())
-	got, err := public.GetDelegation(t.Context(), &delegateev1.GetDelegationRequest{Id: forever.GetDelegation().GetId()})
+	got, err := public.GetDelegation(t.Context(), &executorv1.GetDelegationRequest{Id: forever.GetDelegation().GetId()})
 	require.NoError(t, err)
 	require.Equal(t, "active", got.GetDelegation().GetStatus())
 }
@@ -282,7 +282,7 @@ func TestGetStatus(t *testing.T) {
 		},
 	}}
 	admin := NewAdmin(nil, nil, stub, nil)
-	resp, err := admin.GetStatus(t.Context(), &delegateev1.GetStatusRequest{})
+	resp, err := admin.GetStatus(t.Context(), &executorv1.GetStatusRequest{})
 	require.NoError(t, err)
 	require.Equal(t, int64(5), resp.GetActive())
 	require.Equal(t, int64(3), resp.GetQueued())
@@ -309,13 +309,13 @@ func TestGetStatus(t *testing.T) {
 	require.True(t, stub.forecast)
 
 	stub.status = executionapp.Status{}
-	resp, err = admin.GetStatus(t.Context(), &delegateev1.GetStatusRequest{})
+	resp, err = admin.GetStatus(t.Context(), &executorv1.GetStatusRequest{})
 	require.NoError(t, err)
 	require.Zero(t, resp.GetNextDue(), "nothing is due")
 	require.Empty(t, resp.GetBatches())
 
 	stub.err = errors.New("database down")
-	_, err = admin.GetStatus(t.Context(), &delegateev1.GetStatusRequest{})
+	_, err = admin.GetStatus(t.Context(), &executorv1.GetStatusRequest{})
 	require.Equal(t, codes.Internal, status.Code(err))
 }
 
@@ -341,7 +341,7 @@ func TestParseCursorRefusesWhatItDidNotWrite(t *testing.T) {
 }
 
 type statusStub struct {
-	Executor
+	Execution
 	status   executionapp.Status
 	err      error
 	forecast bool
@@ -354,7 +354,7 @@ func (s *statusStub) Status(_ context.Context, forecast bool) (executionapp.Stat
 
 // summaryStub lists the summaries it was given, in that order.
 type summaryStub struct {
-	Executor
+	Execution
 	rows []ports.Summary
 }
 
@@ -376,13 +376,13 @@ type healthStub struct{ entries []health.Entry }
 
 func (s *healthStub) Check(context.Context) []health.Entry { return s.entries }
 
-func testAdmin(t *testing.T) (*Admin, *Delegatee) {
+func testAdmin(t *testing.T) (*Admin, *Executor) {
 	t.Helper()
 	admin, h, _ := testAdminAndAttempts(t)
 	return admin, h
 }
 
-func testAdminAndAttempts(t *testing.T) (*Admin, *Delegatee, *attempts) {
+func testAdminAndAttempts(t *testing.T) (*Admin, *Executor, *attempts) {
 	t.Helper()
 	h, _, attempts := testHandlerAndStores(t, 10, delegationapp.Limits{MinDelegationExpiry: 24 * time.Hour})
 	return NewAdmin(h.registry, h.delegations, h.execution, nil), h, attempts
@@ -395,7 +395,7 @@ func summary(id int64, nextDue time.Time, coins int, amount uint64, last delegat
 	}
 }
 
-func delegationIDs(resp *delegateev1.ListDelegationsResponse) []int64 {
+func delegationIDs(resp *executorv1.ListDelegationsResponse) []int64 {
 	ids := make([]int64, 0, len(resp.GetDelegations()))
 	for _, d := range resp.GetDelegations() {
 		ids = append(ids, d.GetDelegation().GetId())
@@ -404,11 +404,11 @@ func delegationIDs(resp *delegateev1.ListDelegationsResponse) []int64 {
 }
 
 // registerDefault registers the default artifact and the renewal template, returning the template id.
-func registerDefault(t *testing.T, public *Delegatee) string {
+func registerDefault(t *testing.T, public *Executor) string {
 	t.Helper()
-	_, err := public.RegisterArtifact(t.Context(), &delegateev1.RegisterArtifactRequest{Document: testDocument(t)})
+	_, err := public.RegisterArtifact(t.Context(), &executorv1.RegisterArtifactRequest{Document: testDocument(t)})
 	require.NoError(t, err)
-	reg, err := public.RegisterTemplate(t.Context(), &delegateev1.RegisterTemplateRequest{
+	reg, err := public.RegisterTemplate(t.Context(), &executorv1.RegisterTemplateRequest{
 		Document: testTemplateDocument(t, "renew.json"),
 	})
 	require.NoError(t, err)

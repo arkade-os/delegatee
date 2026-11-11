@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/internal/infrastructure/postgres/sqlc/queries"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/infrastructure/postgres/sqlc/queries"
 )
 
 type AttemptRepository struct{ db *DB }

@@ -5,7 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/arkade-os/delegatee/internal/config"
+	"github.com/arkade-os/executor/internal/config"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -19,7 +19,7 @@ func main() {
 	}
 	cfg.Version = Version
 	log.SetLevel(log.Level(cfg.LogLevel))
-	log.WithField("version", Version).Info("starting delegateed")
+	log.WithField("version", Version).Info("starting executord")
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -29,7 +29,7 @@ func main() {
 	}
 	go func() {
 		<-ctx.Done()
-		log.Info("shutting down delegateed")
+		log.Info("shutting down executord")
 		daemon.Stop()
 	}()
 	if err := daemon.Server.Serve(); err != nil {

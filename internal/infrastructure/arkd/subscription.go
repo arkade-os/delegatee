@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	clientlib "github.com/arkade-os/arkd/pkg/client-lib"
-	"github.com/arkade-os/delegatee/internal/core/ports"
+	"github.com/arkade-os/executor/internal/core/ports"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	delegateev1 "github.com/arkade-os/delegatee/api-spec/protobuf/gen/delegatee/v1"
+	executorv1 "github.com/arkade-os/executor/api-spec/protobuf/gen/executor/v1"
 	"github.com/stretchr/testify/require"
 )
 
@@ -176,7 +176,7 @@ func waitCoins(t *testing.T, d *Daemon, id string, n int) []coin {
 
 func tipHeight(t *testing.T, d *Daemon) int64 {
 	t.Helper()
-	resp, err := d.Admin.GetStatus(t.Context(), &delegateev1.GetStatusRequest{})
+	resp, err := d.Admin.GetStatus(t.Context(), &executorv1.GetStatusRequest{})
 	require.NoError(t, err)
 	return resp.GetTipHeight()
 }

@@ -3,8 +3,8 @@ package execution
 import (
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/internal/core/ports"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/core/ports"
 )
 
 // syncVtxos is the coins the vtxos reported at w's script add or spend; when complete, the report

@@ -2,7 +2,7 @@ version: v1
 managed:
   enabled: true
   go_package_prefix:
-    default: github.com/arkade-os/delegatee
+    default: github.com/arkade-os/executor
     except:
       - buf.build/meshapi/grpc-api-gateway
 plugins:

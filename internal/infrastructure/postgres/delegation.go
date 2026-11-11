@@ -7,8 +7,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
-	"github.com/arkade-os/delegatee/internal/infrastructure/postgres/sqlc/queries"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/infrastructure/postgres/sqlc/queries"
 )
 
 type DelegationRepository struct{ db *DB }

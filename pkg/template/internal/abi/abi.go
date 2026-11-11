@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/arkade-os/delegatee/pkg/template/internal/asm"
-	"github.com/arkade-os/delegatee/pkg/template/internal/jcs"
+	"github.com/arkade-os/executor/pkg/template/internal/asm"
+	"github.com/arkade-os/executor/pkg/template/internal/jcs"
 )
 
 // Field is a named, typed value: a constructor input, a struct field or a covenant input.

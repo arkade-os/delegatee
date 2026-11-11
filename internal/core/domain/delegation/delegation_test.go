@@ -9,9 +9,9 @@ import (
 	"time"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
-	"github.com/arkade-os/delegatee/pkg/template"
-	"github.com/arkade-os/delegatee/templates"
 	"github.com/arkade-os/emulator/pkg/arkade"
+	"github.com/arkade-os/executor/pkg/template"
+	"github.com/arkade-os/executor/templates"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/stretchr/testify/require"

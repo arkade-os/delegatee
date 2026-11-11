@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/arkade-os/delegatee/internal/core/domain/delegation"
+	"github.com/arkade-os/executor/internal/core/domain/delegation"
 )
 
 // Summary is a delegation with what its present coins and its attempts come to.
