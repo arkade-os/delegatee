@@ -155,6 +155,20 @@ func TestForfeitsSkipTheBoardingInputs(t *testing.T) {
 	require.ErrorContains(t, err, "got 0 connectors for 1 vtxos")
 }
 
+func TestForfeitsSkipTheSweptInputs(t *testing.T) {
+	r := newRenewal(t, 1000)
+	in, err := BuildIntent(r.inst, r.inputs, []delegation.Coin{r.coin}, r.txs, template.Fee{Dust: 330}, r.cosigner.PubKey())
+	require.NoError(t, err)
+	require.Equal(t, 1, in.Forfeited())
+
+	in.Swept = []bool{true}
+	require.Equal(t, 1, in.Vtxos(), "a swept vtxo is still a vtxo")
+	require.Zero(t, in.Forfeited())
+	forfeits, err := in.Forfeits(nil, nil)
+	require.NoError(t, err)
+	require.Empty(t, forfeits, "arkd recovers a swept vtxo without a forfeit")
+}
+
 func TestAssetPacketInputsShiftWithTheIntentMessageInput(t *testing.T) {
 	id := asset.AssetId{}
 	id.Txid[0] = 7

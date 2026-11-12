@@ -232,6 +232,9 @@ func (b *batchWorker) intentOf(ctx context.Context, inst *delegationapp.Instance
 	if err != nil {
 		return nil, err
 	}
+	if in.Swept, err = s.swept(ctx, e.Coins); err != nil {
+		return nil, err
+	}
 	if in.HasArkadePacket {
 		if in.Proof, err = s.emulator.SubmitIntent(ctx, *in); err != nil {
 			return nil, fmt.Errorf("emulator: %w", refusal(ctx, err))
@@ -404,7 +407,7 @@ func (b *batchWorker) finalization(ev ports.BatchFinalization) {
 	}
 	forfeits := make([][]string, len(r.intents))
 	for i, h := range r.intents {
-		n := h.intent.Vtxos()
+		n := h.intent.Forfeited()
 		if len(connectors) < n {
 			b.abort(fmt.Errorf("got %d connectors for %d vtxos", len(connectors), n))
 			return
@@ -446,6 +449,9 @@ func (b *batchWorker) forfeit(h *registration, forfeits []string, connectors tre
 	signedCommitment, err := signCommitment(h.intent, commitmentTx, remoteCommitment)
 	if err != nil {
 		return err
+	}
+	if len(signed) == 0 && signedCommitment == "" {
+		return nil // arkd recovers swept vtxos on its own
 	}
 	if err := b.s.ark.SubmitSignedForfeitTxs(b.s.ctx, signed, signedCommitment); err != nil {
 		return fmt.Errorf("forfeits: %w", err)

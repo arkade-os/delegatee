@@ -82,6 +82,8 @@ func TestToOutput(t *testing.T) {
 		set(&gone)
 		require.True(t, toOutput(gone).Spent)
 	}
+	require.True(t, toOutput(clientlib.Vtxo{Swept: true}).Swept)
+	require.False(t, toOutput(clientlib.Vtxo{Unrolled: true}).Swept)
 }
 
 func TestScriptEventSpentByFallsBackToItsTxid(t *testing.T) {

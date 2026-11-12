@@ -11,6 +11,7 @@ import (
 	delegationapp "github.com/arkade-os/executor/internal/core/application/delegation"
 	"github.com/arkade-os/executor/internal/core/domain/delegation"
 	"github.com/arkade-os/executor/internal/core/domain/execution"
+	"github.com/arkade-os/executor/internal/core/ports"
 	"github.com/arkade-os/executor/pkg/template"
 	"github.com/btcsuite/btcd/wire/v2"
 	log "github.com/sirupsen/logrus"
@@ -121,6 +122,28 @@ func (s *Service) sources(ctx context.Context, coins []delegation.Coin) (map[str
 		maps.Copy(txs, found)
 	}
 	return txs, nil
+}
+
+// swept asks arkd which of the coins it swept: a batch recovers those without a forfeit.
+func (s *Service) swept(ctx context.Context, coins []delegation.Coin) ([]bool, error) {
+	var scripts []string
+	for _, c := range coins {
+		if !c.Onchain && !slices.Contains(scripts, c.Script) {
+			scripts = append(scripts, c.Script)
+		}
+	}
+	swept := make([]bool, len(coins))
+	if len(scripts) == 0 {
+		return swept, nil
+	}
+	vtxos, err := s.indexer.Vtxos(ctx, scripts)
+	if err != nil {
+		return nil, fmt.Errorf("vtxos: %w", err)
+	}
+	for i, c := range coins {
+		swept[i] = slices.ContainsFunc(vtxos, func(v ports.Output) bool { return v.Outpoint == c.Outpoint && v.Swept })
+	}
+	return swept, nil
 }
 
 // cosign has the emulator sign the transaction last: it submits and finalizes it at arkd.

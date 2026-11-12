@@ -19,6 +19,7 @@ type Output struct {
 	CreatedAt time.Time // offchain only
 	Height    int64     // onchain only, 0 in mempool
 	Spent     bool      // spent, swept or unrolled
+	Swept     bool      // arkd swept its batch; unspent, it is recoverable in a batch without a forfeit
 	SpentBy   string    // the batch or transaction that spent it, empty when unknown
 }
 

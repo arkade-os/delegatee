@@ -205,7 +205,7 @@ func (c *Client) Close() {
 func toOutput(v clientlib.Vtxo) ports.Output {
 	o := ports.Output{
 		Outpoint: v.Outpoint.String(), Script: v.Script, Amount: v.Amount, ExpiresAt: v.ExpiresAt, CreatedAt: v.CreatedAt,
-		Spent: v.Spent || v.Swept || v.Unrolled,
+		Spent: v.Spent || v.Swept || v.Unrolled, Swept: v.Swept,
 	}
 	if o.Spent {
 		o.SpentBy = cmp.Or(v.SettledBy, v.ArkTxid, v.SpentBy)

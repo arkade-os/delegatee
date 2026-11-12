@@ -43,10 +43,11 @@ type Intent struct {
 	Outputs         []*wire.TxOut // the offchain outputs
 	Onchain         []*wire.TxOut
 	Boarding        []bool // per input of Tx: a boarding input, which has no forfeit
+	Swept           []bool // per input of Tx: a vtxo arkd swept, which it recovers without a forfeit
 	HasArkadePacket bool   // the transaction carries an arkade packet, which the emulator cosigns
 }
 
-// Vtxos is how many inputs are vtxos, each forfeited to a connector.
+// Vtxos is how many inputs are vtxos.
 func (in *Intent) Vtxos() int {
 	n := len(in.Tx.UnsignedTx.TxIn)
 	for _, boarding := range in.Boarding {
@@ -57,7 +58,20 @@ func (in *Intent) Vtxos() int {
 	return n
 }
 
-func (in *Intent) boarding(i int) bool { return i < len(in.Boarding) && in.Boarding[i] }
+// Forfeited is how many inputs forfeit to a connector: the vtxos arkd has not swept.
+func (in *Intent) Forfeited() int {
+	n := 0
+	for i := range in.Tx.UnsignedTx.TxIn {
+		if in.forfeited(i) {
+			n++
+		}
+	}
+	return n
+}
+
+func (in *Intent) boarding(i int) bool  { return i < len(in.Boarding) && in.Boarding[i] }
+func (in *Intent) swept(i int) bool     { return i < len(in.Swept) && in.Swept[i] }
+func (in *Intent) forfeited(i int) bool { return !in.boarding(i) && !in.swept(i) }
 
 func BuildOffchain(
 	inst *template.Instance, inputs []delegation.Input, coins []delegation.Coin, txs map[string]*wire.MsgTx,
@@ -326,15 +340,15 @@ func (in *Intent) proofInputs() []intent.Input {
 	return inputs
 }
 
-// Forfeits builds one forfeit per vtxo input, each spending its coin and a connector.
+// Forfeits builds one forfeit per forfeited input, each spending its coin and a connector.
 func (in *Intent) Forfeits(connectors []*psbt.Packet, forfeitScript []byte) ([]string, error) {
 	tx := in.Tx.UnsignedTx
-	if len(connectors) < in.Vtxos() {
-		return nil, fmt.Errorf("got %d connectors for %d vtxos", len(connectors), in.Vtxos())
+	if len(connectors) < in.Forfeited() {
+		return nil, fmt.Errorf("got %d connectors for %d vtxos", len(connectors), in.Forfeited())
 	}
 	var forfeits []string
 	for i, txin := range tx.TxIn {
-		if in.boarding(i) {
+		if !in.forfeited(i) {
 			continue
 		}
 		next := len(forfeits)
