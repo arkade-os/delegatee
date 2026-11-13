@@ -1,6 +1,6 @@
 {
   "format": "template/v1",
-  "type": "intent",
+  "type": "proof",
   "inputs": [
     {
       "name": "funds",
@@ -16,9 +16,7 @@
                 {
                   "name": "release",
                   "asm": ["<COSIGNER_KEY>", "OP_CHECKSIG"],
-                  "witness": [
-                    {"name": "delegateSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
-                  ]
+                  "witness": [{"name": "delegateSig", "type": "signature", "encoding": "schnorr-64", "injected": true}]
                 }
               ]
             }

@@ -48,7 +48,9 @@ func (r *AttemptRepository) ListPending(ctx context.Context) ([]delegation.Attem
 	return toAttempts(rows)
 }
 
-func (r *AttemptRepository) ListByDelegation(ctx context.Context, id, cursor int64, limit int) ([]delegation.Attempt, error) {
+func (r *AttemptRepository) ListByDelegation(
+	ctx context.Context, id, cursor int64, limit int,
+) ([]delegation.Attempt, error) {
 	rows, err := r.db.querier.ListAttemptsByDelegation(ctx, queries.ListAttemptsByDelegationParams{
 		DelegationID: id, Cursor: cursor, MaxCount: int32(limit),
 	})

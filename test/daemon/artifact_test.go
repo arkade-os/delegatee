@@ -45,16 +45,22 @@ func TestRegisterArtifactRefused(t *testing.T) {
 	d := Start(t, func(c *config.Config) { c.MaxArtifacts = 1 })
 	doc := artifactDocument(t)
 
-	code, body := post(t, d.RestURL+"/v1/artifact", map[string]string{"document": "not an artifact"})
+	code, body := post(
+		t, d.RestURL+"/v1/artifact", map[string]string{"document": "not an artifact"},
+	)
 	require.Equal(t, http.StatusBadRequest, code, string(body))
 	require.Equal(t, 0, tableRows(t, d, "artifacts"))
 
-	_, err := d.Client.RegisterArtifact(t.Context(), &executorv1.RegisterArtifactRequest{Document: doc})
+	_, err := d.Client.RegisterArtifact(
+		t.Context(), &executorv1.RegisterArtifactRequest{Document: doc},
+	)
 	require.NoError(t, err)
 	other := strings.Replace(doc, `"DelegatedVtxo"`, `"Other"`, 1)
 	code, body = post(t, d.RestURL+"/v1/artifact", map[string]string{"document": other})
 	require.Equal(t, http.StatusTooManyRequests, code, string(body))
-	_, err = d.Client.RegisterArtifact(t.Context(), &executorv1.RegisterArtifactRequest{Document: other})
+	_, err = d.Client.RegisterArtifact(
+		t.Context(), &executorv1.RegisterArtifactRequest{Document: other},
+	)
 	require.Equal(t, codes.ResourceExhausted, status.Code(err))
 	require.Equal(t, 1, tableRows(t, d, "artifacts"))
 

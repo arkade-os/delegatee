@@ -33,8 +33,8 @@ type Input struct {
 	Locktime   arklib.AbsoluteLocktime // of the spend leaf, zero means no locktime
 }
 
-// Delegation is a template instance the daemon runs over every coin landing at its address; a client
-// registers one, a stream spawns others.
+// Delegation is a template instance the daemon runs over every coin landing at its address; a
+// client registers one, a stream spawns others.
 type Delegation struct {
 	ID          int64
 	Fingerprint string
@@ -47,6 +47,64 @@ type Delegation struct {
 	Status      string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+// ListFilter selects delegations: an empty Status means any, a non-zero Cursor the ids strictly
+// below it.
+type ListFilter struct {
+	Status string
+	Cursor int64
+	Limit  int
+}
+
+type DelegationRepository interface {
+	// AddOrUpdate inserts d when its id is zero, filling the id and times in, else persists its
+	// status; ErrDelegationNotFound when no row has its id.
+	AddOrUpdate(ctx context.Context, d *Delegation) error
+	Get(ctx context.Context, id int64) (*Delegation, error)
+	// GetByAddress returns the newest delegation watching address, an active one first.
+	GetByAddress(ctx context.Context, address string) (*Delegation, error)
+	// GetByFingerprint returns the newest delegation with the fingerprint.
+	GetByFingerprint(ctx context.Context, fingerprint string) (*Delegation, error)
+	// Expire marks the active delegations whose expiry is not after before as expired and returns
+	// them.
+	Expire(ctx context.Context, before time.Time) ([]Delegation, error)
+	// List returns the delegations matching f, newest first.
+	List(ctx context.Context, f ListFilter) ([]Delegation, error)
+	// CountActive counts the active delegations clients registered and those streams spawned.
+	CountActive(ctx context.Context) (clients, spawned int64, err error)
+	// Prune deletes the delegations a stream spawned that expired before the time, unless a
+	// successor names one as its parent.
+	Prune(ctx context.Context, before time.Time) (int64, error)
+}
+
+type DelegationParams struct {
+	Template  *template.Template
+	Variables map[string]string
+	ExpiresAt *time.Time
+	Now       time.Time
+	MinExpiry time.Duration // zero only refuses the past
+	Keys      template.Keys
+	Decrypt   func([]byte) ([]byte, error) // nil without an encryption key
+	Network   arklib.Network
+}
+
+// NewDelegation is what a client registers: it fills a one-input template with variables and
+// derives the address its coins land at.
+func NewDelegation(p DelegationParams) (*Delegation, error) {
+	if err := p.check(); err != nil {
+		return nil, err
+	}
+	if len(p.Template.Triggers()) > 0 {
+		return nil, ErrStreamOnly
+	}
+	if p.ExpiresAt != nil &&
+		(!p.ExpiresAt.After(p.Now) || p.ExpiresAt.Before(p.Now.Add(p.MinExpiry))) {
+		return nil, fmt.Errorf(
+			"%w: expires_at must be at least %s ahead", ErrInvalidArgs, p.MinExpiry,
+		)
+	}
+	return p.build(0)
 }
 
 func (d *Delegation) Cancel() error {
@@ -65,55 +123,10 @@ func (d *Delegation) Resume() error {
 	return nil
 }
 
-// ListFilter selects delegations: an empty Status means any, a non-zero Cursor the ids strictly below it.
-type ListFilter struct {
-	Status string
-	Cursor int64
-	Limit  int
-}
-
-type DelegationRepository interface {
-	// AddOrUpdate inserts d when its id is zero, filling the id and times in, else persists its status;
-	// ErrDelegationNotFound when no row has its id.
-	AddOrUpdate(ctx context.Context, d *Delegation) error
-	Get(ctx context.Context, id int64) (*Delegation, error)
-	// GetByAddress returns the newest delegation watching address, an active one first.
-	GetByAddress(ctx context.Context, address string) (*Delegation, error)
-	// GetByFingerprint returns the newest delegation with the fingerprint.
-	GetByFingerprint(ctx context.Context, fingerprint string) (*Delegation, error)
-	// Expire marks the active delegations whose expiry is not after before as expired and returns them.
-	Expire(ctx context.Context, before time.Time) ([]Delegation, error)
-	// List returns the delegations matching f, newest first.
-	List(ctx context.Context, f ListFilter) ([]Delegation, error)
-	// CountActive counts the active delegations clients registered and those streams spawned.
-	CountActive(ctx context.Context) (clients, spawned int64, err error)
-	// Prune deletes the delegations a stream spawned that expired before the time, unless a successor names one as its parent.
-	Prune(ctx context.Context, before time.Time) (int64, error)
-}
-
-type DelegationParams struct {
-	Template  *template.Template
-	Variables map[string]string
-	ExpiresAt *time.Time
-	Now       time.Time
-	MinExpiry time.Duration // zero only refuses the past
-	Keys      template.Keys
-	Decrypt   func([]byte) ([]byte, error) // nil without an encryption key
-	Network   arklib.Network
-}
-
-// NewDelegation is what a client registers: it fills a one-input template with variables and derives the address its coins land at.
-func NewDelegation(p DelegationParams) (*Delegation, error) {
-	if err := p.check(); err != nil {
-		return nil, err
-	}
-	if p.Template.Trigger() != nil {
-		return nil, ErrStreamOnly
-	}
-	if p.ExpiresAt != nil && (!p.ExpiresAt.After(p.Now) || p.ExpiresAt.Before(p.Now.Add(p.MinExpiry))) {
-		return nil, fmt.Errorf("%w: expires_at must be at least %s ahead", ErrInvalidArgs, p.MinExpiry)
-	}
-	return p.build(0)
+func (d Delegation) Instantiate(
+	tmpl *template.Template, keys template.Keys, decrypt func([]byte) ([]byte, error),
+) (*template.Instance, error) {
+	return instantiate(tmpl, d.Variables, keys, decrypt)
 }
 
 func (p DelegationParams) check() error {
@@ -124,7 +137,7 @@ func (p DelegationParams) check() error {
 }
 
 func (p DelegationParams) build(streamID int64) (*Delegation, error) {
-	if p.Template.Secrets() && (p.Decrypt == nil) {
+	if len(p.Template.Sealed()) > 0 && p.Decrypt == nil {
 		return nil, ErrNoEncryptionKey
 	}
 	inst, err := instantiate(p.Template, p.Variables, p.Keys, p.Decrypt)
@@ -134,8 +147,8 @@ func (p DelegationParams) build(streamID int64) (*Delegation, error) {
 	slot := p.Template.Inputs()[0]
 	locktime, _ := inst.Locktime(0)
 	in := Input{
-		Name: slot.Name, Onchain: slot.Onchain, Script: hex.EncodeToString(inst.PkScript(0)), Tapscripts: inst.Tapscripts(0),
-		Locktime: locktime,
+		Name: slot.Name, Onchain: slot.Onchain, Script: hex.EncodeToString(inst.PkScript(0)),
+		Tapscripts: inst.Tapscripts(0), Locktime: locktime,
 	}
 	if err := checkCosignerKeyLeaf(in.Tapscripts, p.Keys.Cosigner); err != nil {
 		return nil, err
@@ -148,34 +161,24 @@ func (p DelegationParams) build(streamID int64) (*Delegation, error) {
 		p.Variables = map[string]string{}
 	}
 	return &Delegation{
-		Fingerprint: fingerprint(p.Template.ID(), p.Variables),
-		Address:     addr,
-		TemplateID:  p.Template.ID(),
-		Variables:   p.Variables,
-		Inputs:      []Input{in},
-		StreamID:    streamID,
-		ExpiresAt:   p.ExpiresAt,
-		Status:      StatusActive,
+		Fingerprint: fingerprint(p.Template.ID(), p.Variables), Address: addr,
+		TemplateID: p.Template.ID(),
+		Variables:  p.Variables,
+		Inputs:     []Input{in},
+		StreamID:   streamID, ExpiresAt: p.ExpiresAt, Status: StatusActive,
 	}, nil
 }
 
-func (d Delegation) Instantiate(
-	tmpl *template.Template, keys template.Keys, decrypt func([]byte) ([]byte, error),
-) (*template.Instance, error) {
-	return instantiate(tmpl, d.Variables, keys, decrypt)
-}
-
 func instantiate(
-	tmpl *template.Template, variables map[string]string, keys template.Keys, decrypt func([]byte) ([]byte, error),
+	tmpl *template.Template, variables map[string]string, keys template.Keys,
+	decrypt func([]byte) ([]byte, error),
 ) (*template.Instance, error) {
 	decoded, err := decodeVariables(variables)
 	if err != nil {
 		return nil, err
 	}
 	inst, err := tmpl.Instantiate(template.Context{
-		Keys:      keys,
-		Variables: decoded,
-		Decrypt:   decrypt,
+		Keys: keys, Variables: decoded, Decrypt: decrypt,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgs, err)
@@ -238,7 +241,9 @@ func pushes(script, data []byte) (bool, error) {
 	return false, tok.Err()
 }
 
-func addressOf(pkScript []byte, onchain bool, server *btcec.PublicKey, network arklib.Network) (string, error) {
+func addressOf(
+	pkScript []byte, onchain bool, server *btcec.PublicKey, network arklib.Network,
+) (string, error) {
 	if len(pkScript) != 34 || pkScript[0] != txscript.OP_1 || pkScript[1] != txscript.OP_DATA_32 {
 		return "", fmt.Errorf("%w: input script is not taproot", ErrInvalidArgs)
 	}

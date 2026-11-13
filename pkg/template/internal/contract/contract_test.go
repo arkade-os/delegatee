@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/arkade-os/executor/pkg/template/internal/abi"
+	"github.com/arkade-os/executor/pkg/template/artifact"
 	"github.com/arkade-os/executor/pkg/template/internal/asm"
 
 	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
@@ -21,14 +21,22 @@ import (
 
 func TestBuildMatchesArkLib(t *testing.T) {
 	server, owner, emulator := testKey(t, 1), testKey(t, 2), testKey(t, 3)
-	def := parseDef(t, `{"contractName":"DelegatedVtxo","constructorInputs":[{"name":"owner","type":"pubkey"}],"functions":[
+	def := parseDef(
+		t,
+		`{"contractName":"DelegatedVtxo","constructorInputs":[{"name":"owner","type":"pubkey"}],"functions":[
 	 {"name":"spend","leaves":[{"name":"spend","asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","<owner>","OP_CHECKSIG"],"witness":[]}]},
 	 {"name":"delayed","leaves":[{"name":"delayed","asm":["4194306","OP_CHECKSEQUENCEVERIFY","OP_DROP","<SERVER_KEY>","OP_CHECKSIG"],"witness":[]}]},
-	 {"name":"renew","arkade":{"inputs":[],"asm":["OP_1"]},"leaves":[{"name":"renew","asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","<EMULATOR_KEY:renew>","OP_CHECKSIG"],"witness":[]}]}]}`)
-	c, err := Build(def, map[string]asm.Value{"owner": {Type: "pubkey", Raw: owner.SerializeCompressed()}}, Keys{Server: server, Emulator: emulator}, nil)
+	 {"name":"renew","arkade":{"inputs":[],"asm":["OP_1"]},"leaves":[{"name":"renew","asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","<EMULATOR_KEY:renew>","OP_CHECKSIG"],"witness":[]}]}]}`,
+	)
+	c, err := Build(
+		def, map[string]asm.Value{"owner": {Type: "pubkey", Raw: owner.SerializeCompressed()}},
+		Keys{Server: server, Emulator: emulator}, nil,
+	)
 	require.NoError(t, err)
 
-	tweaked := arkade.ComputeArkadeScriptPublicKey(emulator, arkade.ArkadeScriptHash([]byte{txscript.OP_1}))
+	tweaked := arkade.ComputeArkadeScriptPublicKey(
+		emulator, arkade.ArkadeScriptHash([]byte{txscript.OP_1}),
+	)
 	want := &script.TapscriptsVtxoScript{Closures: []script.Closure{
 		&script.MultisigClosure{PubKeys: []*btcec.PublicKey{server, owner}},
 		&script.CSVMultisigClosure{
@@ -70,13 +78,20 @@ func TestBuildTreeShapes(t *testing.T) {
 // x-only bytes a leaf gets; arkadec's own e2e binds pubkeys the same way.
 func TestBuildCovenantPushesXOnlyPubkey(t *testing.T) {
 	owner := testKey(t, 2)
-	def := parseDef(t, `{"contractName":"C","constructorInputs":[{"name":"owner","type":"pubkey"}],"functions":[
-	 {"name":"pay","arkade":{"inputs":[],"asm":["<owner>","OP_DROP","OP_1"]},"leaves":[{"name":"pay","asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","<EMULATOR_KEY:pay>","OP_CHECKSIG"],"witness":[]}]}]}`)
-	c, err := Build(def, map[string]asm.Value{"owner": {Type: "pubkey", Raw: owner.SerializeCompressed()}}, Keys{Server: testKey(t, 1), Emulator: testKey(t, 3)}, nil)
+	def := parseDef(
+		t,
+		`{"contractName":"C","constructorInputs":[{"name":"owner","type":"pubkey"}],"functions":[
+	 {"name":"pay","arkade":{"inputs":[],"asm":["<owner>","OP_DROP","OP_1"]},"leaves":[{"name":"pay","asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","<EMULATOR_KEY:pay>","OP_CHECKSIG"],"witness":[]}]}]}`,
+	)
+	c, err := Build(
+		def, map[string]asm.Value{"owner": {Type: "pubkey", Raw: owner.SerializeCompressed()}},
+		Keys{Server: testKey(t, 1), Emulator: testKey(t, 3)}, nil,
+	)
 	require.NoError(t, err)
 
 	want, err := txscript.NewScriptBuilder().
-		AddData(schnorr.SerializePubKey(owner)).AddOp(txscript.OP_DROP).AddOp(txscript.OP_1).Script()
+		AddData(schnorr.SerializePubKey(owner)).
+		AddOp(txscript.OP_DROP).AddOp(txscript.OP_1).Script()
 	require.NoError(t, err)
 	require.Equal(t, want, c.Covenants["pay"])
 }
@@ -89,8 +104,11 @@ func TestBuildRejects(t *testing.T) {
 	_, err := Build(def, nil, keys, nil)
 	require.ErrorIs(t, err, ErrBadLeaf, "duplicate leaves")
 
-	def = parseDef(t, `{"contractName":"C","constructorInputs":[{"name":"n","type":"int"}],"functions":[
-	 {"name":"a","leaves":[{"name":"a","asm":["<n>","OP_DROP","OP_1"],"witness":[]}]}]}`)
+	def = parseDef(
+		t,
+		`{"contractName":"C","constructorInputs":[{"name":"n","type":"int"}],"functions":[
+	 {"name":"a","leaves":[{"name":"a","asm":["<n>","OP_DROP","OP_1"],"witness":[]}]}]}`,
+	)
 	_, err = Build(def, nil, keys, nil)
 	require.ErrorIs(t, err, ErrBadLeaf, "missing constructor value")
 }
@@ -112,16 +130,16 @@ func testKey(t testing.TB, n int) *btcec.PublicKey {
 	return pub
 }
 
-func parseDef(t *testing.T, doc string) *abi.Definition {
+func parseDef(t *testing.T, doc string) *artifact.Definition {
 	t.Helper()
 	var v any
 	require.NoError(t, json.Unmarshal([]byte(doc), &v))
-	def, err := abi.ParseDefinition(v)
+	def, err := artifact.ParseDefinitionV1(v)
 	require.NoError(t, err)
 	return def
 }
 
-func nLeaves(t *testing.T, n int) (*abi.Definition, []script.Closure) {
+func nLeaves(t *testing.T, n int) (*artifact.Definition, []script.Closure) {
 	t.Helper()
 	server := testKey(t, 1)
 	var fns []string
@@ -131,9 +149,14 @@ func nLeaves(t *testing.T, n int) (*abi.Definition, []script.Closure) {
 		name := fmt.Sprintf("f%d", i)
 		fns = append(fns, fmt.Sprintf(
 			`{"name":%q,"leaves":[{"name":%q,"asm":["<SERVER_KEY>","OP_CHECKSIGVERIFY","0x%s","OP_CHECKSIG"],"witness":[]}]}`,
-			name, name, hex.EncodeToString(schnorr.SerializePubKey(k))))
+			name,
+			name,
+			hex.EncodeToString(schnorr.SerializePubKey(k)),
+		))
 		closures = append(closures, &script.MultisigClosure{PubKeys: []*btcec.PublicKey{server, k}})
 	}
-	def := parseDef(t, `{"contractName":"C","constructorInputs":[],"functions":[`+strings.Join(fns, ",")+`]}`)
+	def := parseDef(
+		t, `{"contractName":"C","constructorInputs":[],"functions":[`+strings.Join(fns, ",")+`]}`,
+	)
 	return def, closures
 }

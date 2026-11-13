@@ -1,5 +1,5 @@
-// Package daemon boots executord in-process against the real postgres, with stand-ins for arkd, electrum and
-// the emulator; it is the gate every slice passes.
+// Package daemon boots executord in-process against the real postgres, with stand-ins for arkd,
+// electrum and the emulator; it is the gate every slice passes.
 package daemon
 
 import (
@@ -50,7 +50,10 @@ func Start(t *testing.T, opts ...func(*config.Config)) *Daemon {
 	dsn := DatabaseURL()
 	standin, chain := newArk(), newChain()
 	standin.chain = chain
-	return boot(t, dsn, ResetDatabase(t, dsn), standin, chain, &emulator{signer: newKey(3).PubKey(), ark: standin}, opts)
+	return boot(
+		t, dsn, ResetDatabase(t, dsn), standin, chain,
+		&emulator{signer: newKey(3).PubKey(), ark: standin}, opts,
+	)
 }
 
 // DatabaseURL is the postgres the suites run against.
@@ -81,7 +84,8 @@ func ScriptNum(n int64) string {
 // Stop shuts the daemon down, leaving the database and the stand-ins as they are.
 func (d *Daemon) Stop() { d.stop() }
 
-// Restart stops the daemon and boots another over the same database and stand-ins, their counters reset.
+// Restart stops the daemon and boots another over the same database and stand-ins, their counters
+// reset.
 func (d *Daemon) Restart(t *testing.T, opts ...func(*config.Config)) *Daemon {
 	t.Helper()
 	d.stop()
@@ -102,7 +106,8 @@ func WithBanDuration(d time.Duration) func(*config.Config) {
 	return func(c *config.Config) { c.BanDuration = d }
 }
 
-// WithLandingWindow is how long a restarted daemon waits to see the coins of forfeited intents spent.
+// WithLandingWindow is how long a restarted daemon waits to see the coins of forfeited intents
+// spent.
 func WithLandingWindow(d time.Duration) func(*config.Config) {
 	return func(c *config.Config) { c.LandingWindow = d }
 }
@@ -118,13 +123,14 @@ func WithEncryptionKey(c *config.Config) { c.EncryptionKey = newKey(9) }
 // WithDefaultTemplates registers the daemon's own templates and starts their streams.
 func WithDefaultTemplates(c *config.Config) { c.DefaultTemplates = true }
 
-// WithMaxDelegations caps the active delegations clients register and, apart from them, the ones streams spawn.
+// WithMaxDelegations caps the active delegations clients register and, apart from them, the ones
+// streams spawn.
 func WithMaxDelegations(clients, spawned int) func(*config.Config) {
 	return func(c *config.Config) { c.MaxDelegations, c.MaxStreamChildren = clients, spawned }
 }
 
-// WithDelegationExpiry sets the shortest delegation lifetime, how often expired delegations are marked and how long after
-// expiry a spawned one is deleted.
+// WithDelegationExpiry sets the shortest delegation lifetime, how often expired delegations are
+// marked and how long after expiry a spawned one is deleted.
 func WithDelegationExpiry(min, interval, pruneAfter time.Duration) func(*config.Config) {
 	return func(c *config.Config) {
 		c.MinDelegationExpiry, c.ExpiryInterval, c.PruneAfter = min, interval, pruneAfter
@@ -151,41 +157,6 @@ func WithAdminUser(t *testing.T, name, password string) func(*config.Config) {
 	users, err := config.LoadAdminUsers(path)
 	require.NoError(t, err)
 	return func(c *config.Config) { c.AdminUsers = users }
-}
-
-func boot(t *testing.T, dsn string, db *sql.DB, standin *ark, chain *chain, emu *emulator, opts []func(*config.Config)) *Daemon {
-	t.Helper()
-	server, cosigner := newKey(1), newKey(4)
-	cfg := config.Default()
-	cfg.Version, cfg.DatabaseURL, cfg.Port, cfg.AdminPort = "test", dsn, FreePort(t), FreePort(t)
-	cfg.MaxDelegations, cfg.PruneAfter, cfg.PublicRateLimit, cfg.DefaultTemplates = 1000, 0, 0, false
-	cfg.CosignerKey, cfg.Ark, cfg.Indexer, cfg.Chain, cfg.Emulator = cosigner, standin, arkd.NewIndexer(standin, standin), chain, emu
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-	standin.once.Do(func() { go standin.runSessions(t.Context()) })
-	d, err := config.NewDaemon(context.Background(), cfg)
-	require.NoError(t, err)
-	go func() { _ = d.Server.Serve() }()
-	t.Cleanup(d.Stop)
-
-	conn := Dial(t, d.Server.PublicAddr())
-	adminConn := Dial(t, d.Server.AdminAddr())
-	return &Daemon{
-		Client:   executorv1.NewExecutorServiceClient(conn),
-		Admin:    executorv1.NewAdminServiceClient(adminConn),
-		RestURL:  "http://127.0.0.1:" + strconv.Itoa(cfg.Port),
-		AdminURL: "http://127.0.0.1:" + strconv.Itoa(cfg.AdminPort),
-		DB:       db,
-		Server:   server.PubKey(),
-		Emulator: emu.signer,
-		Cosigner: cosigner.PubKey(),
-		Arkd:     standin,
-		Chain:    chain,
-		Emu:      emu,
-		dsn:      dsn,
-		stop:     d.Stop,
-	}
 }
 
 // Dial connects to a gRPC server in the clear and closes with the test.
@@ -221,10 +192,54 @@ func TLV(values ...[]byte) []byte {
 func EnforcePayTo(t *testing.T, program []byte) []byte {
 	t.Helper()
 	s, err := txscript.NewScriptBuilder().
-		AddOp(arkade.OP_PUSHCURRENTINPUTINDEX).AddOp(arkade.OP_DUP).AddOp(arkade.OP_INSPECTOUTPUTSCRIPTPUBKEY).
-		AddOp(arkade.OP_1).AddOp(arkade.OP_EQUALVERIFY).AddData(program).AddOp(arkade.OP_EQUALVERIFY).
-		AddOp(arkade.OP_INSPECTOUTPUTVALUE).AddOp(arkade.OP_PUSHCURRENTINPUTINDEX).AddOp(arkade.OP_INSPECTINPUTVALUE).
+		AddOp(arkade.OP_PUSHCURRENTINPUTINDEX).
+		AddOp(arkade.OP_DUP).AddOp(arkade.OP_INSPECTOUTPUTSCRIPTPUBKEY).
+		AddOp(arkade.OP_1).
+		AddOp(arkade.OP_EQUALVERIFY).AddData(program).AddOp(arkade.OP_EQUALVERIFY).
+		AddOp(arkade.OP_INSPECTOUTPUTVALUE).
+		AddOp(arkade.OP_PUSHCURRENTINPUTINDEX).AddOp(arkade.OP_INSPECTINPUTVALUE).
 		AddOp(arkade.OP_GREATERTHANOREQUAL).Script()
 	require.NoError(t, err)
 	return s
+}
+
+func boot(
+	t *testing.T, dsn string, db *sql.DB, standin *ark, chain *chain, emu *emulator,
+	opts []func(*config.Config),
+) *Daemon {
+	t.Helper()
+	server, cosigner := newKey(1), newKey(4)
+	cfg := config.Default()
+	cfg.Version, cfg.DatabaseURL, cfg.Port, cfg.AdminPort = "test", dsn, FreePort(t), FreePort(t)
+	cfg.MaxDelegations, cfg.PruneAfter, cfg.PublicRateLimit, cfg.DefaultTemplates = 1000, 0, 0, false
+	cfg.CosignerKey, cfg.Ark, cfg.Indexer, cfg.Chain, cfg.Emulator = cosigner, standin, arkd.NewIndexer(
+		standin,
+		standin,
+	), chain, emu
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	standin.once.Do(func() { go standin.runSessions(t.Context()) })
+	d, err := config.NewDaemon(context.Background(), cfg)
+	require.NoError(t, err)
+	go func() { _ = d.Server.Serve() }()
+	t.Cleanup(d.Stop)
+
+	conn := Dial(t, d.Server.PublicAddr())
+	adminConn := Dial(t, d.Server.AdminAddr())
+	return &Daemon{
+		Client:   executorv1.NewExecutorServiceClient(conn),
+		Admin:    executorv1.NewAdminServiceClient(adminConn),
+		RestURL:  "http://127.0.0.1:" + strconv.Itoa(cfg.Port),
+		AdminURL: "http://127.0.0.1:" + strconv.Itoa(cfg.AdminPort),
+		DB:       db,
+		Server:   server.PubKey(),
+		Emulator: emu.signer,
+		Cosigner: cosigner.PubKey(),
+		Arkd:     standin,
+		Chain:    chain,
+		Emu:      emu,
+		dsn:      dsn,
+		stop:     d.Stop,
+	}
 }

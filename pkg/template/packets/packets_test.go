@@ -154,7 +154,9 @@ func TestFind(t *testing.T) {
 	statePacket := packets.Raw(packets.TypeState, []byte{0xde, 0xad})
 	adPacket := packets.Raw(packets.TypeAdvertisement, []byte{0xbe, 0xef})
 
-	tx := buildTxWithExtension(t, validAssetPacket(t), validEmulatorPacket(t), statePacket, adPacket)
+	tx := buildTxWithExtension(
+		t, validAssetPacket(t), validEmulatorPacket(t), statePacket, adPacket,
+	)
 
 	t.Run("finds state packet", func(t *testing.T) {
 		body, ok := packets.Find(tx, packets.TypeState)

@@ -77,7 +77,9 @@ func TestDecryptFor(t *testing.T) {
 }
 
 func testDelegation(fingerprint string, streamID int64) *delegation.Delegation {
-	return &delegation.Delegation{Fingerprint: fingerprint, StreamID: streamID, Status: delegation.StatusActive}
+	return &delegation.Delegation{
+		Fingerprint: fingerprint, StreamID: streamID, Status: delegation.StatusActive,
+	}
 }
 
 // rows is the part of a delegation.DelegationRepository that add uses.
@@ -92,7 +94,9 @@ func (r *rows) AddOrUpdate(_ context.Context, d *delegation.Delegation) error {
 	return nil
 }
 
-func (r *rows) GetByFingerprint(_ context.Context, fingerprint string) (*delegation.Delegation, error) {
+func (r *rows) GetByFingerprint(
+	_ context.Context, fingerprint string,
+) (*delegation.Delegation, error) {
 	for i := len(r.list) - 1; i >= 0; i-- {
 		if r.list[i].Fingerprint == fingerprint {
 			v := r.list[i]

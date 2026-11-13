@@ -34,7 +34,9 @@ func TestBasicAuthThrottlesFailures(t *testing.T) {
 	require.NoError(t, err)
 	auth := newBasicAuth([]AdminUser{{Name: "admin", PasswordHash: string(hash)}})
 	for range 5 {
-		require.Equal(t, codes.Unauthenticated, status.Code(auth.check(withBasic(t, "admin:wrong"))))
+		require.Equal(
+			t, codes.Unauthenticated, status.Code(auth.check(withBasic(t, "admin:wrong"))),
+		)
 	}
 	require.Equal(t, codes.ResourceExhausted, status.Code(auth.check(withBasic(t, "admin:secret"))))
 	// missing credentials never count as attempts
@@ -70,5 +72,7 @@ func TestBasicAuthPages(t *testing.T) {
 func withBasic(t *testing.T, credentials string) context.Context {
 	t.Helper()
 	encoded := base64.StdEncoding.EncodeToString([]byte(credentials))
-	return metadata.NewIncomingContext(t.Context(), metadata.Pairs("authorization", "Basic "+encoded))
+	return metadata.NewIncomingContext(
+		t.Context(), metadata.Pairs("authorization", "Basic "+encoded),
+	)
 }

@@ -15,7 +15,9 @@ import (
 
 func TestRegisterTemplateOverREST(t *testing.T) {
 	d := Start(t)
-	code, body := post(t, d.RestURL+"/v1/artifact", map[string]string{"document": artifactDocument(t)})
+	code, body := post(
+		t, d.RestURL+"/v1/artifact", map[string]string{"document": artifactDocument(t)},
+	)
 	require.Equal(t, http.StatusOK, code, string(body))
 	artifactID := decodeArtifact(t, body).ID
 	doc := templateDocument(t)
@@ -26,7 +28,7 @@ func TestRegisterTemplateOverREST(t *testing.T) {
 	require.Len(t, first.ID, 64)
 	require.Equal(t, doc, first.Document)
 	require.Equal(t, []string{artifactID}, first.ArtifactIDs)
-	require.Equal(t, "intent", first.Type)
+	require.Equal(t, "proof", first.Type)
 	require.Equal(t, "active", first.Status)
 	require.Contains(t, first.Params, param{Name: "owner", Type: "pubkey"})
 	require.NotZero(t, first.CreatedAt)
@@ -58,7 +60,9 @@ func TestRegisterTemplateRefused(t *testing.T) {
 	code, body := post(t, d.RestURL+"/v1/template", map[string]string{"document": "not a template"})
 	require.Equal(t, http.StatusBadRequest, code, string(body))
 
-	code, body = post(t, d.RestURL+"/v1/template", map[string]string{"document": templateDocument(t)})
+	code, body = post(
+		t, d.RestURL+"/v1/template", map[string]string{"document": templateDocument(t)},
+	)
 	require.Equal(t, http.StatusNotFound, code, string(body))
 	require.Equal(t, 0, tableRows(t, d, "templates"))
 
@@ -80,7 +84,10 @@ func TestTemplateIsDisabledByItsFailures(t *testing.T) {
 	d.Emu.Refuse(status.Error(codes.InvalidArgument, "covenant not satisfied"))
 	templateID, w := refusedDelegation(t, d)
 
-	require.Eventually(t, func() bool { return getTemplate(t, d, templateID).Status == "disabled" }, 15*time.Second, 50*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return getTemplate(t, d, templateID).Status == "disabled" },
+		15*time.Second, 50*time.Millisecond,
+	)
 	require.Equal(t, 3, failures(t, d, templateID))
 	time.Sleep(2 * time.Second)
 	require.Len(t, listAttempts(t, d, w.ID), 3, "its delegations are not attempted again")
@@ -90,15 +97,27 @@ func TestOutagesDoNotCountAndASuccessResetsTheFailures(t *testing.T) {
 	d := Start(t, WithSessions(500*time.Millisecond, 128), WithTemplateMaxFailures(3))
 	d.Emu.Refuse(errors.New("connection refused"))
 	templateID, w := refusedDelegation(t, d)
-	require.Eventually(t, func() bool { return len(listAttempts(t, d, w.ID)) >= 4 }, 15*time.Second, 50*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return len(listAttempts(t, d, w.ID)) >= 4 }, 15*time.Second,
+		50*time.Millisecond,
+	)
 	require.Zero(t, failures(t, d, templateID), "an outage is not the template's fault")
 	require.Equal(t, "active", getTemplate(t, d, templateID).Status)
 
 	d.Emu.Refuse(status.Error(codes.InvalidArgument, "covenant not satisfied"))
-	require.Eventually(t, func() bool { return failures(t, d, templateID) == 2 }, 15*time.Second, 5*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return failures(t, d, templateID) == 2 }, 15*time.Second,
+		5*time.Millisecond,
+	)
 	d.Emu.Refuse(nil)
-	require.Eventually(t, func() bool { return attemptRows(t, d, "succeeded") == 1 }, 15*time.Second, 20*time.Millisecond)
-	require.Eventually(t, func() bool { return failures(t, d, templateID) == 0 }, 5*time.Second, 20*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return attemptRows(t, d, "succeeded") == 1 }, 15*time.Second,
+		20*time.Millisecond,
+	)
+	require.Eventually(
+		t, func() bool { return failures(t, d, templateID) == 0 }, 5*time.Second,
+		20*time.Millisecond,
+	)
 	require.Equal(t, "active", getTemplate(t, d, templateID).Status)
 }
 

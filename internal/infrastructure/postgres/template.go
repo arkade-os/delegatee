@@ -21,8 +21,8 @@ func (r *TemplateRepository) AddOrUpdate(ctx context.Context, t *registry.Templa
 		return err
 	}
 	row, err := r.db.querier.UpsertTemplate(ctx, queries.UpsertTemplateParams{
-		ID: t.ID, Document: t.Document, ArtifactIds: orEmpty(t.ArtifactIDs), Params: params, Type: string(t.Type),
-		Status: t.Status, Failures: int32(t.Failures),
+		ID: t.ID, Document: t.Document, ArtifactIds: orEmpty(t.ArtifactIDs), Params: params,
+		Type: string(t.Type), Status: t.Status, Failures: int32(t.Failures),
 	})
 	if err != nil {
 		return err
@@ -65,17 +65,6 @@ func (r *TemplateRepository) List(ctx context.Context, status string) ([]registr
 	return out, nil
 }
 
-func toTemplate(row queries.Template) (*registry.Template, error) {
-	t := registry.Template{
-		ID: row.ID, Document: row.Document, ArtifactIDs: row.ArtifactIds, Type: template.Type(row.Type),
-		Status: row.Status, Failures: int(row.Failures), CreatedAt: row.CreatedAt,
-	}
-	if err := json.Unmarshal(row.Params, &t.Params); err != nil {
-		return nil, err
-	}
-	return &t, nil
-}
-
 func (r *TemplateRepository) Delete(ctx context.Context, id string) error {
 	inUse, err := r.db.querier.DeleteTemplate(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -88,4 +77,16 @@ func (r *TemplateRepository) Delete(ctx context.Context, id string) error {
 		return registry.ErrTemplateInUse
 	}
 	return nil
+}
+
+func toTemplate(row queries.Template) (*registry.Template, error) {
+	t := registry.Template{
+		ID: row.ID, Document: row.Document, ArtifactIDs: row.ArtifactIds,
+		Type: template.Type(row.Type), Status: row.Status, Failures: int(row.Failures),
+		CreatedAt: row.CreatedAt,
+	}
+	if err := json.Unmarshal(row.Params, &t.Params); err != nil {
+		return nil, err
+	}
+	return &t, nil
 }

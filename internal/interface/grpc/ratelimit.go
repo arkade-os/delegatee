@@ -9,7 +9,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// rateLimiter keeps a token bucket per client address; behind a reverse proxy every request has the proxy's.
+// rateLimiter keeps a token bucket per client address; behind a reverse proxy every request has the
+// proxy's.
 type rateLimiter struct {
 	mu      sync.Mutex
 	limit   rate.Limit
@@ -20,10 +21,6 @@ type rateLimiter struct {
 type client struct {
 	limiter  *rate.Limiter
 	lastSeen time.Time
-}
-
-func newRateLimiter(perSecond int) *rateLimiter {
-	return &rateLimiter{limit: rate.Limit(perSecond), burst: perSecond * 10, clients: map[string]*client{}}
 }
 
 func (l *rateLimiter) allow(ip string, now time.Time) bool {
@@ -46,18 +43,30 @@ func (l *rateLimiter) allow(ip string, now time.Time) bool {
 	return c.limiter.AllowN(now, 1)
 }
 
-// middleware refuses the clients over their rate; loopback is exempt, which is where the gateway calls from.
+// middleware refuses the clients over their rate; loopback is exempt, which is where the gateway
+// calls from.
 func (l *rateLimiter) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
 			ip = r.RemoteAddr
 		}
-		if parsed := net.ParseIP(ip); (parsed == nil || !parsed.IsLoopback()) && !l.allow(ip, time.Now()) {
+		if parsed := net.ParseIP(
+			ip,
+		); (parsed == nil || !parsed.IsLoopback()) &&
+			!l.allow(ip, time.Now()) {
 			w.Header().Set("Retry-After", "1")
 			http.Error(w, "too many requests", http.StatusTooManyRequests)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func newRateLimiter(perSecond int) *rateLimiter {
+	return &rateLimiter{
+		limit:   rate.Limit(perSecond),
+		burst:   perSecond * 10,
+		clients: map[string]*client{},
+	}
 }

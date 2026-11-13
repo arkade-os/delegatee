@@ -19,8 +19,18 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// spendOffchain spends coins as an offchain transaction of their own; the deadline covers building and
-// the emulator, not arkd once the transaction is persisted. An intent delegation's coins go to the queue.
+// errRefused marks what arkd or the emulator turned down for good.
+var errRefused = errors.New("refused")
+
+// refused is an error that is a refusal; its text stays the same.
+type refused struct{ error }
+
+func (r refused) Unwrap() error      { return r.error }
+func (refused) Is(target error) bool { return target == errRefused }
+
+// spendOffchain spends coins as an offchain transaction of their own; the deadline covers building
+// and the emulator, not arkd once the transaction is persisted. An intent delegation's coins go to
+// the queue.
 func (s *Service) spendOffchain(coins []delegation.Coin) {
 	select {
 	case s.slots <- struct{}{}:
@@ -33,15 +43,17 @@ func (s *Service) spendOffchain(coins []delegation.Coin) {
 	defer cancel()
 	inst, err := s.delegations.Instance(ctx, coins[0].DelegationID)
 	if err != nil {
-		log.WithError(err).WithField("delegation", coins[0].DelegationID).Error("instantiate template")
+		log.WithError(err).
+			WithField("delegation", coins[0].DelegationID).
+			Error("instantiate template")
 		s.send(skipped{coins: outpoints})
 		return
 	}
 	switch {
-	case inst.Disabled || inst.Type != template.Offchain && inst.Type != template.Intent:
+	case inst.Disabled || inst.Type != template.Virtual && inst.Type != template.Proof:
 		s.send(skipped{coins: outpoints})
 		return
-	case inst.Type == template.Intent:
+	case inst.Type == template.Proof:
 		s.send(intentReady{coins: coins})
 		return
 	}
@@ -72,18 +84,23 @@ func (s *Service) spendOffchain(coins []delegation.Coin) {
 		fail(err)
 		return
 	}
-	log.WithFields(log.Fields{"delegation": a.DelegationID, "txid": strings.Join(a.Spenders(), ",")}).Info("offchain tx finalized by the emulator")
+	log.WithFields(log.Fields{"delegation": a.DelegationID, "txid": strings.Join(a.Spenders(), ",")}).
+		Info("offchain tx finalized by the emulator")
 	s.send(attemptDone{attempt: a})
 }
 
 // build fetches the sources of the coins and builds the signed transaction over them.
-func (s *Service) build(ctx context.Context, inst *delegationapp.Instance, coins []delegation.Coin) ([]delegation.Tx, []*wire.MsgTx, error) {
+func (s *Service) build(
+	ctx context.Context, inst *delegationapp.Instance, coins []delegation.Coin,
+) ([]delegation.Tx, []*wire.MsgTx, error) {
 	txs, err := s.sources(ctx, coins)
 	if err != nil {
 		return nil, nil, err
 	}
 	fee := template.Fee{Intent: s.info.IntentFees, Dust: s.info.Dust}
-	built, err := execution.BuildOffchain(inst.Template, inst.Delegation.Inputs, coins, txs, fee, s.info.CheckpointTapscript)
+	built, err := execution.BuildOffchain(
+		inst.Template, inst.Delegation.Inputs, coins, txs, fee, s.info.CheckpointTapscript,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -95,8 +112,11 @@ func (s *Service) build(ctx context.Context, inst *delegationapp.Instance, coins
 	return built, sources, nil
 }
 
-// sources fetches the transactions that created the coins: the virtual ones from arkd, the onchain from the chain.
-func (s *Service) sources(ctx context.Context, coins []delegation.Coin) (map[string]*wire.MsgTx, error) {
+// sources fetches the transactions that created the coins: the virtual ones from arkd, the onchain
+// from the chain.
+func (s *Service) sources(
+	ctx context.Context, coins []delegation.Coin,
+) (map[string]*wire.MsgTx, error) {
 	txs := map[string]*wire.MsgTx{}
 	var virtual []string
 	for _, c := range coins {
@@ -141,7 +161,9 @@ func (s *Service) swept(ctx context.Context, coins []delegation.Coin) ([]bool, e
 		return nil, fmt.Errorf("vtxos: %w", err)
 	}
 	for i, c := range coins {
-		swept[i] = slices.ContainsFunc(vtxos, func(v ports.Output) bool { return v.Outpoint == c.Outpoint && v.Swept })
+		swept[i] = slices.ContainsFunc(
+			vtxos, func(v ports.Output) bool { return v.Outpoint == c.Outpoint && v.Swept },
+		)
 	}
 	return swept, nil
 }
@@ -164,27 +186,24 @@ func refusal(ctx context.Context, err error) error {
 		return err
 	}
 	switch status.Code(err) {
-	case codes.InvalidArgument, codes.FailedPrecondition, codes.NotFound, codes.AlreadyExists, codes.OutOfRange:
+	case codes.InvalidArgument,
+		codes.FailedPrecondition,
+		codes.NotFound,
+		codes.AlreadyExists,
+		codes.OutOfRange:
 		return refused{err}
 	}
 	return err
 }
 
-// errRefused marks what arkd or the emulator turned down for good.
-var errRefused = errors.New("refused")
-
-// refused is an error that is a refusal; its text stays the same.
-type refused struct{ error }
-
-func (r refused) Unwrap() error { return r.error }
-
-func (refused) Is(target error) bool { return target == errRefused }
-
 // chargesTemplate says a failed attempt counts against its template: the template could not build
-// it, or arkd or the emulator refused it. Outages, the daemon's own shutdown and sources fees or dust refuse do not.
+// it, or arkd or the emulator refused it. Outages, the daemon's own shutdown and sources fees or
+// dust refuse do not.
 func chargesTemplate(err error) bool {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, template.ErrUnaffordable) {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, template.ErrUnaffordable) {
 		return false
 	}
-	return errors.Is(err, template.ErrIneligible) || errors.Is(err, execution.ErrBadTx) || errors.Is(err, errRefused)
+	return errors.Is(err, template.ErrIneligible) || errors.Is(err, execution.ErrBadTx) ||
+		errors.Is(err, errRefused)
 }

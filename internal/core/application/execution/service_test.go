@@ -55,10 +55,17 @@ func TestDueAt(t *testing.T) {
 	owner, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
 	inst := instance(t, templates.Templates["renew.json"], map[string]string{
-		"owner": hex.EncodeToString(owner.PubKey().SerializeCompressed()), "exit_delay": scriptNum(1<<22 | 1),
-		"renewal_window": scriptNum(1024), "max_fee": scriptNum(1000),
+		"owner": hex.EncodeToString(
+			owner.PubKey().SerializeCompressed(),
+		),
+		"exit_delay":     scriptNum(1<<22 | 1),
+		"renewal_window": scriptNum(1024),
+		"max_fee":        scriptNum(1000),
 	})
-	c := delegation.Coin{Outpoint: strings.Repeat("ab", 32) + ":1", Amount: 1000, CreatedAt: now, ExpiresAt: now.Add(time.Hour)}
+	c := delegation.Coin{
+		Outpoint: strings.Repeat("ab", 32) + ":1", Amount: 1000, CreatedAt: now,
+		ExpiresAt: now.Add(time.Hour),
+	}
 	require.Equal(t, c.ExpiresAt.Add(-1024*time.Second), dueAt(inst, c, now))
 
 	// a short life halves the lead
@@ -81,10 +88,20 @@ func TestDueAtOnchainWaitsForConfirmations(t *testing.T) {
 	owner, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
 	inst := instance(t, templates.Templates["board.json"], map[string]string{
-		"owner": hex.EncodeToString(owner.PubKey().SerializeCompressed()), "boarding_exit_delay": scriptNum(1<<22 | 2),
-		"exit_delay": scriptNum(1<<22 | 1), "renewal_window": scriptNum(1024), "max_fee": scriptNum(1000),
+		"owner": hex.EncodeToString(
+			owner.PubKey().SerializeCompressed(),
+		),
+		"boarding_exit_delay": scriptNum(1<<22 | 2),
+		"exit_delay": scriptNum(
+			1<<22 | 1,
+		),
+		"renewal_window": scriptNum(1024),
+		"max_fee":        scriptNum(1000),
 	})
-	c := delegation.Coin{Outpoint: strings.Repeat("ab", 32) + ":0", Amount: 1000, CreatedAt: now.Add(-time.Minute), Onchain: true}
+	c := delegation.Coin{
+		Outpoint: strings.Repeat("ab", 32) + ":0", Amount: 1000, CreatedAt: now.Add(-time.Minute),
+		Onchain: true,
+	}
 	require.Equal(t, now.Add(time.Hour), dueAt(inst, c, now), "unconfirmed")
 	c.Confirmations = 1
 	require.Equal(t, c.CreatedAt, dueAt(inst, c, now))

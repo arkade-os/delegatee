@@ -30,7 +30,10 @@ func TestCoinLandsThenIsSpent(t *testing.T) {
 	require.Equal(t, 0, coins[0].Input)
 	require.Equal(t, "10000", coins[0].Amount)
 	require.Equal(t, fmt.Sprint(expires.Unix()), coins[0].ExpiresAt)
-	require.Equal(t, fmt.Sprint(expires.Add(-1024*time.Second).Unix()), coins[0].Due, "the renewal window before expiry")
+	require.Equal(
+		t, fmt.Sprint(expires.Add(-1024*time.Second).Unix()), coins[0].Due,
+		"the renewal window before expiry",
+	)
 	require.Equal(t, "present", coins[0].Status)
 	require.Empty(t, coins[0].SpentBy)
 
@@ -53,13 +56,29 @@ func TestStartupServesStoredCoinsThenReconciles(t *testing.T) {
 	var first int64
 	for i := range 1001 {
 		script := fmt.Sprintf("5120%064x", i)
-		inputs := fmt.Sprintf(`[{"Name":"funds","Onchain":false,"Script":"%s","Tapscripts":["51"]}]`, script)
+		inputs := fmt.Sprintf(
+			`[{"Name":"funds","Onchain":false,"Script":"%s","Tapscripts":["51"]}]`, script,
+		)
 		var id int64
-		require.NoError(t, d.DB.QueryRowContext(t.Context(), `
+		require.NoError(t, d.DB.QueryRowContext(
+			t.Context(),
+			`
 			INSERT INTO delegations (fingerprint, address, template_id, variables, inputs)
 			VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-			fmt.Sprintf("fp%d", i), fmt.Sprintf("addr%d", i), templateID, variables, inputs).Scan(&id))
-		_, err := d.DB.ExecContext(t.Context(), `INSERT INTO claims (delegation_id, input, script, onchain, locktime) VALUES ($1, 0, $2, false, 0)`, id, script)
+			fmt.Sprintf(
+				"fp%d", i,
+			),
+			fmt.Sprintf("addr%d", i),
+			templateID,
+			variables,
+			inputs,
+		).Scan(&id))
+		_, err := d.DB.ExecContext(
+			t.Context(),
+			`INSERT INTO claims (delegation_id, input, script, onchain, locktime) VALUES ($1, 0, $2, false, 0)`,
+			id,
+			script,
+		)
 		require.NoError(t, err)
 		if i == 0 {
 			first = id
@@ -80,7 +99,10 @@ func TestStartupServesStoredCoinsThenReconciles(t *testing.T) {
 	url := fmt.Sprintf("%s/v1/delegation?id=%d", d.RestURL, first)
 	code, body := get(t, url)
 	require.Equal(t, http.StatusOK, code, string(body))
-	require.Equal(t, []string{kept, gone}, coinOutpoints(decodeCoins(t, body)), "stored coins before any reconcile")
+	require.Equal(
+		t, []string{kept, gone}, coinOutpoints(decodeCoins(t, body)),
+		"stored coins before any reconcile",
+	)
 	for _, c := range decodeCoins(t, body) {
 		require.Equal(t, "present", c.Status)
 	}
@@ -89,14 +111,18 @@ func TestStartupServesStoredCoinsThenReconciles(t *testing.T) {
 	require.Eventually(t, func() bool {
 		_, body := get(t, url)
 		coins := decodeCoins(t, body)
-		return len(coins) == 2 && coins[0].Status == "present" && coins[1].Status == "spent" && len(d.Arkd.vtxosChunks()) == 2
+		return len(coins) == 2 && coins[0].Status == "present" && coins[1].Status == "spent" &&
+			len(d.Arkd.vtxosChunks()) == 2
 	}, 5*time.Second, 50*time.Millisecond)
 	require.Equal(t, []int{1000, 1}, d.Arkd.vtxosChunks())
 	require.Equal(t, []int{1000, 1}, d.Arkd.subscriptionSizes())
 	require.Equal(t, 2, d.Arkd.Subscriptions())
 
 	d.Arkd.Reconnect()
-	require.Eventually(t, func() bool { return len(d.Arkd.vtxosChunks()) >= 4 }, 5*time.Second, 50*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return len(d.Arkd.vtxosChunks()) >= 4 }, 5*time.Second,
+		50*time.Millisecond,
+	)
 	for _, n := range d.Arkd.vtxosChunks() {
 		require.LessOrEqual(t, n, 1000)
 	}
@@ -135,6 +161,10 @@ func coinOutpoints(coins []coin) []string {
 func coinRows(t *testing.T, d *Daemon, status string) int {
 	t.Helper()
 	var n int
-	require.NoError(t, d.DB.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM coins WHERE status = $1", status).Scan(&n))
+	require.NoError(
+		t,
+		d.DB.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM coins WHERE status = $1", status).
+			Scan(&n),
+	)
 	return n
 }

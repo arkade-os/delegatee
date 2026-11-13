@@ -65,7 +65,10 @@ func TestArtifactGetNotFound(t *testing.T) {
 }
 
 func TestOpenErrors(t *testing.T) {
-	_, err := Open(t.Context(), "postgres://nobody@127.0.0.1:1/none?sslmode=disable&connect_timeout=1")
+	_, err := Open(
+		t.Context(),
+		"postgres://nobody@127.0.0.1:1/none?sslmode=disable&connect_timeout=1",
+	)
 	require.Error(t, err)
 }
 
@@ -90,7 +93,9 @@ func testDB(t *testing.T) *DB {
 func count(t *testing.T, repo *ArtifactRepository) int {
 	t.Helper()
 	var n int
-	require.NoError(t, repo.db.db.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM artifacts").Scan(&n))
+	require.NoError(
+		t, repo.db.db.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM artifacts").Scan(&n),
+	)
 	return n
 }
 

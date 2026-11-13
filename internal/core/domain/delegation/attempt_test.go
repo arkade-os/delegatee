@@ -40,7 +40,10 @@ func TestBatchedAttemptSucceedsOnceTheBatchSpendsItsCoins(t *testing.T) {
 
 	a.AddTx(Tx{Txid: "commitment", Onchain: true, Spends: true})
 	require.Equal(t, []string{"commitment"}, a.Spenders())
-	require.Equal(t, []Tx{{Raw: []byte{1}, Txid: "proof"}, {Txid: "commitment", Onchain: true, Spends: true}}, a.Txs)
+	require.Equal(
+		t, []Tx{{Raw: []byte{1}, Txid: "proof"}, {Txid: "commitment", Onchain: true, Spends: true}},
+		a.Txs,
+	)
 	require.True(t, a.Pending(), "its coins are not seen spent yet")
 
 	require.NoError(t, a.Succeeded())
@@ -50,7 +53,9 @@ func TestBatchedAttemptSucceedsOnceTheBatchSpendsItsCoins(t *testing.T) {
 
 func TestAttemptNeedsAnActiveDelegationOwningTheCoins(t *testing.T) {
 	d := &Delegation{ID: 7, Status: StatusActive}
-	a, err := d.Attempt([]Coin{{Outpoint: "a:0", DelegationID: 7}, {Outpoint: "b:1", DelegationID: 7}})
+	a, err := d.Attempt(
+		[]Coin{{Outpoint: "a:0", DelegationID: 7}, {Outpoint: "b:1", DelegationID: 7}},
+	)
 	require.NoError(t, err)
 	require.Equal(t, Attempt{DelegationID: 7, Coins: []string{"a:0", "b:1"}, Status: Submitted}, a)
 
@@ -71,7 +76,9 @@ func TestAttemptRecordsItsSubmittedTxsOnceAndNamesTheSpendingOne(t *testing.T) {
 	require.NoError(t, off.Succeeded())
 	require.ErrorIs(t, off.Submit(Tx{Txid: "tx"}), errAttemptState)
 
-	a, err := (&Delegation{ID: 7, Status: StatusActive}).Attempt([]Coin{{Outpoint: "a:0", DelegationID: 7}})
+	a, err := (&Delegation{ID: 7, Status: StatusActive}).Attempt(
+		[]Coin{{Outpoint: "a:0", DelegationID: 7}},
+	)
 	require.NoError(t, err)
 	require.Empty(t, a.Spenders())
 	require.NoError(t, a.Submit(Tx{Raw: []byte{2}, Txid: "raw", Onchain: true, Spends: true}))
@@ -79,7 +86,9 @@ func TestAttemptRecordsItsSubmittedTxsOnceAndNamesTheSpendingOne(t *testing.T) {
 	require.Equal(t, []string{"raw"}, a.Spenders())
 	require.True(t, a.Pending())
 
-	b, err := (&Delegation{ID: 7, Status: StatusActive}).Attempt([]Coin{{Outpoint: "a:0", DelegationID: 7}})
+	b, err := (&Delegation{ID: 7, Status: StatusActive}).Attempt(
+		[]Coin{{Outpoint: "a:0", DelegationID: 7}},
+	)
 	require.NoError(t, err)
 	require.NoError(t, b.Submit(Tx{Txid: "ark", Spends: true}, Tx{Txid: "checkpoint"}))
 	require.Len(t, b.Txs, 2)
@@ -88,7 +97,9 @@ func TestAttemptRecordsItsSubmittedTxsOnceAndNamesTheSpendingOne(t *testing.T) {
 
 func offchainAttempt(t *testing.T) Attempt {
 	t.Helper()
-	a, err := (&Delegation{ID: 7, Status: StatusActive}).Attempt([]Coin{{Outpoint: "a:0", DelegationID: 7}})
+	a, err := (&Delegation{ID: 7, Status: StatusActive}).Attempt(
+		[]Coin{{Outpoint: "a:0", DelegationID: 7}},
+	)
 	require.NoError(t, err)
 	require.NoError(t, a.Submit(Tx{Raw: []byte{1}, Txid: "tx", Spends: true}))
 	return a
@@ -96,7 +107,9 @@ func offchainAttempt(t *testing.T) Attempt {
 
 func batchedAttempt(t *testing.T) Attempt {
 	t.Helper()
-	a, err := (&Delegation{ID: 7, Status: StatusActive}).Attempt([]Coin{{Outpoint: "a:0", DelegationID: 7}})
+	a, err := (&Delegation{ID: 7, Status: StatusActive}).Attempt(
+		[]Coin{{Outpoint: "a:0", DelegationID: 7}},
+	)
 	require.NoError(t, err)
 	require.NoError(t, a.Submit(Tx{Raw: []byte{1}, Txid: "proof"}))
 	return a

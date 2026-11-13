@@ -12,9 +12,15 @@ func TestPlanHoldsRenewalsInOneGroupAtTheEarliestDeadline(t *testing.T) {
 	r := Session{Duration: 30 * time.Second, MaxIntents: 10}
 	first, second := entry(1, time.Hour), entry(2, 2*time.Hour)
 	p := NewPlan([]Entry{second, first}, r, now)
-	require.Equal(t, []PlannedBatch{{
-		At: now.Add(time.Hour), RegisterAt: now.Add(time.Hour - r.Duration), Entries: []Entry{first, second},
-	}}, p.Batches, "every renewal rides in the batch the earliest deadline forces")
+	require.Equal(t, []PlannedBatch{
+		{
+			At: now.Add(
+				time.Hour,
+			),
+			RegisterAt: now.Add(time.Hour - r.Duration),
+			Entries:    []Entry{first, second},
+		},
+	}, p.Batches, "every renewal rides in the batch the earliest deadline forces")
 	require.Empty(t, p.Late)
 	require.Equal(t, now.Add(time.Hour-r.Duration), p.NextRegistration(now))
 }
@@ -38,7 +44,9 @@ func TestPlanSplitsTheGroupByCapacity(t *testing.T) {
 	} {
 		require.Equal(t, want.at, p.Batches[i].At, i)
 		require.Equal(t, want.at.Add(-r.Duration), p.Batches[i].RegisterAt, i)
-		require.Equal(t, want.ids, delegations(p.Batches[i].Entries), "the earliest deadlines go first")
+		require.Equal(
+			t, want.ids, delegations(p.Batches[i].Entries), "the earliest deadlines go first",
+		)
 	}
 	require.Empty(t, p.Late)
 }
@@ -52,15 +60,25 @@ func TestPlanOfAnOverdueCoinGoesAtTheNextSession(t *testing.T) {
 	p := NewPlan(entries, r, now)
 	require.Len(t, p.Batches, 3)
 	for i, b := range p.Batches {
-		require.Equal(t, now.Add(time.Duration(i+1)*r.Duration), b.At, "a batch after another from the next one")
+		require.Equal(
+			t, now.Add(time.Duration(i+1)*r.Duration), b.At,
+			"a batch after another from the next one",
+		)
 		require.Equal(t, now.Add(time.Duration(i)*r.Duration), b.RegisterAt)
 	}
-	require.Equal(t, []string{"op1", "op2", "op3", "op4", "op5"}, p.Late, "no batch comes before their deadline")
+	require.Equal(
+		t, []string{"op1", "op2", "op3", "op4", "op5"}, p.Late,
+		"no batch comes before their deadline",
+	)
 }
 
 func TestPlanPutsBoardingsFirstAndNow(t *testing.T) {
 	r := Session{Duration: 30 * time.Second, MaxIntents: 10}
-	boarding := Entry{DelegationID: 9, Coins: []delegation.Coin{{Outpoint: "dep:0", Onchain: true, Amount: 500}}, Due: now.Add(-time.Hour), Deadline: now.Add(-time.Hour)}
+	boarding := Entry{
+		DelegationID: 9,
+		Coins:        []delegation.Coin{{Outpoint: "dep:0", Onchain: true, Amount: 500}},
+		Due:          now.Add(-time.Hour), Deadline: now.Add(-time.Hour),
+	}
 	renewal := entry(1, time.Hour)
 	p := NewPlan([]Entry{renewal, boarding}, r, now)
 	require.Len(t, p.Batches, 2)
@@ -76,7 +94,9 @@ func TestPlanCountsAReservedEntryAsTaken(t *testing.T) {
 	held, waiting := entry(1, 10*time.Second), entry(2, 10*time.Second)
 	held.Reserved = true
 	p := NewPlan([]Entry{held}, r, now)
-	require.Equal(t, now.Add(10*time.Second), p.Batches[0].At, "its batch is the next one, not one more away")
+	require.Equal(
+		t, now.Add(10*time.Second), p.Batches[0].At, "its batch is the next one, not one more away",
+	)
 	require.Empty(t, p.Late)
 	require.Empty(t, p.Registrations(now.Add(time.Hour), 10))
 	require.True(t, p.NextRegistration(now).IsZero())
@@ -88,8 +108,14 @@ func TestPlanCountsAReservedEntryAsTaken(t *testing.T) {
 
 func TestPlanReportsCoinsWhoseDeadlinePrecedesTheirBatch(t *testing.T) {
 	r := Session{Duration: time.Minute, MaxIntents: 1}
-	p := NewPlan([]Entry{entry(1, 30*time.Second), entry(2, 200*time.Second), entry(3, 100*time.Second)}, r, now)
-	require.Equal(t, []string{"op1", "op3"}, p.Late, "the first batch is at 1m, the second at 2m, the third at 3m")
+	p := NewPlan(
+		[]Entry{entry(1, 30*time.Second), entry(2, 200*time.Second), entry(3, 100*time.Second)}, r,
+		now,
+	)
+	require.Equal(
+		t, []string{"op1", "op3"}, p.Late,
+		"the first batch is at 1m, the second at 2m, the third at 3m",
+	)
 }
 
 func TestPlanBreaksTiesDeterministically(t *testing.T) {
@@ -115,7 +141,9 @@ func TestPlanOfNoEntriesIsEmptyAndABatchHoldsAtLeastOneIntent(t *testing.T) {
 	require.Empty(t, p.Late)
 	require.True(t, p.NextRegistration(now).IsZero())
 
-	p = NewPlan([]Entry{entry(1, time.Hour), entry(2, time.Hour)}, Session{Duration: time.Second}, now)
+	p = NewPlan(
+		[]Entry{entry(1, time.Hour), entry(2, time.Hour)}, Session{Duration: time.Second}, now,
+	)
 	require.Len(t, p.Batches, 2, "a batch holds at least one intent")
 }
 
@@ -128,9 +156,15 @@ func TestRegistrationsOpenAtBatchRegisterTimeLimitedByFreeSlots(t *testing.T) {
 	entries[0].Reserved = true
 	p := NewPlan(entries, r, now)
 	require.Empty(t, p.Registrations(now, 10), "nothing is registered early")
-	require.Equal(t, []int64{2}, delegations(p.Registrations(p.Batches[0].RegisterAt, 10)), "the reserved one is skipped")
+	require.Equal(
+		t, []int64{2}, delegations(p.Registrations(p.Batches[0].RegisterAt, 10)),
+		"the reserved one is skipped",
+	)
 	require.Equal(t, []int64{2, 3, 4}, delegations(p.Registrations(p.Batches[1].RegisterAt, 10)))
-	require.Equal(t, []int64{2, 3}, delegations(p.Registrations(p.Batches[1].RegisterAt, 2)), "no more than the slots")
+	require.Equal(
+		t, []int64{2, 3}, delegations(p.Registrations(p.Batches[1].RegisterAt, 2)),
+		"no more than the slots",
+	)
 	require.Empty(t, p.Registrations(p.Batches[1].RegisterAt, 0))
 }
 
@@ -145,8 +179,14 @@ func TestNextRegistrationSkipsReservedBatches(t *testing.T) {
 
 func TestEntryIsDueWithItsLastCoinAndDeadlineAtEarliestCoinReserve(t *testing.T) {
 	reserve := 6 * time.Hour
-	early := delegation.Coin{DelegationID: 7, Outpoint: "a:0", Due: now.Add(time.Hour), ExpiresAt: now.Add(10 * time.Hour)}
-	late := delegation.Coin{DelegationID: 7, Outpoint: "b:0", Due: now.Add(2 * time.Hour), ExpiresAt: now.Add(20 * time.Hour)}
+	early := delegation.Coin{
+		DelegationID: 7, Outpoint: "a:0", Due: now.Add(time.Hour),
+		ExpiresAt: now.Add(10 * time.Hour),
+	}
+	late := delegation.Coin{
+		DelegationID: 7, Outpoint: "b:0", Due: now.Add(2 * time.Hour),
+		ExpiresAt: now.Add(20 * time.Hour),
+	}
 	e := NewEntry([]delegation.Coin{late, early}, reserve)
 	require.Equal(t, int64(7), e.DelegationID)
 	require.Equal(t, now.Add(2*time.Hour), e.Due, "due when the last coin is")
@@ -169,7 +209,9 @@ func TestDeadlineIsReserveBeforeExpiryButNeverBeforeDue(t *testing.T) {
 		"the reserve beyond the life":    {now.Add(time.Hour), now, now},
 		"the reserve exactly at the due": {now.Add(reserve), now, now},
 	} {
-		require.Equal(t, tc.want, deadline(delegation.Coin{ExpiresAt: tc.expiry}, tc.due, reserve), name)
+		require.Equal(
+			t, tc.want, deadline(delegation.Coin{ExpiresAt: tc.expiry}, tc.due, reserve), name,
+		)
 	}
 }
 
@@ -204,7 +246,11 @@ func TestPlanOfAFutureRenewalDueBeforeTheEarliestDeadlineJoinsItsGroup(t *testin
 
 func TestPlanPutsAFutureBoardingAtItsDueTime(t *testing.T) {
 	r := Session{Duration: 30 * time.Second, MaxIntents: 10}
-	boarding := Entry{DelegationID: 9, Coins: []delegation.Coin{{Outpoint: "dep:0", Onchain: true, Amount: 500}}, Due: now.Add(3 * time.Hour), Deadline: now.Add(3 * time.Hour)}
+	boarding := Entry{
+		DelegationID: 9,
+		Coins:        []delegation.Coin{{Outpoint: "dep:0", Onchain: true, Amount: 500}},
+		Due:          now.Add(3 * time.Hour), Deadline: now.Add(3 * time.Hour),
+	}
 	renewal := entry(1, 6*time.Hour)
 	p := NewPlan([]Entry{renewal, boarding}, r, now)
 	require.Len(t, p.Batches, 2)
@@ -216,8 +262,12 @@ func TestPlanPutsAFutureBoardingAtItsDueTime(t *testing.T) {
 
 func entry(id int64, deadline time.Duration) Entry {
 	return Entry{
-		DelegationID: id, Coins: []delegation.Coin{{Outpoint: "op" + string(rune('0'+id)), DelegationID: id, Amount: 1000}},
-		Due: now, Deadline: now.Add(deadline),
+		DelegationID: id,
+		Coins: []delegation.Coin{
+			{Outpoint: "op" + string(rune('0'+id)), DelegationID: id, Amount: 1000},
+		},
+		Due:      now,
+		Deadline: now.Add(deadline),
 	}
 }
 

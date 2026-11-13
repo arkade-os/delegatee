@@ -95,8 +95,9 @@ func proofTxids(ours []intent) []string {
 	return out
 }
 
-// blamed lists the proof txids of the intents a failed batch is held against: the ones its reason names,
-// else all of ours when it says our nonces, signatures or forfeits were wrong or late, or we refused.
+// blamed lists the proof txids of the intents a failed batch is held against: the ones its reason
+// names, else all of ours when it says our nonces, signatures or forfeits were wrong or late, or we
+// refused.
 func blamed(reason string, ours []intent) []string {
 	var named []string
 	for _, in := range ours {

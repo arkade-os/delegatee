@@ -161,7 +161,7 @@ message ListAttemptsResponse {
 message Attempt {
   int64 id = 1;
   int64 delegation_id = 2;
-  // kind is the delegation's template type: offchain or intent.
+  // kind is the delegation's template type: virtual or proof.
   string kind = 3;
   // coins are the outpoints the attempt spends.
   repeated string coins = 4;

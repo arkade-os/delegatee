@@ -10,14 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// the daemon dies while an intent is registered; its coins are not spent by the landing window and go again.
+// the daemon dies while an intent is registered; its coins are not spent by the landing window and
+// go again.
 func TestRestartFailsARegisteredIntentAtTheLandingWindowAndRegistersAgain(t *testing.T) {
 	d := Start(t, WithSessions(500*time.Millisecond, 128))
 	d.Arkd.PauseBatches(true)
 	d.Arkd.CrashAfterRegistration(true)
 	_, templateID := registerRenewal(t, d)
 	w := renewalDelegation(t, d, templateID, 1024, 1000)
-	outpoint := d.Arkd.FundAged(w.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(500*time.Second))
+	outpoint := d.Arkd.FundAged(
+		w.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(500*time.Second),
+	)
 	require.Eventually(t, func() bool {
 		attempts := listAttempts(t, d, w.ID)
 		return len(attempts) == 1 && attempts[0].Status == "submitted"
@@ -46,16 +49,28 @@ func TestRestartLandsAForfeitedAttemptOnce(t *testing.T) {
 	d.Arkd.CrashAfterForfeits(true)
 	_, templateID := registerRenewal(t, d)
 	w := renewalDelegation(t, d, templateID, 1024, 1000)
-	outpoint := d.Arkd.FundAged(w.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(500*time.Second))
-	require.Eventually(t, func() bool { return len(d.Arkd.Commitments()) == 1 }, 10*time.Second, 20*time.Millisecond)
-	require.Equal(t, "submitted", listAttempts(t, d, w.ID)[0].Status, "the daemon never saw the batch end")
+	outpoint := d.Arkd.FundAged(
+		w.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(500*time.Second),
+	)
+	require.Eventually(
+		t, func() bool { return len(d.Arkd.Commitments()) == 1 }, 10*time.Second,
+		20*time.Millisecond,
+	)
+	require.Equal(
+		t, "submitted", listAttempts(t, d, w.ID)[0].Status, "the daemon never saw the batch end",
+	)
 
 	d.stop()
 	d.Arkd.CrashAfterForfeits(false)
 	d.Arkd.HoldLanding(false)
-	require.Eventually(t, func() bool { return d.Arkd.spent(outpoint) }, 5*time.Second, 20*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return d.Arkd.spent(outpoint) }, 5*time.Second, 20*time.Millisecond,
+	)
 	d = d.Restart(t)
-	require.Eventually(t, func() bool { return attemptRows(t, d, "succeeded") == 1 }, 10*time.Second, 20*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return attemptRows(t, d, "succeeded") == 1 }, 10*time.Second,
+		20*time.Millisecond,
+	)
 	time.Sleep(300 * time.Millisecond)
 
 	require.Equal(t, 1, attemptRows(t, d, ""))
@@ -78,7 +93,9 @@ func TestRestartFailsAForfeitedAttemptThatDidNotLand(t *testing.T) {
 	d.Arkd.FailAfterForfeits(true)
 	_, templateID := registerRenewal(t, d)
 	w := renewalDelegation(t, d, templateID, 1024, 1000)
-	outpoint := d.Arkd.FundAged(w.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(500*time.Second))
+	outpoint := d.Arkd.FundAged(
+		w.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(500*time.Second),
+	)
 	require.Eventually(t, func() bool {
 		return slices.Contains(d.Arkd.batchCalls(), "forfeits") && !d.Arkd.InBatch()
 	}, 10*time.Second, 20*time.Millisecond)
@@ -105,9 +122,13 @@ func TestBlamedCoinsWaitOutTheBan(t *testing.T) {
 	_, templateID := registerRenewal(t, d)
 	late := renewalDelegation(t, d, templateID, 1024, 1000)
 	other := renewalDelegation(t, d, templateID, 1024, 1000)
-	lateCoin := d.Arkd.FundAged(late.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(500*time.Second))
+	lateCoin := d.Arkd.FundAged(
+		late.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(500*time.Second),
+	)
 	d.Arkd.FundAged(other.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(500*time.Second))
-	require.Eventually(t, func() bool { return d.Arkd.Registered() == 2 }, 5*time.Second, 20*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return d.Arkd.Registered() == 2 }, 5*time.Second, 20*time.Millisecond,
+	)
 
 	d.Arkd.FailNextBatchBlaming(lateCoin, "sent its forfeits late")
 	d.Arkd.PauseBatches(false)
@@ -143,13 +164,18 @@ func TestStopWaitsForTheBatchInFlight(t *testing.T) {
 
 	d.stop()
 	var status string
-	require.NoError(t, d.DB.QueryRowContext(t.Context(), "SELECT status FROM attempts").Scan(&status))
+	require.NoError(
+		t, d.DB.QueryRowContext(t.Context(), "SELECT status FROM attempts").Scan(&status),
+	)
 	require.Contains(t, []string{"submitted", "succeeded"}, status)
 	require.Len(t, d.Arkd.Commitments(), 1)
-	require.Equal(t, []string{"register", "confirm", "nonces", "signatures", "forfeits"}, d.Arkd.batchCalls())
+	require.Equal(
+		t, []string{"register", "confirm", "nonces", "signatures", "forfeits"}, d.Arkd.batchCalls(),
+	)
 }
 
-// An entry queued and not yet registered goes when its delegation is cancelled or its coin is spent.
+// An entry queued and not yet registered goes when its delegation is cancelled or its coin is
+// spent.
 func TestQueuedEntriesAreWithdrawn(t *testing.T) {
 	d := Start(t, WithSessions(time.Second, 1), func(c *config.Config) { c.IntentsPerBatch = 1 })
 	d.Arkd.PauseBatches(true)
@@ -159,10 +185,19 @@ func TestQueuedEntriesAreWithdrawn(t *testing.T) {
 	for i := range 3 {
 		w := renewalDelegation(t, d, templateID, 8*3600, 1000)
 		delegations = append(delegations, w)
-		coins = append(coins, d.Arkd.FundAged(w.Inputs[0].Script, 10_000, 14*time.Hour, time.Now().Add(reserve+time.Duration(i)*time.Second)))
+		coins = append(
+			coins,
+			d.Arkd.FundAged(
+				w.Inputs[0].Script, 10_000, 14*time.Hour,
+				time.Now().Add(reserve+time.Duration(i)*time.Second),
+			),
+		)
 		if i == 0 {
 			// the first entry queued is the one registered
-			require.Eventually(t, func() bool { return readStatus(t, d).Registered == 1 }, 10*time.Second, 20*time.Millisecond)
+			require.Eventually(
+				t, func() bool { return readStatus(t, d).Registered == 1 }, 10*time.Second,
+				20*time.Millisecond,
+			)
 		}
 	}
 	require.Eventually(t, func() bool {
@@ -170,15 +205,27 @@ func TestQueuedEntriesAreWithdrawn(t *testing.T) {
 		return st.Registered == 1 && st.Queued == 2
 	}, 10*time.Second, 20*time.Millisecond)
 
-	code, body := post(t, d.AdminURL+"/v1/admin/delegation/"+delegations[1].ID+"/cancel", map[string]any{})
+	code, body := post(
+		t, d.AdminURL+"/v1/admin/delegation/"+delegations[1].ID+"/cancel", map[string]any{},
+	)
 	require.Equal(t, http.StatusOK, code, string(body))
-	require.Eventually(t, func() bool { return readStatus(t, d).Queued == 1 }, 5*time.Second, 20*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return readStatus(t, d).Queued == 1 }, 5*time.Second, 20*time.Millisecond,
+	)
 	d.Arkd.Spend(coins[2], "elsewhere")
-	require.Eventually(t, func() bool { return readStatus(t, d).Queued == 0 }, 5*time.Second, 20*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return readStatus(t, d).Queued == 0 }, 5*time.Second, 20*time.Millisecond,
+	)
 	require.Equal(t, 1, readStatus(t, d).Registered)
 
 	d.Arkd.PauseBatches(false)
-	require.Eventually(t, func() bool { return attemptRows(t, d, "succeeded") == 1 }, 10*time.Second, 20*time.Millisecond)
-	require.Never(t, func() bool { return d.Arkd.registeredCount() > 1 }, 2500*time.Millisecond, 100*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return attemptRows(t, d, "succeeded") == 1 }, 10*time.Second,
+		20*time.Millisecond,
+	)
+	require.Never(
+		t, func() bool { return d.Arkd.registeredCount() > 1 }, 2500*time.Millisecond,
+		100*time.Millisecond,
+	)
 	require.Equal(t, 1, attemptRows(t, d, ""), "no attempt fails at registration")
 }

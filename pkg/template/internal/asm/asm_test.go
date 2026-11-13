@@ -37,17 +37,27 @@ func TestAssemble(t *testing.T) {
 		AddInt64(4194306).AddOp(txscript.OP_CHECKSEQUENCEVERIFY).AddOp(txscript.OP_DROP).
 		AddData(key).AddOp(txscript.OP_CHECKSIG).Script()
 	require.NoError(t, err)
-	got, err := Assemble([]string{"<delay>", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<SERVER_KEY>", "OP_CHECKSIG"}, lookup)
+	got, err := Assemble(
+		[]string{"<delay>", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<SERVER_KEY>", "OP_CHECKSIG"},
+		lookup,
+	)
 	require.NoError(t, err)
 	require.Equal(t, want, got)
 
-	got, err = Assemble([]string{"4194306", "0x74797065", "OP_INSPECTINTENTMESSAGE", "<zero>", "16", "17", "-1"}, lookup)
+	got, err = Assemble(
+		[]string{"4194306", "0x74797065", "OP_INSPECTINTENTMESSAGE", "<zero>", "16", "17", "-1"},
+		lookup,
+	)
 	require.NoError(t, err)
 	want, _ = txscript.NewScriptBuilder().AddInt64(4194306).AddData([]byte("type")).
-		AddOp(arkade.OP_INSPECTINTENTMESSAGE).AddInt64(0).AddInt64(16).AddInt64(17).AddInt64(-1).Script()
+		AddOp(arkade.OP_INSPECTINTENTMESSAGE).
+		AddInt64(0).AddInt64(16).AddInt64(17).AddInt64(-1).Script()
 	require.Equal(t, want, got)
 
-	got, err = Assemble([]string{"0x05", "0x81", "<empty>", "<one>", "9007199254740991", "-9007199254740991"}, lookup)
+	got, err = Assemble(
+		[]string{"0x05", "0x81", "<empty>", "<one>", "9007199254740991", "-9007199254740991"},
+		lookup,
+	)
 	require.NoError(t, err)
 	want, _ = txscript.NewScriptBuilder().AddData([]byte{5}).AddData([]byte{0x81}).AddData(nil).
 		AddData([]byte{1}).AddInt64(1<<53 - 1).AddInt64(1 - 1<<53).Script()
@@ -69,11 +79,20 @@ func TestAssemble(t *testing.T) {
 	require.Empty(t, got)
 
 	for name, tokens := range map[string][]string{
-		"unknown opcode": {"OP_NOPE"}, "uppercase hex": {"0xAB"}, "odd hex": {"0xabc"},
-		"unknown name": {"<nope>"}, "leading zero": {"007"}, "empty": {""},
-		"negative zero": {"-0"}, "too large": {"9007199254740992"}, "too small": {"-9007199254740992"},
-		"overflow": {"99999999999999999999"}, "long hex": {"0x" + string(bytes.Repeat([]byte("ab"), 521))},
-		"long value": {"<big>"}, "bad int value": {"<badint>"}, "empty placeholder": {"<>"},
+		"unknown opcode":    {"OP_NOPE"},
+		"uppercase hex":     {"0xAB"},
+		"odd hex":           {"0xabc"},
+		"unknown name":      {"<nope>"},
+		"leading zero":      {"007"},
+		"empty":             {""},
+		"negative zero":     {"-0"},
+		"too large":         {"9007199254740992"},
+		"too small":         {"-9007199254740992"},
+		"overflow":          {"99999999999999999999"},
+		"long hex":          {"0x" + string(bytes.Repeat([]byte("ab"), 521))},
+		"long value":        {"<big>"},
+		"bad int value":     {"<badint>"},
+		"empty placeholder": {"<>"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := Assemble(tokens, lookup)

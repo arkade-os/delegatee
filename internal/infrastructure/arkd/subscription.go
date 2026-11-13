@@ -25,19 +25,6 @@ type subscription struct {
 	stops  []func()
 }
 
-func subscribe(ctx context.Context, indexer clientlib.Indexer, scripts []string) (*subscription, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	s := &subscription{
-		ctx: ctx, cancel: cancel, indexer: indexer, shards: shards{size: ports.MaxScripts},
-		events: make(chan ports.ScriptEvent, 64), reconnects: make(chan struct{}, 1),
-	}
-	if err := s.Update(ctx, scripts, nil); err != nil {
-		s.Stop()
-		return nil, err
-	}
-	return s, nil
-}
-
 func (s *subscription) Events() <-chan ports.ScriptEvent { return s.events }
 func (s *subscription) Reconnects() <-chan struct{}      { return s.reconnects }
 
@@ -142,7 +129,26 @@ func (s *subscription) signalReconnect() {
 	}
 }
 
-// toScriptEvent lists the created vtxos, then the spent ones, spent by the event's transaction when arkd names nothing else.
+func subscribe(
+	ctx context.Context, indexer clientlib.Indexer, scripts []string,
+) (*subscription, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	s := &subscription{
+		ctx:     ctx,
+		cancel:  cancel,
+		indexer: indexer,
+		shards:  shards{size: ports.MaxScripts},
+		events:  make(chan ports.ScriptEvent, 64), reconnects: make(chan struct{}, 1),
+	}
+	if err := s.Update(ctx, scripts, nil); err != nil {
+		s.Stop()
+		return nil, err
+	}
+	return s, nil
+}
+
+// toScriptEvent lists the created vtxos, then the spent ones, spent by the event's transaction when
+// arkd names nothing else.
 func toScriptEvent(d *clientlib.ScriptEventData) ports.ScriptEvent {
 	ev := ports.ScriptEvent{Txid: d.Txid}
 	for _, v := range d.NewVtxos {

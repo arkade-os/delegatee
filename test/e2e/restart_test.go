@@ -44,7 +44,9 @@ func TestRestartMidRenewal(t *testing.T) {
 	d := start(t)
 	w, renewal := boardingDelegations(t, d, newOwner(t, d))
 	// cancelled, the renewal leaves the boarded coin alone until the daemon is ready to crash
-	_, err := d.admin.CancelDelegation(t.Context(), &executorv1.CancelDelegationRequest{Id: renewal.Id})
+	_, err := d.admin.CancelDelegation(
+		t.Context(), &executorv1.CancelDelegationRequest{Id: renewal.Id},
+	)
 	require.NoError(t, err)
 	faucet(t, w.Address, 20_000)
 	boarded := landed(t, d, w, renewal, 1)[0]
@@ -52,7 +54,9 @@ func TestRestartMidRenewal(t *testing.T) {
 
 	crash := &crashingArk{afterForfeits: true}
 	mid := d.restart(t, crash.dial(t))
-	_, err = mid.admin.ResumeDelegation(t.Context(), &executorv1.ResumeDelegationRequest{Id: renewal.Id})
+	_, err = mid.admin.ResumeDelegation(
+		t.Context(), &executorv1.ResumeDelegationRequest{Id: renewal.Id},
+	)
 	require.NoError(t, err)
 	crash.wait(t)
 	mid.stop()
@@ -73,7 +77,10 @@ func TestRestartMidRenewal(t *testing.T) {
 		return spending == 1 && succeeded == 1
 	}, time.Minute, time.Second, "the renewal is not recorded once")
 	require.Eventually(t, func() bool {
-		unspent := slices.DeleteFunc(vtxosAt(t, again, renewal.Inputs[0].Script), func(v clientlib.Vtxo) bool { return v.Spent })
+		unspent := slices.DeleteFunc(
+			vtxosAt(t, again, renewal.Inputs[0].Script),
+			func(v clientlib.Vtxo) bool { return v.Spent },
+		)
 		return len(unspent) == 1 && unspent[0].Amount == 20_000
 	}, time.Minute, time.Second, "no single unspent output of the full amount")
 }
@@ -81,7 +88,8 @@ func TestRestartMidRenewal(t *testing.T) {
 // realArk makes a restarted daemon dial arkd itself.
 func realArk(c *config.Config) { c.Ark, c.Indexer = nil, nil }
 
-// crashingArk is arkd as the daemon sees it until it dies: then every call fails and the batch events end.
+// crashingArk is arkd as the daemon sees it until it dies: then every call fails and the batch
+// events end.
 type crashingArk struct {
 	ports.Signer
 	afterForfeits bool // dies once its forfeits reached arkd
@@ -147,14 +155,18 @@ func (a *crashingArk) BatchEvents(ctx context.Context) (<-chan ports.BatchEvent,
 	return out, stop, nil
 }
 
-func (a *crashingArk) SubmitTreeNonces(ctx context.Context, batchID, cosigner string, nonces tree.TreeNonces) error {
+func (a *crashingArk) SubmitTreeNonces(
+	ctx context.Context, batchID, cosigner string, nonces tree.TreeNonces,
+) error {
 	if err := a.dead(); err != nil {
 		return err
 	}
 	return a.Signer.SubmitTreeNonces(ctx, batchID, cosigner, nonces)
 }
 
-func (a *crashingArk) SubmitSignedForfeitTxs(ctx context.Context, forfeits []string, commitment string) error {
+func (a *crashingArk) SubmitSignedForfeitTxs(
+	ctx context.Context, forfeits []string, commitment string,
+) error {
 	if err := a.dead(); err != nil {
 		return err
 	}

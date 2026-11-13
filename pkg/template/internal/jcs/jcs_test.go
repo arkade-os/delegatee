@@ -33,19 +33,13 @@ func TestCanonical(t *testing.T) {
 
 func TestDecodeStrictRejects(t *testing.T) {
 	for name, in := range map[string]string{
-		"duplicate key":        `{"a":1,"a":2}`,
-		"nested duplicate key": `{"a":{"b":1,"b":1}}`,
-		"trailing data":        `{"a":1} {}`,
-		"invalid utf8":         "{\"a\":\"\xff\"}",
-		"fraction":             `{"a":1.5}`,
-		"exponent":             `{"a":1e3}`,
-		"too large":            `{"a":9007199254740992}`,
-		"negative zero":        `{"a":-0}`,
-		"lone high surrogate":  `{"a":"\ud800"}`,
-		"lone low surrogate":   `{"a":"\uDC00"}`,
-		"lone surrogate key":   `{"\ud800":1}`,
-		"high then non-low":    `{"a":"\ud800\u0041"}`,
-		"too deep":             strings.Repeat("[", 65) + strings.Repeat("]", 65),
+		"duplicate key": `{"a":1,"a":2}`, "nested duplicate key": `{"a":{"b":1,"b":1}}`,
+		"trailing data": `{"a":1} {}`, "invalid utf8": "{\"a\":\"\xff\"}",
+		"fraction": `{"a":1.5}`, "exponent": `{"a":1e3}`,
+		"too large": `{"a":9007199254740992}`, "negative zero": `{"a":-0}`,
+		"lone high surrogate": `{"a":"\ud800"}`, "lone low surrogate": `{"a":"\uDC00"}`,
+		"lone surrogate key": `{"\ud800":1}`, "high then non-low": `{"a":"\ud800\u0041"}`,
+		"too deep": strings.Repeat("[", 65) + strings.Repeat("]", 65),
 	} {
 		t.Run(name, func(t *testing.T) {
 			v, err := Decode([]byte(in))

@@ -59,12 +59,14 @@ type Config struct {
 // Default is what Load starts from before reading the environment.
 func Default() Config {
 	return Config{
-		Port: 7080, AdminPort: 7081, MaxArtifacts: 1000, MaxTemplates: 1000, MaxDocumentBytes: 1 << 20,
-		MaxDelegations: 500000, MaxStreamChildren: 10000, MinDelegationExpiry: 24 * time.Hour,
-		ExpiryInterval: time.Minute, PruneAfter: 30 * 24 * time.Hour, OffchainConcurrency: 8,
-		AttemptTimeout: time.Minute, RetryDelay: time.Minute, IntentsPerBatch: 128, IntentTimeout: 5 * time.Minute,
+		Port: 7080, AdminPort: 7081, MaxArtifacts: 1000, MaxTemplates: 1000,
+		MaxDocumentBytes: 1 << 20, MaxDelegations: 500000, MaxStreamChildren: 10000,
+		MinDelegationExpiry: 24 * time.Hour, ExpiryInterval: time.Minute,
+		PruneAfter: 30 * 24 * time.Hour, OffchainConcurrency: 8, AttemptTimeout: time.Minute,
+		RetryDelay: time.Minute, IntentsPerBatch: 128, IntentTimeout: 5 * time.Minute,
 		Reserve: 15 * time.Minute, BanDuration: 5 * time.Minute, LandingWindow: 5 * time.Minute,
-		TemplateMaxFailures: 10, LoopStall: 2 * time.Minute, PublicRateLimit: 5, LogLevel: 4, DefaultTemplates: true,
+		TemplateMaxFailures: 10, LoopStall: 2 * time.Minute, PublicRateLimit: 5, LogLevel: 4,
+		DefaultTemplates: true,
 	}
 }
 
@@ -136,7 +138,9 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("%sTEMPLATE_MAX_FAILURES must be at least 1", envPrefix)
 	}
 	if cfg.Reserve < 2*cfg.IntentTimeout {
-		return Config{}, fmt.Errorf("%sRESERVE must be at least twice %sINTENT_TIMEOUT", envPrefix, envPrefix)
+		return Config{}, fmt.Errorf(
+			"%sRESERVE must be at least twice %sINTENT_TIMEOUT", envPrefix, envPrefix,
+		)
 	}
 	if cfg.DefaultTemplates, err = envBool("DEFAULT_TEMPLATES", cfg.DefaultTemplates); err != nil {
 		return Config{}, err
@@ -144,7 +148,9 @@ func Load() (Config, error) {
 	if os.Getenv(envPrefix+"COSIGNER_KEY") == "" {
 		return Config{}, fmt.Errorf("%sCOSIGNER_KEY is required", envPrefix)
 	}
-	if cfg.CosignerKey, err = parseKey("COSIGNER_KEY", os.Getenv(envPrefix+"COSIGNER_KEY")); err != nil {
+	if cfg.CosignerKey, err = parseKey(
+		"COSIGNER_KEY", os.Getenv(envPrefix+"COSIGNER_KEY"),
+	); err != nil {
 		return Config{}, err
 	}
 	if value := os.Getenv(envPrefix + "ENCRYPTION_KEY"); value != "" {
@@ -156,14 +162,18 @@ func Load() (Config, error) {
 	switch os.Getenv(envPrefix + "ADMIN_AUTH") {
 	case "file":
 		if usersFile == "" {
-			return Config{}, fmt.Errorf("%sADMIN_USERS_FILE is required when %sADMIN_AUTH=file", envPrefix, envPrefix)
+			return Config{}, fmt.Errorf(
+				"%sADMIN_USERS_FILE is required when %sADMIN_AUTH=file", envPrefix, envPrefix,
+			)
 		}
 		if cfg.AdminUsers, err = LoadAdminUsers(usersFile); err != nil {
 			return Config{}, err
 		}
 	case "disabled":
 		if usersFile != "" {
-			return Config{}, fmt.Errorf("%sADMIN_USERS_FILE cannot be set when %sADMIN_AUTH=disabled", envPrefix, envPrefix)
+			return Config{}, fmt.Errorf(
+				"%sADMIN_USERS_FILE cannot be set when %sADMIN_AUTH=disabled", envPrefix, envPrefix,
+			)
 		}
 	default:
 		return Config{}, fmt.Errorf("%sADMIN_AUTH must be file or disabled", envPrefix)
@@ -186,10 +196,14 @@ func LoadAdminUsers(path string) ([]grpcserver.AdminUser, error) {
 		}
 		name, hash, ok := strings.Cut(line, ":")
 		if !ok || name == "" || hash == "" {
-			return nil, fmt.Errorf("%sADMIN_USERS_FILE line %d must be user:bcrypt-hash", envPrefix, i+1)
+			return nil, fmt.Errorf(
+				"%sADMIN_USERS_FILE line %d must be user:bcrypt-hash", envPrefix, i+1,
+			)
 		}
 		if cost, err := bcrypt.Cost([]byte(hash)); err != nil || cost < bcrypt.DefaultCost {
-			return nil, fmt.Errorf("%sADMIN_USERS_FILE line %d has an invalid bcrypt hash", envPrefix, i+1)
+			return nil, fmt.Errorf(
+				"%sADMIN_USERS_FILE line %d has an invalid bcrypt hash", envPrefix, i+1,
+			)
 		}
 		if seen[name] {
 			return nil, fmt.Errorf("%sADMIN_USERS_FILE repeats user %q", envPrefix, name)

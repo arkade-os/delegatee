@@ -11,7 +11,6 @@ import (
 	"github.com/btcsuite/btcd/txscript/v2"
 )
 
-// maxPushSize is the largest data push a script accepts.
 const maxPushSize = 520
 
 // Value is a resolved scalar; int values are pushed as Script numbers.
@@ -34,6 +33,28 @@ func Assemble(tokens []string, lookup Lookup) ([]byte, error) {
 	return b.Script()
 }
 
+// Opcode returns the byte of an OP_ token; push opcodes are refused, they would run the next
+// token's data as code.
+func Opcode(tok string) (byte, error) {
+	op, ok := arkade.OpcodeByName[tok]
+	if !ok {
+		return 0, fmt.Errorf("unknown opcode %q", tok)
+	}
+	if op >= txscript.OP_DATA_1 && op <= txscript.OP_PUSHDATA4 {
+		return 0, fmt.Errorf("push opcode %q", tok)
+	}
+	return op, nil
+}
+
+// ParseDecimal parses a decimal token with magnitude up to 2^53-1.
+func ParseDecimal(tok string) (int64, error) {
+	n, err := strconv.ParseInt(tok, 10, 64)
+	if err != nil || n > MaxScriptNum || n < -MaxScriptNum {
+		return 0, fmt.Errorf("number %q out of range", tok)
+	}
+	return n, nil
+}
+
 func addToken(b *txscript.ScriptBuilder, tok string, lookup Lookup) error {
 	switch {
 	case strings.HasPrefix(tok, "OP_"):
@@ -51,6 +72,15 @@ func addToken(b *txscript.ScriptBuilder, tok string, lookup Lookup) error {
 	case HexTok.MatchString(tok):
 		raw, _ := hex.DecodeString(tok[2:])
 		return addData(b, tok, raw)
+	case Splice.MatchString(tok):
+		if lookup == nil {
+			return fmt.Errorf("%s: no lookup", tok)
+		}
+		v, err := lookup(tok[2 : len(tok)-1])
+		if err != nil {
+			return fmt.Errorf("%s: %w", tok, err)
+		}
+		b.AddOps(v.Raw)
 	case Placeholder.MatchString(tok):
 		if lookup == nil {
 			return fmt.Errorf("%s: no lookup", tok)
@@ -73,18 +103,6 @@ func addToken(b *txscript.ScriptBuilder, tok string, lookup Lookup) error {
 	return nil
 }
 
-// Opcode returns the byte of an OP_ token; push opcodes are refused, they would run the next token's data as code.
-func Opcode(tok string) (byte, error) {
-	op, ok := arkade.OpcodeByName[tok]
-	if !ok {
-		return 0, fmt.Errorf("unknown opcode %q", tok)
-	}
-	if op >= txscript.OP_DATA_1 && op <= txscript.OP_PUSHDATA4 {
-		return 0, fmt.Errorf("push opcode %q", tok)
-	}
-	return op, nil
-}
-
 func addData(b *txscript.ScriptBuilder, tok string, raw []byte) error {
 	if len(raw) > maxPushSize {
 		return fmt.Errorf("%s: push of %d bytes exceeds %d", tok, len(raw), maxPushSize)
@@ -95,13 +113,4 @@ func addData(b *txscript.ScriptBuilder, tok string, raw []byte) error {
 		b.AddData(raw)
 	}
 	return nil
-}
-
-// ParseDecimal parses a decimal token with magnitude up to 2^53-1.
-func ParseDecimal(tok string) (int64, error) {
-	n, err := strconv.ParseInt(tok, 10, 64)
-	if err != nil || n > MaxScriptNum || n < -MaxScriptNum {
-		return 0, fmt.Errorf("number %q out of range", tok)
-	}
-	return n, nil
 }

@@ -8,22 +8,18 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 )
 
-// MaxScriptNum bounds the magnitude of an int value.
 const MaxScriptNum = 1<<53 - 1
 
 // ScalarTypes are the types a variable, a constructor field or a witness item can have.
 var ScalarTypes = []string{"pubkey", "bytes", "bytes20", "bytes32", "asset", "int", "bool"}
 
 var (
-	// DecimalTok matches a decimal token without leading zeros.
-	DecimalTok = regexp.MustCompile(`^(0|-?[1-9][0-9]*)$`)
-	// HexTok matches a 0x-prefixed lowercase hex push.
-	HexTok = regexp.MustCompile(`^0x([0-9a-f]{2})+$`)
-	// Placeholder matches a <name> token.
+	DecimalTok  = regexp.MustCompile(`^(0|-?[1-9][0-9]*)$`)
+	HexTok      = regexp.MustCompile(`^0x([0-9a-f]{2})+$`)
+	Splice      = regexp.MustCompile(`^<!([^<>!]+)>$`)
 	Placeholder = regexp.MustCompile(`^<([^<>]+)>$`)
 )
 
-// CanonicalBytes requires raw to be the canonical encoding of typ.
 func CanonicalBytes(typ string, raw []byte) error {
 	var err error
 	switch typ {
@@ -58,7 +54,6 @@ func CanonicalBytes(typ string, raw []byte) error {
 	return nil
 }
 
-// ScriptNum encodes n as a minimal Script number.
 func ScriptNum(n int64) []byte {
 	b, _ := arkade.BigNumFromInt64(n).Bytes()
 	return b

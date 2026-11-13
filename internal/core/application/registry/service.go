@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/arkade-os/executor/internal/core/domain/registry"
@@ -24,11 +25,15 @@ type Service struct {
 	parsed    sync.Map   // *template.Template by id; documents are content-addressed, so entries never go stale
 }
 
-func NewService(artifacts registry.ArtifactRepository, templates registry.TemplateRepository, limits Limits) *Service {
+func NewService(
+	artifacts registry.ArtifactRepository, templates registry.TemplateRepository, limits Limits,
+) *Service {
 	return &Service{artifacts: artifacts, templates: templates, limits: limits}
 }
 
-func (s *Service) RegisterArtifact(ctx context.Context, document []byte) (*registry.Artifact, error) {
+func (s *Service) RegisterArtifact(
+	ctx context.Context, document []byte,
+) (*registry.Artifact, error) {
 	a, err := registry.NewArtifact(document, s.limits.MaxDocumentBytes)
 	if err != nil {
 		return nil, err
@@ -60,13 +65,21 @@ func (s *Service) DeleteArtifact(ctx context.Context, id string) error {
 	return s.artifacts.Delete(ctx, id)
 }
 
-func (s *Service) RegisterTemplate(ctx context.Context, document []byte) (*registry.Template, error) {
-	ids, _ := template.ArtifactIDs(document) // a document it cannot read fails in NewTemplate
-	artifacts, err := s.loadArtifacts(ctx, ids)
+func (s *Service) RegisterTemplate(
+	ctx context.Context, document []byte,
+) (*registry.Template, error) {
+	if max := s.limits.MaxDocumentBytes; max > 0 && len(document) > max {
+		return nil, fmt.Errorf("%w: document exceeds %d bytes", registry.ErrInvalidDocument, max)
+	}
+	decoded, err := template.Decode(document)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", registry.ErrInvalidDocument, err)
+	}
+	artifacts, err := s.loadArtifacts(ctx, decoded.ArtifactIDs())
 	if err != nil {
 		return nil, err
 	}
-	t, err := registry.NewTemplate(document, s.limits.MaxDocumentBytes, artifacts)
+	t, err := registry.NewDecodedTemplate(decoded, artifacts)
 	if err != nil {
 		return nil, err
 	}
@@ -85,27 +98,15 @@ func (s *Service) RegisterTemplate(ctx context.Context, document []byte) (*regis
 	return t, nil
 }
 
-// belowCap fails with ErrCapReached when max rows exist; 0 means no cap.
-func (s *Service) belowCap(ctx context.Context, count func(context.Context) (int64, error), max int) error {
-	if max <= 0 {
-		return nil
-	}
-	n, err := count(ctx)
-	if err != nil {
-		return err
-	}
-	if n >= int64(max) {
-		return registry.ErrCapReached
-	}
-	return nil
-}
-
 func (s *Service) GetTemplate(ctx context.Context, id string) (*registry.Template, error) {
 	return s.templates.Get(ctx, id)
 }
 
-// Parsed returns the stored template, read fresh for its status, and its parsed form, artifacts resolved.
-func (s *Service) Parsed(ctx context.Context, id string) (*registry.Template, *template.Template, error) {
+// Parsed returns the stored template, read fresh for its status, and its parsed form, artifacts
+// resolved.
+func (s *Service) Parsed(
+	ctx context.Context, id string,
+) (*registry.Template, *template.Template, error) {
 	t, err := s.templates.Get(ctx, id)
 	if err != nil {
 		return nil, nil, err
@@ -125,7 +126,8 @@ func (s *Service) Parsed(ctx context.Context, id string) (*registry.Template, *t
 	return t, parsed, nil
 }
 
-// Usable is Parsed for a template about to be used anew: it fails with ErrTemplateDisabled when the template is disabled.
+// Usable is Parsed for a template about to be used anew: it fails with ErrTemplateDisabled when the
+// template is disabled.
 func (s *Service) Usable(ctx context.Context, id string) (*template.Template, error) {
 	t, parsed, err := s.Parsed(ctx, id)
 	if err != nil {
@@ -142,13 +144,18 @@ func (s *Service) ListTemplates(ctx context.Context, status string) ([]registry.
 }
 
 func (s *Service) SetTemplateStatus(ctx context.Context, id, status string) error {
-	_, err := s.updateTemplate(ctx, id, func(t *registry.Template) error { return t.SetStatus(status) })
+	_, err := s.updateTemplate(
+		ctx, id, func(t *registry.Template) error { return t.SetStatus(status) },
+	)
 	return err
 }
 
-// RecordOutcome tells a template how an attempt of its ended and returns its failures and status.
-// A success resets the failures; the template is disabled once maxFailures failures follow one another.
-func (s *Service) RecordOutcome(ctx context.Context, id string, success bool, maxFailures int) (int, string, error) {
+// RecordOutcome tells a template how an attempt of its ended and returns its failures and status. A
+// success resets the failures; the template is disabled once maxFailures failures follow one
+// another.
+func (s *Service) RecordOutcome(
+	ctx context.Context, id string, success bool, maxFailures int,
+) (int, string, error) {
 	t, err := s.updateTemplate(ctx, id, func(t *registry.Template) error {
 		if success {
 			t.Failures = 0
@@ -166,28 +173,15 @@ func (s *Service) RecordOutcome(ctx context.Context, id string, success bool, ma
 	return t.Failures, t.Status, nil
 }
 
-func (s *Service) updateTemplate(ctx context.Context, id string, change func(*registry.Template) error) (*registry.Template, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	t, err := s.templates.Get(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if err := change(t); err != nil {
-		return nil, err
-	}
-	if err := s.templates.AddOrUpdate(ctx, t); err != nil {
-		return nil, err
-	}
-	return t, nil
-}
-
 func (s *Service) DeleteTemplate(ctx context.Context, id string) error {
 	return s.templates.Delete(ctx, id)
 }
 
-// RegisterDefaults registers the daemon's own documents. An invalid document is an error; any other failure is logged.
-func (s *Service) RegisterDefaults(ctx context.Context, artifacts, templates map[string][]byte) error {
+// RegisterDefaults registers the daemon's own documents. An invalid document is an error; any other
+// failure is logged.
+func (s *Service) RegisterDefaults(
+	ctx context.Context, artifacts, templates map[string][]byte,
+) error {
 	for name, doc := range artifacts {
 		if _, err := s.RegisterArtifact(ctx, doc); err != nil {
 			if errors.Is(err, registry.ErrInvalidDocument) {
@@ -204,6 +198,41 @@ func (s *Service) RegisterDefaults(ctx context.Context, artifacts, templates map
 		}
 	}
 	return nil
+}
+
+// belowCap fails with ErrCapReached when max rows exist; 0 means no cap.
+func (s *Service) belowCap(
+	ctx context.Context, count func(context.Context) (int64, error), max int,
+) error {
+	if max <= 0 {
+		return nil
+	}
+	n, err := count(ctx)
+	if err != nil {
+		return err
+	}
+	if n >= int64(max) {
+		return registry.ErrCapReached
+	}
+	return nil
+}
+
+func (s *Service) updateTemplate(
+	ctx context.Context, id string, change func(*registry.Template) error,
+) (*registry.Template, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, err := s.templates.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := change(t); err != nil {
+		return nil, err
+	}
+	if err := s.templates.AddOrUpdate(ctx, t); err != nil {
+		return nil, err
+	}
+	return t, nil
 }
 
 func (s *Service) loadArtifacts(ctx context.Context, ids []string) (map[string][]byte, error) {

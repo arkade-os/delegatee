@@ -866,7 +866,7 @@ type Template struct {
 	Document    string                 `protobuf:"bytes,2,opt,name=document,proto3" json:"document,omitempty"`
 	ArtifactIds []string               `protobuf:"bytes,3,rep,name=artifact_ids,json=artifactIds,proto3" json:"artifact_ids,omitempty"`
 	Params      []*Param               `protobuf:"bytes,4,rep,name=params,proto3" json:"params,omitempty"`
-	// type is intent or offchain.
+	// type is proof or virtual.
 	Type string `protobuf:"bytes,5,opt,name=type,proto3" json:"type,omitempty"`
 	// status is active or disabled.
 	Status string `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`

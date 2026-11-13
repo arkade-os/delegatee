@@ -27,7 +27,8 @@ type Status struct {
 	Amount    uint64 // of those coins
 	Succeeded uint64 // attempts ended since the daemon started
 	Failed    uint64
-	// TemplateFailures counts the failed attempts charged to their template since the daemon started.
+	// TemplateFailures counts the failed attempts charged to their template since the daemon
+	// started.
 	TemplateFailures uint64
 	Reserve          time.Duration // before expiry, the latest a coin enters a batch
 	Session          execution.Session
@@ -78,6 +79,27 @@ func (s *Service) Status(ctx context.Context, forecast bool) (Status, error) {
 	return out, err
 }
 
+// Alive fails when the loop has been silent for LoopStall past the time its timer should have
+// fired.
+func (s *Service) Alive(now time.Time) error {
+	wake := s.wake.Load()
+	if wake == 0 {
+		return nil
+	}
+	since := time.Unix(0, max(wake, s.beat.Load()))
+	if silent := now.Sub(since); silent > s.limits.LoopStall {
+		return fmt.Errorf("nothing handled for %s with work due", silent.Round(time.Second))
+	}
+	return nil
+}
+
+func (s *Service) ChainConnected() error {
+	if s.chainSub == nil || !s.chainSub.Connected() {
+		return errors.New("not connected")
+	}
+	return nil
+}
+
 // forecast plans the published entries with every present coin not yet due.
 func (s *Service) forecast(ctx context.Context, st *Status) error {
 	now := time.Now()
@@ -116,11 +138,10 @@ func (s *Service) publish(now time.Time) {
 	plan := s.plan(now)
 	reserved, queued := s.counts()
 	st := Status{
-		entries: slices.Collect(maps.Values(s.entries)),
-		Queued:  queued, Registered: reserved, Late: len(plan.Late),
-		NextDue: s.nextDue, Tip: s.tip,
-		Succeeded: s.attemptsSucceeded, Failed: s.attemptsFailed, TemplateFailures: s.templateFailures,
-		Reserve: s.limits.Reserve, Session: s.session,
+		entries: slices.Collect(maps.Values(s.entries)), Queued: queued, Registered: reserved,
+		Late: len(plan.Late), NextDue: s.nextDue, Tip: s.tip, Succeeded: s.attemptsSucceeded,
+		Failed: s.attemptsFailed, TemplateFailures: s.templateFailures, Reserve: s.limits.Reserve,
+		Session: s.session,
 	}
 	st.Batches = forecastBatches(plan)
 	s.status.Store(&st)
@@ -135,30 +156,11 @@ func forecastBatches(plan execution.Plan) []BatchForecast {
 			out[i].Amount += e.Amount()
 			if j < maxForecastEntries {
 				out[i].Entries = append(out[i].Entries, ForecastEntry{
-					DelegationID: e.DelegationID, Coins: len(e.Coins), Amount: e.Amount(), Due: e.Due, Deadline: e.Deadline,
+					DelegationID: e.DelegationID, Coins: len(e.Coins), Amount: e.Amount(),
+					Due: e.Due, Deadline: e.Deadline,
 				})
 			}
 		}
 	}
 	return out
-}
-
-// Alive fails when the loop has been silent for LoopStall past the time its timer should have fired.
-func (s *Service) Alive(now time.Time) error {
-	wake := s.wake.Load()
-	if wake == 0 {
-		return nil
-	}
-	since := time.Unix(0, max(wake, s.beat.Load()))
-	if silent := now.Sub(since); silent > s.limits.LoopStall {
-		return fmt.Errorf("nothing handled for %s with work due", silent.Round(time.Second))
-	}
-	return nil
-}
-
-func (s *Service) ChainConnected() error {
-	if s.chainSub == nil || !s.chainSub.Connected() {
-		return errors.New("not connected")
-	}
-	return nil
 }

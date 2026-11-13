@@ -32,17 +32,26 @@ func TestSyncEventAddsThenSpends(t *testing.T) {
 }
 
 func TestSyncGivesNewCoinsToTheOwner(t *testing.T) {
-	w := watched("aa", delegation.Claim{DelegationID: 1}, delegation.Claim{DelegationID: 2, Input: 1, Spawned: true})
+	w := watched(
+		"aa", delegation.Claim{DelegationID: 1},
+		delegation.Claim{DelegationID: 2, Input: 1, Spawned: true},
+	)
 	changes := syncVtxos(w, []ports.Output{vtxo("a:0", "aa", 1)}, false)
 	require.Equal(t, int64(2), changes[0].DelegationID)
 	require.Equal(t, 1, changes[0].Input)
 }
 
 func TestSyncCompleteSpendsWhatIsMissing(t *testing.T) {
-	w := watched("aa", delegation.Claim{DelegationID: 1}, coin("old:0", 1, "aa"), coin("gone:0", 1, "aa"))
+	w := watched(
+		"aa", delegation.Claim{DelegationID: 1}, coin("old:0", 1, "aa"), coin("gone:0", 1, "aa"),
+	)
 	gone := vtxo("gone:0", "aa", 1)
 	gone.Spent, gone.SpentBy = true, "spender"
-	changes := syncVtxos(w, []ports.Output{vtxo("old:0", "aa", 1), gone, vtxo("new:0", "aa", 5), vtxo("x:0", "bb", 1)}, true)
+	changes := syncVtxos(
+		w,
+		[]ports.Output{vtxo("old:0", "aa", 1), gone, vtxo("new:0", "aa", 5), vtxo("x:0", "bb", 1)},
+		true,
+	)
 	require.Len(t, changes, 2)
 	require.Equal(t, delegation.Spent, changes[0].Status)
 	require.Equal(t, "gone:0", changes[0].Outpoint)
@@ -61,19 +70,31 @@ func TestSyncCompleteSpendsWhatIsMissing(t *testing.T) {
 func TestSyncUtxosAddsUpdatesAndSpends(t *testing.T) {
 	w := watched("aa", delegation.Claim{DelegationID: 1, Onchain: true})
 	tip := delegation.Tip{Height: 100, Time: now}
-	changes := syncUtxos(w, []ports.Output{{Outpoint: "tx1:0", Script: "aa", Amount: 5000}, {Outpoint: "tx2:1", Script: "aa", Amount: 7, Height: 100}, {Outpoint: "x:0", Script: "bb"}}, tip, now)
+	changes := syncUtxos(
+		w,
+		[]ports.Output{
+			{Outpoint: "tx1:0", Script: "aa", Amount: 5000},
+			{Outpoint: "tx2:1", Script: "aa", Amount: 7, Height: 100},
+			{Outpoint: "x:0", Script: "bb"},
+		},
+		tip,
+		now,
+	)
 	require.Len(t, changes, 2)
 	require.Equal(t, delegation.Coin{
-		Outpoint: "tx1:0", DelegationID: 1, Script: "aa", Amount: 5000, Status: delegation.Present, Onchain: true,
+		Outpoint: "tx1:0", DelegationID: 1, Script: "aa", Amount: 5000, Status: delegation.Present,
+		Onchain: true,
 	}, changes[0])
 	require.Equal(t, delegation.Coin{
-		Outpoint: "tx2:1", DelegationID: 1, Script: "aa", Amount: 7, Status: delegation.Present, Onchain: true, Height: 100, Confirmations: 1,
-		CreatedAt: now,
+		Outpoint: "tx2:1", DelegationID: 1, Script: "aa", Amount: 7, Status: delegation.Present,
+		Onchain: true, Height: 100, Confirmations: 1, CreatedAt: now,
 	}, changes[1], "created in the tip's block")
 
 	w.Coins = []delegation.Coin{changes[0], changes[1]}
 	tip = delegation.Tip{Height: 101, Time: now.Add(10 * time.Minute)}
-	changes = syncUtxos(w, []ports.Output{{Outpoint: "tx1:0", Script: "aa", Amount: 5000, Height: 101}}, tip, now)
+	changes = syncUtxos(
+		w, []ports.Output{{Outpoint: "tx1:0", Script: "aa", Amount: 5000, Height: 101}}, tip, now,
+	)
 	require.Len(t, changes, 2)
 	require.Equal(t, delegation.Present, changes[0].Status)
 	require.Equal(t, 1, changes[0].Confirmations)
@@ -84,7 +105,14 @@ func TestSyncUtxosAddsUpdatesAndSpends(t *testing.T) {
 	due := changes[0]
 	due.Due = now
 	w.Coins = []delegation.Coin{due}
-	require.Empty(t, syncUtxos(w, []ports.Output{{Outpoint: "tx1:0", Script: "aa", Amount: 5000, Height: 101}}, tip, now), "nothing changed")
+	require.Empty(
+		t,
+		syncUtxos(
+			w, []ports.Output{{Outpoint: "tx1:0", Script: "aa", Amount: 5000, Height: 101}}, tip,
+			now,
+		),
+		"nothing changed",
+	)
 }
 
 func TestRefresh(t *testing.T) {
@@ -115,7 +143,9 @@ func TestRefresh(t *testing.T) {
 }
 
 func TestScriptsOf(t *testing.T) {
-	outputs := []ports.Output{vtxo("a:0", "aa", 1), vtxo("b:0", "bb", 1), vtxo("c:0", "aa", 1), vtxo("d:0", "cc", 1)}
+	outputs := []ports.Output{
+		vtxo("a:0", "aa", 1), vtxo("b:0", "bb", 1), vtxo("c:0", "aa", 1), vtxo("d:0", "cc", 1),
+	}
 	require.Equal(t, []string{"aa", "bb", "cc"}, scriptsOf(outputs))
 }
 
@@ -135,9 +165,15 @@ func watched(script string, claim delegation.Claim, rest ...any) delegation.Watc
 }
 
 func vtxo(outpoint, script string, amount uint64) ports.Output {
-	return ports.Output{Outpoint: outpoint, Script: script, Amount: amount, CreatedAt: now, ExpiresAt: now.Add(time.Hour)}
+	return ports.Output{
+		Outpoint: outpoint, Script: script, Amount: amount, CreatedAt: now,
+		ExpiresAt: now.Add(time.Hour),
+	}
 }
 
 func coin(outpoint string, delegationID int64, script string) delegation.Coin {
-	return delegation.Coin{Outpoint: outpoint, DelegationID: delegationID, Script: script, Amount: 1, CreatedAt: now, Status: delegation.Present}
+	return delegation.Coin{
+		Outpoint: outpoint, DelegationID: delegationID, Script: script, Amount: 1, CreatedAt: now,
+		Status: delegation.Present,
+	}
 }

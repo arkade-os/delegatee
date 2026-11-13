@@ -49,18 +49,21 @@ type CoinRepository interface {
 	Onchain(ctx context.Context) ([]Coin, error)
 	// Hold keeps the coins, and the other coins of their delegations, from Ready until Release.
 	Hold(ctx context.Context, outpoints []string) error
-	// Release gives the coins back, ready no earlier than readyAt, and never sooner than a retry they already wait for.
+	// Release gives the coins back, ready no earlier than readyAt, and never sooner than a retry
+	// they already wait for.
 	Release(ctx context.Context, outpoints []string, readyAt time.Time) error
 	// ResetHolds holds exactly the coins of the pending attempts.
 	ResetHolds(ctx context.Context) error
-	// Ready lists, for at most limit active delegations holding no coin, the oldest coin ready by now at
-	// each input past its locktime at tip; only delegations with every input filled, coins by input.
+	// Ready lists, for at most limit active delegations holding no coin, the oldest coin ready by
+	// now at each input past its locktime at tip; only delegations with every input filled, coins
+	// by input.
 	Ready(ctx context.Context, now time.Time, tip Tip, limit int) ([][]Coin, error)
 	// NextReady is the earliest time after now a coin becomes ready, zero when none will.
 	NextReady(ctx context.Context, now time.Time, tip Tip) (time.Time, error)
 	// Totals counts the present coins of the active delegations and adds up their amount.
 	Totals(ctx context.Context) (coins int, amount uint64, err error)
-	// ScriptStatus is the electrum status hash stored for script, and whether it is claimed onchain.
+	// ScriptStatus is the electrum status hash stored for script, and whether it is claimed
+	// onchain.
 	ScriptStatus(ctx context.Context, script string) (status string, watched bool, err error)
 	SetScriptStatus(ctx context.Context, script, status string) error
 }
@@ -70,14 +73,6 @@ type Tip struct {
 	Height     int64
 	Time       time.Time
 	MedianTime time.Time // of the last eleven blocks
-}
-
-// Confirmations is how many blocks deep an output mined at height is, zero in the mempool.
-func (t Tip) Confirmations(height int64) int {
-	if height <= 0 || height > t.Height {
-		return 0
-	}
-	return int(t.Height - height + 1)
 }
 
 // Claim is a delegation's right to the coins landing at the script of one of its inputs.
@@ -96,10 +91,22 @@ type Watched struct {
 	Coins  []Coin
 }
 
-// Owner is the claim that holds the coins: a spawned delegation before a public one, then the oldest.
+// Confirmations is how many blocks deep an output mined at height is, zero in the mempool.
+func (t Tip) Confirmations(height int64) int {
+	if height <= 0 || height > t.Height {
+		return 0
+	}
+	return int(t.Height - height + 1)
+}
+
+// Owner is the claim that holds the coins: a spawned delegation before a public one, then the
+// oldest.
 func (w Watched) Owner() Claim {
 	return slices.MinFunc(w.Claims, func(a, b Claim) int {
-		return cmp.Or(-cmp.Compare(boolInt(a.Spawned), boolInt(b.Spawned)), cmp.Compare(a.DelegationID, b.DelegationID))
+		return cmp.Or(
+			-cmp.Compare(boolInt(a.Spawned), boolInt(b.Spawned)),
+			cmp.Compare(a.DelegationID, b.DelegationID),
+		)
 	})
 }
 

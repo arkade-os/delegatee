@@ -51,18 +51,35 @@ type Service struct {
 	wg          sync.WaitGroup
 }
 
+// Instance is a delegation's template filled with its variables and keys.
+type Instance struct {
+	Delegation *delegation.Delegation
+	Template   *template.Instance
+	Type       template.Type
+	Disabled   bool // whether the template is switched off, by the operator or by its failures
+}
+
 func NewService(
-	registry *registry.Service, delegations delegation.DelegationRepository, streams delegation.StreamRepository, indexer ports.Indexer,
-	cosigner *btcec.PublicKey, encryption *btcec.PrivateKey, server, emulator *btcec.PublicKey, network arklib.Network, limits Limits,
+	registry *registry.Service, delegations delegation.DelegationRepository,
+	streams delegation.StreamRepository, indexer ports.Indexer, cosigner *btcec.PublicKey,
+	encryption *btcec.PrivateKey, server, emulator *btcec.PublicKey, network arklib.Network,
+	limits Limits,
 ) *Service {
 	s := &Service{
-		registry: registry, delegations: delegations, streams: streams, indexer: indexer,
-		keys:       template.TriggerKeys{Keys: template.Keys{Server: server, Emulator: emulator, Cosigner: cosigner}},
-		encryption: encryption, network: network, limits: limits, changed: make(chan struct{}, 1),
+		registry:    registry,
+		delegations: delegations,
+		streams:     streams,
+		indexer:     indexer,
+		keys: template.TriggerKeys{
+			Keys: template.Keys{Server: server, Emulator: emulator, Cosigner: cosigner},
+		},
+		encryption: encryption,
+		network:    network,
+		limits:     limits,
+		changed:    make(chan struct{}, 1),
 	}
 	s.info = Info{
-		Network:     network.Name,
-		CosignerKey: hex.EncodeToString(cosigner.SerializeCompressed()),
+		Network: network.Name, CosignerKey: hex.EncodeToString(cosigner.SerializeCompressed()),
 		ServerKey:   hex.EncodeToString(server.SerializeCompressed()),
 		EmulatorKey: hex.EncodeToString(emulator.SerializeCompressed()),
 	}
@@ -93,64 +110,13 @@ func (s *Service) RegisterDelegation(
 	if err != nil {
 		return nil, err
 	}
-	log.WithFields(log.Fields{"id": created.ID, "address": created.Address, "template": created.TemplateID}).Info("delegation registered")
+	log.WithFields(log.Fields{"id": created.ID, "address": created.Address, "template": created.TemplateID}).
+		Info("delegation registered")
 	s.notify(*created)
 	return created, nil
 }
 
-// decryptFor is nil without an encryption key.
-func (s *Service) decryptFor(templateID string) func([]byte) ([]byte, error) {
-	if s.encryption == nil {
-		return nil
-	}
-	return func(ciphertext []byte) ([]byte, error) {
-		return ecies.Decrypt(s.encryption, ciphertext, templateID)
-	}
-}
-
-// add stores d, or returns the active delegation of its fingerprint when there is one. It fails with
-// ErrBlocked when the newest delegation of the fingerprint is cancelled, and with ErrCapReached when
-// max active delegations of its origin exist (0: no cap): those streams spawned count apart.
-func (s *Service) add(ctx context.Context, d *delegation.Delegation, max int) (*delegation.Delegation, error) {
-	s.addMu.Lock()
-	defer s.addMu.Unlock()
-	newest, err := s.delegations.GetByFingerprint(ctx, d.Fingerprint)
-	switch {
-	case err == nil && newest.Status == delegation.StatusActive:
-		return newest, nil
-	case err == nil && newest.Status == delegation.StatusCancelled:
-		return nil, delegation.ErrBlocked
-	case err != nil && !errors.Is(err, delegation.ErrDelegationNotFound):
-		return nil, err
-	}
-	if max > 0 {
-		clients, spawned, err := s.delegations.CountActive(ctx)
-		if err != nil {
-			return nil, err
-		}
-		active := clients
-		if d.StreamID != 0 {
-			active = spawned
-		}
-		if active >= int64(max) {
-			return nil, delegation.ErrCapReached
-		}
-	}
-	if err := s.delegations.AddOrUpdate(ctx, d); err != nil {
-		return nil, err
-	}
-	return d, nil
-}
-
 func (s *Service) OnChange(fn func(delegation.Delegation)) { s.onChange = fn }
-
-// Instance is a delegation's template filled with its variables and keys.
-type Instance struct {
-	Delegation *delegation.Delegation
-	Template   *template.Instance
-	Type       template.Type
-	Disabled   bool // whether the template is switched off, by the operator or by its failures
-}
 
 func (s *Service) Instance(ctx context.Context, id int64) (*Instance, error) {
 	d, err := s.delegations.Get(ctx, id)
@@ -180,7 +146,9 @@ func (s *Service) GetDelegation(ctx context.Context, id int64) (*delegation.Dele
 	return s.delegations.Get(ctx, id)
 }
 
-func (s *Service) GetDelegationByAddress(ctx context.Context, address string) (*delegation.Delegation, error) {
+func (s *Service) GetDelegationByAddress(
+	ctx context.Context, address string,
+) (*delegation.Delegation, error) {
 	return s.delegations.GetByAddress(ctx, address)
 }
 
@@ -192,28 +160,14 @@ func (s *Service) ResumeDelegation(ctx context.Context, id int64) error {
 	return s.transition(ctx, id, "resumed", (*delegation.Delegation).Resume)
 }
 
-func (s *Service) transition(ctx context.Context, id int64, verb string, step func(*delegation.Delegation) error) error {
-	d, err := s.delegations.Get(ctx, id)
-	if err != nil {
-		return err
-	}
-	if err := step(d); err != nil {
-		return err
-	}
-	if err := s.delegations.AddOrUpdate(ctx, d); err != nil {
-		return err
-	}
-	log.WithField("id", id).Info("delegation " + verb)
-	s.notify(*d)
-	return nil
-}
-
-func (s *Service) ListDelegations(ctx context.Context, f delegation.ListFilter) ([]delegation.Delegation, error) {
+func (s *Service) ListDelegations(
+	ctx context.Context, f delegation.ListFilter,
+) ([]delegation.Delegation, error) {
 	return s.delegations.List(ctx, f)
 }
 
-// ExpireDelegations marks the active delegations whose expiry has passed at now and deletes the spawned
-// ones that expired PruneAfter ago.
+// ExpireDelegations marks the active delegations whose expiry has passed at now and deletes the
+// spawned ones that expired PruneAfter ago.
 func (s *Service) ExpireDelegations(ctx context.Context, now time.Time) (int, error) {
 	expired, err := s.delegations.Expire(ctx, now)
 	if err != nil {
@@ -237,8 +191,8 @@ func (s *Service) ExpireDelegations(ctx context.Context, now time.Time) (int, er
 	return len(expired), nil
 }
 
-// Start runs ExpireDelegations every ExpiryInterval and follows arkd's transactions while a stream is
-// active, until Stop or ctx ends.
+// Start runs ExpireDelegations every ExpiryInterval and follows arkd's transactions while a stream
+// is active, until Stop or ctx ends.
 func (s *Service) Start(ctx context.Context) {
 	ctx, s.stop = context.WithCancel(ctx)
 	s.wg.Go(func() {
@@ -271,6 +225,71 @@ func (s *Service) Stop() {
 }
 
 func (s *Service) Info() Info { return s.info }
+
+// decryptFor is nil without an encryption key.
+func (s *Service) decryptFor(templateID string) func([]byte) ([]byte, error) {
+	if s.encryption == nil {
+		return nil
+	}
+	return func(ciphertext []byte) ([]byte, error) {
+		return ecies.Decrypt(s.encryption, ciphertext, templateID)
+	}
+}
+
+// add stores d, or returns the active delegation of its fingerprint when there is one. It fails
+// with ErrBlocked when the newest delegation of the fingerprint is cancelled, and with
+// ErrCapReached when max active delegations of its origin exist (0: no cap): those streams spawned
+// count apart.
+func (s *Service) add(
+	ctx context.Context, d *delegation.Delegation, max int,
+) (*delegation.Delegation, error) {
+	s.addMu.Lock()
+	defer s.addMu.Unlock()
+	newest, err := s.delegations.GetByFingerprint(ctx, d.Fingerprint)
+	switch {
+	case err == nil && newest.Status == delegation.StatusActive:
+		return newest, nil
+	case err == nil && newest.Status == delegation.StatusCancelled:
+		return nil, delegation.ErrBlocked
+	case err != nil && !errors.Is(err, delegation.ErrDelegationNotFound):
+		return nil, err
+	}
+	if max > 0 {
+		clients, spawned, err := s.delegations.CountActive(ctx)
+		if err != nil {
+			return nil, err
+		}
+		active := clients
+		if d.StreamID != 0 {
+			active = spawned
+		}
+		if active >= int64(max) {
+			return nil, delegation.ErrCapReached
+		}
+	}
+	if err := s.delegations.AddOrUpdate(ctx, d); err != nil {
+		return nil, err
+	}
+	return d, nil
+}
+
+func (s *Service) transition(
+	ctx context.Context, id int64, verb string, step func(*delegation.Delegation) error,
+) error {
+	d, err := s.delegations.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := step(d); err != nil {
+		return err
+	}
+	if err := s.delegations.AddOrUpdate(ctx, d); err != nil {
+		return err
+	}
+	log.WithField("id", id).Info("delegation " + verb)
+	s.notify(*d)
+	return nil
+}
 
 func (s *Service) notify(d delegation.Delegation) {
 	if s.onChange != nil {

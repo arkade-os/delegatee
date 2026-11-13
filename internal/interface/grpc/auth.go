@@ -24,7 +24,9 @@ type AdminUser struct {
 // the gateway sends the Unauthenticated message as the WWW-Authenticate header
 const challenge = `Basic realm="executor admin"`
 
-var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("executor-invalid-password"), bcrypt.DefaultCost)
+var dummyHash, _ = bcrypt.GenerateFromPassword(
+	[]byte("executor-invalid-password"), bcrypt.DefaultCost,
+)
 
 // basicAuth checks the authorization metadata, which the gateway forwards from the HTTP header.
 type basicAuth struct {
@@ -32,15 +34,9 @@ type basicAuth struct {
 	failures *rate.Limiter
 }
 
-func newBasicAuth(users []AdminUser) *basicAuth {
-	a := &basicAuth{hashes: map[string][]byte{}, failures: rate.NewLimiter(rate.Every(time.Second), 5)}
-	for _, u := range users {
-		a.hashes[u.Name] = []byte(u.PasswordHash)
-	}
-	return a
-}
-
-func (a *basicAuth) unary(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+func (a *basicAuth) unary(
+	ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+) (any, error) {
 	if err := a.check(ctx); err != nil {
 		return nil, err
 	}
@@ -84,6 +80,17 @@ func (a *basicAuth) verify(authorization []string) error {
 		return status.Error(codes.Unauthenticated, challenge)
 	}
 	return nil
+}
+
+func newBasicAuth(users []AdminUser) *basicAuth {
+	a := &basicAuth{
+		hashes:   map[string][]byte{},
+		failures: rate.NewLimiter(rate.Every(time.Second), 5),
+	}
+	for _, u := range users {
+		a.hashes[u.Name] = []byte(u.PasswordHash)
+	}
+	return a
 }
 
 func parseBasic(values []string) (user, pass string, ok bool) {

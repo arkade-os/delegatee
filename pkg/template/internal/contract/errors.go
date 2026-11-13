@@ -7,6 +7,7 @@ var (
 	ErrNoCosigner = errors.New("no cosigner key")
 	// ErrBadTree marks a given taptree that does not decode or misses a declared leaf.
 	ErrBadTree = errors.New("bad taptree")
-	// ErrBadLeaf marks a leaf or covenant that does not assemble, is duplicated, or a definition without leaves.
+	// ErrBadLeaf marks a leaf or covenant that does not assemble, is duplicated, or a definition
+	// without leaves.
 	ErrBadLeaf = errors.New("bad leaf")
 )

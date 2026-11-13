@@ -1,6 +1,6 @@
 {
   "format": "template/v1",
-  "type": "offchain",
+  "type": "virtual",
   "variables": {
     "sender": "pubkey",
     "receiver": "pubkey",
@@ -10,9 +10,8 @@
     "unilateral_refund_without_receiver_delay": "int",
     "receiver_program": "bytes32",
     "sender_program": "bytes32",
-    "ciphertext": "bytes"
+    "preimage": "bytes32"
   },
-  "secrets": {"preimage": {"type": "bytes32", "from": "htlc", "ciphertext": "<ciphertext>"}},
   "inputs": [
     {
       "name": "htlc",
@@ -38,8 +37,17 @@
                 {
                   "name": "claim",
                   "asm": [
-                    "OP_SIZE", "32", "OP_EQUALVERIFY", "OP_HASH160", "<preimageHash>", "OP_EQUAL", "OP_VERIFY",
-                    "<receiver>", "OP_CHECKSIGVERIFY", "<SERVER_KEY>", "OP_CHECKSIG"
+                    "OP_SIZE",
+                    "32",
+                    "OP_EQUALVERIFY",
+                    "OP_HASH160",
+                    "<preimageHash>",
+                    "OP_EQUAL",
+                    "OP_VERIFY",
+                    "<receiver>",
+                    "OP_CHECKSIGVERIFY",
+                    "<SERVER_KEY>",
+                    "OP_CHECKSIG"
                   ],
                   "witness": [
                     {"name": "preimage", "type": "bytes32", "encoding": "raw"},
@@ -55,7 +63,11 @@
                 {
                   "name": "refund",
                   "asm": [
-                    "<sender>", "OP_CHECKSIGVERIFY", "<receiver>", "OP_CHECKSIGVERIFY", "<SERVER_KEY>",
+                    "<sender>",
+                    "OP_CHECKSIGVERIFY",
+                    "<receiver>",
+                    "OP_CHECKSIGVERIFY",
+                    "<SERVER_KEY>",
                     "OP_CHECKSIG"
                   ],
                   "witness": [
@@ -72,8 +84,13 @@
                 {
                   "name": "refundWithoutReceiver",
                   "asm": [
-                    "<refundLocktime>", "OP_CHECKLOCKTIMEVERIFY", "OP_DROP", "<sender>", "OP_CHECKSIGVERIFY",
-                    "<SERVER_KEY>", "OP_CHECKSIG"
+                    "<refundLocktime>",
+                    "OP_CHECKLOCKTIMEVERIFY",
+                    "OP_DROP",
+                    "<sender>",
+                    "OP_CHECKSIGVERIFY",
+                    "<SERVER_KEY>",
+                    "OP_CHECKSIG"
                   ],
                   "witness": [
                     {"name": "senderSig", "type": "signature", "encoding": "schnorr-64"},
@@ -88,8 +105,18 @@
                 {
                   "name": "unilateralClaim",
                   "asm": [
-                    "OP_SIZE", "32", "OP_EQUALVERIFY", "OP_HASH160", "<preimageHash>", "OP_EQUAL", "OP_VERIFY",
-                    "<unilateralClaimDelay>", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<receiver>", "OP_CHECKSIG"
+                    "OP_SIZE",
+                    "32",
+                    "OP_EQUALVERIFY",
+                    "OP_HASH160",
+                    "<preimageHash>",
+                    "OP_EQUAL",
+                    "OP_VERIFY",
+                    "<unilateralClaimDelay>",
+                    "OP_CHECKSEQUENCEVERIFY",
+                    "OP_DROP",
+                    "<receiver>",
+                    "OP_CHECKSIG"
                   ],
                   "witness": [
                     {"name": "preimage", "type": "bytes32", "encoding": "raw"},
@@ -104,8 +131,13 @@
                 {
                   "name": "unilateralRefund",
                   "asm": [
-                    "<unilateralRefundDelay>", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<sender>",
-                    "OP_CHECKSIGVERIFY", "<receiver>", "OP_CHECKSIG"
+                    "<unilateralRefundDelay>",
+                    "OP_CHECKSEQUENCEVERIFY",
+                    "OP_DROP",
+                    "<sender>",
+                    "OP_CHECKSIGVERIFY",
+                    "<receiver>",
+                    "OP_CHECKSIG"
                   ],
                   "witness": [
                     {"name": "senderSig", "type": "signature", "encoding": "schnorr-64"},
@@ -120,7 +152,10 @@
                 {
                   "name": "unilateralRefundWithoutReceiver",
                   "asm": [
-                    "<unilateralRefundWithoutReceiverDelay>", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<sender>",
+                    "<unilateralRefundWithoutReceiverDelay>",
+                    "OP_CHECKSEQUENCEVERIFY",
+                    "OP_DROP",
+                    "<sender>",
                     "OP_CHECKSIG"
                   ],
                   "witness": [{"name": "senderSig", "type": "signature", "encoding": "schnorr-64"}]
@@ -132,17 +167,34 @@
               "arkade": {
                 "inputs": [],
                 "asm": [
-                  "OP_PUSHCURRENTINPUTINDEX", "OP_DUP", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "1", "OP_EQUALVERIFY",
-                  "<receiverProgram>", "OP_EQUALVERIFY", "OP_INSPECTOUTPUTVALUE", "OP_PUSHCURRENTINPUTINDEX",
-                  "OP_INSPECTINPUTVALUE", "OP_GREATERTHANOREQUAL"
+                  "OP_PUSHCURRENTINPUTINDEX",
+                  "OP_DUP",
+                  "OP_INSPECTOUTPUTSCRIPTPUBKEY",
+                  "1",
+                  "OP_EQUALVERIFY",
+                  "<receiverProgram>",
+                  "OP_EQUALVERIFY",
+                  "OP_INSPECTOUTPUTVALUE",
+                  "OP_PUSHCURRENTINPUTINDEX",
+                  "OP_INSPECTINPUTVALUE",
+                  "OP_GREATERTHANOREQUAL"
                 ]
               },
               "leaves": [
                 {
                   "name": "nonInteractiveClaim",
                   "asm": [
-                    "OP_SIZE", "32", "OP_EQUALVERIFY", "OP_HASH160", "<preimageHash>", "OP_EQUAL", "OP_VERIFY",
-                    "<SERVER_KEY>", "OP_CHECKSIGVERIFY", "<EMULATOR_KEY:nonInteractiveClaim>", "OP_CHECKSIG"
+                    "OP_SIZE",
+                    "32",
+                    "OP_EQUALVERIFY",
+                    "OP_HASH160",
+                    "<preimageHash>",
+                    "OP_EQUAL",
+                    "OP_VERIFY",
+                    "<SERVER_KEY>",
+                    "OP_CHECKSIGVERIFY",
+                    "<EMULATOR_KEY:nonInteractiveClaim>",
+                    "OP_CHECKSIG"
                   ],
                   "witness": [
                     {"name": "preimage", "type": "bytes32", "encoding": "raw"},
@@ -157,17 +209,29 @@
               "arkade": {
                 "inputs": [],
                 "asm": [
-                  "OP_PUSHCURRENTINPUTINDEX", "OP_DUP", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "1", "OP_EQUALVERIFY",
-                  "<senderProgram>", "OP_EQUALVERIFY", "OP_INSPECTOUTPUTVALUE", "OP_PUSHCURRENTINPUTINDEX",
-                  "OP_INSPECTINPUTVALUE", "OP_GREATERTHANOREQUAL"
+                  "OP_PUSHCURRENTINPUTINDEX",
+                  "OP_DUP",
+                  "OP_INSPECTOUTPUTSCRIPTPUBKEY",
+                  "1",
+                  "OP_EQUALVERIFY",
+                  "<senderProgram>",
+                  "OP_EQUALVERIFY",
+                  "OP_INSPECTOUTPUTVALUE",
+                  "OP_PUSHCURRENTINPUTINDEX",
+                  "OP_INSPECTINPUTVALUE",
+                  "OP_GREATERTHANOREQUAL"
                 ]
               },
               "leaves": [
                 {
                   "name": "nonInteractiveRefund",
                   "asm": [
-                    "<SERVER_KEY>", "OP_CHECKSIGVERIFY", "<receiver>", "OP_CHECKSIGVERIFY",
-                    "<EMULATOR_KEY:nonInteractiveRefund>", "OP_CHECKSIG"
+                    "<SERVER_KEY>",
+                    "OP_CHECKSIGVERIFY",
+                    "<receiver>",
+                    "OP_CHECKSIGVERIFY",
+                    "<EMULATOR_KEY:nonInteractiveRefund>",
+                    "OP_CHECKSIG"
                   ],
                   "witness": [
                     {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
@@ -178,8 +242,13 @@
                 {
                   "name": "nonInteractiveRefundWithoutReceiver",
                   "asm": [
-                    "<refundLocktime>", "OP_CHECKLOCKTIMEVERIFY", "OP_DROP", "<SERVER_KEY>",
-                    "OP_CHECKSIGVERIFY", "<EMULATOR_KEY:nonInteractiveRefund>", "OP_CHECKSIG"
+                    "<refundLocktime>",
+                    "OP_CHECKLOCKTIMEVERIFY",
+                    "OP_DROP",
+                    "<SERVER_KEY>",
+                    "OP_CHECKSIGVERIFY",
+                    "<EMULATOR_KEY:nonInteractiveRefund>",
+                    "OP_CHECKSIG"
                   ],
                   "witness": [
                     {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
@@ -218,5 +287,6 @@
       "assets": [{"from": "htlc"}]
     }
   ],
-  "packets": {"output_index": 1, "unmatched": "drop"}
+  "packets": {"output_index": 1, "unmatched": "drop"},
+  "delegation": {"sealed": ["preimage"]}
 }

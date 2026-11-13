@@ -1,6 +1,6 @@
 {
   "format": "template/v1",
-  "type": "offchain",
+  "type": "virtual",
   "variables": {
     "sender": "pubkey",
     "receiver": "pubkey",
@@ -10,14 +10,7 @@
     "unilateral_refund_without_receiver_delay": "int",
     "receiver_program": "bytes32",
     "sender_program": "bytes32",
-    "ciphertext": "bytes"
-  },
-  "secrets": {
-    "preimage": {
-      "type": "bytes32",
-      "from": "htlc",
-      "ciphertext": "<ciphertext>"
-    }
+    "preimage": "bytes32"
   },
   "inputs": [
     {
@@ -26,42 +19,15 @@
         "definition": {
           "contractName": "VHTLC",
           "constructorInputs": [
-            {
-              "name": "sender",
-              "type": "pubkey"
-            },
-            {
-              "name": "receiver",
-              "type": "pubkey"
-            },
-            {
-              "name": "preimageHash",
-              "type": "bytes20"
-            },
-            {
-              "name": "refundLocktime",
-              "type": "int"
-            },
-            {
-              "name": "unilateralClaimDelay",
-              "type": "int"
-            },
-            {
-              "name": "unilateralRefundDelay",
-              "type": "int"
-            },
-            {
-              "name": "unilateralRefundWithoutReceiverDelay",
-              "type": "int"
-            },
-            {
-              "name": "receiverProgram",
-              "type": "bytes32"
-            },
-            {
-              "name": "senderProgram",
-              "type": "bytes32"
-            }
+            {"name": "sender", "type": "pubkey"},
+            {"name": "receiver", "type": "pubkey"},
+            {"name": "preimageHash", "type": "bytes20"},
+            {"name": "refundLocktime", "type": "int"},
+            {"name": "unilateralClaimDelay", "type": "int"},
+            {"name": "unilateralRefundDelay", "type": "int"},
+            {"name": "unilateralRefundWithoutReceiverDelay", "type": "int"},
+            {"name": "receiverProgram", "type": "bytes32"},
+            {"name": "senderProgram", "type": "bytes32"}
           ],
           "structs": [],
           "functions": [
@@ -84,22 +50,9 @@
                     "OP_CHECKSIG"
                   ],
                   "witness": [
-                    {
-                      "name": "preimage",
-                      "type": "bytes32",
-                      "encoding": "raw"
-                    },
-                    {
-                      "name": "receiverSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64"
-                    },
-                    {
-                      "name": "serverSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64",
-                      "injected": true
-                    }
+                    {"name": "preimage", "type": "bytes32", "encoding": "raw"},
+                    {"name": "receiverSig", "type": "signature", "encoding": "schnorr-64"},
+                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
                   ]
                 }
               ]
@@ -118,22 +71,9 @@
                     "OP_CHECKSIG"
                   ],
                   "witness": [
-                    {
-                      "name": "senderSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64"
-                    },
-                    {
-                      "name": "receiverSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64"
-                    },
-                    {
-                      "name": "serverSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64",
-                      "injected": true
-                    }
+                    {"name": "senderSig", "type": "signature", "encoding": "schnorr-64"},
+                    {"name": "receiverSig", "type": "signature", "encoding": "schnorr-64"},
+                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
                   ]
                 }
               ]
@@ -153,17 +93,8 @@
                     "OP_CHECKSIG"
                   ],
                   "witness": [
-                    {
-                      "name": "senderSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64"
-                    },
-                    {
-                      "name": "serverSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64",
-                      "injected": true
-                    }
+                    {"name": "senderSig", "type": "signature", "encoding": "schnorr-64"},
+                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
                   ]
                 }
               ]
@@ -188,16 +119,8 @@
                     "OP_CHECKSIG"
                   ],
                   "witness": [
-                    {
-                      "name": "preimage",
-                      "type": "bytes32",
-                      "encoding": "raw"
-                    },
-                    {
-                      "name": "receiverSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64"
-                    }
+                    {"name": "preimage", "type": "bytes32", "encoding": "raw"},
+                    {"name": "receiverSig", "type": "signature", "encoding": "schnorr-64"}
                   ]
                 }
               ]
@@ -217,16 +140,8 @@
                     "OP_CHECKSIG"
                   ],
                   "witness": [
-                    {
-                      "name": "senderSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64"
-                    },
-                    {
-                      "name": "receiverSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64"
-                    }
+                    {"name": "senderSig", "type": "signature", "encoding": "schnorr-64"},
+                    {"name": "receiverSig", "type": "signature", "encoding": "schnorr-64"}
                   ]
                 }
               ]
@@ -243,13 +158,7 @@
                     "<sender>",
                     "OP_CHECKSIG"
                   ],
-                  "witness": [
-                    {
-                      "name": "senderSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64"
-                    }
-                  ]
+                  "witness": [{"name": "senderSig", "type": "signature", "encoding": "schnorr-64"}]
                 }
               ]
             },
@@ -288,23 +197,9 @@
                     "OP_CHECKSIG"
                   ],
                   "witness": [
-                    {
-                      "name": "preimage",
-                      "type": "bytes32",
-                      "encoding": "raw"
-                    },
-                    {
-                      "name": "serverSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64",
-                      "injected": true
-                    },
-                    {
-                      "name": "emulatorSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64",
-                      "injected": true
-                    }
+                    {"name": "preimage", "type": "bytes32", "encoding": "raw"},
+                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
+                    {"name": "emulatorSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
                   ]
                 }
               ]
@@ -339,23 +234,9 @@
                     "OP_CHECKSIG"
                   ],
                   "witness": [
-                    {
-                      "name": "serverSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64",
-                      "injected": true
-                    },
-                    {
-                      "name": "receiverSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64"
-                    },
-                    {
-                      "name": "emulatorSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64",
-                      "injected": true
-                    }
+                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
+                    {"name": "receiverSig", "type": "signature", "encoding": "schnorr-64"},
+                    {"name": "emulatorSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
                   ]
                 },
                 {
@@ -370,18 +251,8 @@
                     "OP_CHECKSIG"
                   ],
                   "witness": [
-                    {
-                      "name": "serverSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64",
-                      "injected": true
-                    },
-                    {
-                      "name": "emulatorSig",
-                      "type": "signature",
-                      "encoding": "schnorr-64",
-                      "injected": true
-                    }
+                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
+                    {"name": "emulatorSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
                   ]
                 }
               ]
@@ -400,29 +271,18 @@
           "senderProgram": "<sender_program>"
         }
       },
-      "spend": {
-        "function": "nonInteractiveRefund",
-        "leaf": "nonInteractiveRefundWithoutReceiver"
-      }
+      "spend": {"function": "nonInteractiveRefund", "leaf": "nonInteractiveRefundWithoutReceiver"}
     }
   ],
   "outputs": [
     {
       "name": "payout",
       "index": 0,
-      "value": {
-        "from": "htlc"
-      },
+      "value": {"from": "htlc"},
       "locking": "5120<sender_program>",
-      "assets": [
-        {
-          "from": "htlc"
-        }
-      ]
+      "assets": [{"from": "htlc"}]
     }
   ],
-  "packets": {
-    "output_index": 1,
-    "unmatched": "drop"
-  }
+  "packets": {"output_index": 1, "unmatched": "drop"},
+  "delegation": {"sealed": ["preimage"]}
 }

@@ -7,3 +7,11 @@ formatters:
   enable:
     - gofmt
     - goimports
+    - golines
+  settings:
+    golines:
+      max-len: 100
+  exclusions:
+    paths:
+      - api-spec/protobuf/gen
+      - internal/infrastructure/postgres/sqlc

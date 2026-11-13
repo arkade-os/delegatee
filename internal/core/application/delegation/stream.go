@@ -14,9 +14,18 @@ import (
 
 const streamRetry = time.Second
 
+type active struct {
+	stream  delegation.Stream
+	trigger *template.Trigger
+	given   map[string][]byte // the stream's variables
+}
+
 // RegisterStream has the daemon run a template's trigger against arkd's transactions. The same
-// template and variables give the stream already registered; an operator's cancel keeps it cancelled.
-func (s *Service) RegisterStream(ctx context.Context, templateID string, variables map[string]string) (*delegation.Stream, error) {
+// template and variables give the stream already registered; an operator's cancel keeps it
+// cancelled.
+func (s *Service) RegisterStream(
+	ctx context.Context, templateID string, variables map[string]string,
+) (*delegation.Stream, error) {
 	tmpl, err := s.registry.Usable(ctx, templateID)
 	if err != nil {
 		return nil, err
@@ -59,8 +68,8 @@ func (s *Service) CancelStream(ctx context.Context, id int64) error {
 	return nil
 }
 
-// StartStreams registers a stream for each document with a trigger. It runs at startup, so a stream the
-// operator cancelled stays cancelled.
+// StartStreams registers a stream for each document with a trigger. It runs at startup, so a stream
+// the operator cancelled stays cancelled.
 func (s *Service) StartStreams(ctx context.Context, documents map[string][]byte) {
 	for name, doc := range documents {
 		stored, err := s.registry.RegisterTemplate(ctx, doc)
@@ -68,7 +77,10 @@ func (s *Service) StartStreams(ctx context.Context, documents map[string][]byte)
 			log.WithError(err).Error("register default template " + name)
 			continue
 		}
-		if _, tmpl, err := s.registry.Parsed(ctx, stored.ID); err != nil || tmpl.Trigger() == nil {
+		if _, tmpl, err := s.registry.Parsed(
+			ctx, stored.ID,
+		); err != nil ||
+			len(tmpl.Triggers()) == 0 {
 			continue
 		}
 		_, err = s.RegisterStream(ctx, stored.ID, nil)
@@ -89,11 +101,6 @@ func (s *Service) streamsChanged() {
 	}
 }
 
-type active struct {
-	stream  delegation.Stream
-	trigger *template.Trigger
-}
-
 func (s *Service) activeStreams(ctx context.Context) []active {
 	streams, err := s.streams.List(ctx, delegation.StatusActive)
 	if err != nil {
@@ -103,11 +110,16 @@ func (s *Service) activeStreams(ctx context.Context) []active {
 	var out []active
 	for _, st := range streams {
 		tmpl, err := s.registry.Usable(ctx, st.TemplateID)
-		if err != nil || tmpl.Trigger() == nil {
+		if err != nil || len(tmpl.Triggers()) != 1 {
 			log.WithError(err).WithField("stream", st.ID).Warn("stream template unusable")
 			continue
 		}
-		out = append(out, active{stream: st, trigger: tmpl.Trigger()})
+		given, err := st.Given()
+		if err != nil {
+			log.WithError(err).WithField("stream", st.ID).Warn("stream variables unusable")
+			continue
+		}
+		out = append(out, active{stream: st, trigger: tmpl.Triggers()[0], given: given})
 	}
 	return out
 }
@@ -155,7 +167,8 @@ func (s *Service) wait(ctx context.Context, d time.Duration) {
 	}
 }
 
-// react spawns a delegation for every output of a streamed transaction that a trigger captures and its template locks.
+// react spawns a delegation for every output of a streamed transaction that a trigger captures and
+// its template locks.
 func (s *Service) react(ctx context.Context, streams []active, raw string) {
 	ptx, err := psbt.NewFromRawBytes(strings.NewReader(raw), true)
 	if err != nil {
@@ -163,23 +176,32 @@ func (s *Service) react(ctx context.Context, streams []active, raw string) {
 		return
 	}
 	for _, st := range streams {
-		captures, err := st.trigger.Match(ptx, s.keys)
+		captures, err := st.trigger.Match(ptx, s.keys, st.given, s.decryptFor(st.stream.TemplateID))
 		if err != nil {
 			continue
 		}
 		for _, c := range captures {
-			if err := s.spawn(ctx, st, ptx.UnsignedTx.TxOut[c.Output].PkScript, c.Variables); err != nil {
+			if err := s.spawn(
+				ctx, st, ptx.UnsignedTx.TxOut[c.Output].PkScript, c.Variables,
+			); err != nil {
 				level := log.WarnLevel
-				if errors.Is(err, delegation.ErrIneligible) || errors.Is(err, delegation.ErrInvalidArgs) || errors.Is(err, delegation.ErrBlocked) || ctx.Err() != nil {
+				if errors.Is(err, delegation.ErrIneligible) ||
+					errors.Is(err, delegation.ErrInvalidArgs) ||
+					errors.Is(err, delegation.ErrBlocked) ||
+					ctx.Err() != nil {
 					level = log.DebugLevel
 				}
-				log.WithError(err).WithFields(log.Fields{"stream": st.stream.ID, "output": c.Output}).Log(level, "no delegation spawned")
+				log.WithError(err).
+					WithFields(log.Fields{"stream": st.stream.ID, "output": c.Output}).
+					Log(level, "no delegation spawned")
 			}
 		}
 	}
 }
 
-func (s *Service) spawn(ctx context.Context, st active, output []byte, captured map[string]string) error {
+func (s *Service) spawn(
+	ctx context.Context, st active, output []byte, captured map[string]string,
+) error {
 	tmpl, err := s.registry.Usable(ctx, st.stream.TemplateID)
 	if err != nil {
 		return err
@@ -195,7 +217,8 @@ func (s *Service) spawn(ctx context.Context, st active, output []byte, captured 
 	if err != nil {
 		return err
 	}
-	log.WithFields(log.Fields{"id": created.ID, "stream": st.stream.ID, "address": created.Address}).Info("delegation spawned")
+	log.WithFields(log.Fields{"id": created.ID, "stream": st.stream.ID, "address": created.Address}).
+		Info("delegation spawned")
 	s.notify(*created)
 	return nil
 }

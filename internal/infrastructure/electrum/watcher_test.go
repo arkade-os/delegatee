@@ -35,7 +35,12 @@ func TestRepliesAreMatchedByID(t *testing.T) {
 		if params[0] == scriptHashOf(t, "aa") {
 			time.Sleep(100 * time.Millisecond)
 		}
-		return []map[string]any{{"tx_hash": strings.Repeat("ab", 32), "tx_pos": 1, "height": 0, "value": len(params[0].(string))}}, nil
+		return []map[string]any{
+			{
+				"tx_hash": strings.Repeat("ab", 32), "tx_pos": 1, "height": 0,
+				"value": len(params[0].(string)),
+			},
+		}, nil
 	})
 	w := newTestWatcher(t, srv)
 	var wg sync.WaitGroup
@@ -51,7 +56,11 @@ func TestRepliesAreMatchedByID(t *testing.T) {
 	}
 	wg.Wait()
 	for i, script := range []string{"aa", "bb"} {
-		require.Equal(t, []ports.Output{{Outpoint: strings.Repeat("ab", 32) + ":1", Script: script, Amount: 64}}, got[i])
+		require.Equal(
+			t,
+			[]ports.Output{{Outpoint: strings.Repeat("ab", 32) + ":1", Script: script, Amount: 64}},
+			got[i],
+		)
 	}
 }
 
@@ -87,7 +96,9 @@ func TestSubscribePushesTipThenStatuses(t *testing.T) {
 	require.NotNil(t, tip)
 	require.Equal(t, int64(100), tip.Height)
 	require.Equal(t, time.Unix(1_700_001_000, 0), tip.Time)
-	require.Equal(t, time.Unix(1_700_000_950, 0), tip.MedianTime, "the sixth of the last eleven blocks")
+	require.Equal(
+		t, time.Unix(1_700_000_950, 0), tip.MedianTime, "the sixth of the last eleven blocks",
+	)
 	statuses := map[string]string{}
 	for range 2 {
 		ev := next(t, sub)
@@ -154,10 +165,15 @@ func TestUpdateSubscribesAddedAndUnsubscribesRemoved(t *testing.T) {
 
 	require.NoError(t, sub.Update(t.Context(), []string{"bb"}, []string{"aa"}))
 	require.Equal(t, ports.ChainEvent{Script: "bb", Status: "s-bb"}, next(t, sub))
-	require.Equal(t, []string{scriptHashOf(t, "aa")}, srv.paramsOf("blockchain.scripthash.unsubscribe"))
+	require.Equal(
+		t, []string{scriptHashOf(t, "aa")}, srv.paramsOf("blockchain.scripthash.unsubscribe"),
+	)
 	srv.push("blockchain.scripthash.subscribe", scriptHashOf(t, "aa"), "late")
 	srv.push("blockchain.scripthash.subscribe", scriptHashOf(t, "bb"), "s2")
-	require.Equal(t, ports.ChainEvent{Script: "bb", Status: "s2"}, next(t, sub), "a removed script is not reported")
+	require.Equal(
+		t, ports.ChainEvent{Script: "bb", Status: "s2"}, next(t, sub),
+		"a removed script is not reported",
+	)
 	require.Error(t, sub.Update(t.Context(), []string{"zz"}, nil))
 	require.Error(t, sub.Update(t.Context(), nil, []string{"zz"}))
 
@@ -188,7 +204,10 @@ func TestReconnectSubscribesAgainAndReportsStatuses(t *testing.T) {
 		ev := next(t, sub)
 		statuses[ev.Script] = ev.Status
 	}
-	require.Equal(t, map[string]string{"aa": "s2", "bb": "t1"}, statuses, "every script reports its status again")
+	require.Equal(
+		t, map[string]string{"aa": "s2", "bb": "t1"}, statuses,
+		"every script reports its status again",
+	)
 	require.Equal(t, 2, srv.connections())
 	require.Len(t, srv.paramsOf("server.version"), 2, "the handshake is repeated")
 }
@@ -215,25 +234,42 @@ func TestReconnectKeepsTryingUntilTheServerReturns(t *testing.T) {
 
 func TestPingKeepsTheConnectionBusy(t *testing.T) {
 	srv := newChain(t, 100)
-	w, err := newWatcher(srv.url(), timings{request: time.Second, ping: 20 * time.Millisecond, backoff: 10 * time.Millisecond})
+	w, err := newWatcher(
+		srv.url(),
+		timings{request: time.Second, ping: 20 * time.Millisecond, backoff: 10 * time.Millisecond},
+	)
 	require.NoError(t, err)
 	t.Cleanup(w.Close)
-	require.Eventually(t, func() bool { return len(srv.paramsOf("server.ping")) >= 3 }, 2*time.Second, 10*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return len(srv.paramsOf("server.ping")) >= 3 }, 2*time.Second,
+		10*time.Millisecond,
+	)
 }
 
 func TestSilentServerDropsTheConnection(t *testing.T) {
 	srv := newChain(t, 100)
 	srv.silent = "server.ping"
-	w, err := newWatcher(srv.url(), timings{request: 50 * time.Millisecond, ping: 20 * time.Millisecond, backoff: 10 * time.Millisecond})
+	w, err := newWatcher(
+		srv.url(),
+		timings{
+			request: 50 * time.Millisecond, ping: 20 * time.Millisecond,
+			backoff: 10 * time.Millisecond,
+		},
+	)
 	require.NoError(t, err)
 	t.Cleanup(w.Close)
-	require.Eventually(t, func() bool { return srv.connections() >= 2 }, 2*time.Second, 10*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return srv.connections() >= 2 }, 2*time.Second, 10*time.Millisecond,
+	)
 }
 
 func TestRequestTimesOut(t *testing.T) {
 	srv := newChain(t, 100)
 	srv.silent = "blockchain.transaction.get"
-	w, err := newWatcher(srv.url(), timings{request: 50 * time.Millisecond, ping: time.Hour, backoff: 10 * time.Millisecond})
+	w, err := newWatcher(
+		srv.url(),
+		timings{request: 50 * time.Millisecond, ping: time.Hour, backoff: 10 * time.Millisecond},
+	)
 	require.NoError(t, err)
 	t.Cleanup(w.Close)
 	_, err = w.Transaction(t.Context(), "tx")
@@ -308,7 +344,9 @@ func TestTLSURLsHandshake(t *testing.T) {
 }
 
 func TestServerVersionRefused(t *testing.T) {
-	srv := newServer(t, func(string, []any) (any, *rpcError) { return nil, &rpcError{Code: 1, Message: "no"} })
+	srv := newServer(
+		t, func(string, []any) (any, *rpcError) { return nil, &rpcError{Code: 1, Message: "no"} },
+	)
 	_, err := NewWatcher(srv.url())
 	require.ErrorContains(t, err, "server.version")
 }

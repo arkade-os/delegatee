@@ -10,7 +10,10 @@ import (
 )
 
 func TestOnlyThePublicPortIsRateLimited(t *testing.T) {
-	s, err := Listen(t.Context(), Options{PublicRateLimit: 1, Status: statusStub{}, Health: &healthStub{}}, &handlers.Executor{}, &handlers.Admin{})
+	s, err := Listen(
+		t.Context(), Options{PublicRateLimit: 1, Status: statusStub{}, Health: &healthStub{}},
+		&handlers.Executor{}, &handlers.Admin{},
+	)
 	require.NoError(t, err)
 	t.Cleanup(s.Stop)
 

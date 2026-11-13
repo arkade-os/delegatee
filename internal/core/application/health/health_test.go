@@ -68,5 +68,7 @@ func (emulatorStub) Info(context.Context) (ports.EmulatorInfo, error) {
 }
 
 func newLoop() *executionapp.Service {
-	return executionapp.NewService(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, executionapp.Limits{})
+	return executionapp.NewService(
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, executionapp.Limits{},
+	)
 }

@@ -39,22 +39,20 @@ type Watcher struct {
 	sub    *subscription
 }
 
-func NewWatcher(rawURL string) (*Watcher, error) { return newWatcher(rawURL, defaultTimings) }
-
-func newWatcher(rawURL string, times timings) (*Watcher, error) {
-	c, err := newClient(rawURL, times)
-	if err != nil {
-		return nil, err
-	}
-	w := &Watcher{c: c, hashes: map[string]string{}}
-	c.onNotify, c.onReconnect = w.notify, w.resync
-	c.start()
-	return w, nil
+type subscription struct {
+	w      *Watcher
+	ctx    context.Context
+	cancel context.CancelFunc
+	events chan ports.ChainEvent
 }
+
+func NewWatcher(rawURL string) (*Watcher, error) { return newWatcher(rawURL, defaultTimings) }
 
 func (w *Watcher) Close() { w.c.close() }
 
-func (w *Watcher) Subscribe(ctx context.Context, scripts []string) (ports.ChainSubscription, error) {
+func (w *Watcher) Subscribe(
+	ctx context.Context, scripts []string,
+) (ports.ChainSubscription, error) {
 	hashes, err := scriptHashes(scripts)
 	if err != nil {
 		return nil, err
@@ -65,7 +63,9 @@ func (w *Watcher) Subscribe(ctx context.Context, scripts []string) (ports.ChainS
 		return nil, errSubscribed
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	w.sub = &subscription{w: w, ctx: ctx, cancel: cancel, events: make(chan ports.ChainEvent, eventsBuffer)}
+	w.sub = &subscription{
+		w: w, ctx: ctx, cancel: cancel, events: make(chan ports.ChainEvent, eventsBuffer),
+	}
 	for i, h := range hashes {
 		w.hashes[h] = scripts[i]
 	}
@@ -95,7 +95,12 @@ func (w *Watcher) Unspents(ctx context.Context, script string) ([]ports.Output, 
 	out := make([]ports.Output, 0, len(items))
 	for _, it := range items {
 		out = append(out, ports.Output{
-			Outpoint: fmt.Sprintf("%s:%d", it.TxHash, it.TxPos), Script: script, Amount: it.Value, Height: max(it.Height, 0),
+			Outpoint: fmt.Sprintf(
+				"%s:%d", it.TxHash, it.TxPos,
+			),
+			Script: script,
+			Amount: it.Value,
+			Height: max(it.Height, 0),
 		})
 	}
 	return out, nil
@@ -125,6 +130,54 @@ func (w *Watcher) Transaction(ctx context.Context, txid string) (*wire.MsgTx, er
 		return nil, err
 	}
 	return tx, nil
+}
+
+func (s *subscription) Events() <-chan ports.ChainEvent { return s.events }
+func (s *subscription) Connected() bool                 { return s.w.c.connected() }
+
+func (s *subscription) Update(ctx context.Context, add, remove []string) error {
+	addHashes, err := scriptHashes(add)
+	if err != nil {
+		return err
+	}
+	removeHashes, err := scriptHashes(remove)
+	if err != nil {
+		return err
+	}
+	s.w.mu.Lock()
+	for i, h := range addHashes {
+		s.w.hashes[h] = add[i]
+	}
+	for _, h := range removeHashes {
+		delete(s.w.hashes, h)
+	}
+	s.w.mu.Unlock()
+	// a script added while disconnected is subscribed by the resync that follows the reconnect
+	if err := s.w.subscribeHashes(
+		ctx, addHashes,
+	); err != nil &&
+		!errors.Is(err, ports.ErrDisconnected) {
+		return err
+	}
+	for chunk := range slices.Chunk(removeHashes, ports.MaxChainScripts) {
+		calls := make([]call, len(chunk))
+		for i, h := range chunk {
+			calls[i] = call{method: "blockchain.scripthash.unsubscribe", params: []any{h}}
+		}
+		if _, err := s.w.c.batch(ctx, calls); err != nil {
+			log.WithError(err).Debug("electrum unsubscribe")
+		}
+	}
+	return nil
+}
+
+func (s *subscription) Stop() {
+	s.cancel()
+	s.w.mu.Lock()
+	defer s.w.mu.Unlock()
+	if s.w.sub == s {
+		s.w.sub, s.w.hashes = nil, map[string]string{}
+	}
 }
 
 func (w *Watcher) callInto(ctx context.Context, out any, method string, params ...any) error {
@@ -250,59 +303,6 @@ func (w *Watcher) tipAt(ctx context.Context, height int64) (delegation.Tip, erro
 	return tip, nil
 }
 
-type subscription struct {
-	w      *Watcher
-	ctx    context.Context
-	cancel context.CancelFunc
-	events chan ports.ChainEvent
-}
-
-func (s *subscription) Events() <-chan ports.ChainEvent { return s.events }
-
-func (s *subscription) Connected() bool { return s.w.c.connected() }
-
-func (s *subscription) Update(ctx context.Context, add, remove []string) error {
-	addHashes, err := scriptHashes(add)
-	if err != nil {
-		return err
-	}
-	removeHashes, err := scriptHashes(remove)
-	if err != nil {
-		return err
-	}
-	s.w.mu.Lock()
-	for i, h := range addHashes {
-		s.w.hashes[h] = add[i]
-	}
-	for _, h := range removeHashes {
-		delete(s.w.hashes, h)
-	}
-	s.w.mu.Unlock()
-	// a script added while disconnected is subscribed by the resync that follows the reconnect
-	if err := s.w.subscribeHashes(ctx, addHashes); err != nil && !errors.Is(err, ports.ErrDisconnected) {
-		return err
-	}
-	for chunk := range slices.Chunk(removeHashes, ports.MaxChainScripts) {
-		calls := make([]call, len(chunk))
-		for i, h := range chunk {
-			calls[i] = call{method: "blockchain.scripthash.unsubscribe", params: []any{h}}
-		}
-		if _, err := s.w.c.batch(ctx, calls); err != nil {
-			log.WithError(err).Debug("electrum unsubscribe")
-		}
-	}
-	return nil
-}
-
-func (s *subscription) Stop() {
-	s.cancel()
-	s.w.mu.Lock()
-	defer s.w.mu.Unlock()
-	if s.w.sub == s {
-		s.w.sub, s.w.hashes = nil, map[string]string{}
-	}
-}
-
 // emit pushes ev, false when the subscription ended first.
 func (s *subscription) emit(ev ports.ChainEvent) bool {
 	select {
@@ -311,6 +311,17 @@ func (s *subscription) emit(ev ports.ChainEvent) bool {
 	case <-s.ctx.Done():
 		return false
 	}
+}
+
+func newWatcher(rawURL string, times timings) (*Watcher, error) {
+	c, err := newClient(rawURL, times)
+	if err != nil {
+		return nil, err
+	}
+	w := &Watcher{c: c, hashes: map[string]string{}}
+	c.onNotify, c.onReconnect = w.notify, w.resync
+	c.start()
+	return w, nil
 }
 
 func scriptHashes(scripts []string) ([]string, error) {

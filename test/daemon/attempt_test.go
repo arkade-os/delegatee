@@ -27,10 +27,11 @@ func TestClaimLandsThroughAnOffchainAttempt(t *testing.T) {
 	var attempts []attempt
 	require.Eventually(t, func() bool {
 		attempts = listAttempts(t, d, w.ID)
-		return len(attempts) == 1 && attempts[0].Status == "submitted" && len(d.Arkd.submitted()) == 1
+		return len(attempts) == 1 && attempts[0].Status == "submitted" &&
+			len(d.Arkd.submitted()) == 1
 	}, 5*time.Second, 50*time.Millisecond)
 	a := attempts[0]
-	require.Equal(t, "offchain", a.Kind)
+	require.Equal(t, "virtual", a.Kind)
 	require.Equal(t, w.ID, a.DelegationID)
 	require.Equal(t, []string{outpoint}, a.Coins)
 	require.Empty(t, a.Error)
@@ -38,11 +39,17 @@ func TestClaimLandsThroughAnOffchainAttempt(t *testing.T) {
 	require.Equal(t, 1, d.Emu.Signed)
 
 	var raw []byte
-	require.NoError(t, d.DB.QueryRowContext(t.Context(), "SELECT decode(txs->0->>'raw', 'base64') FROM attempts").Scan(&raw))
+	require.NoError(
+		t,
+		d.DB.QueryRowContext(t.Context(), "SELECT decode(txs->0->>'raw', 'base64') FROM attempts").
+			Scan(&raw),
+	)
 	ptx, err := psbt.NewFromRawBytes(bytes.NewReader(raw), false)
 	require.NoError(t, err)
 	require.Equal(t, a.Txid, ptx.UnsignedTx.TxHash().String())
-	require.Equal(t, sw.receiverScript, ptx.UnsignedTx.TxOut[0].PkScript, "the claim pays the receiver")
+	require.Equal(
+		t, sw.receiverScript, ptx.UnsignedTx.TxOut[0].PkScript, "the claim pays the receiver",
+	)
 	require.Equal(t, int64(10_000), ptx.UnsignedTx.TxOut[0].Value)
 
 	d.Arkd.Spend(outpoint, a.Txid)
@@ -73,10 +80,13 @@ func TestRestartBeforeTheEmulatorFailsTheAttempt(t *testing.T) {
 	require.Empty(t, d.Arkd.submitted())
 
 	d.Emu.Hang(false, false)
-	d = d.Restart(t, WithEncryptionKey, WithLandingWindow(time.Second), WithRetryDelay(100*time.Millisecond))
+	d = d.Restart(
+		t, WithEncryptionKey, WithLandingWindow(time.Second), WithRetryDelay(100*time.Millisecond),
+	)
 	require.Eventually(t, func() bool {
 		attempts = listAttempts(t, d, w.ID)
-		return len(attempts) == 2 && attempts[1].Status == "failed" && attempts[0].Status == "submitted"
+		return len(attempts) == 2 && attempts[1].Status == "failed" &&
+			attempts[0].Status == "submitted"
 	}, 10*time.Second, 50*time.Millisecond)
 	require.NotEmpty(t, attempts[1].Error)
 	require.Equal(t, []string{outpoint}, attempts[0].Coins)
@@ -135,7 +145,8 @@ func TestRefusedAttemptsAreRetried(t *testing.T) {
 	d.Emu.Refuse(nil)
 	require.Eventually(t, func() bool {
 		attempts = listAttempts(t, d, w.ID)
-		return len(attempts) >= 2 && attempts[0].Error != "" && attempts[0].Error != attempts[len(attempts)-1].Error
+		return len(attempts) >= 2 && attempts[0].Error != "" &&
+			attempts[0].Error != attempts[len(attempts)-1].Error
 	}, 5*time.Second, 50*time.Millisecond, "a retry reaches arkd")
 	require.Equal(t, "failed", attempts[0].Status, "arkd refused")
 	require.Contains(t, attempts[0].Error, "bad tx")
@@ -150,7 +161,9 @@ func TestRefusedAttemptsAreRetried(t *testing.T) {
 	require.Equal(t, []string{attempts[0].Txid}, d.Arkd.submitted())
 
 	cancelled, _ := claimDelegation(t, d)
-	code, body := post(t, d.AdminURL+"/v1/admin/delegation/"+cancelled.ID+"/cancel", map[string]any{})
+	code, body := post(
+		t, d.AdminURL+"/v1/admin/delegation/"+cancelled.ID+"/cancel", map[string]any{},
+	)
 	require.Equal(t, http.StatusOK, code, string(body))
 	d.Arkd.Fund(cancelled.Inputs[0].Script, 10_000, time.Now().Add(time.Hour))
 	require.Never(t, func() bool {
@@ -216,15 +229,19 @@ func newSwap(t *testing.T, d *Daemon, templateID string) swap {
 	program := schnorr.SerializePubKey(receiver.PubKey())
 	return swap{
 		variables: map[string]string{
-			"sender":                  hex.EncodeToString(sender.PubKey().SerializeCompressed()),
-			"receiver":                hex.EncodeToString(receiver.PubKey().SerializeCompressed()),
-			"refund_locktime":         hex.EncodeToString(binary.LittleEndian.AppendUint32(nil, uint32(time.Now().Add(24*time.Hour).Unix()))),
-			"unilateral_claim_delay":  ScriptNum(1024),
-			"unilateral_refund_delay": ScriptNum(1536),
+			"sender":   hex.EncodeToString(sender.PubKey().SerializeCompressed()),
+			"receiver": hex.EncodeToString(receiver.PubKey().SerializeCompressed()),
+			"refund_locktime": hex.EncodeToString(
+				binary.LittleEndian.AppendUint32(nil, uint32(time.Now().Add(24*time.Hour).Unix())),
+			),
+			"unilateral_claim_delay":                   ScriptNum(1024),
+			"unilateral_refund_delay":                  ScriptNum(1536),
 			"unilateral_refund_without_receiver_delay": ScriptNum(2048),
 			"receiver_program":                         hex.EncodeToString(program),
-			"sender_program":                           hex.EncodeToString(schnorr.SerializePubKey(sender.PubKey())),
-			"ciphertext":                               seal(t, d, preimage, templateID),
+			"sender_program": hex.EncodeToString(
+				schnorr.SerializePubKey(sender.PubKey()),
+			),
+			"preimage": seal(t, d, preimage, templateID),
 		},
 		receiverScript: append([]byte{0x51, 0x20}, program...),
 		preimage:       preimage,
@@ -246,6 +263,10 @@ func seal(t *testing.T, d *Daemon, preimage []byte, templateID string) string {
 func attemptRows(t *testing.T, d *Daemon, status string) int {
 	t.Helper()
 	var n int
-	require.NoError(t, d.DB.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM attempts WHERE $1 = '' OR status = $1", status).Scan(&n))
+	require.NoError(
+		t,
+		d.DB.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM attempts WHERE $1 = '' OR status = $1", status).
+			Scan(&n),
+	)
 	return n
 }

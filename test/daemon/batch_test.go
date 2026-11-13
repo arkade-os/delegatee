@@ -22,22 +22,28 @@ func TestRenewalGoesThroughARound(t *testing.T) {
 	outpoint := d.Arkd.FundAged(script, 10_000, time.Hour, time.Now().Add(500*time.Second))
 	require.Eventually(t, func() bool {
 		attempts := listAttempts(t, d, w.ID)
-		return len(attempts) == 1 && len(d.Arkd.Commitments()) == 1 && attempts[0].Txid == d.Arkd.Commitments()[0]
+		return len(attempts) == 1 && len(d.Arkd.Commitments()) == 1 &&
+			attempts[0].Txid == d.Arkd.Commitments()[0]
 	}, 15*time.Second, 10*time.Millisecond, "the attempt keeps the commitment of its batch")
 
 	attempts := listAttempts(t, d, w.ID)
 	require.Len(t, attempts, 1)
 	a := attempts[0]
-	require.Equal(t, "intent", a.Kind)
+	require.Equal(t, "proof", a.Kind)
 	require.Equal(t, "submitted", a.Status)
 	require.Equal(t, []string{outpoint}, a.Coins)
 	require.Equal(t, d.Arkd.Commitments(), []string{a.Txid})
-	require.Equal(t, []string{"register", "confirm", "nonces", "signatures", "forfeits"}, d.Arkd.batchCalls())
+	require.Equal(
+		t, []string{"register", "confirm", "nonces", "signatures", "forfeits"}, d.Arkd.batchCalls(),
+	)
 	require.Equal(t, 1, d.Emu.Intents)
 	require.Equal(t, 1, d.Emu.Finalizations)
 
 	d.Arkd.HoldLanding(false)
-	require.Eventually(t, func() bool { return listAttempts(t, d, w.ID)[0].Status == "succeeded" }, 5*time.Second, 20*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return listAttempts(t, d, w.ID)[0].Status == "succeeded" }, 5*time.Second,
+		20*time.Millisecond,
+	)
 	coins := coinsOf(t, d, w.ID)
 	require.Len(t, coins, 2)
 	spent, renewed := coins[0], coins[1]
@@ -51,7 +57,8 @@ func TestRenewalGoesThroughARound(t *testing.T) {
 	require.Equal(t, 1, attemptRows(t, d, "succeeded"))
 }
 
-// at most one batch's worth stays registered, oldest deadline first, and the next worth follows a batch.
+// at most one batch's worth stays registered, oldest deadline first, and the next worth follows a
+// batch.
 func TestOneBatchesWorthIsRegistered(t *testing.T) {
 	d := Start(t, WithSessions(time.Second, 3), func(c *config.Config) { c.IntentsPerBatch = 3 })
 	d.Arkd.PauseBatches(true)
@@ -60,10 +67,19 @@ func TestOneBatchesWorthIsRegistered(t *testing.T) {
 	var outpoints []string
 	for i := range 7 {
 		w := renewalDelegation(t, d, templateID, 8*3600, 1000)
-		outpoints = append(outpoints, d.Arkd.FundAged(w.Inputs[0].Script, 10_000, 14*time.Hour, time.Now().Add(reserve+5*time.Second+time.Duration(i)*100*time.Millisecond)))
+		outpoints = append(
+			outpoints,
+			d.Arkd.FundAged(
+				w.Inputs[0].Script, 10_000, 14*time.Hour,
+				time.Now().Add(reserve+5*time.Second+time.Duration(i)*100*time.Millisecond),
+			),
+		)
 	}
 
-	require.Eventually(t, func() bool { return d.Arkd.Registered() == 3 && readStatus(t, d).Queued == 4 }, 10*time.Second, 20*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return d.Arkd.Registered() == 3 && readStatus(t, d).Queued == 4 },
+		10*time.Second, 20*time.Millisecond,
+	)
 	time.Sleep(300 * time.Millisecond)
 	require.ElementsMatch(t, outpoints[:3], d.Arkd.RegisteredCoins(), "the earliest deadlines")
 	st := readStatus(t, d)
@@ -72,26 +88,40 @@ func TestOneBatchesWorthIsRegistered(t *testing.T) {
 	require.Equal(t, 4, st.Queued)
 	require.Zero(t, st.Late)
 	require.Len(t, st.Batches, 3)
-	require.Equal(t, []int{3, 3, 1}, []int{st.Batches[0].Intents, st.Batches[1].Intents, st.Batches[2].Intents})
+	require.Equal(
+		t, []int{3, 3, 1},
+		[]int{st.Batches[0].Intents, st.Batches[1].Intents, st.Batches[2].Intents},
+	)
 
 	d.Arkd.PauseBatches(false)
 	require.Eventually(t, func() bool {
 		return d.Arkd.InBatch() && d.Arkd.Registered() == 3
 	}, 10*time.Second, 5*time.Millisecond, "the next batch's worth is registered while the first one runs")
-	require.Eventually(t, func() bool { return attemptRows(t, d, "succeeded") == 7 }, 20*time.Second, 50*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return attemptRows(t, d, "succeeded") == 7 }, 20*time.Second,
+		50*time.Millisecond,
+	)
 	require.Len(t, d.Arkd.Commitments(), 3)
 }
 
 // 128 delegations funded together land within eight batches, and the plan forecasts them.
 func TestManyDelegationsLandWithinEightBatches(t *testing.T) {
-	d := Start(t, WithSessions(700*time.Millisecond, 20), func(c *config.Config) { c.IntentsPerBatch = 20 })
+	d := Start(
+		t, WithSessions(700*time.Millisecond, 20),
+		func(c *config.Config) { c.IntentsPerBatch = 20 },
+	)
 	d.Arkd.PauseBatches(true)
 	_, templateID := registerRenewal(t, d)
 	for range 128 {
 		w := renewalDelegation(t, d, templateID, 8*3600, 1000)
-		d.Arkd.FundAged(w.Inputs[0].Script, 10_000, 14*time.Hour, time.Now().Add(reserve+12*time.Second))
+		d.Arkd.FundAged(
+			w.Inputs[0].Script, 10_000, 14*time.Hour, time.Now().Add(reserve+12*time.Second),
+		)
 	}
-	require.Eventually(t, func() bool { return readStatus(t, d).Queued == 108 }, 30*time.Second, 50*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return readStatus(t, d).Queued == 108 }, 30*time.Second,
+		50*time.Millisecond,
+	)
 	st := readStatus(t, d)
 	require.Equal(t, 20, st.Registered)
 	require.Zero(t, st.Late, "the batches fit before the deadlines")
@@ -104,7 +134,10 @@ func TestManyDelegationsLandWithinEightBatches(t *testing.T) {
 	require.Equal(t, 128, total, "a batch is forecast for every coin")
 
 	d.Arkd.PauseBatches(false)
-	require.Eventually(t, func() bool { return attemptRows(t, d, "succeeded") == 128 }, 40*time.Second, 100*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return attemptRows(t, d, "succeeded") == 128 }, 40*time.Second,
+		100*time.Millisecond,
+	)
 	require.LessOrEqual(t, len(d.Arkd.Commitments()), 8)
 	require.Equal(t, 0, readStatus(t, d).Registered)
 }
@@ -116,16 +149,25 @@ func TestLateCoinsAreCounted(t *testing.T) {
 	_, templateID := registerRenewal(t, d)
 	far := renewalDelegation(t, d, templateID, 8*3600, 1000)
 	d.Arkd.FundAged(far.Inputs[0].Script, 10_000, 14*time.Hour, time.Now().Add(7*time.Hour))
-	require.Eventually(t, func() bool { return readStatus(t, d).Queued == 1 }, 5*time.Second, 20*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return readStatus(t, d).Queued == 1 }, 5*time.Second, 20*time.Millisecond,
+	)
 	require.Zero(t, readStatus(t, d).Late)
 	require.Zero(t, d.Arkd.Registered(), "its deadline is an hour away")
 
 	soon := renewalDelegation(t, d, templateID, 8*3600, 1000)
-	d.Arkd.FundAged(soon.Inputs[0].Script, 10_000, 14*time.Hour, time.Now().Add(reserve-time.Second))
-	require.Eventually(t, func() bool { return readStatus(t, d).Late == 1 }, 5*time.Second, 20*time.Millisecond)
+	d.Arkd.FundAged(
+		soon.Inputs[0].Script, 10_000, 14*time.Hour, time.Now().Add(reserve-time.Second),
+	)
+	require.Eventually(
+		t, func() bool { return readStatus(t, d).Late == 1 }, 5*time.Second, 20*time.Millisecond,
+	)
 	st := readStatus(t, d)
 	require.Equal(t, 2, st.Registered+st.Queued)
-	require.Eventually(t, func() bool { return d.Arkd.Registered() == 2 }, 5*time.Second, 20*time.Millisecond, "the batch carries the far one too")
+	require.Eventually(
+		t, func() bool { return d.Arkd.Registered() == 2 }, 5*time.Second, 20*time.Millisecond,
+		"the batch carries the far one too",
+	)
 }
 
 // nothing is registered before the batch time; the earliest deadline forces a batch of
@@ -135,20 +177,38 @@ func TestRenewalsWaitForTheEarliestDeadlineThenShareARound(t *testing.T) {
 	d.Arkd.PauseBatches(true)
 	_, templateID := registerRenewal(t, d)
 	start := time.Now()
-	// due one second apart, one after the other; the first deadline is at 6s, the others up to a second later
+	// due one second apart, one after the other; the first deadline is at 6s, the others up to a
+	// second later
 	var delegations []delegation
 	var outpoints []string
 	for i := range 4 {
-		due, deadline := time.Duration(i+1)*time.Second, 6*time.Second+time.Duration(i)*time.Second/3
+		due, deadline := time.Duration(
+			i+1,
+		)*time.Second, 6*time.Second+time.Duration(
+			i,
+		)*time.Second/3
 		expiry := start.Add(reserve + deadline)
-		w := renewalDelegation(t, d, templateID, int64((expiry.Sub(start.Add(due))+time.Second-1)/time.Second), 1000)
-		outpoints = append(outpoints, d.Arkd.FundAged(w.Inputs[0].Script, 10_000, 14*time.Hour, expiry))
+		w := renewalDelegation(
+			t, d, templateID, int64((expiry.Sub(start.Add(due))+time.Second-1)/time.Second), 1000,
+		)
+		outpoints = append(
+			outpoints, d.Arkd.FundAged(w.Inputs[0].Script, 10_000, 14*time.Hour, expiry),
+		)
 		delegations = append(delegations, w)
 	}
 
-	require.Never(t, func() bool { return d.Arkd.Registered() > 0 }, 4*time.Second, 50*time.Millisecond, "the coins are due and wait")
-	require.Eventually(t, func() bool { return d.Arkd.Registered() == 4 }, 4*time.Second, 20*time.Millisecond, "all registered together")
-	require.GreaterOrEqual(t, time.Since(start), 4500*time.Millisecond, "a batch ahead of the first deadline, not earlier")
+	require.Never(
+		t, func() bool { return d.Arkd.Registered() > 0 }, 4*time.Second, 50*time.Millisecond,
+		"the coins are due and wait",
+	)
+	require.Eventually(
+		t, func() bool { return d.Arkd.Registered() == 4 }, 4*time.Second, 20*time.Millisecond,
+		"all registered together",
+	)
+	require.GreaterOrEqual(
+		t, time.Since(start), 4500*time.Millisecond,
+		"a batch ahead of the first deadline, not earlier",
+	)
 	require.ElementsMatch(t, outpoints, d.Arkd.RegisteredCoins())
 
 	d.Arkd.PauseBatches(false)
@@ -166,19 +226,30 @@ func TestGroupOverTheBatchCapacitySplitsIntoBatches(t *testing.T) {
 	d := Start(t, WithSessions(time.Second, 2), func(c *config.Config) { c.IntentsPerBatch = 2 })
 	_, templateID := registerRenewal(t, d)
 	start := time.Now()
-	deadlines := []time.Duration{9 * time.Second, 10 * time.Second, 10500 * time.Millisecond, 11 * time.Second, 11500 * time.Millisecond}
+	deadlines := []time.Duration{
+		9 * time.Second, 10 * time.Second, 10500 * time.Millisecond, 11 * time.Second,
+		11500 * time.Millisecond,
+	}
 	delegations := make([]delegation, len(deadlines))
 	for i, deadline := range deadlines {
 		expiry := start.Add(reserve + deadline)
-		delegations[i] = renewalDelegation(t, d, templateID, int64((expiry.Sub(start)+time.Second-1)/time.Second), 1000)
+		delegations[i] = renewalDelegation(
+			t, d, templateID, int64((expiry.Sub(start)+time.Second-1)/time.Second), 1000,
+		)
 		d.Arkd.FundAged(delegations[i].Inputs[0].Script, 10_000, 14*time.Hour, expiry)
 	}
 
-	require.Never(t, func() bool { return d.Arkd.Registered() > 0 }, 5*time.Second, 50*time.Millisecond, "the first batch is registered three batches before the group")
+	require.Never(
+		t, func() bool { return d.Arkd.Registered() > 0 }, 5*time.Second, 50*time.Millisecond,
+		"the first batch is registered three batches before the group",
+	)
 	for i, w := range delegations {
 		attempts := waitAttempts(t, d, w.ID, 1, "succeeded")
 		landed := time.Unix(atoi(t, attempts[0].UpdatedAt), 0)
-		require.True(t, landed.Before(start.Add(deadlines[i])), "coin %d landed at %s, deadline %s", i, landed.Sub(start), deadlines[i])
+		require.True(
+			t, landed.Before(start.Add(deadlines[i])), "coin %d landed at %s, deadline %s", i,
+			landed.Sub(start), deadlines[i],
+		)
 	}
 	require.GreaterOrEqual(t, len(d.Arkd.Commitments()), 3, "two intents per batch")
 }
@@ -191,7 +262,10 @@ func TestIntentFeeIsCapped(t *testing.T) {
 
 	paid := renewalDelegation(t, d, templateID, 1024, 1000)
 	d.Arkd.FundAged(paid.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(500*time.Second))
-	require.Eventually(t, func() bool { return attemptRows(t, d, "succeeded") == 1 }, 10*time.Second, 20*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return attemptRows(t, d, "succeeded") == 1 }, 10*time.Second,
+		20*time.Millisecond,
+	)
 	present := presentCoins(t, d, paid.ID)
 	require.Len(t, present, 1)
 	require.Equal(t, "9500", present[0].Amount, "the renewal pays the fee, within its cap")
@@ -204,7 +278,7 @@ func TestIntentFeeIsCapped(t *testing.T) {
 		return len(attempts) == 1
 	}, 5*time.Second, 20*time.Millisecond)
 	require.Equal(t, "failed", attempts[0].Status)
-	require.Equal(t, "intent", attempts[0].Kind)
+	require.Equal(t, "proof", attempts[0].Kind)
 	require.Contains(t, attempts[0].Error, "exceeds the cap 0")
 	coins := coinsOf(t, d, refused.ID)
 	require.Len(t, coins, 1)
@@ -222,9 +296,14 @@ func TestIntentSelectedAtRegistrationIsConfirmed(t *testing.T) {
 	w := renewalDelegation(t, d, templateID, 1024, 1000)
 	d.Arkd.FundAged(w.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(500*time.Second))
 
-	require.Eventually(t, func() bool { return attemptRows(t, d, "succeeded") == 1 }, 15*time.Second, 50*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return attemptRows(t, d, "succeeded") == 1 }, 15*time.Second,
+		50*time.Millisecond,
+	)
 	require.Equal(t, 1, attemptRows(t, d, ""))
-	require.Equal(t, []string{"register", "confirm", "nonces", "signatures", "forfeits"}, d.Arkd.batchCalls())
+	require.Equal(
+		t, []string{"register", "confirm", "nonces", "signatures", "forfeits"}, d.Arkd.batchCalls(),
+	)
 }
 
 func TestFailedBatchIsRetried(t *testing.T) {
@@ -246,7 +325,10 @@ func TestFailedBatchIsRetried(t *testing.T) {
 
 // An intent no batch selects within the timeout fails and its coins are queued again.
 func TestUnselectedIntentFailsAndItsCoinsAreQueuedAgain(t *testing.T) {
-	d := Start(t, WithSessions(500*time.Millisecond, 128), func(c *config.Config) { c.IntentTimeout = 300 * time.Millisecond })
+	d := Start(
+		t, WithSessions(500*time.Millisecond, 128),
+		func(c *config.Config) { c.IntentTimeout = 300 * time.Millisecond },
+	)
 	d.Arkd.PauseBatches(true)
 	_, templateID := registerRenewal(t, d)
 	w := renewalDelegation(t, d, templateID, 1024, 1000)
@@ -291,18 +373,28 @@ func readStatus(t *testing.T, d *Daemon) statusResponse {
 		require.NoError(t, err)
 		return n
 	}
-	out := statusResponse{Active: num(raw.Active), Queued: num(raw.Queued), Registered: num(raw.Registered), Late: num(raw.Late)}
+	out := statusResponse{
+		Active: num(raw.Active), Queued: num(raw.Queued), Registered: num(raw.Registered),
+		Late: num(raw.Late),
+	}
 	for _, r := range raw.Batches {
-		out.Batches = append(out.Batches, batchForecast{Intents: num(r.Intents), Coins: num(r.Coins)})
+		out.Batches = append(
+			out.Batches, batchForecast{Intents: num(r.Intents), Coins: num(r.Coins)},
+		)
 	}
 	return out
 }
 
-func renewalDelegation(t *testing.T, d *Daemon, templateID string, windowSeconds, maxFee int64) delegation {
+func renewalDelegation(
+	t *testing.T, d *Daemon, templateID string, windowSeconds, maxFee int64,
+) delegation {
 	t.Helper()
 	variables := renewalVariables(t)
 	variables["renewal_window"], variables["max_fee"] = ScriptNum(windowSeconds), ScriptNum(maxFee)
-	code, body := post(t, d.RestURL+"/v1/delegation", map[string]any{"templateId": templateID, "variables": variables})
+	code, body := post(
+		t, d.RestURL+"/v1/delegation",
+		map[string]any{"templateId": templateID, "variables": variables},
+	)
 	require.Equal(t, http.StatusOK, code, string(body))
 	return decodeDelegation(t, body)
 }

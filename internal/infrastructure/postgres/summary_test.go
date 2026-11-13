@@ -16,7 +16,10 @@ func TestSummariesOrderByNextDueWithoutCoinsLast(t *testing.T) {
 
 	list, err := repo.List(t.Context(), ports.SummaryFilter{Limit: 10})
 	require.NoError(t, err)
-	require.Equal(t, []int64{ids["soon"], ids["tied"], ids["later"], ids["empty"], ids["spent"]}, summaryIDs(list))
+	require.Equal(
+		t, []int64{ids["soon"], ids["tied"], ids["later"], ids["empty"], ids["spent"]},
+		summaryIDs(list),
+	)
 
 	soon, later := list[0], list[2]
 	require.Equal(t, 2, soon.Coins)
@@ -59,13 +62,25 @@ func TestSummariesPageByCursor(t *testing.T) {
 
 func TestSummariesFilterByStatus(t *testing.T) {
 	repo, ids := testSummaries(t)
-	require.NoError(t, repo.db.Delegations().AddOrUpdate(t.Context(), &delegation.Delegation{ID: ids["tied"], Status: delegation.StatusCancelled}))
-	require.NoError(t, repo.db.Delegations().AddOrUpdate(t.Context(), &delegation.Delegation{ID: ids["empty"], Status: delegation.StatusCancelled}))
+	require.NoError(
+		t,
+		repo.db.Delegations().
+			AddOrUpdate(t.Context(), &delegation.Delegation{ID: ids["tied"], Status: delegation.StatusCancelled}),
+	)
+	require.NoError(
+		t,
+		repo.db.Delegations().
+			AddOrUpdate(t.Context(), &delegation.Delegation{ID: ids["empty"], Status: delegation.StatusCancelled}),
+	)
 
-	list, err := repo.List(t.Context(), ports.SummaryFilter{Status: delegation.StatusCancelled, Limit: 10})
+	list, err := repo.List(
+		t.Context(), ports.SummaryFilter{Status: delegation.StatusCancelled, Limit: 10},
+	)
 	require.NoError(t, err)
 	require.Equal(t, []int64{ids["tied"], ids["empty"]}, summaryIDs(list))
-	list, err = repo.List(t.Context(), ports.SummaryFilter{Status: delegation.StatusActive, Limit: 10})
+	list, err = repo.List(
+		t.Context(), ports.SummaryFilter{Status: delegation.StatusActive, Limit: 10},
+	)
 	require.NoError(t, err)
 	require.Equal(t, []int64{ids["soon"], ids["later"], ids["spent"]}, summaryIDs(list))
 }
@@ -82,7 +97,11 @@ func TestSummariesFilterByStreamAndTemplate(t *testing.T) {
 		require.NoError(t, repo.db.Delegations().AddOrUpdate(ctx, &d))
 		spawnedIDs = append(spawnedIDs, d.ID)
 	}
-	require.NoError(t, repo.db.Delegations().AddOrUpdate(ctx, &delegation.Delegation{ID: spawnedIDs[1], Status: delegation.StatusCancelled}))
+	require.NoError(
+		t,
+		repo.db.Delegations().
+			AddOrUpdate(ctx, &delegation.Delegation{ID: spawnedIDs[1], Status: delegation.StatusCancelled}),
+	)
 
 	list, err := repo.List(ctx, ports.SummaryFilter{StreamID: stream.ID, Limit: 10})
 	require.NoError(t, err)
@@ -109,8 +128,9 @@ func TestSummariesOfNothing(t *testing.T) {
 	require.Empty(t, list)
 }
 
-// testSummaries stores five delegations: soon holds two coins, the first due in an hour, and two failed attempts,
-// tied one coin due at the same time as that one, later one coin due after, empty none and spent only a spent one.
+// testSummaries stores five delegations: soon holds two coins, the first due in an hour, and two
+// failed attempts, tied one coin due at the same time as that one, later one coin due after, empty
+// none and spent only a spent one.
 func testSummaries(t *testing.T) (*SummaryRepository, map[string]int64) {
 	t.Helper()
 	db := testDB(t)
@@ -131,11 +151,21 @@ func testSummaries(t *testing.T) (*SummaryRepository, map[string]int64) {
 	spent := coin("s:0", "spent", now.Add(time.Minute), 9000)
 	spent.Status = delegation.Spent
 	require.NoError(t, db.Coins().Upsert(t.Context(),
-		coin("a:0", "soon", now.Add(time.Hour), 1000), coin("a:1", "soon", now.Add(3*time.Hour), 2000),
-		coin("b:0", "tied", now.Add(time.Hour), 500), coin("c:0", "later", now.Add(2*time.Hour), 1000), spent,
-	))
+		coin(
+			"a:0", "soon", now.Add(time.Hour), 1000,
+		), coin("a:1", "soon", now.Add(3*time.Hour), 2000),
+		coin(
+			"b:0", "tied", now.Add(time.Hour), 500,
+		), coin("c:0", "later", now.Add(2*time.Hour), 1000), spent,
+	),
+	)
 	for _, status := range []error{errors.New("first"), errors.New("second")} {
-		a := delegation.Attempt{DelegationID: ids["soon"], Txs: []delegation.Tx{{Txid: "tx"}}, Coins: []string{"a:0"}, Status: delegation.Submitted}
+		a := delegation.Attempt{
+			DelegationID: ids["soon"],
+			Txs:          []delegation.Tx{{Txid: "tx"}},
+			Coins:        []string{"a:0"},
+			Status:       delegation.Submitted,
+		}
 		require.NoError(t, db.Attempts().AddOrUpdate(t.Context(), &a))
 		require.NoError(t, a.Fail(status))
 		require.NoError(t, db.Attempts().AddOrUpdate(t.Context(), &a))

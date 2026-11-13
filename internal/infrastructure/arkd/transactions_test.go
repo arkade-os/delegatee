@@ -41,6 +41,8 @@ type fakeStream struct {
 	err    error
 }
 
-func (f fakeStream) GetTransactionsStream(context.Context) (<-chan clientlib.TransactionEvent, func(), error) {
+func (f fakeStream) GetTransactionsStream(
+	context.Context,
+) (<-chan clientlib.TransactionEvent, func(), error) {
 	return f.events, f.stop, f.err
 }

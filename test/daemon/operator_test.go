@@ -19,7 +19,10 @@ import (
 func TestStatusAnswersWhileArkdIsUnreachable(t *testing.T) {
 	d := Start(t)
 	_, templateID := registerRenewal(t, d)
-	code, body := post(t, d.RestURL+"/v1/delegation", map[string]any{"templateId": templateID, "variables": renewalVariables(t)})
+	code, body := post(
+		t, d.RestURL+"/v1/delegation",
+		map[string]any{"templateId": templateID, "variables": renewalVariables(t)},
+	)
 	require.Equal(t, http.StatusOK, code, string(body))
 
 	health, err := d.Admin.GetHealth(t.Context(), &executorv1.GetHealthRequest{})
@@ -79,19 +82,33 @@ func TestListDelegationsByNextDueWithItsDetail(t *testing.T) {
 	d := Start(t)
 	_, templateID := registerRenewal(t, d)
 	register := func() delegation {
-		code, body := post(t, d.RestURL+"/v1/delegation", map[string]any{"templateId": templateID, "variables": renewalVariables(t)})
+		code, body := post(
+			t, d.RestURL+"/v1/delegation",
+			map[string]any{"templateId": templateID, "variables": renewalVariables(t)},
+		)
 		require.Equal(t, http.StatusOK, code, string(body))
 		return decodeDelegation(t, body)
 	}
 	idle, later, sooner := register(), register(), register()
-	d.Arkd.Land(later.Inputs[0].Script, strings.Repeat("aa", 32)+":0", 10_000, time.Now().Add(3*time.Hour))
-	d.Arkd.Land(sooner.Inputs[0].Script, strings.Repeat("bb", 32)+":0", 4_000, time.Now().Add(2*time.Hour))
-	d.Arkd.Land(sooner.Inputs[0].Script, strings.Repeat("cc", 32)+":0", 6_000, time.Now().Add(4*time.Hour))
-	require.Eventually(t, func() bool { return coinRows(t, d, "present") == 3 }, 5*time.Second, 50*time.Millisecond)
+	d.Arkd.Land(
+		later.Inputs[0].Script, strings.Repeat("aa", 32)+":0", 10_000, time.Now().Add(3*time.Hour),
+	)
+	d.Arkd.Land(
+		sooner.Inputs[0].Script, strings.Repeat("bb", 32)+":0", 4_000, time.Now().Add(2*time.Hour),
+	)
+	d.Arkd.Land(
+		sooner.Inputs[0].Script, strings.Repeat("cc", 32)+":0", 6_000, time.Now().Add(4*time.Hour),
+	)
+	require.Eventually(
+		t, func() bool { return coinRows(t, d, "present") == 3 }, 5*time.Second,
+		50*time.Millisecond,
+	)
 
 	code, body := get(t, d.AdminURL+"/v1/admin/delegations")
 	require.Equal(t, http.StatusOK, code, string(body))
-	require.Equal(t, []string{sooner.ID, later.ID, idle.ID}, delegationIDs(decodeDelegations(t, body)))
+	require.Equal(
+		t, []string{sooner.ID, later.ID, idle.ID}, delegationIDs(decodeDelegations(t, body)),
+	)
 	var list struct {
 		Delegations []struct {
 			Coins   string `json:"coins"`
@@ -123,7 +140,10 @@ func TestListDelegationsByNextDueWithItsDetail(t *testing.T) {
 	code, body = get(t, d.AdminURL+"/v1/delegation?id="+sooner.ID)
 	require.Equal(t, http.StatusOK, code, string(body))
 	require.Equal(t, sooner.ID, decodeDelegation(t, body).ID)
-	require.Equal(t, []string{strings.Repeat("bb", 32) + ":0", strings.Repeat("cc", 32) + ":0"}, coinOutpoints(decodeCoins(t, body)))
+	require.Equal(
+		t, []string{strings.Repeat("bb", 32) + ":0", strings.Repeat("cc", 32) + ":0"},
+		coinOutpoints(decodeCoins(t, body)),
+	)
 	code, _ = get(t, d.AdminURL+"/v1/delegation?id=404")
 	require.Equal(t, http.StatusNotFound, code)
 }
@@ -144,18 +164,22 @@ func TestMetricsFollowACoin(t *testing.T) {
 	outpoint := strings.Repeat("aa", 32) + ":0"
 	d.Arkd.Land(w.Inputs[0].Script, outpoint, 10_000, time.Now().Add(time.Hour))
 	require.Eventually(t, func() bool {
-		return metric(t, d, "executor_coins_watched") == "1" && metric(t, d, "executor_sats_watched") == "10000"
+		return metric(t, d, "executor_coins_watched") == "1" &&
+			metric(t, d, "executor_sats_watched") == "10000"
 	}, 5*time.Second, 50*time.Millisecond)
 
 	d.Arkd.Spend(outpoint, strings.Repeat("bb", 32))
 	require.Eventually(t, func() bool {
-		return metric(t, d, "executor_coins_watched") == "0" && metric(t, d, "executor_sats_watched") == "0"
+		return metric(t, d, "executor_coins_watched") == "0" &&
+			metric(t, d, "executor_sats_watched") == "0"
 	}, 5*time.Second, 50*time.Millisecond)
 
 	d.Arkd.Unreachable(true)
 	require.Equal(t, "0", metric(t, d, `executor_dependency_up{name="arkd"}`))
 	require.Equal(t, "1", metric(t, d, `executor_dependency_up{name="db"}`))
-	require.Equal(t, "1", metric(t, d, "executor_delegations_active"), "the gauges do not need arkd")
+	require.Equal(
+		t, "1", metric(t, d, "executor_delegations_active"), "the gauges do not need arkd",
+	)
 }
 
 func TestMetricsCountAFailedAttempt(t *testing.T) {
@@ -177,7 +201,10 @@ func TestMetricsCountASucceededAttempt(t *testing.T) {
 	w, _ := claimDelegation(t, d)
 
 	outpoint := d.Arkd.Fund(w.Inputs[0].Script, 10_000, time.Now().Add(time.Hour))
-	require.Eventually(t, func() bool { return len(listAttempts(t, d, w.ID)) == 1 }, 5*time.Second, 50*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return len(listAttempts(t, d, w.ID)) == 1 }, 5*time.Second,
+		50*time.Millisecond,
+	)
 	d.Arkd.Spend(outpoint, listAttempts(t, d, w.ID)[0].Txid)
 	require.Eventually(t, func() bool {
 		return metric(t, d, `executor_attempts_total{status="succeeded"}`) == "1"
@@ -261,12 +288,16 @@ func TestPublicRateLimitRefusesAClientOverItsRate(t *testing.T) {
 func TestPublicRateLimitSparesLoopbackAndTheAdminPort(t *testing.T) {
 	d := Start(t, WithPublicRateLimit(1))
 	for range 60 {
-		require.Equal(t, http.StatusOK, send(t, d.RestURL+"/v1/info", "", "").StatusCode, "the gateway's own calls come from loopback")
+		require.Equal(
+			t, http.StatusOK, send(t, d.RestURL+"/v1/info", "", "").StatusCode,
+			"the gateway's own calls come from loopback",
+		)
 		require.Equal(t, http.StatusOK, send(t, d.AdminURL+"/v1/admin/status", "", "").StatusCode)
 	}
 }
 
-// metric reads the value of the sample whose name and labels are series, empty when it is not exposed.
+// metric reads the value of the sample whose name and labels are series, empty when it is not
+// exposed.
 func metric(t *testing.T, d *Daemon, series string) string {
 	t.Helper()
 	code, body := get(t, d.AdminURL+"/metrics")
@@ -297,7 +328,8 @@ func unhealthy(resp *executorv1.GetHealthResponse) []string {
 	return names
 }
 
-// externalIP is an address of this host that is not loopback, where the daemon sees a client that is not the gateway.
+// externalIP is an address of this host that is not loopback, where the daemon sees a client that
+// is not the gateway.
 func externalIP(t *testing.T) string {
 	t.Helper()
 	addrs, err := net.InterfaceAddrs()

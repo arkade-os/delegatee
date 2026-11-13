@@ -16,7 +16,9 @@ func (d *DB) Streams() *StreamRepository { return &StreamRepository{db: d} }
 
 func (r *StreamRepository) AddOrUpdate(ctx context.Context, s *delegation.Stream) error {
 	if s.ID != 0 {
-		n, err := r.db.querier.UpdateStreamStatus(ctx, queries.UpdateStreamStatusParams{ID: s.ID, Status: s.Status})
+		n, err := r.db.querier.UpdateStreamStatus(
+			ctx, queries.UpdateStreamStatusParams{ID: s.ID, Status: s.Status},
+		)
 		if err != nil {
 			return err
 		}

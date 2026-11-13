@@ -663,7 +663,7 @@
           },
           "kind": {
             "type": "string",
-            "description": "kind is the delegation's template type: offchain or intent."
+            "description": "kind is the delegation's template type: virtual or proof."
           },
           "status": {
             "type": "string",

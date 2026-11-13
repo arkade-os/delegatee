@@ -47,7 +47,10 @@ func EncodeAdvertisement(records []Record) ([]byte, error) {
 	}
 
 	sorted := slices.Clone(records)
-	slices.SortStableFunc(sorted, func(x, y Record) int { return cmp.Compare(slices.Min(x.Outputs), slices.Min(y.Outputs)) })
+	slices.SortStableFunc(
+		sorted,
+		func(x, y Record) int { return cmp.Compare(slices.Min(x.Outputs), slices.Min(y.Outputs)) },
+	)
 
 	out := []byte{advertisementVersion}
 	for i, r := range sorted {
@@ -64,7 +67,9 @@ func EncodeAdvertisement(records []Record) ([]byte, error) {
 	}
 
 	if len(out) > maxAdvertisementLen {
-		return nil, fmt.Errorf("packets: advertisement too long: %d bytes, max %d", len(out), maxAdvertisementLen)
+		return nil, fmt.Errorf(
+			"packets: advertisement too long: %d bytes, max %d", len(out), maxAdvertisementLen,
+		)
 	}
 	return out, nil
 }
@@ -72,13 +77,18 @@ func EncodeAdvertisement(records []Record) ([]byte, error) {
 // DecodeAdvertisement decodes a packet 5 body, keeping the records in their encoded order.
 func DecodeAdvertisement(body []byte) ([]Record, error) {
 	if len(body) > maxAdvertisementLen {
-		return nil, fmt.Errorf("%w: advertisement too long: %d bytes, max %d", ErrInvalidAdvertisement, len(body), maxAdvertisementLen)
+		return nil, fmt.Errorf(
+			"%w: advertisement too long: %d bytes, max %d", ErrInvalidAdvertisement, len(body),
+			maxAdvertisementLen,
+		)
 	}
 	if len(body) < 1 {
 		return nil, fmt.Errorf("%w: empty advertisement body", ErrInvalidAdvertisement)
 	}
 	if body[0] != advertisementVersion {
-		return nil, fmt.Errorf("%w: unsupported advertisement version 0x%02x", ErrInvalidAdvertisement, body[0])
+		return nil, fmt.Errorf(
+			"%w: unsupported advertisement version 0x%02x", ErrInvalidAdvertisement, body[0],
+		)
 	}
 
 	rest := body[1:]
@@ -90,7 +100,10 @@ func DecodeAdvertisement(body []byte) ([]Record, error) {
 		recLen := int(binary.LittleEndian.Uint16(rest[:2]))
 		rest = rest[2:]
 		if recLen > len(rest) {
-			return nil, fmt.Errorf("%w: truncated record body: want %d bytes, have %d", ErrInvalidAdvertisement, recLen, len(rest))
+			return nil, fmt.Errorf(
+				"%w: truncated record body: want %d bytes, have %d", ErrInvalidAdvertisement,
+				recLen, len(rest),
+			)
 		}
 		recBody := rest[:recLen]
 		rest = rest[recLen:]
@@ -106,28 +119,6 @@ func DecodeAdvertisement(body []byte) ([]Record, error) {
 		return nil, fmt.Errorf("%w: advertisement has no records", ErrInvalidAdvertisement)
 	}
 	return records, nil
-}
-
-func decodeRecord(body []byte) (Record, error) {
-	if len(body) < templateIDLen {
-		return Record{}, fmt.Errorf("body shorter than template id: %d bytes", len(body))
-	}
-	var rec Record
-	copy(rec.Template[:], body[:templateIDLen])
-
-	indexBytes := body[templateIDLen:]
-	if len(indexBytes)%2 != 0 {
-		return Record{}, fmt.Errorf("odd number of index bytes: %d", len(indexBytes))
-	}
-	if len(indexBytes) == 0 {
-		return Record{}, fmt.Errorf("record has no output indexes")
-	}
-
-	rec.Outputs = make([]uint16, len(indexBytes)/2)
-	for i := range rec.Outputs {
-		rec.Outputs[i] = binary.LittleEndian.Uint16(indexBytes[2*i : 2*i+2])
-	}
-	return rec, nil
 }
 
 // Raw wraps body as an unparsed extension packet of type typ.
@@ -150,4 +141,26 @@ func Find(tx *wire.MsgTx, typ uint8) ([]byte, bool) {
 		return nil, false
 	}
 	return body, true
+}
+
+func decodeRecord(body []byte) (Record, error) {
+	if len(body) < templateIDLen {
+		return Record{}, fmt.Errorf("body shorter than template id: %d bytes", len(body))
+	}
+	var rec Record
+	copy(rec.Template[:], body[:templateIDLen])
+
+	indexBytes := body[templateIDLen:]
+	if len(indexBytes)%2 != 0 {
+		return Record{}, fmt.Errorf("odd number of index bytes: %d", len(indexBytes))
+	}
+	if len(indexBytes) == 0 {
+		return Record{}, fmt.Errorf("record has no output indexes")
+	}
+
+	rec.Outputs = make([]uint16, len(indexBytes)/2)
+	for i := range rec.Outputs {
+		rec.Outputs[i] = binary.LittleEndian.Uint16(indexBytes[2*i : 2*i+2])
+	}
+	return rec, nil
 }

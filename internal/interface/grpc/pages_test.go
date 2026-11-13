@@ -14,7 +14,9 @@ import (
 )
 
 func TestHealthzAnswers503WhileADependencyIsDown(t *testing.T) {
-	checks := &healthStub{entries: []health.Entry{{Name: "db"}, {Name: "arkd", Err: errors.New("refused")}}}
+	checks := &healthStub{
+		entries: []health.Entry{{Name: "db"}, {Name: "arkd", Err: errors.New("refused")}},
+	}
 	pages := adminPages(statusStub{}, checks)
 
 	rec := get(pages, "/healthz")
@@ -28,11 +30,18 @@ func TestHealthzAnswers503WhileADependencyIsDown(t *testing.T) {
 }
 
 func TestMetricsExposeTheStatusAndTheHealth(t *testing.T) {
-	status := statusStub{executionapp.Status{
-		Active: 4, Queued: 2, Registered: 1, Late: 3, Coins: 6, Amount: 60_000, Tip: delegation.Tip{Height: 812},
-		Succeeded: 5, Failed: 2, TemplateFailures: 1,
-	}}
-	checks := &healthStub{entries: []health.Entry{{Name: "db"}, {Name: "arkd", Err: errors.New("refused")}}}
+	status := statusStub{
+		executionapp.Status{
+			Active: 4, Queued: 2, Registered: 1, Late: 3, Coins: 6, Amount: 60_000,
+			Tip:              delegation.Tip{Height: 812},
+			Succeeded:        5,
+			Failed:           2,
+			TemplateFailures: 1,
+		},
+	}
+	checks := &healthStub{
+		entries: []health.Entry{{Name: "db"}, {Name: "arkd", Err: errors.New("refused")}},
+	}
 
 	body := get(adminPages(status, checks), "/metrics").Body.String()
 	for _, line := range []string{

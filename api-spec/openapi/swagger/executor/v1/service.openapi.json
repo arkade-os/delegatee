@@ -731,7 +731,7 @@
           },
           "type": {
             "type": "string",
-            "description": "type is intent or offchain."
+            "description": "type is proof or virtual."
           }
         }
       }

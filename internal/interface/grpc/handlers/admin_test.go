@@ -22,9 +22,13 @@ func TestUpdateTemplate(t *testing.T) {
 	admin, public := testAdmin(t)
 	id := registerDefault(t, public)
 
-	_, err := admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Id: id, Status: "disabled"})
+	_, err := admin.UpdateTemplate(
+		t.Context(), &executorv1.UpdateTemplateRequest{Id: id, Status: "disabled"},
+	)
 	require.NoError(t, err)
-	active, err := public.ListTemplates(t.Context(), &executorv1.ListTemplatesRequest{Status: "active"})
+	active, err := public.ListTemplates(
+		t.Context(), &executorv1.ListTemplatesRequest{Status: "active"},
+	)
 	require.NoError(t, err)
 	require.Empty(t, active.GetTemplates())
 	all, err := public.ListTemplates(t.Context(), &executorv1.ListTemplatesRequest{})
@@ -33,7 +37,9 @@ func TestUpdateTemplate(t *testing.T) {
 	require.Equal(t, "disabled", all.GetTemplates()[0].GetStatus())
 	require.Empty(t, all.GetTemplates()[0].GetDocument())
 
-	_, err = admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Id: id, Status: "active"})
+	_, err = admin.UpdateTemplate(
+		t.Context(), &executorv1.UpdateTemplateRequest{Id: id, Status: "active"},
+	)
 	require.NoError(t, err)
 	got, err := public.GetTemplate(t.Context(), &executorv1.GetTemplateRequest{Id: id})
 	require.NoError(t, err)
@@ -48,9 +54,13 @@ func TestUpdateTemplateErrors(t *testing.T) {
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 	_, err = admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Id: id})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Id: id, Status: "paused"})
+	_, err = admin.UpdateTemplate(
+		t.Context(), &executorv1.UpdateTemplateRequest{Id: id, Status: "paused"},
+	)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Id: "missing", Status: "active"})
+	_, err = admin.UpdateTemplate(
+		t.Context(), &executorv1.UpdateTemplateRequest{Id: "missing", Status: "active"},
+	)
 	require.Equal(t, codes.NotFound, status.Code(err))
 }
 
@@ -92,29 +102,45 @@ func TestCancelThenResumeDelegation(t *testing.T) {
 	admin, public := testAdmin(t)
 	id := registerDefault(t, public)
 	variables := renewalVariables(t)
-	reg, err := public.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: variables})
+	reg, err := public.RegisterDelegation(
+		t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: variables},
+	)
 	require.NoError(t, err)
 	delegationID := reg.GetDelegation().GetId()
 
-	_, err = admin.CancelDelegation(t.Context(), &executorv1.CancelDelegationRequest{Id: delegationID})
+	_, err = admin.CancelDelegation(
+		t.Context(), &executorv1.CancelDelegationRequest{Id: delegationID},
+	)
 	require.NoError(t, err)
-	got, err := public.GetDelegation(t.Context(), &executorv1.GetDelegationRequest{Id: delegationID})
+	got, err := public.GetDelegation(
+		t.Context(), &executorv1.GetDelegationRequest{Id: delegationID},
+	)
 	require.NoError(t, err)
 	require.Equal(t, "cancelled", got.GetDelegation().GetStatus())
-	_, err = public.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: variables})
+	_, err = public.RegisterDelegation(
+		t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: variables},
+	)
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
-	_, err = admin.CancelDelegation(t.Context(), &executorv1.CancelDelegationRequest{Id: delegationID})
+	_, err = admin.CancelDelegation(
+		t.Context(), &executorv1.CancelDelegationRequest{Id: delegationID},
+	)
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
 
-	_, err = admin.ResumeDelegation(t.Context(), &executorv1.ResumeDelegationRequest{Id: delegationID})
+	_, err = admin.ResumeDelegation(
+		t.Context(), &executorv1.ResumeDelegationRequest{Id: delegationID},
+	)
 	require.NoError(t, err)
 	got, err = public.GetDelegation(t.Context(), &executorv1.GetDelegationRequest{Id: delegationID})
 	require.NoError(t, err)
 	require.Equal(t, "active", got.GetDelegation().GetStatus())
-	again, err := public.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: variables})
+	again, err := public.RegisterDelegation(
+		t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: variables},
+	)
 	require.NoError(t, err)
 	require.Equal(t, delegationID, again.GetDelegation().GetId())
-	_, err = admin.ResumeDelegation(t.Context(), &executorv1.ResumeDelegationRequest{Id: delegationID})
+	_, err = admin.ResumeDelegation(
+		t.Context(), &executorv1.ResumeDelegationRequest{Id: delegationID},
+	)
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
 
 	_, err = admin.CancelDelegation(t.Context(), &executorv1.CancelDelegationRequest{})
@@ -130,8 +156,15 @@ func TestCancelThenResumeDelegation(t *testing.T) {
 func TestListDelegations(t *testing.T) {
 	soon := time.Unix(1_800_000_000, 0).UTC()
 	rows := []ports.Summary{
-		summary(3, soon, 2, 30_000, delegation.Succeeded), summary(5, soon.Add(time.Hour), 1, 10_000, ""),
-		summary(1, time.Time{}, 0, 0, delegation.Failed), summary(2, time.Time{}, 0, 0, ""), summary(4, time.Time{}, 0, 0, ""),
+		summary(
+			3, soon, 2, 30_000, delegation.Succeeded,
+		),
+		summary(5, soon.Add(time.Hour), 1, 10_000, ""),
+		summary(
+			1, time.Time{}, 0, 0, delegation.Failed,
+		),
+		summary(2, time.Time{}, 0, 0, ""),
+		summary(4, time.Time{}, 0, 0, ""),
 	}
 	rows[3].Status = delegation.StatusCancelled
 	rows[1].StreamID, rows[4].StreamID = 9, 9
@@ -153,7 +186,9 @@ func TestListDelegations(t *testing.T) {
 	var paged []int64
 	var cursor string
 	for {
-		page, err := admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{Cursor: cursor, Limit: 2})
+		page, err := admin.ListDelegations(
+			t.Context(), &executorv1.ListDelegationsRequest{Cursor: cursor, Limit: 2},
+		)
 		require.NoError(t, err)
 		paged = append(paged, delegationIDs(page)...)
 		if cursor = page.GetNextCursor(); cursor == "" {
@@ -162,17 +197,25 @@ func TestListDelegations(t *testing.T) {
 	}
 	require.Equal(t, []int64{3, 5, 1, 2, 4}, paged)
 
-	cancelled, err := admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{Status: "cancelled"})
+	cancelled, err := admin.ListDelegations(
+		t.Context(), &executorv1.ListDelegationsRequest{Status: "cancelled"},
+	)
 	require.NoError(t, err)
 	require.Equal(t, []int64{2}, delegationIDs(cancelled))
-	spawned, err := admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{StreamId: 9})
+	spawned, err := admin.ListDelegations(
+		t.Context(), &executorv1.ListDelegationsRequest{StreamId: 9},
+	)
 	require.NoError(t, err)
 	require.Equal(t, []int64{5, 4}, delegationIDs(spawned))
-	other, err := admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{TemplateId: "other"})
+	other, err := admin.ListDelegations(
+		t.Context(), &executorv1.ListDelegationsRequest{TemplateId: "other"},
+	)
 	require.NoError(t, err)
 	require.Equal(t, []int64{1}, delegationIDs(other))
 
-	_, err = admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{Cursor: "not a cursor"})
+	_, err = admin.ListDelegations(
+		t.Context(), &executorv1.ListDelegationsRequest{Cursor: "not a cursor"},
+	)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 	_, err = admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{Limit: 1001})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
@@ -181,7 +224,13 @@ func TestListDelegations(t *testing.T) {
 }
 
 func TestGetHealth(t *testing.T) {
-	checks := &healthStub{entries: []health.Entry{{Name: "db"}, {Name: "arkd", Err: errors.New("connection refused")}, {Name: "loop"}}}
+	checks := &healthStub{
+		entries: []health.Entry{
+			{Name: "db"},
+			{Name: "arkd", Err: errors.New("connection refused")},
+			{Name: "loop"},
+		},
+	}
 	admin := NewAdmin(nil, nil, nil, checks)
 
 	resp, err := admin.GetHealth(t.Context(), &executorv1.GetHealthRequest{})
@@ -204,12 +253,20 @@ func TestGetHealth(t *testing.T) {
 func TestListAttempts(t *testing.T) {
 	admin, public, store := testAdminAndAttempts(t)
 	id := registerDefault(t, public)
-	reg, err := public.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: renewalVariables(t)})
+	reg, err := public.RegisterDelegation(
+		t.Context(),
+		&executorv1.RegisterDelegationRequest{TemplateId: id, Variables: renewalVariables(t)},
+	)
 	require.NoError(t, err)
 	delegationID := reg.GetDelegation().GetId()
 	var ids []int64
 	for i := range 3 {
-		a := delegation.Attempt{DelegationID: delegationID, Txs: []delegation.Tx{{Txid: "tx" + string(rune('0'+i)), Spends: true}}, Coins: []string{"a:0"}, Status: delegation.Submitted}
+		a := delegation.Attempt{
+			DelegationID: delegationID,
+			Txs:          []delegation.Tx{{Txid: "tx" + string(rune('0'+i)), Spends: true}},
+			Coins:        []string{"a:0"},
+			Status:       delegation.Submitted,
+		}
 		require.NoError(t, store.AddOrUpdate(t.Context(), &a))
 		ids = append(ids, a.ID)
 	}
@@ -224,7 +281,7 @@ func TestListAttempts(t *testing.T) {
 	require.Equal(t, ids[2], list.GetAttempts()[0].GetId())
 	require.Equal(t, "tx2", list.GetAttempts()[0].GetTxid())
 	require.Equal(t, "submitted", list.GetAttempts()[0].GetStatus())
-	require.Equal(t, "intent", list.GetAttempts()[0].GetKind())
+	require.Equal(t, "proof", list.GetAttempts()[0].GetKind())
 	require.Equal(t, []string{"a:0"}, list.GetAttempts()[0].GetCoins())
 	require.Equal(t, delegationID, list.GetAttempts()[0].GetDelegationId())
 	require.NotZero(t, list.GetAttempts()[0].GetCreatedAt())
@@ -232,7 +289,9 @@ func TestListAttempts(t *testing.T) {
 	require.Equal(t, "emulator: refused", list.GetAttempts()[2].GetError())
 	require.Zero(t, list.GetNextCursor(), "the last page")
 
-	page, err := admin.ListAttempts(t.Context(), &executorv1.ListAttemptsRequest{Id: delegationID, Cursor: ids[2], Limit: 1})
+	page, err := admin.ListAttempts(
+		t.Context(), &executorv1.ListAttemptsRequest{Id: delegationID, Cursor: ids[2], Limit: 1},
+	)
 	require.NoError(t, err)
 	require.Len(t, page.GetAttempts(), 1)
 	require.Equal(t, ids[1], page.GetAttempts()[0].GetId())
@@ -240,7 +299,9 @@ func TestListAttempts(t *testing.T) {
 
 	_, err = admin.ListAttempts(t.Context(), &executorv1.ListAttemptsRequest{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	_, err = admin.ListAttempts(t.Context(), &executorv1.ListAttemptsRequest{Id: delegationID, Limit: 1001})
+	_, err = admin.ListAttempts(
+		t.Context(), &executorv1.ListAttemptsRequest{Id: delegationID, Limit: 1001},
+	)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 	_, err = admin.ListAttempts(t.Context(), &executorv1.ListAttemptsRequest{Id: 404})
 	require.Equal(t, codes.NotFound, status.Code(err))
@@ -254,7 +315,10 @@ func TestExpireDelegations(t *testing.T) {
 		TemplateId: id, Variables: renewalVariables(t), ExpiresAt: soon.Unix(),
 	})
 	require.NoError(t, err)
-	forever, err := public.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: id, Variables: renewalVariables(t, 2)})
+	forever, err := public.RegisterDelegation(
+		t.Context(),
+		&executorv1.RegisterDelegationRequest{TemplateId: id, Variables: renewalVariables(t, 2)},
+	)
 	require.NoError(t, err)
 
 	n, err := admin.delegations.ExpireDelegations(t.Context(), soon.Add(-time.Second))
@@ -263,10 +327,14 @@ func TestExpireDelegations(t *testing.T) {
 	n, err = admin.delegations.ExpireDelegations(t.Context(), soon)
 	require.NoError(t, err)
 	require.Equal(t, 1, n)
-	gone, err := public.GetDelegation(t.Context(), &executorv1.GetDelegationRequest{Id: reg.GetDelegation().GetId()})
+	gone, err := public.GetDelegation(
+		t.Context(), &executorv1.GetDelegationRequest{Id: reg.GetDelegation().GetId()},
+	)
 	require.NoError(t, err)
 	require.Equal(t, "expired", gone.GetDelegation().GetStatus())
-	got, err := public.GetDelegation(t.Context(), &executorv1.GetDelegationRequest{Id: forever.GetDelegation().GetId()})
+	got, err := public.GetDelegation(
+		t.Context(), &executorv1.GetDelegationRequest{Id: forever.GetDelegation().GetId()},
+	)
 	require.NoError(t, err)
 	require.Equal(t, "active", got.GetDelegation().GetStatus())
 }
@@ -274,11 +342,33 @@ func TestExpireDelegations(t *testing.T) {
 func TestGetStatus(t *testing.T) {
 	soon := time.Unix(1_800_000_100, 0)
 	stub := &statusStub{status: executionapp.Status{
-		Active: 5, Queued: 3, Registered: 2, Late: 1, NextDue: soon, Tip: delegation.Tip{Height: 812}, Coins: 7, Amount: 70_000,
-		Succeeded: 11, Failed: 4, TemplateFailures: 2, Reserve: 15 * time.Minute,
-		Session: execution.Session{Duration: time.Minute, MaxIntents: 64},
+		Active:           5,
+		Queued:           3,
+		Registered:       2,
+		Late:             1,
+		NextDue:          soon,
+		Tip:              delegation.Tip{Height: 812},
+		Coins:            7,
+		Amount:           70_000,
+		Succeeded:        11,
+		Failed:           4,
+		TemplateFailures: 2,
+		Reserve:          15 * time.Minute,
+		Session:          execution.Session{Duration: time.Minute, MaxIntents: 64},
 		Batches: []executionapp.BatchForecast{
-			{At: soon, Intents: 2, Coins: 3, Amount: 30_000, Entries: []executionapp.ForecastEntry{{DelegationID: 4, Coins: 3, Amount: 30_000, Due: soon, Deadline: soon.Add(time.Hour)}}}, {At: soon.Add(time.Minute), Intents: 1, Coins: 1, Amount: 10_000},
+			{
+				At:      soon,
+				Intents: 2,
+				Coins:   3,
+				Amount:  30_000,
+				Entries: []executionapp.ForecastEntry{
+					{
+						DelegationID: 4, Coins: 3, Amount: 30_000, Due: soon,
+						Deadline: soon.Add(time.Hour),
+					},
+				},
+			},
+			{At: soon.Add(time.Minute), Intents: 1, Coins: 1, Amount: 10_000},
 		},
 	}}
 	admin := NewAdmin(nil, nil, stub, nil)
@@ -362,7 +452,8 @@ func (s *summaryStub) Summaries(_ context.Context, f ports.SummaryFilter) ([]por
 	var out []ports.Summary
 	after := f.After.ID == 0
 	for _, row := range s.rows {
-		matches := (f.Status == "" || row.Status == f.Status) && (f.StreamID == 0 || row.StreamID == f.StreamID) &&
+		matches := (f.Status == "" || row.Status == f.Status) &&
+			(f.StreamID == 0 || row.StreamID == f.StreamID) &&
 			(f.TemplateID == "" || row.TemplateID == f.TemplateID)
 		if after && matches && len(out) < f.Limit {
 			out = append(out, row)
@@ -384,11 +475,15 @@ func testAdmin(t *testing.T) (*Admin, *Executor) {
 
 func testAdminAndAttempts(t *testing.T) (*Admin, *Executor, *attempts) {
 	t.Helper()
-	h, _, attempts := testHandlerAndStores(t, 10, delegationapp.Limits{MinDelegationExpiry: 24 * time.Hour})
+	h, _, attempts := testHandlerAndStores(
+		t, 10, delegationapp.Limits{MinDelegationExpiry: 24 * time.Hour},
+	)
 	return NewAdmin(h.registry, h.delegations, h.execution, nil), h, attempts
 }
 
-func summary(id int64, nextDue time.Time, coins int, amount uint64, last delegation.AttemptStatus) ports.Summary {
+func summary(
+	id int64, nextDue time.Time, coins int, amount uint64, last delegation.AttemptStatus,
+) ports.Summary {
 	return ports.Summary{
 		Delegation: delegation.Delegation{ID: id, Status: delegation.StatusActive},
 		Coins:      coins, Amount: amount, NextDue: nextDue, LastAttempt: last,
@@ -403,10 +498,13 @@ func delegationIDs(resp *executorv1.ListDelegationsResponse) []int64 {
 	return ids
 }
 
-// registerDefault registers the default artifact and the renewal template, returning the template id.
+// registerDefault registers the default artifact and the renewal template, returning the template
+// id.
 func registerDefault(t *testing.T, public *Executor) string {
 	t.Helper()
-	_, err := public.RegisterArtifact(t.Context(), &executorv1.RegisterArtifactRequest{Document: testDocument(t)})
+	_, err := public.RegisterArtifact(
+		t.Context(), &executorv1.RegisterArtifactRequest{Document: testDocument(t)},
+	)
 	require.NoError(t, err)
 	reg, err := public.RegisterTemplate(t.Context(), &executorv1.RegisterTemplateRequest{
 		Document: testTemplateDocument(t, "renew.json"),

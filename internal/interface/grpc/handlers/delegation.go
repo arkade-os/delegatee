@@ -21,7 +21,9 @@ func (h *Executor) RegisterDelegation(
 		at := time.Unix(req.GetExpiresAt(), 0)
 		expiresAt = &at
 	}
-	d, err := h.delegations.RegisterDelegation(ctx, req.GetTemplateId(), req.GetVariables(), expiresAt)
+	d, err := h.delegations.RegisterDelegation(
+		ctx, req.GetTemplateId(), req.GetVariables(), expiresAt,
+	)
 	if err != nil {
 		return nil, toStatus(err)
 	}
@@ -48,15 +50,17 @@ func (h *Executor) GetDelegation(
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	return &executorv1.GetDelegationResponse{Delegation: toDelegation(d), Coins: toCoins(coins)}, nil
+	return &executorv1.GetDelegationResponse{
+		Delegation: toDelegation(d), Coins: toCoins(coins),
+	}, nil
 }
 
 func toCoins(coins []delegation.Coin) []*executorv1.Coin {
 	out := make([]*executorv1.Coin, 0, len(coins))
 	for _, c := range coins {
 		coin := &executorv1.Coin{
-			Outpoint: c.Outpoint, Input: int32(c.Input), Amount: c.Amount, Status: string(c.Status), SpentBy: c.SpentBy,
-			Confirmations: int32(c.Confirmations),
+			Outpoint: c.Outpoint, Input: int32(c.Input), Amount: c.Amount, Status: string(c.Status),
+			SpentBy: c.SpentBy, Confirmations: int32(c.Confirmations),
 		}
 		if !c.ExpiresAt.IsZero() {
 			coin.ExpiresAt = c.ExpiresAt.Unix()
@@ -72,14 +76,16 @@ func toCoins(coins []delegation.Coin) []*executorv1.Coin {
 func toDelegation(d *delegation.Delegation) *executorv1.Delegation {
 	out := &executorv1.Delegation{
 		Id: d.ID, Fingerprint: d.Fingerprint, Address: d.Address, TemplateId: d.TemplateID,
-		Variables: d.Variables, StreamId: d.StreamID, Status: d.Status, CreatedAt: d.CreatedAt.Unix(), UpdatedAt: d.UpdatedAt.Unix(),
+		Variables: d.Variables, StreamId: d.StreamID, Status: d.Status,
+		CreatedAt: d.CreatedAt.Unix(), UpdatedAt: d.UpdatedAt.Unix(),
 	}
 	if d.ExpiresAt != nil {
 		out.ExpiresAt = d.ExpiresAt.Unix()
 	}
 	for _, in := range d.Inputs {
 		out.Inputs = append(out.Inputs, &executorv1.Input{
-			Name: in.Name, Onchain: in.Onchain, Script: in.Script, Tapscripts: in.Tapscripts, Locktime: uint32(in.Locktime),
+			Name: in.Name, Onchain: in.Onchain, Script: in.Script, Tapscripts: in.Tapscripts,
+			Locktime: uint32(in.Locktime),
 		})
 	}
 	return out

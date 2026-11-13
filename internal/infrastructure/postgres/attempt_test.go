@@ -10,7 +10,12 @@ import (
 
 func TestAttemptCreateThenUpdate(t *testing.T) {
 	repo, id := testAttempts(t)
-	a := delegation.Attempt{DelegationID: id, Txs: []delegation.Tx{{Raw: []byte{1, 2}, Txid: "tx", Spends: true}}, Coins: []string{"a:0", "b:1"}, Status: delegation.Submitted}
+	a := delegation.Attempt{
+		DelegationID: id,
+		Txs:          []delegation.Tx{{Raw: []byte{1, 2}, Txid: "tx", Spends: true}},
+		Coins:        []string{"a:0", "b:1"},
+		Status:       delegation.Submitted,
+	}
 	require.NoError(t, repo.AddOrUpdate(t.Context(), &a))
 	require.NotZero(t, a.ID)
 	require.Equal(t, delegation.Submitted, a.Status)
@@ -41,7 +46,12 @@ func TestAttemptCreateThenUpdate(t *testing.T) {
 
 func TestBatchedAttemptKeepsItsIntentThroughTheBatch(t *testing.T) {
 	repo, id := testAttempts(t)
-	a := delegation.Attempt{DelegationID: id, Txs: []delegation.Tx{{Raw: []byte{3}, Txid: "proof"}}, Coins: []string{"a:0"}, Status: delegation.Submitted}
+	a := delegation.Attempt{
+		DelegationID: id,
+		Txs:          []delegation.Tx{{Raw: []byte{3}, Txid: "proof"}},
+		Coins:        []string{"a:0"},
+		Status:       delegation.Submitted,
+	}
 	require.NoError(t, repo.AddOrUpdate(t.Context(), &a))
 	require.Equal(t, delegation.Submitted, a.Status)
 	proof, ok := a.Proof()
@@ -70,7 +80,12 @@ func TestAttemptListPendingAndByDelegation(t *testing.T) {
 	repo, id := testAttempts(t)
 	var ids []int64
 	for i := range 5 {
-		a := delegation.Attempt{DelegationID: id, Txs: []delegation.Tx{{Txid: "tx"}}, Coins: []string{"a:0"}, Status: delegation.Submitted}
+		a := delegation.Attempt{
+			DelegationID: id,
+			Txs:          []delegation.Tx{{Txid: "tx"}},
+			Coins:        []string{"a:0"},
+			Status:       delegation.Submitted,
+		}
 		require.NoError(t, repo.AddOrUpdate(t.Context(), &a))
 		ids = append(ids, a.ID)
 		if i == 1 {
@@ -96,7 +111,12 @@ func TestAttemptListPendingAndByDelegation(t *testing.T) {
 
 func TestAttemptNeedsItsDelegation(t *testing.T) {
 	repo, id := testAttempts(t)
-	orphan := delegation.Attempt{DelegationID: id + 1, Txs: []delegation.Tx{{Txid: "tx"}}, Coins: []string{"a:0"}, Status: delegation.Submitted}
+	orphan := delegation.Attempt{
+		DelegationID: id + 1,
+		Txs:          []delegation.Tx{{Txid: "tx"}},
+		Coins:        []string{"a:0"},
+		Status:       delegation.Submitted,
+	}
 	require.Error(t, repo.AddOrUpdate(t.Context(), &orphan))
 }
 

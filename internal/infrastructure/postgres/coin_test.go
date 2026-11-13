@@ -114,21 +114,31 @@ func TestClaimsFollowTheActiveDelegations(t *testing.T) {
 	repo, id := testCoins(t)
 	ctx := t.Context()
 	boarding := testDelegation("b")
-	boarding.Inputs = []delegation.Input{{Name: "boarding", Onchain: true, Script: "5120bb", Locktime: 800}}
+	boarding.Inputs = []delegation.Input{
+		{Name: "boarding", Onchain: true, Script: "5120bb", Locktime: 800},
+	}
 	require.NoError(t, repo.db.Delegations().AddOrUpdate(ctx, &boarding))
 	stream := testStream()
 	require.NoError(t, repo.db.Streams().AddOrUpdate(ctx, &stream))
 	spawned := testSpawned("c", stream.ID)
 	require.NoError(t, repo.db.Delegations().AddOrUpdate(ctx, &spawned))
 
-	require.NoError(t, repo.Upsert(ctx, testCoin("a:0", id, time.Now().UTC().Truncate(time.Microsecond))))
+	require.NoError(
+		t, repo.Upsert(ctx, testCoin("a:0", id, time.Now().UTC().Truncate(time.Microsecond))),
+	)
 	watched, err := repo.Watched(ctx, []string{"5120bb", "5120aa", "5120zz"})
 	require.NoError(t, err)
 	require.Len(t, watched, 2)
 	require.Equal(t, "5120bb", watched[0].Script)
-	require.Equal(t, []delegation.Claim{{DelegationID: boarding.ID, Onchain: true, Locktime: 800}}, watched[0].Claims)
+	require.Equal(
+		t, []delegation.Claim{{DelegationID: boarding.ID, Onchain: true, Locktime: 800}},
+		watched[0].Claims,
+	)
 	require.Empty(t, watched[0].Coins)
-	require.Equal(t, []delegation.Claim{{DelegationID: id}, {DelegationID: spawned.ID, Spawned: true}}, watched[1].Claims)
+	require.Equal(
+		t, []delegation.Claim{{DelegationID: id}, {DelegationID: spawned.ID, Spawned: true}},
+		watched[1].Claims,
+	)
 	require.Equal(t, []string{"a:0"}, outpointsOf(watched[1].Coins))
 	scripts, err := repo.Scripts(ctx, false)
 	require.NoError(t, err)
@@ -186,7 +196,10 @@ func TestReadyCoins(t *testing.T) {
 
 	ready, err := repo.Ready(ctx, now, tip, 10)
 	require.NoError(t, err)
-	require.Equal(t, [][]string{{"a:0"}, {"c:0"}}, readyOutpoints(ready), "the locked, the blocked, the retried, the cancelled and the half filled wait")
+	require.Equal(
+		t, [][]string{{"a:0"}, {"c:0"}}, readyOutpoints(ready),
+		"the locked, the blocked, the retried, the cancelled and the half filled wait",
+	)
 	coins, amount, err := repo.Totals(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 9, coins)
@@ -197,7 +210,10 @@ func TestReadyCoins(t *testing.T) {
 	require.NoError(t, repo.Upsert(ctx, second))
 	ready, err = repo.Ready(ctx, now, tip, 10)
 	require.NoError(t, err)
-	require.Equal(t, [][]string{{"a:0"}, {"c:0"}, {"g:0", "h:0"}}, readyOutpoints(ready), "one coin per input, the oldest")
+	require.Equal(
+		t, [][]string{{"a:0"}, {"c:0"}, {"g:0", "h:0"}}, readyOutpoints(ready),
+		"one coin per input, the oldest",
+	)
 	ready, err = repo.Ready(ctx, now, tip, 1)
 	require.NoError(t, err)
 	require.Equal(t, [][]string{{"a:0"}}, readyOutpoints(ready), "limit counts delegations")
@@ -205,15 +221,22 @@ func TestReadyCoins(t *testing.T) {
 	require.NoError(t, repo.Hold(ctx, []string{"a:0", "c:0", "g:0"}))
 	next, err := repo.NextReady(ctx, now, tip)
 	require.NoError(t, err)
-	require.Equal(t, now.Add(30*time.Minute), next, "the retried coin, a held one keeps its delegation's others back")
+	require.Equal(
+		t, now.Add(30*time.Minute), next,
+		"the retried coin, a held one keeps its delegation's others back",
+	)
 	next, err = repo.NextReady(ctx, now.Add(31*time.Minute), tip)
 	require.NoError(t, err)
 	require.Zero(t, next, "what is ready already is not next")
 
 	require.NoError(t, repo.Release(ctx, []string{"d:1"}, time.Time{}))
-	ready, err = repo.Ready(ctx, now.Add(31*time.Minute), delegation.Tip{Height: 101, MedianTime: now}, 10)
+	ready, err = repo.Ready(
+		ctx, now.Add(31*time.Minute), delegation.Tip{Height: 101, MedianTime: now}, 10,
+	)
 	require.NoError(t, err)
-	require.Equal(t, [][]string{{"b:0"}, {"d:0"}, {"e:0"}}, readyOutpoints(ready), "the locktime is reached")
+	require.Equal(
+		t, [][]string{{"b:0"}, {"d:0"}, {"e:0"}}, readyOutpoints(ready), "the locktime is reached",
+	)
 }
 
 func TestReleaseNeverShortensARetry(t *testing.T) {
@@ -252,14 +275,28 @@ func TestResetHolds(t *testing.T) {
 	repo, id := testCoins(t)
 	ctx := t.Context()
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	require.NoError(t, repo.Upsert(ctx, testCoin("a:0", id, now), testCoin("a:1", id, now), testCoin("a:2", id, now)))
+	require.NoError(
+		t,
+		repo.Upsert(
+			ctx, testCoin("a:0", id, now), testCoin("a:1", id, now), testCoin("a:2", id, now),
+		),
+	)
 	require.NoError(t, repo.Hold(ctx, []string{"a:0", "a:1"}))
-	a := delegation.Attempt{DelegationID: id, Txs: []delegation.Tx{{Txid: "tx"}}, Coins: []string{"a:1", "a:2"}, Status: delegation.Submitted}
+	a := delegation.Attempt{
+		DelegationID: id,
+		Txs:          []delegation.Tx{{Txid: "tx"}},
+		Coins:        []string{"a:1", "a:2"},
+		Status:       delegation.Submitted,
+	}
 	require.NoError(t, repo.db.Attempts().AddOrUpdate(ctx, &a))
 
 	require.NoError(t, repo.ResetHolds(ctx))
 	var held string
-	require.NoError(t, repo.db.db.QueryRowContext(ctx, "SELECT string_agg(outpoint, ',' ORDER BY outpoint) FROM coins WHERE held").Scan(&held))
+	require.NoError(
+		t,
+		repo.db.db.QueryRowContext(ctx, "SELECT string_agg(outpoint, ',' ORDER BY outpoint) FROM coins WHERE held").
+			Scan(&held),
+	)
 	require.Equal(t, "a:1,a:2", held, "exactly the coins of the pending attempt")
 }
 
@@ -290,7 +327,9 @@ func TestStrandedScripts(t *testing.T) {
 	ctx := t.Context()
 	other := testDelegation("b")
 	require.NoError(t, repo.db.Delegations().AddOrUpdate(ctx, &other))
-	require.NoError(t, repo.Upsert(ctx, testCoin("a:0", id, time.Now().UTC().Truncate(time.Microsecond))))
+	require.NoError(
+		t, repo.Upsert(ctx, testCoin("a:0", id, time.Now().UTC().Truncate(time.Microsecond))),
+	)
 	stranded, err := repo.Stranded(ctx)
 	require.NoError(t, err)
 	require.Empty(t, stranded)
@@ -322,9 +361,17 @@ func testCoins(t *testing.T) (*CoinRepository, int64) {
 
 func testCoin(outpoint string, delegationID int64, createdAt time.Time) delegation.Coin {
 	return delegation.Coin{
-		Outpoint: outpoint, DelegationID: delegationID, Input: 0, Script: "5120aa", Amount: 1000,
-		ExpiresAt: createdAt.Add(time.Hour), CreatedAt: createdAt, Due: createdAt.Add(30 * time.Minute),
-		Status: delegation.Present,
+		Outpoint:     outpoint,
+		DelegationID: delegationID,
+		Input:        0,
+		Script:       "5120aa",
+		Amount:       1000,
+		ExpiresAt: createdAt.Add(
+			time.Hour,
+		),
+		CreatedAt: createdAt,
+		Due:       createdAt.Add(30 * time.Minute),
+		Status:    delegation.Present,
 	}
 }
 

@@ -26,7 +26,11 @@ func TestSweptAsksArkdForTheOffchainCoins(t *testing.T) {
 	f := &vtxosIndexer{vtxos: []ports.Output{{Outpoint: "a:0", Swept: true}, {Outpoint: "b:0"}}}
 	s := &Service{indexer: f}
 	coins := []delegation.Coin{
-		{Outpoint: "a:0", Script: "aa"}, {Outpoint: "b:0", Script: "aa"}, {Outpoint: "c:0", Script: "cc", Onchain: true},
+		{
+			Outpoint: "a:0", Script: "aa",
+		},
+		{Outpoint: "b:0", Script: "aa"},
+		{Outpoint: "c:0", Script: "cc", Onchain: true},
 	}
 	swept, err := s.swept(context.Background(), coins)
 	require.NoError(t, err)

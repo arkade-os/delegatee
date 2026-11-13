@@ -44,8 +44,8 @@ func forEmulator(txs []delegation.Tx, sources []*wire.MsgTx) (string, []string, 
 	return encoded[0], encoded[1:], nil
 }
 
-// boardingCommitment is the commitment transaction with the leaf and prevout of each boarding input the
-// intent spends, the only inputs the intent's signers sign.
+// boardingCommitment is the commitment transaction with the leaf and prevout of each boarding input
+// the intent spends, the only inputs the intent's signers sign.
 func boardingCommitment(in *execution.Intent, commitment string) (string, error) {
 	tx, err := withBoarding(in, commitment)
 	if err != nil {
@@ -105,7 +105,10 @@ func withBoarding(in *execution.Intent, commitment string) (*psbt.Packet, error)
 		if i >= len(in.Boarding) || !in.Boarding[i] {
 			continue
 		}
-		j := slices.IndexFunc(tx.UnsignedTx.TxIn, func(c *wire.TxIn) bool { return c.PreviousOutPoint == txin.PreviousOutPoint })
+		j := slices.IndexFunc(
+			tx.UnsignedTx.TxIn,
+			func(c *wire.TxIn) bool { return c.PreviousOutPoint == txin.PreviousOutPoint },
+		)
 		if j < 0 {
 			return nil, fmt.Errorf("commitment tx omits boarding input %s", txin.PreviousOutPoint)
 		}
@@ -133,7 +136,9 @@ func mergeSignatures(original, signed *psbt.Packet) {
 	for i := range min(len(original.Inputs), len(signed.Inputs)) {
 		for _, sig := range signed.Inputs[i].TaprootScriptSpendSig {
 			if !hasSig(original.Inputs[i].TaprootScriptSpendSig, sig.XOnlyPubKey, sig.LeafHash) {
-				original.Inputs[i].TaprootScriptSpendSig = append(original.Inputs[i].TaprootScriptSpendSig, sig)
+				original.Inputs[i].TaprootScriptSpendSig = append(
+					original.Inputs[i].TaprootScriptSpendSig, sig,
+				)
 			}
 		}
 	}

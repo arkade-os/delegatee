@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	delegationapp "github.com/arkade-os/executor/internal/core/application/delegation"
 	executionapp "github.com/arkade-os/executor/internal/core/application/execution"
@@ -19,7 +20,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Daemon is the composition root: the services wired to postgres, arkd, electrum and the emulator behind the gRPC server.
+// Daemon is the composition root: the services wired to postgres, arkd, electrum and the emulator
+// behind the gRPC server.
 type Daemon struct {
 	Server  *grpcserver.Server
 	closers []func()
@@ -51,7 +53,8 @@ func NewDaemon(ctx context.Context, cfg Config) (_ *Daemon, err error) {
 	}
 
 	reg := registry.NewService(db.Artifacts(), db.Templates(), registry.Limits{
-		MaxArtifacts: cfg.MaxArtifacts, MaxTemplates: cfg.MaxTemplates, MaxDocumentBytes: cfg.MaxDocumentBytes,
+		MaxArtifacts: cfg.MaxArtifacts, MaxTemplates: cfg.MaxTemplates,
+		MaxDocumentBytes: cfg.MaxDocumentBytes,
 	})
 	if cfg.DefaultTemplates {
 		if err := reg.RegisterDefaults(ctx, templates.Artifacts, templates.Templates); err != nil {
@@ -59,10 +62,19 @@ func NewDaemon(ctx context.Context, cfg Config) (_ *Daemon, err error) {
 		}
 	}
 	delegations := delegationapp.NewService(
-		reg, db.Delegations(), db.Streams(), indexer, cfg.CosignerKey.PubKey(), cfg.EncryptionKey, arkInfo.SignerPubkey, emuInfo.SignerPubkey, arkInfo.Network,
+		reg,
+		db.Delegations(),
+		db.Streams(),
+		indexer,
+		cfg.CosignerKey.PubKey(),
+		cfg.EncryptionKey,
+		arkInfo.SignerPubkey,
+		emuInfo.SignerPubkey,
+		arkInfo.Network,
 		delegationapp.Limits{
-			MinDelegationExpiry: cfg.MinDelegationExpiry, MaxDelegations: cfg.MaxDelegations, MaxStreamChildren: cfg.MaxStreamChildren,
-			ExpiryInterval: cfg.ExpiryInterval, PruneAfter: cfg.PruneAfter,
+			MinDelegationExpiry: cfg.MinDelegationExpiry, MaxDelegations: cfg.MaxDelegations,
+			MaxStreamChildren: cfg.MaxStreamChildren, ExpiryInterval: cfg.ExpiryInterval,
+			PruneAfter: cfg.PruneAfter,
 		},
 	)
 	if cfg.DefaultTemplates {
@@ -70,12 +82,25 @@ func NewDaemon(ctx context.Context, cfg Config) (_ *Daemon, err error) {
 	}
 	delegations.Start(context.Background())
 	d.closers = append(d.closers, delegations.Stop)
-	execution := executionapp.NewService(delegations, reg, ark, indexer, chain, emu, cfg.CosignerKey, db.Coins(), db.Attempts(), db.Summaries(), executionapp.Limits{
-		OffchainConcurrency: cfg.OffchainConcurrency, AttemptTimeout: cfg.AttemptTimeout, RetryDelay: cfg.RetryDelay,
-		IntentsPerBatch: cfg.IntentsPerBatch, IntentTimeout: cfg.IntentTimeout, Reserve: cfg.Reserve,
-		BanDuration: cfg.BanDuration, LandingWindow: cfg.LandingWindow,
-		TemplateMaxFailures: cfg.TemplateMaxFailures, LoopStall: cfg.LoopStall,
-	})
+	execution := executionapp.NewService(
+		delegations,
+		reg,
+		ark,
+		indexer,
+		chain,
+		emu,
+		cfg.CosignerKey,
+		db.Coins(),
+		db.Attempts(),
+		db.Summaries(),
+		executionapp.Limits{
+			OffchainConcurrency: cfg.OffchainConcurrency, AttemptTimeout: cfg.AttemptTimeout,
+			RetryDelay: cfg.RetryDelay, IntentsPerBatch: cfg.IntentsPerBatch,
+			IntentTimeout: cfg.IntentTimeout, Reserve: cfg.Reserve, BanDuration: cfg.BanDuration,
+			LandingWindow: cfg.LandingWindow, TemplateMaxFailures: cfg.TemplateMaxFailures,
+			LoopStall: cfg.LoopStall,
+		},
+	)
 	if err := execution.Start(context.Background()); err != nil {
 		return nil, fmt.Errorf("start execution: %w", err)
 	}
@@ -84,11 +109,15 @@ func NewDaemon(ctx context.Context, cfg Config) (_ *Daemon, err error) {
 	}
 	checker := health.NewChecker(db, ark, emu, execution)
 	server, err := grpcserver.Listen(
-		ctx, grpcserver.Options{
-			PublicPort: cfg.Port, AdminPort: cfg.AdminPort, PublicRateLimit: cfg.PublicRateLimit, Users: cfg.AdminUsers,
-			Status: execution, Health: checker,
+		ctx,
+		grpcserver.Options{
+			PublicPort: cfg.Port, AdminPort: cfg.AdminPort, PublicRateLimit: cfg.PublicRateLimit,
+			Users: cfg.AdminUsers, Status: execution, Health: checker,
 		},
-		handlers.NewExecutor(reg, delegations, execution, cfg.Version), handlers.NewAdmin(reg, delegations, execution, checker),
+		handlers.NewExecutor(
+			reg, delegations, execution, cfg.Version,
+		),
+		handlers.NewAdmin(reg, delegations, execution, checker),
 	)
 	if err != nil {
 		execution.Stop()
@@ -100,8 +129,18 @@ func NewDaemon(ctx context.Context, cfg Config) (_ *Daemon, err error) {
 	return d, nil
 }
 
+// Stop runs the closers newest first, so the server stops before the database.
+func (d *Daemon) Stop() {
+	for _, v := range slices.Backward(d.closers) {
+		v()
+	}
+	d.closers = nil
+}
+
 // connect returns the configured stand-ins or dials the URLs.
-func (d *Daemon) connect(cfg Config) (ports.Signer, ports.Indexer, ports.ChainWatcher, ports.Emulator, error) {
+func (d *Daemon) connect(
+	cfg Config,
+) (ports.Signer, ports.Indexer, ports.ChainWatcher, ports.Emulator, error) {
 	ark, indexer, chain, emu := cfg.Ark, cfg.Indexer, cfg.Chain, cfg.Emulator
 	if ark == nil || indexer == nil {
 		c, err := arkd.NewClient(cfg.ArkURL)
@@ -133,12 +172,4 @@ func (d *Daemon) connect(cfg Config) (ports.Signer, ports.Indexer, ports.ChainWa
 		emu = c
 	}
 	return ark, indexer, chain, emu, nil
-}
-
-// Stop runs the closers newest first, so the server stops before the database.
-func (d *Daemon) Stop() {
-	for i := len(d.closers) - 1; i >= 0; i-- {
-		d.closers[i]()
-	}
-	d.closers = nil
 }

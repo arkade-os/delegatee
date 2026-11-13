@@ -106,10 +106,15 @@ func TestDelegationPruneSpawnedExpired(t *testing.T) {
 	require.NoError(t, repo.AddOrUpdate(t.Context(), &public))
 	_, err := repo.Expire(t.Context(), time.Now())
 	require.NoError(t, err)
-	_, err = repo.db.db.ExecContext(t.Context(), "UPDATE delegations SET expires_at = now() WHERE id = $1", fresh.ID)
+	_, err = repo.db.db.ExecContext(
+		t.Context(), "UPDATE delegations SET expires_at = now() WHERE id = $1", fresh.ID,
+	)
 	require.NoError(t, err)
-	_, err = repo.db.db.ExecContext(t.Context(),
-		"INSERT INTO coins (outpoint, delegation_id, input, script, amount, created_at, status) VALUES ('aa:0', $1, 0, 's', 1, now(), 'present')", old.ID)
+	_, err = repo.db.db.ExecContext(
+		t.Context(),
+		"INSERT INTO coins (outpoint, delegation_id, input, script, amount, created_at, status) VALUES ('aa:0', $1, 0, 's', 1, now(), 'present')",
+		old.ID,
+	)
 	require.NoError(t, err)
 
 	n, err := repo.Prune(t.Context(), time.Now().Add(-24*time.Hour))
@@ -122,7 +127,9 @@ func TestDelegationPruneSpawnedExpired(t *testing.T) {
 		require.NoError(t, err)
 	}
 	var coins int
-	require.NoError(t, repo.db.db.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM coins").Scan(&coins))
+	require.NoError(
+		t, repo.db.db.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM coins").Scan(&coins),
+	)
 	require.Zero(t, coins, "its coins go with it")
 }
 
@@ -150,7 +157,13 @@ func TestDelegationUpdate(t *testing.T) {
 	require.Equal(t, testDelegation("a").Address, got.Address)
 	require.True(t, got.UpdatedAt.After(got.CreatedAt))
 
-	require.ErrorIs(t, repo.AddOrUpdate(t.Context(), &delegation.Delegation{ID: 404, Status: delegation.StatusActive}), delegation.ErrDelegationNotFound)
+	require.ErrorIs(
+		t,
+		repo.AddOrUpdate(
+			t.Context(), &delegation.Delegation{ID: 404, Status: delegation.StatusActive},
+		),
+		delegation.ErrDelegationNotFound,
+	)
 }
 
 func TestDelegationExpire(t *testing.T) {
@@ -211,10 +224,14 @@ func TestDelegationListAndCount(t *testing.T) {
 	require.Equal(t, []int64{ids[4], ids[3], ids[2], ids[1], ids[0]}, listIDs(all))
 	require.Equal(t, testDelegation("e").Inputs, all[0].Inputs)
 
-	active, err := repo.List(t.Context(), delegation.ListFilter{Status: delegation.StatusActive, Limit: 10})
+	active, err := repo.List(
+		t.Context(), delegation.ListFilter{Status: delegation.StatusActive, Limit: 10},
+	)
 	require.NoError(t, err)
 	require.Equal(t, []int64{ids[4], ids[3], ids[2], ids[0]}, listIDs(active))
-	cancelled, err := repo.List(t.Context(), delegation.ListFilter{Status: delegation.StatusCancelled, Limit: 10})
+	cancelled, err := repo.List(
+		t.Context(), delegation.ListFilter{Status: delegation.StatusCancelled, Limit: 10},
+	)
 	require.NoError(t, err)
 	require.Equal(t, []int64{ids[1]}, listIDs(cancelled))
 
@@ -247,10 +264,14 @@ func testDelegations(t *testing.T) *DelegationRepository {
 
 func testDelegation(fingerprint string) delegation.Delegation {
 	return delegation.Delegation{
-		Fingerprint: fingerprint, Address: "addr-" + fingerprint, TemplateID: "t",
-		Variables: map[string]string{"owner": "02ab"},
-		Inputs:    []delegation.Input{{Name: "funds", Script: "5120aa", Tapscripts: []string{"51"}}},
-		Status:    delegation.StatusActive,
+		Fingerprint: fingerprint,
+		Address:     "addr-" + fingerprint,
+		TemplateID:  "t",
+		Variables:   map[string]string{"owner": "02ab"},
+		Inputs: []delegation.Input{
+			{Name: "funds", Script: "5120aa", Tapscripts: []string{"51"}},
+		},
+		Status: delegation.StatusActive,
 	}
 }
 
@@ -261,7 +282,11 @@ func testSpawned(fingerprint string, streamID int64) delegation.Delegation {
 }
 
 func testStream() delegation.Stream {
-	return delegation.Stream{TemplateID: "t", Variables: map[string]string{"a": "01"}, Status: delegation.StatusActive}
+	return delegation.Stream{
+		TemplateID: "t",
+		Variables:  map[string]string{"a": "01"},
+		Status:     delegation.StatusActive,
+	}
 }
 
 func withExpiry(d delegation.Delegation, at *time.Time) delegation.Delegation {

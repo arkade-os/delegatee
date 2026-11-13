@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/arkade-os/executor/pkg/template"
+	"github.com/arkade-os/executor/pkg/template/artifact"
 )
 
 // Artifact is a compiled contract definition, stored under the hash of its canonical document.
@@ -13,18 +13,6 @@ type Artifact struct {
 	ID        string
 	Document  []byte
 	CreatedAt time.Time
-}
-
-// NewArtifact validates document and derives its id; maxBytes bounds the document size, 0 means no bound.
-func NewArtifact(document []byte, maxBytes int) (*Artifact, error) {
-	if maxBytes > 0 && len(document) > maxBytes {
-		return nil, fmt.Errorf("%w: document exceeds %d bytes", ErrInvalidDocument, maxBytes)
-	}
-	parsed, err := template.ParseArtifact(document)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidDocument, err)
-	}
-	return &Artifact{ID: parsed.ID, Document: document}, nil
 }
 
 type ArtifactRepository interface {
@@ -36,4 +24,17 @@ type ArtifactRepository interface {
 	List(ctx context.Context) ([]Artifact, error)
 	// Delete fails with ErrArtifactInUse while a template references the artifact.
 	Delete(ctx context.Context, id string) error
+}
+
+// NewArtifact validates document and derives its id; maxBytes bounds the document size, 0 means no
+// bound.
+func NewArtifact(document []byte, maxBytes int) (*Artifact, error) {
+	if maxBytes > 0 && len(document) > maxBytes {
+		return nil, fmt.Errorf("%w: document exceeds %d bytes", ErrInvalidDocument, maxBytes)
+	}
+	parsed, err := artifact.ParseVersion(artifact.Version1, document)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidDocument, err)
+	}
+	return &Artifact{ID: parsed.ID(), Document: document}, nil
 }

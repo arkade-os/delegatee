@@ -48,7 +48,9 @@ func (c *Client) Info(ctx context.Context) (ports.EmulatorInfo, error) {
 	return ports.EmulatorInfo{SignerPubkey: key}, nil
 }
 
-func (c *Client) SubmitTx(ctx context.Context, tx string, checkpoints []string) (string, []string, error) {
+func (c *Client) SubmitTx(
+	ctx context.Context, tx string, checkpoints []string,
+) (string, []string, error) {
 	return c.emulator.SubmitTx(ctx, tx, checkpoints)
 }
 
@@ -57,9 +59,13 @@ func (c *Client) SubmitIntent(ctx context.Context, in execution.Intent) (string,
 }
 
 func (c *Client) SubmitFinalization(
-	ctx context.Context, in execution.Intent, forfeits []string, connectorTree tree.FlatTxTree, commitmentTx string,
+	ctx context.Context, in execution.Intent, forfeits []string, connectorTree tree.FlatTxTree,
+	commitmentTx string,
 ) ([]string, string, error) {
-	return c.emulator.SubmitFinalization(ctx, emulatorclient.Intent{Proof: in.Proof, Message: in.Message}, forfeits, connectorTree, commitmentTx)
+	return c.emulator.SubmitFinalization(
+		ctx, emulatorclient.Intent{Proof: in.Proof, Message: in.Message}, forfeits, connectorTree,
+		commitmentTx,
+	)
 }
 
 func (c *Client) Close() error { return c.conn.Close() }
@@ -71,7 +77,10 @@ func grpcTarget(url string) (string, credentials.TransportCredentials) {
 		creds = credentials.NewTLS(nil)
 		port = "443"
 	}
-	target := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(url, "https://"), "http://"), "/")
+	target := strings.TrimSuffix(
+		strings.TrimPrefix(strings.TrimPrefix(url, "https://"), "http://"),
+		"/",
+	)
 	if !strings.Contains(target, ":") {
 		target += ":" + port
 	}

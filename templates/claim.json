@@ -1,22 +1,14 @@
 {
   "format": "template/v1",
-  "type": "offchain",
-  "variables": {
-    "taptree": "bytes",
-    "receiver_program": "bytes32",
-    "ciphertext": "bytes"
-  },
-  "secrets": {"preimage": {"type": "bytes32", "from": "htlc", "ciphertext": "<ciphertext>"}},
+  "type": "virtual",
+  "variables": {"taptree": "bytes", "receiver_program": "bytes32", "preimage": "bytes32"},
   "inputs": [
     {
       "name": "htlc",
       "contract": {
         "definition": {
           "contractName": "CovenantClaim",
-          "constructorInputs": [
-            {"name": "preimageHash", "type": "bytes20"},
-            {"name": "receiverProgram", "type": "bytes32"}
-          ],
+          "constructorInputs": [{"name": "preimageHash", "type": "bytes20"}, {"name": "receiverProgram", "type": "bytes32"}],
           "structs": [],
           "functions": [
             {
@@ -24,17 +16,34 @@
               "arkade": {
                 "inputs": [],
                 "asm": [
-                  "OP_PUSHCURRENTINPUTINDEX", "OP_DUP", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "1", "OP_EQUALVERIFY",
-                  "<receiverProgram>", "OP_EQUALVERIFY", "OP_INSPECTOUTPUTVALUE", "OP_PUSHCURRENTINPUTINDEX",
-                  "OP_INSPECTINPUTVALUE", "OP_GREATERTHANOREQUAL"
+                  "OP_PUSHCURRENTINPUTINDEX",
+                  "OP_DUP",
+                  "OP_INSPECTOUTPUTSCRIPTPUBKEY",
+                  "1",
+                  "OP_EQUALVERIFY",
+                  "<receiverProgram>",
+                  "OP_EQUALVERIFY",
+                  "OP_INSPECTOUTPUTVALUE",
+                  "OP_PUSHCURRENTINPUTINDEX",
+                  "OP_INSPECTINPUTVALUE",
+                  "OP_GREATERTHANOREQUAL"
                 ]
               },
               "leaves": [
                 {
                   "name": "claim",
                   "asm": [
-                    "OP_SIZE", "32", "OP_EQUALVERIFY", "OP_HASH160", "<preimageHash>", "OP_EQUAL", "OP_VERIFY",
-                    "<SERVER_KEY>", "OP_CHECKSIGVERIFY", "<EMULATOR_KEY:claim>", "OP_CHECKSIG"
+                    "OP_SIZE",
+                    "32",
+                    "OP_EQUALVERIFY",
+                    "OP_HASH160",
+                    "<preimageHash>",
+                    "OP_EQUAL",
+                    "OP_VERIFY",
+                    "<SERVER_KEY>",
+                    "OP_CHECKSIGVERIFY",
+                    "<EMULATOR_KEY:claim>",
+                    "OP_CHECKSIG"
                   ],
                   "witness": [
                     {"name": "preimage", "type": "bytes32", "encoding": "raw"},
@@ -46,17 +55,10 @@
             }
           ]
         },
-        "arguments": {
-          "preimageHash": "$(<preimage> OP_HASH160)",
-          "receiverProgram": "<receiver_program>"
-        },
+        "arguments": {"preimageHash": "$(<preimage> OP_HASH160)", "receiverProgram": "<receiver_program>"},
         "taptree": "<taptree>"
       },
-      "spend": {
-        "function": "claim",
-        "leaf": "claim",
-        "witness": {"preimage": "<preimage>"}
-      }
+      "spend": {"function": "claim", "leaf": "claim", "witness": {"preimage": "<preimage>"}}
     }
   ],
   "outputs": [
@@ -69,23 +71,21 @@
     }
   ],
   "packets": {"output_index": 1, "unmatched": "drop"},
-  "trigger": {
-    "packet": 4,
-    "decode": "tlv",
-    "min_value": 1000,
-    "require": {"tlv:3": "<ENCRYPTION_KEY>"},
-    "capture": {
-      "ciphertext": "tlv:1",
-      "receiver_program": {
-        "from": "tlv:2",
-        "asm": [
-          "OP_PUSHCURRENTINPUTINDEX", "OP_DUP", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "1", "OP_EQUALVERIFY",
-          "<receiver_program>", "OP_EQUALVERIFY", "OP_INSPECTOUTPUTVALUE", "OP_PUSHCURRENTINPUTINDEX",
-          "OP_INSPECTINPUTVALUE", "OP_GREATERTHANOREQUAL"
-        ]
-      },
-      "taptree": "output:taptree"
-    },
-    "expires_after_seconds": 86400
+  "delegation": {
+    "sealed": ["preimage"],
+    "trigger": {
+      "htlc": {
+        "packet": 4,
+        "decode": "tlv",
+        "min_value": 1000,
+        "require": {"tlv:3": "<ENCRYPTION_KEY>"},
+        "capture": {
+          "preimage": "tlv:1",
+          "receiver_program": "$(<tlv:2> 6 32 OP_SUBSTR)",
+          "taptree": "output:taptree"
+        },
+        "expires_after_seconds": 86400
+      }
+    }
   }
 }

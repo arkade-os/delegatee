@@ -17,8 +17,8 @@ import (
 	"github.com/btcsuite/btcd/wire/v2"
 )
 
-// chain stands in for the Electrum server: utxos by script and the transactions that created them, a
-// tip whose blocks are mined by the test, a status per script that is the hash of its utxos, and
+// chain stands in for the Electrum server: utxos by script and the transactions that created them,
+// a tip whose blocks are mined by the test, a status per script that is the hash of its utxos, and
 // counters of what the daemon asked.
 type chain struct {
 	mu           sync.Mutex
@@ -32,19 +32,17 @@ type chain struct {
 	unspentCalls map[string]int
 }
 
-func newChain() *chain {
-	c := &chain{
-		utxos: map[string][]ports.Output{}, txs: map[string]*wire.MsgTx{}, times: map[int64]time.Time{}, height: 100,
-		unspentCalls: map[string]int{},
-	}
-	for h := c.height - 5; h <= c.height; h++ {
-		c.times[h] = time.Now()
-	}
-	return c
+type chainSub struct {
+	c      *chain
+	ctx    context.Context
+	cancel context.CancelFunc
+	events chan ports.ChainEvent
+
+	scripts map[string]struct{} // guarded by c.mu
 }
 
-// Fund puts a utxo in the mempool at script, paid by a transaction the daemon can fetch, and tells the
-// subscription; the outpoint comes back.
+// Fund puts a utxo in the mempool at script, paid by a transaction the daemon can fetch, and tells
+// the subscription; the outpoint comes back.
 func (c *chain) Fund(script string, amount uint64) string {
 	pkScript, err := hex.DecodeString(script)
 	if err != nil {
@@ -54,11 +52,19 @@ func (c *chain) Fund(script string, amount uint64) string {
 	defer c.mu.Unlock()
 	c.funded++
 	tx := wire.NewMsgTx(3)
-	tx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Hash: sha256.Sum256(fmt.Appendf(nil, "funding%d", c.funded))}})
+	tx.AddTxIn(
+		&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{
+				Hash: sha256.Sum256(fmt.Appendf(nil, "funding%d", c.funded)),
+			},
+		},
+	)
 	tx.AddTxOut(wire.NewTxOut(int64(amount), pkScript))
 	outpoint := tx.TxHash().String() + ":0"
 	c.txs[tx.TxHash().String()] = tx
-	c.utxos[script] = append(c.utxos[script], ports.Output{Outpoint: outpoint, Script: script, Amount: amount})
+	c.utxos[script] = append(
+		c.utxos[script], ports.Output{Outpoint: outpoint, Script: script, Amount: amount},
+	)
 	c.push(script)
 	return outpoint
 }
@@ -88,7 +94,8 @@ func (c *chain) Mine(n int) {
 	}
 }
 
-// SetMedianTime gives the last blocks the time at, which moves the median time past, and pushes the tip.
+// SetMedianTime gives the last blocks the time at, which moves the median time past, and pushes the
+// tip.
 func (c *chain) SetMedianTime(at time.Time) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -115,32 +122,6 @@ func (c *chain) Reconnect() {
 	}
 }
 
-// confirmed is the utxo at outpoint when a block holds it.
-func (c *chain) confirmed(outpoint string) (ports.Output, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for _, utxos := range c.utxos {
-		for _, u := range utxos {
-			if u.Outpoint == outpoint && u.Height > 0 {
-				return u, true
-			}
-		}
-	}
-	return ports.Output{}, false
-}
-
-// spend takes the utxo at outpoint away and tells the subscription.
-func (c *chain) spend(outpoint string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for script, utxos := range c.utxos {
-		if i := slices.IndexFunc(utxos, func(u ports.Output) bool { return u.Outpoint == outpoint }); i >= 0 {
-			c.utxos[script] = slices.Delete(utxos, i, i+1)
-			c.push(script)
-		}
-	}
-}
-
 // UnspentCalls is how many times the daemon listed script.
 func (c *chain) UnspentCalls(script string) int {
 	c.mu.Lock()
@@ -162,7 +143,10 @@ func (c *chain) Subscribe(ctx context.Context, scripts []string) (ports.ChainSub
 		return nil, errors.New("chain already subscribed")
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	c.sub = &chainSub{c: c, ctx: ctx, cancel: cancel, events: make(chan ports.ChainEvent, 1024+len(scripts)), scripts: map[string]struct{}{}}
+	c.sub = &chainSub{
+		c: c, ctx: ctx, cancel: cancel, events: make(chan ports.ChainEvent, 1024+len(scripts)),
+		scripts: map[string]struct{}{},
+	}
 	for _, script := range scripts {
 		c.sub.scripts[script] = struct{}{}
 	}
@@ -199,46 +183,6 @@ func (c *chain) Transaction(_ context.Context, txid string) (*wire.MsgTx, error)
 	return tx, nil
 }
 
-func (c *chain) tip() delegationdomain.Tip {
-	return delegationdomain.Tip{Height: c.height, Time: c.times[c.height], MedianTime: c.times[c.height-5]}
-}
-
-// status is the hash of the script's utxos, empty when it has none.
-func (c *chain) status(script string) string {
-	utxos := slices.Clone(c.utxos[script])
-	if len(utxos) == 0 {
-		return ""
-	}
-	slices.SortFunc(utxos, func(a, b ports.Output) int { return strings.Compare(a.Outpoint, b.Outpoint) })
-	h := sha256.New()
-	for _, u := range utxos {
-		_, _ = fmt.Fprintf(h, "%s:%d:%d;", u.Outpoint, u.Amount, u.Height)
-	}
-	return hex.EncodeToString(h.Sum(nil))
-}
-
-func (c *chain) push(script string) {
-	if c.sub != nil && !c.down {
-		c.sub.status(script)
-	}
-}
-
-func (c *chain) pushTip() {
-	if c.sub != nil && !c.down {
-		tip := c.tip()
-		c.sub.emit(ports.ChainEvent{Tip: &tip})
-	}
-}
-
-type chainSub struct {
-	c      *chain
-	ctx    context.Context
-	cancel context.CancelFunc
-	events chan ports.ChainEvent
-
-	scripts map[string]struct{} // guarded by c.mu
-}
-
 func (s *chainSub) Events() <-chan ports.ChainEvent { return s.events }
 
 func (s *chainSub) Connected() bool {
@@ -269,6 +213,69 @@ func (s *chainSub) Stop() {
 	}
 }
 
+// confirmed is the utxo at outpoint when a block holds it.
+func (c *chain) confirmed(outpoint string) (ports.Output, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, utxos := range c.utxos {
+		for _, u := range utxos {
+			if u.Outpoint == outpoint && u.Height > 0 {
+				return u, true
+			}
+		}
+	}
+	return ports.Output{}, false
+}
+
+// spend takes the utxo at outpoint away and tells the subscription.
+func (c *chain) spend(outpoint string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for script, utxos := range c.utxos {
+		if i := slices.IndexFunc(
+			utxos, func(u ports.Output) bool { return u.Outpoint == outpoint },
+		); i >= 0 {
+			c.utxos[script] = slices.Delete(utxos, i, i+1)
+			c.push(script)
+		}
+	}
+}
+
+func (c *chain) tip() delegationdomain.Tip {
+	return delegationdomain.Tip{
+		Height: c.height, Time: c.times[c.height], MedianTime: c.times[c.height-5],
+	}
+}
+
+// status is the hash of the script's utxos, empty when it has none.
+func (c *chain) status(script string) string {
+	utxos := slices.Clone(c.utxos[script])
+	if len(utxos) == 0 {
+		return ""
+	}
+	slices.SortFunc(
+		utxos, func(a, b ports.Output) int { return strings.Compare(a.Outpoint, b.Outpoint) },
+	)
+	h := sha256.New()
+	for _, u := range utxos {
+		_, _ = fmt.Fprintf(h, "%s:%d:%d;", u.Outpoint, u.Amount, u.Height)
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func (c *chain) push(script string) {
+	if c.sub != nil && !c.down {
+		c.sub.status(script)
+	}
+}
+
+func (c *chain) pushTip() {
+	if c.sub != nil && !c.down {
+		tip := c.tip()
+		c.sub.emit(ports.ChainEvent{Tip: &tip})
+	}
+}
+
 // resync pushes the tip and every script's status; the caller holds c.mu.
 func (s *chainSub) resync() {
 	s.c.pushTip()
@@ -289,4 +296,18 @@ func (s *chainSub) emit(ev ports.ChainEvent) {
 	case s.events <- ev:
 	case <-s.ctx.Done():
 	}
+}
+
+func newChain() *chain {
+	c := &chain{
+		utxos:        map[string][]ports.Output{},
+		txs:          map[string]*wire.MsgTx{},
+		times:        map[int64]time.Time{},
+		height:       100,
+		unspentCalls: map[string]int{},
+	}
+	for h := c.height - 5; h <= c.height; h++ {
+		c.times[h] = time.Now()
+	}
+	return c
 }

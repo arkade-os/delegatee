@@ -266,7 +266,7 @@ function templateKind(t) {
   const d = doc(t);
   if (d.trigger) return 'stream claim';
   if ((d.inputs || []).some((i) => i.type === 'onchain')) return 'boarding';
-  return t?.type === 'intent' ? 'renewal' : t?.type === 'offchain' ? 'spend' : 'unknown';
+  return t?.type === 'proof' ? 'renewal' : t?.type === 'virtual' ? 'spend' : 'unknown';
 }
 // what a delegation does: a stream spawned it, it boards a deposit, or its template's kind
 function kindOf(d) {

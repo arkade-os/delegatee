@@ -42,13 +42,16 @@ const (
 	assetAmount    = uint64(1_000)
 )
 
-// registerTemplate registers the template file of pkg/template/testdata, else of templates/, with its artifacts.
+// registerTemplate registers the template file of pkg/template/testdata, else of templates/, with
+// its artifacts.
 func registerTemplate(t *testing.T, d executor, file string) string {
 	t.Helper()
 	doc := fixture(t, file)
 	for id, artifact := range artifacts(t) {
 		if bytes.Contains(doc, []byte(id)) {
-			_, err := d.client.RegisterArtifact(t.Context(), &executorv1.RegisterArtifactRequest{Document: string(artifact)})
+			_, err := d.client.RegisterArtifact(
+				t.Context(), &executorv1.RegisterArtifactRequest{Document: string(artifact)},
+			)
 			require.NoError(t, err)
 		}
 	}
@@ -57,7 +60,9 @@ func registerTemplate(t *testing.T, d executor, file string) string {
 
 func registerDocument(t *testing.T, d executor, doc []byte) string {
 	t.Helper()
-	resp, err := d.client.RegisterTemplate(t.Context(), &executorv1.RegisterTemplateRequest{Document: string(doc)})
+	resp, err := d.client.RegisterTemplate(
+		t.Context(), &executorv1.RegisterTemplateRequest{Document: string(doc)},
+	)
 	require.NoError(t, err)
 	return resp.Template.Id
 }
@@ -74,7 +79,9 @@ func fixture(t *testing.T, file string) []byte {
 
 func artifacts(t *testing.T) map[string][]byte {
 	t.Helper()
-	paths, err := filepath.Glob(filepath.Join("..", "..", "pkg", "template", "testdata", "artifacts", "*.json"))
+	paths, err := filepath.Glob(
+		filepath.Join("..", "..", "pkg", "template", "testdata", "artifacts", "*.json"),
+	)
 	require.NoError(t, err)
 	defaults, err := filepath.Glob(filepath.Join("..", "..", "templates", "artifacts", "*.json"))
 	require.NoError(t, err)
@@ -90,33 +97,52 @@ func artifacts(t *testing.T) map[string][]byte {
 	return docs
 }
 
-func registerDelegation(t *testing.T, d executor, templateID string, variables map[string]string) *executorv1.Delegation {
+func registerDelegation(
+	t *testing.T, d executor, templateID string, variables map[string]string,
+) *executorv1.Delegation {
 	t.Helper()
-	resp, err := d.client.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: templateID, Variables: variables})
+	resp, err := d.client.RegisterDelegation(
+		t.Context(),
+		&executorv1.RegisterDelegationRequest{TemplateId: templateID, Variables: variables},
+	)
 	require.NoError(t, err)
 	return resp.Delegation
 }
 
-// renewalDelegation registers a delegation on o's address at the default renewal paying up to maxFee.
+// renewalDelegation registers a delegation on o's address at the default renewal paying up to
+// maxFee.
 func renewalDelegation(t *testing.T, d executor, o owner, maxFee int64) *executorv1.Delegation {
 	t.Helper()
 	return registerDelegation(t, d, registerTemplate(t, d, "renew.json"), o.variables(maxFee))
 }
 
-// boardingDelegations registers delegations on o's boarding address and on the renewal address it boards into.
-func boardingDelegations(t *testing.T, d executor, o owner) (boarding, renewal *executorv1.Delegation) {
+// boardingDelegations registers delegations on o's boarding address and on the renewal address it
+// boards into.
+func boardingDelegations(
+	t *testing.T, d executor, o owner,
+) (boarding, renewal *executorv1.Delegation) {
 	t.Helper()
-	return registerDelegation(t, d, registerTemplate(t, d, "board.json"), o.boardingVariables()), renewalDelegation(t, d, o, 0)
+	return registerDelegation(
+			t,
+			d,
+			registerTemplate(t, d, "board.json"),
+			o.boardingVariables(),
+		), renewalDelegation(
+			t, d, o, 0,
+		)
 }
 
 func attemptsOf(t *testing.T, d executor, id int64) []*executorv1.Attempt {
 	t.Helper()
-	resp, err := d.admin.ListAttempts(t.Context(), &executorv1.ListAttemptsRequest{Id: id, Limit: 1000})
+	resp, err := d.admin.ListAttempts(
+		t.Context(), &executorv1.ListAttemptsRequest{Id: id, Limit: 1000},
+	)
 	require.NoError(t, err)
 	return resp.Attempts
 }
 
-// landed waits for n coins at to's script from the batches of by's succeeded attempts, oldest first.
+// landed waits for n coins at to's script from the batches of by's succeeded attempts, oldest
+// first.
 func landed(t *testing.T, d executor, by, to *executorv1.Delegation, n int) []clientlib.Vtxo {
 	t.Helper()
 	var coins []clientlib.Vtxo
@@ -128,9 +154,13 @@ func landed(t *testing.T, d executor, by, to *executorv1.Delegation, n int) []cl
 			}
 		}
 		coins = slices.DeleteFunc(vtxosAt(t, d, to.Inputs[0].Script), func(v clientlib.Vtxo) bool {
-			return !slices.ContainsFunc(v.CommitmentTxids, func(c string) bool { return slices.Contains(txids, c) })
+			return !slices.ContainsFunc(
+				v.CommitmentTxids, func(c string) bool { return slices.Contains(txids, c) },
+			)
 		})
-		slices.SortFunc(coins, func(a, b clientlib.Vtxo) int { return a.CreatedAt.Compare(b.CreatedAt) })
+		slices.SortFunc(
+			coins, func(a, b clientlib.Vtxo) int { return a.CreatedAt.Compare(b.CreatedAt) },
+		)
 		return len(coins) >= n
 	}, 6*time.Minute, time.Second, "no %d coins landed at %d", n, to.Id)
 	return coins
@@ -176,11 +206,17 @@ func neverSpent(t *testing.T, d executor, outpoint string) {
 	op, err := wire.NewOutPointFromString(outpoint)
 	require.NoError(t, err)
 	spent := func() bool {
-		resp, err := d.indexer.GetVtxos(t.Context(), clientlib.WithOutpoints([]clientlib.Outpoint{{Txid: op.Hash.String(), VOut: op.Index}}))
+		resp, err := d.indexer.GetVtxos(
+			t.Context(),
+			clientlib.WithOutpoints([]clientlib.Outpoint{{Txid: op.Hash.String(), VOut: op.Index}}),
+		)
 		return err != nil || len(resp.Vtxos) != 1 || resp.Vtxos[0].Spent
 	}
 	// the indexer learns of a fresh funding a moment after the wallet sent it
-	require.Eventually(t, func() bool { return !spent() }, time.Minute, time.Second, "%s never showed up unspent", outpoint)
+	require.Eventually(
+		t, func() bool { return !spent() }, time.Minute, time.Second, "%s never showed up unspent",
+		outpoint,
+	)
 	require.Never(t, spent, 25*time.Second, time.Second, "%s was spent or unreadable", outpoint)
 }
 
@@ -211,7 +247,9 @@ func btc(sats int64) string {
 // chargeIntentFees makes arkd charge fees until the test ends.
 func chargeIntentFees(t *testing.T, fees string) {
 	t.Helper()
-	code, _ := postJSON(t, arkdAdminURL+"/v1/admin/intentFees", map[string]any{"fees": json.RawMessage(fees)})
+	code, _ := postJSON(
+		t, arkdAdminURL+"/v1/admin/intentFees", map[string]any{"fees": json.RawMessage(fees)},
+	)
 	require.Equal(t, http.StatusOK, code)
 	t.Cleanup(func() { clearIntentFees(t) })
 }
@@ -270,7 +308,8 @@ func pubKey(t *testing.T) *btcec.PublicKey {
 	return key.PubKey()
 }
 
-// variables are the default renewal's for o: regtest arkd's 512-second exit, and a window above its 512-second vtxo life so a coin renews at once.
+// variables are the default renewal's for o: regtest arkd's 512-second exit, and a window above its
+// 512-second vtxo life so a coin renews at once.
 func (o owner) variables(maxFee int64) map[string]string {
 	return map[string]string{
 		"owner": hex.EncodeToString(o.key), "exit_delay": daemon.ScriptNum(1<<22 | 1),
@@ -298,7 +337,10 @@ func keysOf(t *testing.T, d executor) template.Keys {
 	t.Helper()
 	info, err := d.client.GetInfo(t.Context(), &executorv1.GetInfoRequest{})
 	require.NoError(t, err)
-	return template.Keys{Server: parseKey(t, info.ServerPubkey), Emulator: parseKey(t, info.EmulatorPubkey), Cosigner: parseKey(t, info.CosignerPubkey)}
+	return template.Keys{
+		Server: parseKey(t, info.ServerPubkey), Emulator: parseKey(t, info.EmulatorPubkey),
+		Cosigner: parseKey(t, info.CosignerPubkey),
+	}
 }
 
 // parseKey reads a hex key, x-only or compressed.
@@ -313,14 +355,18 @@ func parseKey(t *testing.T, s string) *btcec.PublicKey {
 
 func pay(t *testing.T, alice testWallet, address string, assets ...clientlib.Asset) string {
 	t.Helper()
-	txid, err := alice.SendOffChain(t.Context(), []clientlib.Receiver{{To: address, Amount: delegateAmount, Assets: assets}})
+	txid, err := alice.SendOffChain(
+		t.Context(), []clientlib.Receiver{{To: address, Amount: delegateAmount, Assets: assets}},
+	)
 	require.NoError(t, err)
 	return txid + ":0"
 }
 
 type testWallet struct{ clientwallet.Wallet }
 
-func (w testWallet) SendOffChain(ctx context.Context, receivers []clientlib.Receiver, opts ...offchaintx.Option) (string, error) {
+func (w testWallet) SendOffChain(
+	ctx context.Context, receivers []clientlib.Receiver, opts ...offchaintx.Option,
+) (string, error) {
 	// right after a send the indexer may not show the change yet
 	var need uint64
 	for _, r := range receivers {
@@ -372,7 +418,8 @@ func fundedWallet(t *testing.T) testWallet {
 	w, err := clientwallet.NewWallet(configStore, clientwallet.WithIdentity(identity))
 	require.NoError(t, err)
 	require.NoError(t, w.Init(ctx, clientwallet.InitArgs{
-		ServerUrl: arkURL, Seed: hex.EncodeToString(privKey.Serialize()), Password: password, ExplorerURL: explorerURL,
+		ServerUrl: arkURL, Seed: hex.EncodeToString(privKey.Serialize()), Password: password,
+		ExplorerURL: explorerURL,
 	}))
 	require.NoError(t, w.Unlock(ctx, password))
 	t.Cleanup(w.Stop)           // Stop panics on a wallet that never initialised
@@ -397,7 +444,10 @@ func fundedWallet(t *testing.T) testWallet {
 }
 
 // instantiate derives the instance of a template file the way a funder does.
-func instantiate(t *testing.T, file string, keys template.Keys, variables map[string]string, decrypt func([]byte) ([]byte, error)) *template.Instance {
+func instantiate(
+	t *testing.T, file string, keys template.Keys, variables map[string]string,
+	decrypt func([]byte) ([]byte, error),
+) *template.Instance {
 	t.Helper()
 	tpl, err := template.Parse(fixture(t, file), artifacts(t))
 	require.NoError(t, err)

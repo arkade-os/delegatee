@@ -26,7 +26,9 @@ func TestRegisterArtifactThenGet(t *testing.T) {
 	require.Equal(t, doc, reg.GetArtifact().GetDocument())
 	require.NotZero(t, reg.GetArtifact().GetCreatedAt())
 
-	got, err := h.GetArtifact(t.Context(), &executorv1.GetArtifactRequest{Id: reg.GetArtifact().GetId()})
+	got, err := h.GetArtifact(
+		t.Context(), &executorv1.GetArtifactRequest{Id: reg.GetArtifact().GetId()},
+	)
 	require.NoError(t, err)
 	require.Equal(t, reg.GetArtifact().GetId(), got.GetArtifact().GetId())
 	require.Equal(t, doc, got.GetArtifact().GetDocument())
@@ -39,7 +41,9 @@ func TestRegisterArtifactErrors(t *testing.T) {
 	_, err = h.RegisterArtifact(t.Context(), &executorv1.RegisterArtifactRequest{Document: "nope"})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 
-	_, err = h.RegisterArtifact(t.Context(), &executorv1.RegisterArtifactRequest{Document: testDocument(t)})
+	_, err = h.RegisterArtifact(
+		t.Context(), &executorv1.RegisterArtifactRequest{Document: testDocument(t)},
+	)
 	require.NoError(t, err)
 	other := strings.Replace(testDocument(t), `"DelegatedVtxo"`, `"Other"`, 1)
 	_, err = h.RegisterArtifact(t.Context(), &executorv1.RegisterArtifactRequest{Document: other})
@@ -56,7 +60,9 @@ func TestGetArtifactErrors(t *testing.T) {
 
 func testHandler(t *testing.T, maxArtifacts int) *Executor {
 	t.Helper()
-	return testHandlerWithLimits(t, maxArtifacts, delegationapp.Limits{MinDelegationExpiry: 24 * time.Hour})
+	return testHandlerWithLimits(
+		t, maxArtifacts, delegationapp.Limits{MinDelegationExpiry: 24 * time.Hour},
+	)
 }
 
 func testHandlerWithLimits(t *testing.T, maxArtifacts int, limits delegationapp.Limits) *Executor {
@@ -66,19 +72,28 @@ func testHandlerWithLimits(t *testing.T, maxArtifacts int, limits delegationapp.
 }
 
 // testHandlerAndCoins wires the handler over in-memory repositories and the keys of testKeys.
-func testHandlerAndCoins(t *testing.T, maxArtifacts int, limits delegationapp.Limits) (*Executor, *coins) {
+func testHandlerAndCoins(
+	t *testing.T, maxArtifacts int, limits delegationapp.Limits,
+) (*Executor, *coins) {
 	t.Helper()
 	h, coins, _ := testHandlerAndStores(t, maxArtifacts, limits)
 	return h, coins
 }
 
-func testHandlerAndStores(t *testing.T, maxArtifacts int, limits delegationapp.Limits) (*Executor, *coins, *attempts) {
+func testHandlerAndStores(
+	t *testing.T, maxArtifacts int, limits delegationapp.Limits,
+) (*Executor, *coins, *attempts) {
 	t.Helper()
 	reg := testService(t, maxArtifacts)
 	server, emulator, cosigner := testKeys(t)
-	svc := delegationapp.NewService(reg, newDelegations(), newStreams(), nil, cosigner.PubKey(), nil, server.PubKey(), emulator.PubKey(), arklib.BitcoinRegTest, limits)
+	svc := delegationapp.NewService(
+		reg, newDelegations(), newStreams(), nil, cosigner.PubKey(), nil, server.PubKey(),
+		emulator.PubKey(), arklib.BitcoinRegTest, limits,
+	)
 	coins, attempts := newCoins(), newAttempts()
-	execution := executionapp.NewService(svc, nil, nil, nil, nil, nil, nil, coins, attempts, nil, executionapp.Limits{})
+	execution := executionapp.NewService(
+		svc, nil, nil, nil, nil, nil, nil, coins, attempts, nil, executionapp.Limits{},
+	)
 	return NewExecutor(reg, svc, execution, "test"), coins, attempts
 }
 

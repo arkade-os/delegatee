@@ -28,8 +28,7 @@ func TestNewArtifactDerivesIDFromCanonicalDocument(t *testing.T) {
 
 func TestNewArtifactRejectsInvalidDocument(t *testing.T) {
 	for name, doc := range map[string][]byte{
-		"not json":     []byte("nope"),
-		"empty":        nil,
+		"not json": []byte("nope"), "empty": nil,
 		"wrong schema": []byte(`{"contractName":"x"}`),
 	} {
 		_, err := NewArtifact(doc, 0)

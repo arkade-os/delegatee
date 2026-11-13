@@ -129,7 +129,8 @@ type attemptFailed struct {
 	retryIn time.Duration // the coins are ready again after this long
 }
 
-// skipped releases coins no attempt can spend for now; delegation is the one whose queued entry goes, if any.
+// skipped releases coins no attempt can spend for now; delegation is the one whose queued entry
+// goes, if any.
 type skipped struct {
 	coins      []string
 	delegation int64
@@ -142,15 +143,20 @@ type intentReady struct{ coins []delegation.Coin }
 type selected struct{ delegations []int64 }
 
 func NewService(
-	delegations *delegationapp.Service, templates *registryapp.Service, ark ports.Signer, indexer ports.Indexer, chain ports.ChainWatcher, emulator ports.Emulator,
-	key *btcec.PrivateKey, coins delegation.CoinRepository, attempts delegation.AttemptRepository, summaries ports.SummaryRepository,
-	limits Limits,
+	delegations *delegationapp.Service, templates *registryapp.Service, ark ports.Signer,
+	indexer ports.Indexer, chain ports.ChainWatcher, emulator ports.Emulator, key *btcec.PrivateKey,
+	coins delegation.CoinRepository, attempts delegation.AttemptRepository,
+	summaries ports.SummaryRepository, limits Limits,
 ) *Service {
 	s := &Service{
-		delegations: delegations, templates: templates, ark: ark, indexer: indexer, chain: chain, emulator: emulator, cosignerKey: key, coins: coins, attempts: attempts,
-		summaries: summaries, limits: limits, events: make(chan any, 256), slots: make(chan struct{}, limits.OffchainConcurrency),
-		pending: map[int64]*pending{}, entries: map[int64]execution.Entry{}, inflight: map[string]string{},
-		listing: make(chan struct{}, maxListings),
+		delegations: delegations, templates: templates, ark: ark, indexer: indexer, chain: chain,
+		emulator: emulator, cosignerKey: key, coins: coins, attempts: attempts,
+		summaries: summaries, limits: limits, events: make(chan any, 256),
+		slots:    make(chan struct{}, limits.OffchainConcurrency),
+		pending:  map[int64]*pending{},
+		entries:  map[int64]execution.Entry{},
+		inflight: map[string]string{},
+		listing:  make(chan struct{}, maxListings),
 	}
 	if key != nil {
 		s.cosigner = hex.EncodeToString(key.PubKey().SerializeCompressed())
@@ -170,7 +176,9 @@ func (s *Service) Start(ctx context.Context) error {
 		return fmt.Errorf("arkd info: %w", err)
 	}
 	s.info = info
-	s.session = execution.Session{Duration: info.SessionDuration, MaxIntents: s.limits.IntentsPerBatch}
+	s.session = execution.Session{
+		Duration: info.SessionDuration, MaxIntents: s.limits.IntentsPerBatch,
+	}
 	if s.tip, err = s.chain.Tip(ctx); err != nil {
 		return fmt.Errorf("chain tip: %w", err)
 	}
@@ -214,7 +222,8 @@ func (s *Service) Start(ctx context.Context) error {
 		s.chainSub.Stop()
 		return fmt.Errorf("batch events: %w", err)
 	}
-	log.WithFields(log.Fields{"scripts": len(scripts), "onchain": len(onchain), "pending": len(attempts)}).Info("coins loaded")
+	log.WithFields(log.Fields{"scripts": len(scripts), "onchain": len(onchain), "pending": len(attempts)}).
+		Info("coins loaded")
 	s.delegations.OnChange(func(d delegation.Delegation) { s.send(d) })
 	s.wg.Go(s.forward)
 	s.wg.Go(func() { s.batch.run(events, stopEvents) })
@@ -254,7 +263,9 @@ func (s *Service) Spawned(ctx context.Context) (map[int64]ports.Spawned, error) 
 }
 
 // Attempts lists the attempts of a delegation newest first, below cursor when not zero.
-func (s *Service) Attempts(ctx context.Context, delegationID, cursor int64, limit int) ([]delegation.Attempt, error) {
+func (s *Service) Attempts(
+	ctx context.Context, delegationID, cursor int64, limit int,
+) ([]delegation.Attempt, error) {
 	return s.attempts.ListByDelegation(ctx, delegationID, cursor, limit)
 }
 
@@ -286,7 +297,8 @@ func (s *Service) handle(ev any, now time.Time) {
 	s.beat.Store(now.UnixNano())
 	switch ev := ev.(type) {
 	case ports.ScriptEvent:
-		log.WithFields(log.Fields{"txid": ev.Txid, "outputs": len(ev.Outputs)}).Debug("script event")
+		log.WithFields(log.Fields{"txid": ev.Txid, "outputs": len(ev.Outputs)}).
+			Debug("script event")
 		s.update(scriptsOf(ev.Outputs), now, func(w delegation.Watched) []delegation.Coin {
 			return syncVtxos(w, ev.Outputs, false)
 		})
@@ -309,7 +321,11 @@ func (s *Service) handle(ev any, now time.Time) {
 			s.reconcileAll()
 		}
 	case reconciled:
-		s.update(slices.Collect(maps.Keys(ev)), now, func(w delegation.Watched) []delegation.Coin { return syncVtxos(w, ev[w.Script], true) })
+		s.update(
+			slices.Collect(maps.Keys(ev)),
+			now,
+			func(w delegation.Watched) []delegation.Coin { return syncVtxos(w, ev[w.Script], true) },
+		)
 	case delegation.Delegation:
 		s.follow(ev)
 	case tick:
@@ -345,7 +361,8 @@ func (s *Service) handle(ev any, now time.Time) {
 	}
 }
 
-// dispatch starts a worker for every ready delegation, registers what the plan says is due and arms the timer for the next one.
+// dispatch starts a worker for every ready delegation, registers what the plan says is due and arms
+// the timer for the next one.
 func (s *Service) dispatch(now time.Time) {
 	s.dispatched = now
 	for {
@@ -367,7 +384,10 @@ func (s *Service) dispatch(now time.Time) {
 		}
 	}
 	reserved, _ := s.counts()
-	if entries := s.plan(now).Registrations(now, max(s.session.MaxIntents-reserved, 0)); len(entries) > 0 {
+	if entries := s.plan(now).
+		Registrations(now, max(s.session.MaxIntents-reserved, 0)); len(
+		entries,
+	) > 0 {
 		for i := range entries {
 			entries[i].Reserved = true
 			s.entries[entries[i].DelegationID] = entries[i]
@@ -457,9 +477,13 @@ func (s *Service) record(delegationID int64, success bool) {
 	if err == nil {
 		var failures int
 		var status string
-		if failures, status, err = s.templates.RecordOutcome(s.ctx, d.TemplateID, success, s.limits.TemplateMaxFailures); err == nil &&
-			status == registry.TemplateStatusDisabled && failures == s.limits.TemplateMaxFailures {
-			log.WithFields(log.Fields{"template": d.TemplateID, "failures": failures}).Warn("template disabled by its failures")
+		if failures, status, err = s.templates.RecordOutcome(
+			s.ctx, d.TemplateID, success, s.limits.TemplateMaxFailures,
+		); err == nil &&
+			status == registry.TemplateStatusDisabled &&
+			failures == s.limits.TemplateMaxFailures {
+			log.WithFields(log.Fields{"template": d.TemplateID, "failures": failures}).
+				Warn("template disabled by its failures")
 		}
 	}
 	if err != nil && s.ctx.Err() == nil {
@@ -478,12 +502,19 @@ func (s *Service) landing(c delegation.Coin, now time.Time) {
 }
 
 // settle succeeds p once every coin is seen spent by its transaction and nothing is left to do at
-// arkd. It fails p when another transaction spent a coin, or when an attempt of a previous run still
-// has coins unspent at landBy; a batched attempt knows its transaction late.
+// arkd. It fails p when another transaction spent a coin, or when an attempt of a previous run
+// still has coins unspent at landBy; a batched attempt knows its transaction late.
 func (s *Service) settle(p *pending, now time.Time) {
 	for outpoint, by := range p.spent {
-		if spenders := p.attempt.Spenders(); len(spenders) > 0 && by != "" && !slices.Contains(spenders, by) {
-			s.failed(attemptFailed{attempt: p.attempt, err: fmt.Errorf("coin %s spent by %s", outpoint, by), retryIn: s.retryIn(p.attempt, false)}, now)
+		if spenders := p.attempt.Spenders(); len(spenders) > 0 && by != "" &&
+			!slices.Contains(spenders, by) {
+			s.failed(
+				attemptFailed{
+					attempt: p.attempt, err: fmt.Errorf("coin %s spent by %s", outpoint, by),
+					retryIn: s.retryIn(p.attempt, false),
+				},
+				now,
+			)
 			return
 		}
 	}
@@ -491,12 +522,17 @@ func (s *Service) settle(p *pending, now time.Time) {
 	case !p.busy && len(p.spent) == len(p.attempt.Coins):
 		s.succeed(p)
 	case !p.landBy.IsZero() && !now.Before(p.landBy):
-		s.failed(attemptFailed{attempt: p.attempt, err: errNotLanded, retryIn: s.retryIn(p.attempt, true)}, now)
+		s.failed(
+			attemptFailed{
+				attempt: p.attempt, err: errNotLanded, retryIn: s.retryIn(p.attempt, true),
+			},
+			now,
+		)
 	}
 }
 
-// retryIn is how long the coins of a pending attempt wait: a batched attempt waits for the next session
-// unless a batch, not the coins, is at fault.
+// retryIn is how long the coins of a pending attempt wait: a batched attempt waits for the next
+// session unless a batch, not the coins, is at fault.
 func (s *Service) retryIn(a delegation.Attempt, again bool) time.Duration {
 	switch _, batched := a.Proof(); {
 	case !batched:
@@ -522,7 +558,8 @@ func (s *Service) await(p *pending) error {
 	return nil
 }
 
-// follow watches or forgets the scripts of a changed delegation and gives their coins to their owners.
+// follow watches or forgets the scripts of a changed delegation and gives their coins to their
+// owners.
 func (s *Service) follow(d delegation.Delegation) {
 	active := d.Status == delegation.StatusActive
 	if !active {
@@ -566,7 +603,8 @@ func (s *Service) follow(d delegation.Delegation) {
 	if len(arkAdd)+len(arkRemove)+len(chainAdd)+len(chainRemove) == 0 {
 		return
 	}
-	log.WithFields(log.Fields{"id": d.ID, "status": d.Status, "add": len(arkAdd) + len(chainAdd), "remove": len(arkRemove) + len(chainRemove)}).Debug("delegation changed")
+	log.WithFields(log.Fields{"id": d.ID, "status": d.Status, "add": len(arkAdd) + len(chainAdd), "remove": len(arkRemove) + len(chainRemove)}).
+		Debug("delegation changed")
 	if len(arkAdd)+len(arkRemove) > 0 {
 		if err := s.sub.Update(s.ctx, arkAdd, arkRemove); err != nil && s.ctx.Err() == nil {
 			log.WithError(err).Error("update the script subscription")
@@ -576,7 +614,10 @@ func (s *Service) follow(d delegation.Delegation) {
 		s.wg.Go(func() { s.reconcile(arkAdd, nil) })
 	}
 	if len(chainAdd)+len(chainRemove) > 0 {
-		if err := s.chainSub.Update(s.ctx, chainAdd, chainRemove); err != nil && s.ctx.Err() == nil {
+		if err := s.chainSub.Update(
+			s.ctx, chainAdd, chainRemove,
+		); err != nil &&
+			s.ctx.Err() == nil {
 			log.WithError(err).Error("update the chain subscription")
 		}
 	}
@@ -601,13 +642,15 @@ func (s *Service) move(watched []delegation.Watched) error {
 			return err
 		}
 		for _, c := range moved {
-			log.WithFields(log.Fields{"outpoint": c.Outpoint, "delegation": c.DelegationID}).Debug("coin moved")
+			log.WithFields(log.Fields{"outpoint": c.Outpoint, "delegation": c.DelegationID}).
+				Debug("coin moved")
 		}
 	}
 	return nil
 }
 
-// chainEvent applies a new tip to the onchain coins, or has the script listed when its status is not the stored one.
+// chainEvent applies a new tip to the onchain coins, or has the script listed when its status is
+// not the stored one.
 func (s *Service) chainEvent(ev ports.ChainEvent, now time.Time) {
 	if ev.Tip != nil {
 		s.tip = *ev.Tip
@@ -670,7 +713,10 @@ func (s *Service) reconcileOnchain(ev unspents, now time.Time) {
 	}) {
 		return
 	}
-	if err := s.coins.SetScriptStatus(s.ctx, ev.script, ev.status); err != nil && s.ctx.Err() == nil {
+	if err := s.coins.SetScriptStatus(
+		s.ctx, ev.script, ev.status,
+	); err != nil &&
+		s.ctx.Err() == nil {
 		log.WithError(err).Error("store script status")
 	}
 }
@@ -680,8 +726,8 @@ func (s *Service) reconcileAll() {
 	s.wg.Go(func() { s.reconcile(nil, reconcileDone{}) })
 }
 
-// reconcile asks arkd for the vtxos at scripts, every offchain one when nil, in chunks and feeds them
-// back to the loop, then sends done when it is not nil.
+// reconcile asks arkd for the vtxos at scripts, every offchain one when nil, in chunks and feeds
+// them back to the loop, then sends done when it is not nil.
 func (s *Service) reconcile(scripts []string, done any) {
 	if done != nil {
 		defer s.send(done)
@@ -746,9 +792,11 @@ func (s *Service) send(ev any) {
 	}
 }
 
-// update applies f to those of scripts the active delegations claim and stores what it changed; false
-// when none is claimed or they could not be read.
-func (s *Service) update(scripts []string, now time.Time, f func(delegation.Watched) []delegation.Coin) bool {
+// update applies f to those of scripts the active delegations claim and stores what it changed;
+// false when none is claimed or they could not be read.
+func (s *Service) update(
+	scripts []string, now time.Time, f func(delegation.Watched) []delegation.Coin,
+) bool {
 	watched, err := s.coins.Watched(s.ctx, scripts)
 	if err != nil {
 		if s.ctx.Err() == nil {
@@ -805,7 +853,9 @@ func (s *Service) due(c delegation.Coin, now time.Time) time.Time {
 
 // dueAt is when the template instance becomes eligible to spend c.
 func dueAt(inst *template.Instance, c delegation.Coin, now time.Time) time.Time {
-	src := &template.Source{Amount: c.Amount, Expiry: c.ExpiresAt, CreatedAt: c.CreatedAt, Confirms: c.Confirmations}
+	src := &template.Source{
+		Amount: c.Amount, Expiry: c.ExpiresAt, CreatedAt: c.CreatedAt, Confirms: c.Confirmations,
+	}
 	if op, err := wire.NewOutPointFromString(c.Outpoint); err == nil {
 		src.Outpoint = *op
 	}

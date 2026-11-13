@@ -1,738 +1,566 @@
-package template
+package template_test
 
 import (
+	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
+	"io"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
-	"github.com/arkade-os/emulator/pkg/arkade"
+	"github.com/arkade-os/arkd/pkg/ark-lib/arkfee"
+	"github.com/arkade-os/executor/pkg/template"
+	"github.com/arkade-os/executor/pkg/template/artifact"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/psbt/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseMinimal(t *testing.T) {
-	doc := fixture(t, "minimal.json")
-	tmpl, err := Parse(doc, nil)
-	require.NoError(t, err)
-	require.Equal(t, Onchain, tmpl.Type())
-	require.Equal(t, []Slot{{Name: "funds", Onchain: true}}, tmpl.Inputs())
-	require.Empty(t, tmpl.Variables())
-	inst, err := tmpl.Instantiate(Context{Keys: testKeys(t)})
-	require.NoError(t, err)
-	require.EqualValues(t, 1000, inst.feeCap())
-	require.Len(t, tmpl.ID(), 64)
+type vector struct {
+	ArtifactVersion string                     `json:"artifact_version"`
+	Format          string                     `json:"format"`
+	Name            string                     `json:"name"`
+	Template        json.RawMessage            `json:"template"`
+	TemplateText    *string                    `json:"template_text,omitempty"`
+	Artifacts       map[string]json.RawMessage `json:"artifacts"`
+	Bindings        struct {
+		Keys struct {
+			Server   string `json:"server"`
+			Emulator string `json:"emulator"`
+			Cosigner string `json:"cosigner"`
+		} `json:"keys"`
+		Variables map[string]string `json:"variables"`
+	} `json:"bindings"`
+	Request struct {
+		Sources []struct {
+			Tx     string `json:"tx_hex"`
+			TxID   string `json:"txid"`
+			Vout   uint32 `json:"vout"`
+			Amount string `json:"amount"`
+			Assets []struct {
+				ID     string `json:"id"`
+				Amount string `json:"amount"`
+			} `json:"assets"`
+			Expiry    string `json:"expiry"`
+			CreatedAt string `json:"created_at"`
+			Confirms  int    `json:"confirmations"`
+			Swept     bool   `json:"swept"`
+		} `json:"sources"`
+		Fee struct {
+			Dust   string  `json:"dust"`
+			Rate   *string `json:"onchain_sat_per_vbyte,omitempty"`
+			Intent struct {
+				OffchainInput  string `json:"offchain_input"`
+				OnchainInput   string `json:"onchain_input"`
+				OffchainOutput string `json:"offchain_output"`
+				OnchainOutput  string `json:"onchain_output"`
+			} `json:"intent"`
+		} `json:"fee"`
+		Decryption map[string]string `json:"decryption"`
+	} `json:"request"`
+	Expected struct {
+		ID         string `json:"template_id,omitempty"`
+		SpendID    string `json:"spend_id,omitempty"`
+		Canonical  string `json:"canonical_hex,omitempty"`
+		PSBT       string `json:"psbt_hex,omitempty"`
+		UnsignedTx string `json:"unsigned_tx_hex,omitempty"`
+		Fee        string `json:"fee,omitempty"`
+		Extension  int    `json:"extension,omitempty"`
+		Error      *struct {
+			Stage string `json:"stage"`
+			Code  string `json:"code"`
+		} `json:"error,omitempty"`
+	} `json:"expected"`
 }
 
-func TestIDIgnoresDefaultsAndSpelling(t *testing.T) {
-	doc := fixture(t, "minimal.json")
-	base, err := Parse(doc, nil)
+func TestVectors(t *testing.T) {
+	paths, err := filepath.Glob("testdata/vectors/v1/*.json")
 	require.NoError(t, err)
-	for name, edit := range map[string]func(map[string]any){
-		"explicit empty variables": func(m map[string]any) { m["variables"] = map[string]any{} },
-		"explicit null packets":    func(m map[string]any) { m["packets"] = nil },
-		"explicit input type":      func(m map[string]any) { m["inputs"].([]any)[0].(map[string]any)["type"] = "onchain" },
-		"explicit schedule": func(m map[string]any) {
-			m["inputs"].([]any)[0].(map[string]any)["schedule"] = map[string]any{"immediate": true}
-		},
-		"explicit assets": func(m map[string]any) { m["outputs"].([]any)[0].(map[string]any)["assets"] = []any{} },
-	} {
+	require.NotEmpty(t, paths)
+	for _, path := range paths {
+		name := filepath.Base(path)
+		name = name[:len(name)-5]
 		t.Run(name, func(t *testing.T) {
-			got, err := Parse(edited(t, doc, edit), nil)
+			v := loadVector(t, name)
+			a, err := executeVector(t, v)
+			if want := v.Expected.Error; want != nil {
+				require.Error(t, err)
+				var diagnostic *template.Error
+				require.ErrorAs(t, err, &diagnostic)
+				require.Equal(t, want.Stage, diagnostic.Stage)
+				require.Equal(t, want.Code, diagnostic.Code)
+				return
+			}
 			require.NoError(t, err)
-			require.Equal(t, base.ID(), got.ID())
+			checkAction(t, v, a)
+			// The compatibility API must produce the same complete PSBT.
+			raw := map[string][]byte{}
+			for id, doc := range v.Artifacts {
+				raw[id] = doc
+			}
+			compiled, err := template.Parse(v.document(), raw)
+			require.NoError(t, err)
+			b, r := v.bindings(t), v.request(t)
+			instance, err := compiled.Instantiate(
+				template.Context{
+					Keys:      b.Keys,
+					Variables: b.Variables,
+					Decrypt:   r.Runtime.Decrypt,
+					Sources:   r.Sources,
+				},
+			)
+			require.NoError(t, err)
+			legacy, err := instance.Build(r.Sources, r.Fee)
+			require.NoError(t, err)
+			checkAction(t, v, legacy)
 		})
 	}
-	changed, err := Parse(edited(t, doc, func(m map[string]any) {
-		m["fees"].(map[string]any)["max"] = 1001
-	}), nil)
+}
+
+func TestBindingsOwnValuesAndRebuildFromSources(t *testing.T) {
+	v := loadVector(t, "renew-fee")
+	d, compiled := compileVector(t, v)
+	canonical := d.Canonical()
+	canonical[0] = '!'
+	require.Equal(t, unhex(t, v.Expected.Canonical), d.Canonical())
+	ids := d.ArtifactIDs()
+	ids[0] = "changed"
+	require.NotEqual(t, ids, d.ArtifactIDs())
+	bindings := v.bindings(t)
+	bound, err := compiled.Bind(bindings)
 	require.NoError(t, err)
-	require.NotEqual(t, base.ID(), changed.ID())
+	for _, value := range bindings.Variables {
+		clear(value)
+	}
+	*bindings.Keys.Server = *bindings.Keys.Cosigner
+	req := v.request(t)
+	a, err := bound.Build(req)
+	require.NoError(t, err)
+	checkAction(t, v, a)
+	// Different sources cannot inherit a previous build's value or outpoint.
+	req.Sources[0].Amount = 200000
+	req.Sources[0].Tx.TxOut[req.Sources[0].Outpoint.Index].Value = 200000
+	req.Sources[0].Outpoint.Hash = req.Sources[0].Tx.TxHash()
+	b, err := bound.Build(req)
+	require.NoError(t, err)
+	require.EqualValues(t, 199800, b.Tx.UnsignedTx.TxOut[0].Value)
+	require.NotEqual(
+		t,
+		a.Tx.UnsignedTx.TxIn[0].PreviousOutPoint,
+		b.Tx.UnsignedTx.TxIn[0].PreviousOutPoint,
+	)
+	require.EqualValues(t, 99800, a.Tx.UnsignedTx.TxOut[0].Value)
+	// Mutating a returned result cannot affect the bound template.
+	a.Tx.UnsignedTx.TxOut[0].PkScript[0] = 0
+	again, err := bound.Build(v.request(t))
+	require.NoError(t, err)
+	checkAction(t, v, again)
 }
 
-func TestParseRejects(t *testing.T) {
-	doc := delegateArgument(t)
-	in := func(m map[string]any) map[string]any { return m["inputs"].([]any)[0].(map[string]any) }
-	out := func(m map[string]any) map[string]any { return m["outputs"].([]any)[0].(map[string]any) }
-	for name, edit := range map[string]func(map[string]any){
-		"format":                  func(m map[string]any) { m["format"] = "template/v2" },
-		"type":                    func(m map[string]any) { m["type"] = "batch" },
-		"unknown field":           func(m map[string]any) { m["extra"] = 1 },
-		"field in another case":   func(m map[string]any) { m["Fees"] = m["fees"] },
-		"no input":                func(m map[string]any) { m["inputs"] = []any{} },
-		"bad name":                func(m map[string]any) { in(m)["name"] = "Funds" },
-		"unknown function":        func(m map[string]any) { in(m)["spend"] = map[string]any{"function": "nope", "leaf": "release"} },
-		"unknown leaf":            func(m map[string]any) { in(m)["spend"] = map[string]any{"function": "release", "leaf": "nope"} },
-		"missing argument":        func(m map[string]any) { in(m)["contract"].(map[string]any)["arguments"] = map[string]any{} },
-		"extra argument":          func(m map[string]any) { in(m)["contract"].(map[string]any)["arguments"].(map[string]any)["x"] = "00" },
-		"offchain input onchain":  func(m map[string]any) { in(m)["type"] = "offchain" },
-		"expiry schedule onchain": func(m map[string]any) { in(m)["schedule"] = map[string]any{"before_expiry_seconds": 10} },
-		"index gap":               func(m map[string]any) { out(m)["index"] = 1 },
-		"value from unknown":      func(m map[string]any) { out(m)["value"] = map[string]any{"from": "nope"} },
-		"no remainder output":     func(m map[string]any) { out(m)["value"] = map[string]any{"from": "funds", "amount": 5} },
-		"fee from unknown":        func(m map[string]any) { m["fees"] = map[string]any{"from": "nope", "max": 1} },
-		"undeclared variable":     func(m map[string]any) { out(m)["locking"] = "5120<receiver>" },
-		"rule on reserved type": func(m map[string]any) {
-			m["packets"] = map[string]any{"output_index": 1, "rules": []any{map[string]any{"type": 5, "action": "drop", "from": "funds"}}}
-		},
-		"assets onchain":       func(m map[string]any) { out(m)["assets"] = []any{map[string]any{"from": "funds"}} },
-		"expression bad token": func(m map[string]any) { out(m)["locking"] = "$(1 a>)" },
-		"expression tab":       func(m map[string]any) { out(m)["locking"] = "$(1\tOP_1ADD)" },
-		"expression opcode":    func(m map[string]any) { out(m)["locking"] = "$(OP_NOPE)" },
-		"fees offchain":        func(m map[string]any) { m["type"] = "offchain" },
-		"extra witness": func(m map[string]any) {
-			in(m)["spend"].(map[string]any)["witness"] = map[string]any{"delegateSig": "00"}
-		},
-		"spend argument": func(m map[string]any) { in(m)["spend"].(map[string]any)["arguments"] = []any{"00"} },
-		"sequence":       func(m map[string]any) { in(m)["sequence"] = 4294967295 },
-		"integer for pubkey": func(m map[string]any) {
-			in(m)["contract"].(map[string]any)["arguments"].(map[string]any)["delegate"] = 5
-		},
-		"invalid pubkey literal": func(m map[string]any) {
-			in(m)["contract"].(map[string]any)["arguments"].(map[string]any)["delegate"] = "02" + strings.Repeat("ff", 32)
-		},
-		"forbidden expression opcode": func(m map[string]any) {
-			in(m)["contract"].(map[string]any)["arguments"].(map[string]any)["delegate"] = "$(0 OP_INSPECTOUTPUTVALUE)"
-		},
-		"variable secret clash": func(m map[string]any) {
-			m["variables"] = map[string]any{"x": "bytes"}
-			m["secrets"] = map[string]any{"x": map[string]any{"type": "bytes32", "from": "funds", "ciphertext": "<x>"}}
-		},
-		"ciphertext names a secret": func(m map[string]any) {
-			m["secrets"] = map[string]any{"s": map[string]any{"type": "bytes32", "from": "funds", "ciphertext": "<s>"}}
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := Parse(edited(t, doc, edit), nil)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrInvalidTemplate) || errors.Is(err, ErrInvalidArtifact), err)
+func TestBuildSealedValuesAreLocalAndOpenedOnce(t *testing.T) {
+	v := loadVector(t, "vhtlc-claim")
+	_, compiled := compileVector(t, v)
+	bound, err := compiled.Bind(v.bindings(t))
+	require.NoError(t, err)
+	req := v.request(t)
+	original := req.Runtime.Decrypt
+	calls := atomic.Int32{}
+	req.Runtime.Decrypt = func(ct []byte) ([]byte, error) { calls.Add(1); return original(ct) }
+	for range 2 {
+		a, err := bound.Build(req)
+		require.NoError(t, err)
+		checkAction(t, v, a)
+	}
+	require.EqualValues(
+		t,
+		2,
+		calls.Load(),
+		"each build decrypts once, never caches between requests",
+	)
+	req.Runtime.Decrypt = func([]byte) ([]byte, error) { return nil, errors.New("refused") }
+	_, err = bound.Build(req)
+	require.ErrorIs(t, err, template.ErrIneligible)
+}
+
+func TestConcurrentBuildsAndCompiles(t *testing.T) {
+	v := loadVector(t, "counter")
+	d, compiled := compileVector(t, v)
+	bound, err := compiled.Bind(v.bindings(t))
+	require.NoError(t, err)
+	req := v.request(t)
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			c, err := template.Compile(d, nil)
+			if !assertNoError(t, err) {
+				return
+			}
+			if c.ID() != compiled.ID() {
+				t.Error("ID changed")
+			}
+			a, err := bound.Build(req)
+			if !assertNoError(t, err) {
+				return
+			}
+			var tx bytes.Buffer
+			if !assertNoError(t, a.Tx.UnsignedTx.Serialize(&tx)) {
+				return
+			}
+			if !bytes.Equal(unhex(t, v.Expected.UnsignedTx), tx.Bytes()) {
+				t.Error("transaction changed")
+			}
 		})
 	}
-	_, err := Parse([]byte(strings.Replace(string(fixture(t, "minimal.json")), `"type": "onchain",`, `"type": "onchain", "type": "onchain",`, 1)), nil)
-	require.ErrorIs(t, err, ErrInvalidTemplate, "duplicate key")
+	wg.Wait()
 }
 
-// a program reference is a contract argument and nothing else
-func TestProgramOnlyInContractArguments(t *testing.T) {
-	doc := delegateArgument(t)
-	out := func(m map[string]any) map[string]any { return m["outputs"].([]any)[0].(map[string]any) }
-	for name, edit := range map[string]func(map[string]any){
-		"secret ciphertext": func(m map[string]any) {
-			m["secrets"] = map[string]any{"s": map[string]any{"type": "bytes32", "from": "funds", "ciphertext": map[string]any{"program": "payment"}}}
-		},
-		"output amount": func(m map[string]any) {
-			out(m)["value"] = map[string]any{"from": "funds", "amount": map[string]any{"program": "payment"}}
-		},
-		"rule data": func(m map[string]any) {
-			m["packets"] = map[string]any{"output_index": 1, "rules": []any{map[string]any{"type": 2, "action": "emit", "from": "funds", "data": map[string]any{"program": "payment"}}}}
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := Parse(edited(t, doc, edit), nil)
-			require.ErrorIs(t, err, ErrInvalidTemplate)
-		})
+func TestExplicitInputContractDerivation(t *testing.T) {
+	v := loadVector(t, "renew-assets")
+	_, compiled := compileVector(t, v)
+	b, err := compiled.Bind(v.bindings(t))
+	require.NoError(t, err)
+	in, err := b.InputContracts(template.Runtime{})
+	require.NoError(t, err)
+	s := v.request(t).Sources[0]
+	require.Equal(t, s.Tx.TxOut[s.Outpoint.Index].PkScript, in.PkScript(0))
+	multi := loadVector(t, "counter")
+	_, compiled = compileVector(t, multi)
+	b, err = compiled.Bind(multi.bindings(t))
+	require.NoError(t, err)
+	in, err = b.InputContracts(template.Runtime{})
+	require.NoError(t, err, "every input of a delegation is watched")
+	for slot, s := range multi.request(t).Sources {
+		require.Equal(t, s.Tx.TxOut[s.Outpoint.Index].PkScript, in.PkScript(slot))
 	}
+	_, err = b.Build(template.BuildRequest{})
+	require.ErrorIs(t, err, template.ErrIneligible)
 }
 
-func TestParseIntent(t *testing.T) {
-	doc := edited(t, fixture(t, "minimal.json"), func(m map[string]any) {
-		m["type"] = "intent"
-		m["outputs"].([]any)[0].(map[string]any)["assets"] = []any{map[string]any{"from": "funds"}}
-		m["packets"] = map[string]any{
-			"output_index": 1,
-			"rules":        []any{map[string]any{"type": 2, "action": "copy", "from": "funds"}},
-			"advertise":    []any{map[string]any{"template": "self", "outputs": []any{"payment"}}},
+func TestVersionDispatchBeforeLanguageRules(t *testing.T) {
+	for _, raw := range []string{`{"format":"template/v2","new":1.5}`, `{"format":"template/v99","inputs":null}`} {
+		_, err := template.Decode([]byte(raw))
+		require.ErrorIs(t, err, template.ErrUnsupportedVersion)
+		var version *template.UnsupportedVersionError
+		require.ErrorAs(t, err, &version)
+		require.True(t, strings.HasPrefix(version.Version, "template/v"))
+	}
+	// Structural ambiguity is rejected before choosing either version.
+	_, err := template.Decode([]byte(`{"format":"template/v1","format":"template/v2"}`))
+	require.ErrorIs(t, err, template.ErrInvalidTemplate)
+	_, err = template.Compile(nil, nil)
+	require.ErrorIs(t, err, template.ErrInvalidTemplate)
+	_, err = template.Compile(&template.Document{}, nil)
+	require.ErrorIs(t, err, template.ErrInvalidTemplate)
+	supported := template.SupportedVersions()
+	supported[0] = "changed"
+	require.Equal(t, []string{template.Version1}, template.SupportedVersions())
+}
+
+func TestDecoderDiagnosticPath(t *testing.T) {
+	v := loadVector(t, "onchain")
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(v.Template, &doc))
+	doc["inputs"].([]any)[0].(map[string]any)["spend"].(map[string]any)["leaf"] = false
+	raw, err := json.Marshal(doc)
+	require.NoError(t, err)
+	_, err = template.Decode(raw)
+	var diagnostic *template.Error
+	require.ErrorAs(t, err, &diagnostic)
+	require.Equal(t, "/inputs/0/spend/leaf", diagnostic.Path)
+	require.ErrorIs(t, err, template.ErrInvalidTemplate)
+}
+
+func TestMissingKeysAndMalformedSourcesReturnErrors(t *testing.T) {
+	v := loadVector(t, "renew-fee")
+	_, compiled := compileVector(t, v)
+	bindings := v.bindings(t)
+	bindings.Keys.Server = nil
+	_, err := compiled.Bind(bindings)
+	require.ErrorIs(t, err, template.ErrUnsupported)
+	bound, err := compiled.Bind(v.bindings(t))
+	require.NoError(t, err)
+	for _, which := range []string{"input", "output"} {
+		r := v.request(t)
+		if which == "input" {
+			r.Sources[0].Tx.TxIn[0] = nil
+		} else {
+			r.Sources[0].Tx.TxOut[0] = nil
 		}
-	})
-	tmpl, err := Parse(doc, nil)
-	require.NoError(t, err)
-	require.Equal(t, Intent, tmpl.Type())
-	require.Equal(t, []Slot{{Name: "funds"}}, tmpl.Inputs())
-
-	pk := func(m map[string]any) map[string]any { return m["packets"].(map[string]any) }
-	rule := func(typ int, action string) map[string]any {
-		return map[string]any{"type": typ, "action": action, "from": "funds"}
+		_, err = bound.Build(r)
+		require.ErrorIs(t, err, template.ErrIneligible)
 	}
-	for name, edit := range map[string]func(map[string]any){
-		"copy and drop": func(m map[string]any) { pk(m)["rules"] = append(pk(m)["rules"].([]any), rule(2, "drop")) },
-		"two emits": func(m map[string]any) {
-			a, b := rule(3, "emit"), rule(3, "emit")
-			a["data"], b["data"] = "00", "01"
-			pk(m)["rules"] = []any{a, b}
-		},
-		"emit without data": func(m map[string]any) { pk(m)["rules"] = []any{rule(3, "emit")} },
-		"copy with data": func(m map[string]any) {
-			r := rule(3, "copy")
-			r["data"] = "00"
-			pk(m)["rules"] = []any{r}
-		},
-		"unmatched": func(m map[string]any) { pk(m)["unmatched"] = "keep" },
-		"extension before offchain": func(m map[string]any) {
-			pk(m)["output_index"] = 0
-			m["outputs"].([]any)[0].(map[string]any)["index"] = 1
-		},
-		"self with variables": func(m map[string]any) { m["variables"] = map[string]any{"x": "int"} },
-		"output advertised twice": func(m map[string]any) {
-			pk(m)["advertise"] = append(pk(m)["advertise"].([]any), map[string]any{"template": "self", "outputs": []any{"payment"}})
-		},
-		"self count": func(m map[string]any) {
-			pk(m)["advertise"] = []any{map[string]any{"template": "self", "outputs": []any{}}}
-		},
-		"bad target": func(m map[string]any) {
-			pk(m)["advertise"] = []any{map[string]any{"template": "SELF", "outputs": []any{"payment"}}}
-		},
-		"confirmations offchain": func(m map[string]any) {
-			m["inputs"].([]any)[0].(map[string]any)["schedule"] = map[string]any{"min_confirmations": 1}
-		},
-		"asset id short": func(m map[string]any) {
-			m["outputs"].([]any)[0].(map[string]any)["assets"] = []any{map[string]any{"from": "funds", "asset": "00"}}
-		},
-		"two catch-alls": func(m map[string]any) {
-			m["outputs"].([]any)[0].(map[string]any)["assets"] = []any{map[string]any{"from": "funds"}, map[string]any{"from": "funds"}}
-		},
-		"copy and emit from two inputs": func(m map[string]any) {
-			twoInputs(t, m)
-			pk(m)["rules"] = []any{rule(2, "copy"), packetRule(2, "emit", "more")}
-		},
-		"two copies from two inputs": func(m map[string]any) {
-			twoInputs(t, m)
-			pk(m)["rules"] = []any{rule(2, "copy"), packetRule(2, "copy", "more")}
-		},
-		"self feeds an onchain slot from an offchain output": func(m map[string]any) {
-			m["inputs"].([]any)[0].(map[string]any)["type"] = "onchain"
-			delete(m["outputs"].([]any)[0].(map[string]any), "assets")
-		},
-		"too many rules": func(m map[string]any) {
-			rules := []any{}
-			for range 256 {
-				rules = append(rules, rule(3, "drop"))
-			}
-			pk(m)["rules"] = rules
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := Parse(edited(t, doc, edit), nil)
-			require.ErrorIs(t, err, ErrInvalidTemplate)
-		})
-	}
-
-	_, err = Parse(edited(t, doc, func(m map[string]any) {
-		twoInputs(t, m)
-		pk(m)["rules"] = []any{rule(3, "drop"), packetRule(3, "drop", "more"), packetRule(3, "emit", "more"), rule(2, "copy")}
-	}), nil)
-	require.NoError(t, err, "drops combine across inputs and with an emit")
 }
 
-func TestBindingTypes(t *testing.T) {
-	doc := fixture(t, "minimal.json")
-	// covenant gives the release function one covenant input of type typ, bound to arg.
-	covenant := func(typ string, arg any, vars map[string]any) func(map[string]any) {
-		return func(m map[string]any) {
-			in := m["inputs"].([]any)[0].(map[string]any)
-			fn := in["contract"].(map[string]any)["definition"].(map[string]any)["functions"].([]any)[0].(map[string]any)
-			fn["arkade"] = map[string]any{"inputs": []any{map[string]any{"name": "a", "type": typ}}, "asm": []any{"OP_TRUE"}}
-			in["spend"].(map[string]any)["arguments"] = []any{arg}
-			m["packets"] = map[string]any{"output_index": 1}
-			if vars != nil {
-				m["variables"] = vars
+func FuzzDecode(f *testing.F) {
+	v := loadVector(f, "onchain")
+	f.Add(v.document())
+	f.Add([]byte(`{"format":"template/v2"}`))
+	f.Fuzz(func(t *testing.T, raw []byte) {
+		d, err := template.Decode(raw)
+		if err != nil {
+			var diagnostic *template.Error
+			require.ErrorAs(t, err, &diagnostic)
+			return
+		}
+		canonical := d.Canonical()
+		again, err := template.Decode(canonical)
+		require.NoError(t, err)
+		require.Equal(t, d.ID(), again.ID())
+		require.Equal(t, canonical, again.Canonical())
+	})
+}
+
+func loadVector(t testing.TB, name string) vector {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", "vectors", "v1", name+".json"))
+	require.NoError(t, err)
+	var v vector
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	require.NoError(t, d.Decode(&v))
+	require.ErrorIs(t, d.Decode(new(any)), io.EOF)
+	require.Equal(t, "template-test/v1", v.Format)
+	require.Equal(t, name, v.Name)
+	require.NotEqual(
+		t,
+		v.Template == nil,
+		v.TemplateText == nil,
+		"exactly one document representation",
+	)
+	return v
+}
+
+func (v vector) document() []byte {
+	if v.TemplateText != nil {
+		return []byte(*v.TemplateText)
+	}
+	return v.Template
+}
+
+func unhex(t testing.TB, s string) []byte {
+	t.Helper()
+	b, err := hex.DecodeString(s)
+	require.NoError(t, err)
+	return b
+}
+
+func decimal(t testing.TB, s string) uint64 {
+	t.Helper()
+	n, err := strconv.ParseUint(s, 10, 64)
+	require.NoError(t, err)
+	require.Equal(t, strconv.FormatUint(n, 10), s)
+	return n
+}
+
+func (v vector) bindings(t testing.TB) template.Bindings {
+	t.Helper()
+	key := func(h string) *btcec.PublicKey {
+		if h == "" {
+			return nil
+		}
+		k, err := btcec.ParsePubKey(unhex(t, h))
+		require.NoError(t, err)
+		return k
+	}
+	b := template.Bindings{
+		Keys: template.Keys{
+			Server:   key(v.Bindings.Keys.Server),
+			Emulator: key(v.Bindings.Keys.Emulator),
+			Cosigner: key(v.Bindings.Keys.Cosigner),
+		},
+		Variables: map[string][]byte{},
+	}
+	for n, s := range v.Bindings.Variables {
+		b.Variables[n] = unhex(t, s)
+	}
+	return b
+}
+
+func (v vector) request(t testing.TB) template.BuildRequest {
+	t.Helper()
+	r := template.BuildRequest{}
+	for _, s := range v.Request.Sources {
+		tx := wire.NewMsgTx(2)
+		reader := bytes.NewReader(unhex(t, s.Tx))
+		require.NoError(t, tx.Deserialize(reader))
+		require.Zero(t, reader.Len())
+		op, err := wire.NewOutPointFromString(fmt.Sprintf("%s:%d", s.TxID, s.Vout))
+		require.NoError(t, err)
+		expiry, err := time.Parse(time.RFC3339, s.Expiry)
+		require.NoError(t, err)
+		birth, err := time.Parse(time.RFC3339, s.CreatedAt)
+		require.NoError(t, err)
+		src := &template.Source{
+			Tx:        tx,
+			Outpoint:  *op,
+			Amount:    decimal(t, s.Amount),
+			Expiry:    expiry,
+			CreatedAt: birth,
+			Confirms:  s.Confirms,
+			Swept:     s.Swept,
+		}
+		for _, a := range s.Assets {
+			src.Assets = append(
+				src.Assets,
+				template.Asset{ID: unhex(t, a.ID), Amount: decimal(t, a.Amount)},
+			)
+		}
+		r.Sources = append(r.Sources, src)
+	}
+	f := v.Request.Fee
+	r.Fee = template.Fee{
+		Dust: decimal(t, f.Dust),
+		Intent: arkfee.Config{
+			IntentOffchainInputProgram:  f.Intent.OffchainInput,
+			IntentOnchainInputProgram:   f.Intent.OnchainInput,
+			IntentOffchainOutputProgram: f.Intent.OffchainOutput,
+			IntentOnchainOutputProgram:  f.Intent.OnchainOutput,
+		},
+	}
+	if f.Rate != nil {
+		rate := decimal(t, *f.Rate)
+		r.Fee.Onchain = func(n int) uint64 {
+			require.GreaterOrEqual(t, n, 0)
+			if n > 0 {
+				require.LessOrEqual(t, rate, uint64(math.MaxUint64)/uint64(n))
 			}
+			return uint64(n) * rate
 		}
 	}
-	for name, tc := range map[string]struct {
-		edit func(map[string]any)
-		ok   bool
-	}{
-		"lone name of the field's type": {covenant("pubkey", "<k>", map[string]any{"k": "pubkey"}), true},
-		"pubkey variable in bytes":      {covenant("bytes", "<k>", map[string]any{"k": "pubkey"}), true},
-		"integer for int":               {covenant("int", 5, nil), true},
-		"expression is not typed here":  {covenant("bytes32", "$(<k> OP_SHA256)", map[string]any{"k": "pubkey"}), true},
-		"pubkey variable in bytes32":    {covenant("bytes32", "<k>", map[string]any{"k": "pubkey"}), false},
-		"integer for pubkey":            {covenant("pubkey", 5, nil), false},
-		"boolean for int":               {covenant("int", true, nil), false},
-		"non-minimal int literal":       {covenant("int", "0100", nil), false},
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := Parse(edited(t, doc, tc.edit), nil)
-			if tc.ok {
-				require.NoError(t, err)
-			} else {
-				require.ErrorIs(t, err, ErrInvalidTemplate)
-			}
-		})
-	}
-}
-
-func TestVHTLC(t *testing.T) {
-	doc := []byte(vhtlc)
-	_, err := Parse(doc, nil)
-	require.NoError(t, err)
-
-	args := func(m map[string]any) map[string]any {
-		return m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)["arguments"].(map[string]any)
-	}
-	for name, edit := range map[string]func(map[string]any){
-		"short bytes32":              func(m map[string]any) { args(m)["receiverProgram"] = strings.Repeat("00", 31) },
-		"pubkey variable in bytes32": func(m map[string]any) { args(m)["receiverProgram"] = "<sender>" },
-		"witness of the wrong type": func(m map[string]any) {
-			m["inputs"].([]any)[0].(map[string]any)["spend"].(map[string]any)["witness"] = map[string]any{"preimage": "<sender>"}
-		},
-		"asset amount not positive": func(m map[string]any) {
-			out := m["outputs"].([]any)[0].(map[string]any)
-			out["assets"] = append(out["assets"].([]any), map[string]any{"from": "htlc", "asset": strings.Repeat("ab", 34), "amount": "00"})
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := Parse(edited(t, doc, edit), nil)
-			require.ErrorIs(t, err, ErrInvalidTemplate)
-		})
-	}
-}
-
-func TestSecretsOnlyHashedInScripts(t *testing.T) {
-	doc := fixture(t, "vhtlc_claim.json")
-	in := func(m map[string]any) map[string]any { return m["inputs"].([]any)[0].(map[string]any) }
-	arg := func(name string, v any) func(map[string]any) {
-		return func(m map[string]any) { in(m)["contract"].(map[string]any)["arguments"].(map[string]any)[name] = v }
-	}
-	// fnArg gives nonInteractiveClaim one covenant input of type bytes32, bound to v.
-	fnArg := func(v any) func(map[string]any) {
-		return func(m map[string]any) {
-			fns := in(m)["contract"].(map[string]any)["definition"].(map[string]any)["functions"].([]any)
-			for _, f := range fns {
-				if f := f.(map[string]any); f["name"] == "nonInteractiveClaim" {
-					f["arkade"].(map[string]any)["inputs"] = []any{map[string]any{"name": "a", "type": "bytes32"}}
-				}
-			}
-			in(m)["spend"].(map[string]any)["arguments"] = []any{v}
+	if v.Request.Decryption != nil {
+		responses := map[string][]byte{}
+		for ct, plain := range v.Request.Decryption {
+			responses[ct] = unhex(t, plain)
 		}
-	}
-	locking := func(v any) func(map[string]any) {
-		return func(m map[string]any) { m["outputs"].([]any)[0].(map[string]any)["locking"] = v }
-	}
-	for name, tc := range map[string]struct {
-		edit func(map[string]any)
-		ok   bool
-	}{
-		"bare secret in a constructor argument":   {arg("receiverProgram", "<preimage>"), false},
-		"secret among literals":                   {arg("preimageHash", "<preimage>00"), false},
-		"unhashed expression":                     {arg("receiverProgram", "$(<preimage> OP_SIZE OP_DROP)"), false},
-		"hash before the end":                     {arg("receiverProgram", "$(<preimage> OP_SHA256 OP_DROP <preimage>)"), false},
-		"sha256 constructor argument":             {arg("receiverProgram", "$(<preimage> OP_SHA256)"), true},
-		"hash256 constructor argument":            {arg("receiverProgram", "$(<preimage> OP_HASH256)"), true},
-		"ripemd160 constructor argument":          {arg("preimageHash", "$(<preimage> OP_SHA256 OP_RIPEMD160)"), true},
-		"function argument, a witness item":       {fnArg("<preimage>"), true},
-		"locking script, only in the transaction": {locking("5120<preimage>"), true},
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := Parse(edited(t, doc, tc.edit), nil)
-			if tc.ok {
-				require.NoError(t, err)
-			} else {
-				require.ErrorIs(t, err, ErrInvalidTemplate)
-				require.ErrorContains(t, err, "must be hashed")
+		r.Runtime.Decrypt = func(ct []byte) ([]byte, error) {
+			p, ok := responses[hex.EncodeToString(ct)]
+			if !ok {
+				return nil, errors.New("fixture has no decryption response")
 			}
-		})
-	}
-}
-
-func TestArtifactReference(t *testing.T) {
-	doc := fixture(t, "minimal.json")
-	var m map[string]any
-	require.NoError(t, json.Unmarshal(doc, &m))
-	def := m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)["definition"]
-	raw, err := json.Marshal(def)
-	require.NoError(t, err)
-	artifact, err := ParseArtifact(raw)
-	require.NoError(t, err)
-
-	referenced := edited(t, doc, func(m map[string]any) {
-		m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)["definition"] = map[string]any{"artifact": artifact.ID}
-	})
-	tmpl, err := Parse(referenced, map[string][]byte{artifact.ID: raw})
-	require.NoError(t, err)
-	require.Equal(t, []string{artifact.ID}, tmpl.Artifacts())
-	inline, err := Parse(doc, nil)
-	require.NoError(t, err)
-	require.NotEqual(t, inline.ID(), tmpl.ID(), "the id hashes the template as written")
-
-	_, err = Parse(referenced, nil)
-	require.ErrorIs(t, err, ErrInvalidTemplate, "artifact not provided")
-	other := []byte(strings.Replace(string(raw), "Release", "Other", 1))
-	_, err = Parse(referenced, map[string][]byte{artifact.ID: other})
-	require.ErrorIs(t, err, ErrInvalidTemplate, "the stored document does not hash to the id")
-
-	ids, err := ArtifactIDs(referenced)
-	require.NoError(t, err)
-	require.Equal(t, []string{artifact.ID}, ids)
-	ids, err = ArtifactIDs(doc)
-	require.NoError(t, err)
-	require.Empty(t, ids)
-	_, err = ArtifactIDs([]byte("nope"))
-	require.ErrorIs(t, err, ErrInvalidTemplate)
-}
-
-func TestPushOpcodesRefused(t *testing.T) {
-	doc := fixture(t, "minimal.json")
-	out := func(m map[string]any) map[string]any { return m["outputs"].([]any)[0].(map[string]any) }
-	_, err := Parse(edited(t, doc, func(m map[string]any) {
-		out(m)["locking"] = fmt.Sprintf("5120$(OP_DATA_2 0x01%02x OP_NIP)", arkade.OP_TXID)
-	}), nil)
-	require.ErrorIs(t, err, ErrInvalidTemplate, "locking expression")
-	_, err = Parse(edited(t, doc, func(m map[string]any) {
-		def := m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)["definition"].(map[string]any)
-		leafOf(def, 0)["asm"] = []any{"OP_DATA_1", "<delegate>", "OP_CHECKSIG"}
-	}), nil)
-	require.ErrorIs(t, err, ErrInvalidArtifact, "leaf")
-}
-
-func TestParseRefusesUnbuildable(t *testing.T) {
-	_, err := Parse(edited(t, fixture(t, "renew.json"), func(m map[string]any) { delete(m, "packets") }), nil)
-	require.ErrorIs(t, err, ErrInvalidTemplate, "a covenant without packets")
-
-	_, err = Parse(edited(t, mixedPaymentDoc(t, false), func(m map[string]any) {
-		in := m["inputs"].([]any)[0].(map[string]any)
-		sp := in["spend"].(map[string]any)
-		sp["function"], sp["leaf"] = "spend", "spend"
-		def := in["contract"].(map[string]any)["definition"].(map[string]any)
-		delete(leafOf(def, 0)["witness"].([]any)[1].(map[string]any), "injected")
-	}), nil)
-	require.ErrorIs(t, err, ErrInvalidTemplate, "a signature nobody injects")
-
-	adverts := func(n int) []byte {
-		return edited(t, mixedPaymentDoc(t, false), func(m map[string]any) {
-			outs := m["outputs"].([]any)
-			outs[1].(map[string]any)["index"] = n + 2
-			var ads []any
-			for k := range n {
-				name := fmt.Sprintf("o%d", k)
-				outs = append(outs, map[string]any{"name": name, "index": 1 + k, "value": map[string]any{"from": "funds", "amount": 1000},
-					"locking": "5120f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"})
-				ads = append(ads, map[string]any{"template": strings.Repeat("ab", 32), "outputs": []any{name}})
-			}
-			m["outputs"] = outs
-			m["packets"] = map[string]any{"output_index": n + 1, "advertise": ads}
-		})
-	}
-	_, err = Parse(adverts(14), nil)
-	require.NoError(t, err, "14 records fit")
-	_, err = Parse(adverts(15), nil)
-	require.ErrorIs(t, err, ErrInvalidTemplate, "15 records do not fit")
-}
-
-func fixture(t testing.TB, name string) []byte {
-	t.Helper()
-	doc, err := os.ReadFile(filepath.Join("testdata", name))
-	if errors.Is(err, fs.ErrNotExist) {
-		doc, err = os.ReadFile(filepath.Join("..", "..", "templates", name))
-	}
-	require.NoError(t, err)
-	return doc
-}
-
-// delegateArgument is minimal.json with the key bound as a constructor argument.
-func delegateArgument(t *testing.T) []byte {
-	t.Helper()
-	return edited(t, fixture(t, "minimal.json"), func(m map[string]any) {
-		c := m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)
-		def := c["definition"].(map[string]any)
-		def["constructorInputs"] = []any{map[string]any{"name": "delegate", "type": "pubkey"}}
-		leafOf(def, 0)["asm"] = []any{"<delegate>", "OP_CHECKSIG"}
-		c["arguments"] = map[string]any{"delegate": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"}
-	})
-}
-
-func edited(t *testing.T, doc []byte, edit func(map[string]any)) []byte {
-	t.Helper()
-	var m map[string]any
-	require.NoError(t, json.Unmarshal(doc, &m))
-	edit(m)
-	out, err := json.Marshal(m)
-	require.NoError(t, err)
-	return out
-}
-
-// twoInputs adds an input "more", its remainder output and a second advertised slot.
-func twoInputs(t *testing.T, m map[string]any) {
-	t.Helper()
-	raw, err := json.Marshal(m["inputs"].([]any)[0])
-	require.NoError(t, err)
-	var more map[string]any
-	require.NoError(t, json.Unmarshal(raw, &more))
-	more["name"] = "more"
-	m["inputs"] = append(m["inputs"].([]any), more)
-	m["outputs"] = append(m["outputs"].([]any), map[string]any{
-		"name": "more_out", "index": 1, "value": map[string]any{"from": "more"}, "locking": map[string]any{"from": "more"},
-	})
-	p := m["packets"].(map[string]any)
-	p["output_index"] = 2
-	p["advertise"] = []any{map[string]any{"template": "self", "outputs": []any{"payment", "more_out"}}}
-}
-
-func packetRule(typ int, action, from string) map[string]any {
-	r := map[string]any{"type": typ, "action": action, "from": from}
-	if action == "emit" {
-		r["data"] = "00"
+			return bytes.Clone(p), nil
+		}
 	}
 	return r
 }
 
-// vhtlc is the protocol's non-interactive VHTLC claim example.
-const vhtlc = `
-{
-  "format": "template/v1",
-  "type": "offchain",
-  "variables": {
-    "sender": "pubkey",
-    "receiver": "pubkey",
-    "refund_locktime": "int",
-    "unilateral_claim_delay": "int",
-    "unilateral_refund_delay": "int",
-    "unilateral_refund_without_receiver_delay": "int",
-    "receiver_program": "bytes32",
-    "sender_program": "bytes32",
-    "ciphertext": "bytes"
-  },
-  "secrets": {"preimage": {"type": "bytes32", "from": "htlc", "ciphertext": "<ciphertext>"}},
-  "inputs": [
-    {
-      "name": "htlc",
-      "contract": {
-        "definition": {
-          "contractName": "VHTLC",
-          "constructorInputs": [
-            {"name": "sender", "type": "pubkey"},
-            {"name": "receiver", "type": "pubkey"},
-            {"name": "preimageHash", "type": "bytes20"},
-            {"name": "refundLocktime", "type": "int"},
-            {"name": "unilateralClaimDelay", "type": "int"},
-            {"name": "unilateralRefundDelay", "type": "int"},
-            {"name": "unilateralRefundWithoutReceiverDelay", "type": "int"},
-            {"name": "receiverProgram", "type": "bytes32"},
-            {"name": "senderProgram", "type": "bytes32"}
-          ],
-          "structs": [],
-          "functions": [
-            {
-              "name": "claim",
-              "leaves": [
-                {
-                  "name": "claim",
-                  "asm": [
-                    "OP_SIZE", "32", "OP_EQUALVERIFY", "OP_HASH160", "<preimageHash>", "OP_EQUAL", "OP_VERIFY",
-                    "<receiver>", "OP_CHECKSIGVERIFY", "<SERVER_KEY>", "OP_CHECKSIG"
-                  ],
-                  "witness": [
-                    {"name": "preimage", "type": "bytes32", "encoding": "raw"},
-                    {"name": "receiverSig", "type": "signature", "encoding": "schnorr-64"},
-                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "refund",
-              "leaves": [
-                {
-                  "name": "refund",
-                  "asm": [
-                    "<sender>", "OP_CHECKSIGVERIFY", "<receiver>", "OP_CHECKSIGVERIFY", "<SERVER_KEY>",
-                    "OP_CHECKSIG"
-                  ],
-                  "witness": [
-                    {"name": "senderSig", "type": "signature", "encoding": "schnorr-64"},
-                    {"name": "receiverSig", "type": "signature", "encoding": "schnorr-64"},
-                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "refundWithoutReceiver",
-              "leaves": [
-                {
-                  "name": "refundWithoutReceiver",
-                  "asm": [
-                    "<refundLocktime>", "OP_CHECKLOCKTIMEVERIFY", "OP_DROP", "<sender>", "OP_CHECKSIGVERIFY",
-                    "<SERVER_KEY>", "OP_CHECKSIG"
-                  ],
-                  "witness": [
-                    {"name": "senderSig", "type": "signature", "encoding": "schnorr-64"},
-                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "unilateralClaim",
-              "leaves": [
-                {
-                  "name": "unilateralClaim",
-                  "asm": [
-                    "OP_SIZE", "32", "OP_EQUALVERIFY", "OP_HASH160", "<preimageHash>", "OP_EQUAL", "OP_VERIFY",
-                    "<unilateralClaimDelay>", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<receiver>", "OP_CHECKSIG"
-                  ],
-                  "witness": [
-                    {"name": "preimage", "type": "bytes32", "encoding": "raw"},
-                    {"name": "receiverSig", "type": "signature", "encoding": "schnorr-64"}
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "unilateralRefund",
-              "leaves": [
-                {
-                  "name": "unilateralRefund",
-                  "asm": [
-                    "<unilateralRefundDelay>", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<sender>",
-                    "OP_CHECKSIGVERIFY", "<receiver>", "OP_CHECKSIG"
-                  ],
-                  "witness": [
-                    {"name": "senderSig", "type": "signature", "encoding": "schnorr-64"},
-                    {"name": "receiverSig", "type": "signature", "encoding": "schnorr-64"}
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "unilateralRefundWithoutReceiver",
-              "leaves": [
-                {
-                  "name": "unilateralRefundWithoutReceiver",
-                  "asm": [
-                    "<unilateralRefundWithoutReceiverDelay>", "OP_CHECKSEQUENCEVERIFY", "OP_DROP", "<sender>",
-                    "OP_CHECKSIG"
-                  ],
-                  "witness": [{"name": "senderSig", "type": "signature", "encoding": "schnorr-64"}]
-                }
-              ]
-            },
-            {
-              "name": "nonInteractiveClaim",
-              "arkade": {
-                "inputs": [],
-                "asm": [
-                  "OP_PUSHCURRENTINPUTINDEX", "OP_DUP", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "1", "OP_EQUALVERIFY",
-                  "<receiverProgram>", "OP_EQUALVERIFY", "OP_INSPECTOUTPUTVALUE", "OP_PUSHCURRENTINPUTINDEX",
-                  "OP_INSPECTINPUTVALUE", "OP_GREATERTHANOREQUAL"
-                ]
-              },
-              "leaves": [
-                {
-                  "name": "nonInteractiveClaim",
-                  "asm": [
-                    "OP_SIZE", "32", "OP_EQUALVERIFY", "OP_HASH160", "<preimageHash>", "OP_EQUAL", "OP_VERIFY",
-                    "<SERVER_KEY>", "OP_CHECKSIGVERIFY", "<EMULATOR_KEY:nonInteractiveClaim>", "OP_CHECKSIG"
-                  ],
-                  "witness": [
-                    {"name": "preimage", "type": "bytes32", "encoding": "raw"},
-                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
-                    {"name": "emulatorSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "nonInteractiveRefund",
-              "arkade": {
-                "inputs": [],
-                "asm": [
-                  "OP_PUSHCURRENTINPUTINDEX", "OP_DUP", "OP_INSPECTOUTPUTSCRIPTPUBKEY", "1", "OP_EQUALVERIFY",
-                  "<senderProgram>", "OP_EQUALVERIFY", "OP_INSPECTOUTPUTVALUE", "OP_PUSHCURRENTINPUTINDEX",
-                  "OP_INSPECTINPUTVALUE", "OP_GREATERTHANOREQUAL"
-                ]
-              },
-              "leaves": [
-                {
-                  "name": "nonInteractiveRefund",
-                  "asm": [
-                    "<SERVER_KEY>", "OP_CHECKSIGVERIFY", "<receiver>", "OP_CHECKSIGVERIFY",
-                    "<EMULATOR_KEY:nonInteractiveRefund>", "OP_CHECKSIG"
-                  ],
-                  "witness": [
-                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
-                    {"name": "receiverSig", "type": "signature", "encoding": "schnorr-64"},
-                    {"name": "emulatorSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
-                  ]
-                },
-                {
-                  "name": "nonInteractiveRefundWithoutReceiver",
-                  "asm": [
-                    "<refundLocktime>", "OP_CHECKLOCKTIMEVERIFY", "OP_DROP", "<SERVER_KEY>",
-                    "OP_CHECKSIGVERIFY", "<EMULATOR_KEY:nonInteractiveRefund>", "OP_CHECKSIG"
-                  ],
-                  "witness": [
-                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true},
-                    {"name": "emulatorSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        "arguments": {
-          "sender": "<sender>",
-          "receiver": "<receiver>",
-          "preimageHash": "$(<preimage> OP_HASH160)",
-          "refundLocktime": "<refund_locktime>",
-          "unilateralClaimDelay": "<unilateral_claim_delay>",
-          "unilateralRefundDelay": "<unilateral_refund_delay>",
-          "unilateralRefundWithoutReceiverDelay": "<unilateral_refund_without_receiver_delay>",
-          "receiverProgram": "<receiver_program>",
-          "senderProgram": "<sender_program>"
-        }
-      },
-      "spend": {
-        "function": "nonInteractiveClaim",
-        "leaf": "nonInteractiveClaim",
-        "witness": {"preimage": "<preimage>"}
-      }
-    }
-  ],
-  "outputs": [
-    {
-      "name": "payout",
-      "index": 0,
-      "value": {"from": "htlc"},
-      "locking": "5120<receiver_program>",
-      "assets": [{"from": "htlc"}]
-    }
-  ],
-  "packets": {"output_index": 1, "unmatched": "drop"}
-}
-`
+// executeVector uses only public APIs and serialized fixture inputs. It never
 
-func TestArrayInputs(t *testing.T) {
-	withInput := func(name string) []byte {
-		return edited(t, []byte(releaseDoc), func(m map[string]any) {
-			def := m["inputs"].([]any)[0].(map[string]any)["contract"].(map[string]any)["definition"].(map[string]any)
-			for _, raw := range def["functions"].([]any) {
-				if f := raw.(map[string]any); f["name"] == name {
-					if f["arkade"] == nil {
-						f["arkade"] = map[string]any{"asm": []any{"1"}}
-					}
-					f["arkade"].(map[string]any)["inputs"] = []any{map[string]any{"name": "sigs", "type": "bytes[3]"}}
-					return
-				}
-			}
-			t.Fatalf("releaseDoc has no function %q", name)
-		})
+// constructs source contracts or calculates expected transaction data.
+
+func executeVector(t testing.TB, v vector) (*template.Action, error) {
+	t.Helper()
+	d, err := template.Decode(v.document())
+	if err != nil {
+		return nil, err
 	}
-	_, err := Parse(withInput("exit"), nil)
-	require.NoError(t, err, "an array input on a function the template does not spend")
-
-	_, err = Parse(withInput("release"), nil)
-	require.ErrorIs(t, err, ErrUnsupported)
-	require.ErrorContains(t, err, `array input "sigs"`)
+	// Parse only dependencies, exactly as an application loading a registry would.
+	artifacts := map[string]*artifact.Artifact{}
+	for _, id := range d.ArtifactIDs() {
+		if raw, ok := v.Artifacts[id]; ok {
+			a, err := artifact.ParseVersion(artifact.Version1, raw)
+			if err != nil {
+				return nil, err
+			}
+			artifacts[id] = a
+		}
+	}
+	compiled, err := template.Compile(d, artifacts)
+	if err != nil {
+		return nil, err
+	}
+	if v.Expected.Error == nil {
+		require.Equal(t, v.Expected.ID, d.ID())
+		require.Equal(t, v.Expected.SpendID, d.SpendID())
+		require.Equal(t, d.ID(), compiled.ID())
+		require.Equal(t, unhex(t, v.Expected.Canonical), d.Canonical())
+		require.Equal(t, template.Version1, compiled.Version())
+	}
+	b, err := compiled.Bind(v.bindings(t))
+	if err != nil {
+		return nil, err
+	}
+	return b.Build(v.request(t))
 }
 
-func fnOf(m map[string]any, i int) map[string]any {
-	return m["functions"].([]any)[i].(map[string]any)
+func checkAction(t testing.TB, v vector, a *template.Action) {
+	t.Helper()
+	require.NotNil(t, a)
+	var tx, packet bytes.Buffer
+	require.NoError(t, a.Tx.UnsignedTx.Serialize(&tx))
+	require.NoError(t, a.Tx.Serialize(&packet))
+	require.Equal(t, unhex(t, v.Expected.UnsignedTx), tx.Bytes())
+	require.Equal(t, decimal(t, v.Expected.Fee), a.Fee)
+	require.Equal(t, v.Expected.Extension, a.Extension)
+	require.Equal(
+		t,
+		psbtMaps(t, unhex(t, v.Expected.PSBT)),
+		psbtMaps(t, packet.Bytes()),
+		"all PSBT key/value pairs, including proprietary fields",
+	)
 }
 
-func leafOf(m map[string]any, f int) map[string]any {
-	return fnOf(m, f)["leaves"].([]any)[0].(map[string]any)
+// Map ordering is deliberately ignored; every key and value is compared. Unknown
+
+// fields are retained. Duplicate keys, trailing bytes and malformed PSBTs fail.
+
+func psbtMaps(t testing.TB, raw []byte) []map[string]string {
+	t.Helper()
+	packet, err := psbt.NewFromRawBytes(bytes.NewReader(raw), false)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(raw), 5)
+	require.Equal(t, []byte{'p', 's', 'b', 't', 0xff}, raw[:5])
+	r := bytes.NewReader(raw[5:])
+	out := make([]map[string]string, 1+len(packet.Inputs)+len(packet.Outputs))
+	for i := range out {
+		out[i] = map[string]string{}
+		for {
+			key, err := wire.ReadVarBytes(r, 0, uint32(len(raw)), "PSBT key")
+			require.NoError(t, err)
+			if len(key) == 0 {
+				break
+			}
+			value, err := wire.ReadVarBytes(r, 0, uint32(len(raw)), "PSBT value")
+			require.NoError(t, err)
+			k := hex.EncodeToString(key)
+			_, duplicate := out[i][k]
+			require.False(t, duplicate, "duplicate PSBT key")
+			out[i][k] = hex.EncodeToString(value)
+		}
+	}
+	require.Zero(t, r.Len(), "trailing PSBT data")
+	return out
+}
+
+func compileVector(t testing.TB, v vector) (*template.Document, *template.Template) {
+	t.Helper()
+	d, err := template.Decode(v.document())
+	require.NoError(t, err)
+	raw := map[string][]byte{}
+	for id, a := range v.Artifacts {
+		raw[id] = a
+	}
+	arts, err := artifact.ParseSet(v.ArtifactVersion, raw)
+	require.NoError(t, err)
+	compiled, err := template.Compile(d, arts)
+	require.NoError(t, err)
+	return d, compiled
+}
+
+func assertNoError(t *testing.T, err error) bool {
+	t.Helper()
+	if err != nil {
+		t.Error(err)
+		return false
+	}
+	return true
 }

@@ -25,7 +25,10 @@ func TestFulcrumAnswers(t *testing.T) {
 	require.Positive(t, tip.Height)
 	require.False(t, tip.MedianTime.After(tip.Time))
 
-	sub, err := w.Subscribe(t.Context(), []string{"5120" + "11111111111111111111111111111111111111111111111111111111111111aa"})
+	sub, err := w.Subscribe(
+		t.Context(),
+		[]string{"5120" + "11111111111111111111111111111111111111111111111111111111111111aa"},
+	)
 	require.NoError(t, err)
 	defer sub.Stop()
 	select {

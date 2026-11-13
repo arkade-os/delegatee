@@ -25,7 +25,9 @@ import (
 
 func TestBuildOffchainClaimPaysTheReceiverThroughACheckpoint(t *testing.T) {
 	c := newClaim(t)
-	txs, err := BuildOffchain(c.inst, c.inputs, []delegation.Coin{c.coin}, c.txs, template.Fee{Dust: 330}, c.unroll)
+	txs, err := BuildOffchain(
+		c.inst, c.inputs, []delegation.Coin{c.coin}, c.txs, template.Fee{Dust: 330}, c.unroll,
+	)
 	require.NoError(t, err)
 	require.Len(t, txs, 2)
 	require.True(t, txs[0].Spends)
@@ -68,7 +70,9 @@ func TestCoinSourcesCarryTransferredAndIssuedAssets(t *testing.T) {
 	require.NoError(t, err)
 	output, err := asset.NewAssetOutput(0, 700)
 	require.NoError(t, err)
-	transfer, err := asset.NewAssetGroup(id, nil, []asset.AssetInput{*input}, []asset.AssetOutput{*output}, nil)
+	transfer, err := asset.NewAssetGroup(
+		id, nil, []asset.AssetInput{*input}, []asset.AssetOutput{*output}, nil,
+	)
 	require.NoError(t, err)
 	issuance, err := asset.NewAssetGroup(nil, nil, nil, []asset.AssetOutput{*output}, nil)
 	require.NoError(t, err)
@@ -83,7 +87,10 @@ func TestCoinSourcesCarryTransferredAndIssuedAssets(t *testing.T) {
 			c.source.AddTxOut(ext)
 			c.coin.Outpoint = c.source.TxHash().String() + ":0"
 
-			sources, err := sourcesOf([]delegation.Coin{c.coin}, map[string]*wire.MsgTx{c.source.TxHash().String(): c.source})
+			sources, err := sourcesOf(
+				[]delegation.Coin{c.coin},
+				map[string]*wire.MsgTx{c.source.TxHash().String(): c.source},
+			)
 			require.NoError(t, err)
 			want := group.AssetId
 			if want == nil {
@@ -109,15 +116,26 @@ func TestCheckTxRefusesTxNotSpendingExactlyTheWatchedCoins(t *testing.T) {
 	require.ErrorContains(t, checkTx(act.Tx, nil, c.inputs), "inputs for 0 coins")
 	other := c.coin
 	other.Outpoint = strings.Repeat("00", 32) + ":0"
-	require.ErrorContains(t, checkTx(act.Tx, []delegation.Coin{other}, c.inputs), "spends another coin")
+	require.ErrorContains(
+		t, checkTx(act.Tx, []delegation.Coin{other}, c.inputs), "spends another coin",
+	)
 	moved := c.coin
 	moved.Script = "5120" + strings.Repeat("00", 32)
-	require.ErrorContains(t, checkTx(act.Tx, []delegation.Coin{moved}, c.inputs), "witness utxo does not match")
+	require.ErrorContains(
+		t, checkTx(act.Tx, []delegation.Coin{moved}, c.inputs), "witness utxo does not match",
+	)
 	wrongInput := c.coin
 	wrongInput.Input = 1
-	require.ErrorContains(t, checkTx(act.Tx, []delegation.Coin{wrongInput}, c.inputs), "not at the script of its input")
-	pruned := []delegation.Input{{Script: c.inputs[0].Script, Tapscripts: c.inputs[0].Tapscripts[:1]}}
-	require.ErrorContains(t, checkTx(act.Tx, []delegation.Coin{c.coin}, pruned), "not in the registered tree")
+	require.ErrorContains(
+		t, checkTx(act.Tx, []delegation.Coin{wrongInput}, c.inputs),
+		"not at the script of its input",
+	)
+	pruned := []delegation.Input{
+		{Script: c.inputs[0].Script, Tapscripts: c.inputs[0].Tapscripts[:1]},
+	}
+	require.ErrorContains(
+		t, checkTx(act.Tx, []delegation.Coin{c.coin}, pruned), "not in the registered tree",
+	)
 }
 
 // claim is a VHTLC claim watch with a coin funded by a real transaction.
@@ -146,20 +164,24 @@ func newClaim(t *testing.T) claim {
 	require.NoError(t, err)
 	program := schnorr.SerializePubKey(receiver.PubKey())
 	variables := map[string][]byte{
-		"sender":                  sender.PubKey().SerializeCompressed(),
-		"receiver":                receiver.PubKey().SerializeCompressed(),
-		"refund_locktime":         binary.LittleEndian.AppendUint32(nil, uint32(now.Add(24*time.Hour).Unix())),
-		"unilateral_claim_delay":  scriptNum(1024),
-		"unilateral_refund_delay": scriptNum(1536),
+		"sender":   sender.PubKey().SerializeCompressed(),
+		"receiver": receiver.PubKey().SerializeCompressed(),
+		"refund_locktime": binary.LittleEndian.AppendUint32(
+			nil, uint32(now.Add(24*time.Hour).Unix()),
+		),
+		"unilateral_claim_delay":                   scriptNum(1024),
+		"unilateral_refund_delay":                  scriptNum(1536),
 		"unilateral_refund_without_receiver_delay": scriptNum(2048),
 		"receiver_program":                         program,
 		"sender_program":                           schnorr.SerializePubKey(sender.PubKey()),
-		"ciphertext":                               preimage,
+		"preimage":                                 preimage,
 	}
 	tmpl, err := template.Parse(fixture(t, "vhtlc_claim.json"), nil)
 	require.NoError(t, err)
 	inst, err := tmpl.Instantiate(template.Context{
-		Keys:      template.Keys{Server: server.PubKey(), Emulator: emulator.PubKey(), Cosigner: cosigner.PubKey()},
+		Keys: template.Keys{
+			Server: server.PubKey(), Emulator: emulator.PubKey(), Cosigner: cosigner.PubKey(),
+		},
 		Variables: variables,
 		Decrypt:   func(ciphertext []byte) ([]byte, error) { return ciphertext, nil },
 	})
@@ -175,14 +197,31 @@ func newClaim(t *testing.T) claim {
 	}).Script()
 	require.NoError(t, err)
 	return claim{
-		inst:   inst,
-		inputs: []delegation.Input{{Name: "htlc", Script: pkScript, Tapscripts: inst.Tapscripts(0)}},
-		coin: delegation.Coin{
-			Outpoint: source.TxHash().String() + ":0", DelegationID: 1, Script: pkScript, Amount: 10_000,
-			ExpiresAt: now.Add(time.Hour), CreatedAt: now, Due: now, Status: delegation.Present,
+		inst: inst,
+		inputs: []delegation.Input{
+			{Name: "htlc", Script: pkScript, Tapscripts: inst.Tapscripts(0)},
 		},
-		source: source, txs: map[string]*wire.MsgTx{source.TxHash().String(): source}, unroll: unroll,
-		receiver: hex.EncodeToString(program), server: server, emulator: emulator, cosigner: cosigner,
+		coin: delegation.Coin{
+			Outpoint: source.TxHash().
+				String() +
+				":0",
+			DelegationID: 1,
+			Script:       pkScript,
+			Amount:       10_000,
+			ExpiresAt:    now.Add(time.Hour),
+			CreatedAt:    now,
+			Due:          now,
+			Status:       delegation.Present,
+		},
+		source: source,
+		txs:    map[string]*wire.MsgTx{source.TxHash().String(): source},
+		unroll: unroll,
+		receiver: hex.EncodeToString(
+			program,
+		),
+		server:   server,
+		emulator: emulator,
+		cosigner: cosigner,
 	}
 }
 

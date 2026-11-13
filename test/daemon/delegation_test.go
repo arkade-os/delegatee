@@ -41,7 +41,10 @@ func TestRegisterDelegationOverREST(t *testing.T) {
 
 	addr, err := arklib.DecodeAddressV0(first.Address)
 	require.NoError(t, err)
-	require.Equal(t, "5120"+hex.EncodeToString(schnorr.SerializePubKey(addr.VtxoTapKey)), first.Inputs[0].Script)
+	require.Equal(
+		t, "5120"+hex.EncodeToString(schnorr.SerializePubKey(addr.VtxoTapKey)),
+		first.Inputs[0].Script,
+	)
 	require.Equal(t, schnorr.SerializePubKey(d.Server), schnorr.SerializePubKey(addr.Signer))
 
 	code, body := get(t, d.RestURL+"/v1/delegation?id="+first.ID)
@@ -51,12 +54,17 @@ func TestRegisterDelegationOverREST(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, string(body))
 	require.Equal(t, first, decodeDelegation(t, body))
 
-	code, body = post(t, d.RestURL+"/v1/delegation", map[string]any{"templateId": templateID, "variables": variables})
+	code, body = post(
+		t, d.RestURL+"/v1/delegation",
+		map[string]any{"templateId": templateID, "variables": variables},
+	)
 	require.Equal(t, http.StatusOK, code, string(body))
 	require.Equal(t, first.ID, decodeDelegation(t, body).ID)
 	require.Equal(t, 1, tableRows(t, d, "delegations"))
 
-	got, err := d.Client.GetDelegation(t.Context(), &executorv1.GetDelegationRequest{Address: first.Address})
+	got, err := d.Client.GetDelegation(
+		t.Context(), &executorv1.GetDelegationRequest{Address: first.Address},
+	)
 	require.NoError(t, err)
 	require.Equal(t, first.Fingerprint, got.GetDelegation().GetFingerprint())
 	code, _ = get(t, d.RestURL+"/v1/delegation?id=404")
@@ -69,14 +77,21 @@ func TestRegisterDelegationRefused(t *testing.T) {
 	d := Start(t, func(c *config.Config) { c.MaxDelegations = 1 })
 	_, templateID := registerRenewal(t, d)
 	register := func(id string, variables map[string]string, expiresAt int64) (int, []byte) {
-		return post(t, d.RestURL+"/v1/delegation", map[string]any{"templateId": id, "variables": variables, "expiresAt": expiresAt})
+		return post(
+			t, d.RestURL+"/v1/delegation",
+			map[string]any{"templateId": id, "variables": variables, "expiresAt": expiresAt},
+		)
 	}
 
-	code, body := post(t, d.AdminURL+"/v1/admin/template/"+templateID, map[string]string{"status": "disabled"})
+	code, body := post(
+		t, d.AdminURL+"/v1/admin/template/"+templateID, map[string]string{"status": "disabled"},
+	)
 	require.Equal(t, http.StatusOK, code, string(body))
 	code, body = register(templateID, renewalVariables(t), 0)
 	require.Equal(t, http.StatusPreconditionFailed, code, string(body))
-	code, body = post(t, d.AdminURL+"/v1/admin/template/"+templateID, map[string]string{"status": "active"})
+	code, body = post(
+		t, d.AdminURL+"/v1/admin/template/"+templateID, map[string]string{"status": "active"},
+	)
 	require.Equal(t, http.StatusOK, code, string(body))
 
 	two := registerFixture(t, d, "counter.json")
@@ -86,7 +101,9 @@ func TestRegisterDelegationRefused(t *testing.T) {
 	release := registerFixture(t, d, "delegate_release.json")
 	code, body = register(release, nil, 0)
 	require.Equal(t, http.StatusPreconditionFailed, code, string(body))
-	_, err := d.Client.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: release})
+	_, err := d.Client.RegisterDelegation(
+		t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: release},
+	)
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
 
 	code, body = register(templateID, renewalVariables(t), time.Now().Add(time.Hour).Unix())
@@ -102,7 +119,12 @@ func TestRegisterDelegationRefused(t *testing.T) {
 
 	code, body = register(templateID, renewalVariables(t), 0)
 	require.Equal(t, http.StatusTooManyRequests, code, string(body))
-	_, err = d.Client.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: templateID, Variables: renewalVariables(t)})
+	_, err = d.Client.RegisterDelegation(
+		t.Context(),
+		&executorv1.RegisterDelegationRequest{
+			TemplateId: templateID, Variables: renewalVariables(t),
+		},
+	)
 	require.Equal(t, codes.ResourceExhausted, status.Code(err))
 	require.Equal(t, 1, tableRows(t, d, "delegations"))
 }
@@ -132,7 +154,9 @@ func TestGetInfoOverREST(t *testing.T) {
 	code, body = get(t, d.RestURL+"/v1/info")
 	require.Equal(t, http.StatusOK, code, string(body))
 	require.NoError(t, json.Unmarshal(body, &info))
-	require.Equal(t, hex.EncodeToString(encryption.PubKey().SerializeCompressed()), info.EncryptionPubkey)
+	require.Equal(
+		t, hex.EncodeToString(encryption.PubKey().SerializeCompressed()), info.EncryptionPubkey,
+	)
 }
 
 func TestCancelThenResumeDelegation(t *testing.T) {
@@ -146,7 +170,10 @@ func TestCancelThenResumeDelegation(t *testing.T) {
 	code, body = get(t, d.RestURL+"/v1/delegation?id="+dlg.ID)
 	require.Equal(t, http.StatusOK, code, string(body))
 	require.Equal(t, "cancelled", decodeDelegation(t, body).Status)
-	code, body = post(t, d.RestURL+"/v1/delegation", map[string]any{"templateId": templateID, "variables": variables})
+	code, body = post(
+		t, d.RestURL+"/v1/delegation",
+		map[string]any{"templateId": templateID, "variables": variables},
+	)
 	require.Equal(t, http.StatusPreconditionFailed, code, string(body))
 	code, body = post(t, d.AdminURL+"/v1/admin/delegation/"+dlg.ID+"/cancel", map[string]any{})
 	require.Equal(t, http.StatusPreconditionFailed, code, string(body))
@@ -156,7 +183,10 @@ func TestCancelThenResumeDelegation(t *testing.T) {
 	code, body = get(t, d.RestURL+"/v1/delegation?id="+dlg.ID)
 	require.Equal(t, http.StatusOK, code, string(body))
 	require.Equal(t, "active", decodeDelegation(t, body).Status)
-	code, body = post(t, d.RestURL+"/v1/delegation", map[string]any{"templateId": templateID, "variables": variables})
+	code, body = post(
+		t, d.RestURL+"/v1/delegation",
+		map[string]any{"templateId": templateID, "variables": variables},
+	)
 	require.Equal(t, http.StatusOK, code, string(body))
 	require.Equal(t, dlg.ID, decodeDelegation(t, body).ID)
 	code, body = post(t, d.AdminURL+"/v1/admin/delegation/"+dlg.ID+"/resume", map[string]any{})
@@ -170,17 +200,24 @@ func TestCancelThenResumeDelegation(t *testing.T) {
 }
 
 func TestExpireAndListDelegations(t *testing.T) {
-	d := Start(t, func(c *config.Config) { c.MinDelegationExpiry, c.ExpiryInterval = 0, 100*time.Millisecond })
+	d := Start(
+		t,
+		func(c *config.Config) { c.MinDelegationExpiry, c.ExpiryInterval = 0, 100*time.Millisecond },
+	)
 	_, templateID := registerRenewal(t, d)
 	code, body := post(t, d.RestURL+"/v1/delegation", map[string]any{
-		"templateId": templateID, "variables": renewalVariables(t), "expiresAt": time.Now().Add(2 * time.Second).Unix(),
+		"templateId": templateID, "variables": renewalVariables(t),
+		"expiresAt": time.Now().Add(2 * time.Second).Unix(),
 	})
 	require.Equal(t, http.StatusOK, code, string(body))
 	expiring := decodeDelegation(t, body)
 
 	var ids []string
 	for range 4 {
-		code, body = post(t, d.RestURL+"/v1/delegation", map[string]any{"templateId": templateID, "variables": renewalVariables(t)})
+		code, body = post(
+			t, d.RestURL+"/v1/delegation",
+			map[string]any{"templateId": templateID, "variables": renewalVariables(t)},
+		)
 		require.Equal(t, http.StatusOK, code, string(body))
 		ids = append(ids, decodeDelegation(t, body).ID)
 	}
@@ -296,8 +333,12 @@ func renewalVariables(t *testing.T) map[string]string {
 	owner, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
 	return map[string]string{
-		"owner": hex.EncodeToString(owner.PubKey().SerializeCompressed()), "exit_delay": ScriptNum(1<<22 | 1),
-		"renewal_window": ScriptNum(1024), "max_fee": ScriptNum(1000),
+		"owner": hex.EncodeToString(
+			owner.PubKey().SerializeCompressed(),
+		),
+		"exit_delay":     ScriptNum(1<<22 | 1),
+		"renewal_window": ScriptNum(1024),
+		"max_fee":        ScriptNum(1000),
 	}
 }
 

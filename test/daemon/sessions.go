@@ -43,11 +43,6 @@ type boardingInput struct {
 	prevOut  *wire.TxOut
 }
 
-func (r *registered) spends(outpoint string) bool {
-	return slices.Contains(r.outpoints, outpoint) ||
-		slices.ContainsFunc(r.boardings, func(d boardingInput) bool { return d.outpoint.String() == outpoint })
-}
-
 // batch is a batch in flight: who was selected, confirmed and what they sent.
 type batch struct {
 	id        string
@@ -85,10 +80,6 @@ type sessions struct {
 	crashAtRegistration, crashAtForfeits bool   // the daemon's batch events end after the step
 }
 
-func newSessions() sessions {
-	return sessions{duration: 2 * time.Second, cap: 128, lifetime: 30 * 24 * time.Hour, events: map[int]chan ports.BatchEvent{}}
-}
-
 // WithVtxoLifetime is how long the vtxos a batch creates live.
 func WithVtxoLifetime(d time.Duration) func(*config.Config) {
 	return func(c *config.Config) {
@@ -116,7 +107,8 @@ func (a *ark) ForgetIntents() {
 	a.sessions.queue = nil
 }
 
-// SelectAtRegistration makes the stand-in start a batch with an intent before its registration returns, while on.
+// SelectAtRegistration makes the stand-in start a batch with an intent before its registration
+// returns, while on.
 func (a *ark) SelectAtRegistration(on bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -140,6 +132,204 @@ func (a *ark) RegisterIntent(_ context.Context, proof, message string) error {
 	return nil
 }
 
+func (a *ark) ConfirmRegistration(_ context.Context, id string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	b := a.sessions.cur
+	if b == nil ||
+		!slices.ContainsFunc(b.selected, func(r *registered) bool { return r.id == id }) {
+		return status.Errorf(codes.FailedPrecondition, "intent %s is not awaiting confirmation", id)
+	}
+	b.confirmed[id] = true
+	a.sessions.calls = append(a.sessions.calls, "confirm")
+	return nil
+}
+
+func (a *ark) BatchEvents(ctx context.Context) (<-chan ports.BatchEvent, func(), error) {
+	ch := make(chan ports.BatchEvent, 1024)
+	a.mu.Lock()
+	a.sessions.listeners++
+	id := a.sessions.listeners
+	a.sessions.events[id] = ch
+	a.mu.Unlock()
+	stop := func() {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		delete(a.sessions.events, id)
+	}
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
+	return ch, stop, nil
+}
+
+func (a *ark) UpdateTopics(context.Context, []string, []string) error { return nil }
+
+func (a *ark) SubmitTreeNonces(
+	_ context.Context, id, cosigner string, nonces tree.TreeNonces,
+) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	b := a.sessions.cur
+	if b == nil || b.id != id {
+		return status.Errorf(codes.FailedPrecondition, "no batch %s", id)
+	}
+	b.nonces[cosigner] = nonces
+	a.sessions.calls = append(a.sessions.calls, "nonces")
+	return nil
+}
+
+func (a *ark) SubmitTreeSignatures(
+	_ context.Context, id, cosigner string, sigs tree.TreePartialSigs,
+) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	b := a.sessions.cur
+	if b == nil || b.id != id {
+		return status.Errorf(codes.FailedPrecondition, "no batch %s", id)
+	}
+	b.sigs[cosigner] = sigs
+	a.sessions.calls = append(a.sessions.calls, "signatures")
+	return nil
+}
+
+func (a *ark) SubmitSignedForfeitTxs(
+	_ context.Context, forfeits []string, signedCommitment string,
+) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	b := a.sessions.cur
+	if b == nil {
+		return status.Error(codes.FailedPrecondition, "no batch")
+	}
+	if signedCommitment != "" {
+		commitment, err := psbt.NewFromRawBytes(strings.NewReader(signedCommitment), true)
+		if err != nil {
+			return status.Error(codes.InvalidArgument, err.Error())
+		}
+		leaves := 0
+		for i, in := range commitment.UnsignedTx.TxIn {
+			if b.boardings[in.PreviousOutPoint.String()] &&
+				len(commitment.Inputs[i].TaprootLeafScript) == 1 {
+				leaves++
+			}
+		}
+		if leaves == 0 {
+			return status.Error(
+				codes.InvalidArgument, "no boarding input of the commitment tx carries its leaf",
+			)
+		}
+		b.signed++
+	}
+	for _, raw := range forfeits {
+		ptx, err := psbt.NewFromRawBytes(strings.NewReader(raw), true)
+		if err != nil {
+			return status.Error(codes.InvalidArgument, err.Error())
+		}
+		b.forfeits[ptx.UnsignedTx.TxIn[0].PreviousOutPoint.String()]++
+	}
+	a.sessions.calls = append(a.sessions.calls, "forfeits")
+	if a.sessions.crashAtForfeits {
+		a.crashLocked()
+	}
+	return nil
+}
+
+// SlowPhases makes the stand-in wait d before it moves a batch to its next phase.
+func (a *ark) SlowPhases(d time.Duration) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.sessions.slow = d
+}
+
+func (a *ark) InBatch() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.sessions.cur != nil
+}
+
+// RegisteredCoins lists the vtxos the registered intents spend, oldest intent first.
+func (a *ark) RegisteredCoins() []string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	var out []string
+	for _, r := range a.sessions.queue {
+		out = append(out, r.outpoints...)
+	}
+	return out
+}
+
+// FailNextBatch fails the next batch, once its intents confirmed, with reason.
+func (a *ark) FailNextBatch(reason string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.sessions.failNext = reason
+}
+
+// FailNextBatchBlaming fails the next batch with reason, naming the intent that spends outpoint.
+func (a *ark) FailNextBatchBlaming(outpoint, reason string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.sessions.failNext, a.sessions.blamed = reason, outpoint
+}
+
+// CrashAfterRegistration ends the batch events of the daemon once an intent is registered, while
+// on.
+func (a *ark) CrashAfterRegistration(on bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.sessions.crashAtRegistration = on
+}
+
+// CrashAfterForfeits ends the batch events of the daemon once forfeits arrived, while on.
+func (a *ark) CrashAfterForfeits(on bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.sessions.crashAtForfeits = on
+}
+
+// FailAfterForfeits makes batches fail once their forfeits arrived, while on: nothing is spent.
+func (a *ark) FailAfterForfeits(on bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.sessions.dropAfter = on
+}
+
+// PauseBatches makes the batches take no intent while on.
+func (a *ark) PauseBatches(on bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.sessions.paused = on
+}
+
+// HoldLanding keeps finalized batches from landing while on.
+func (a *ark) HoldLanding(on bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.sessions.held = on
+}
+
+func (a *ark) Registered() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return len(a.sessions.queue)
+}
+
+// Commitments lists the commitment txids of the batches that finalized.
+func (a *ark) Commitments() []string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return slices.Clone(a.sessions.commits)
+}
+
+func (r *registered) spends(outpoint string) bool {
+	return slices.Contains(r.outpoints, outpoint) ||
+		slices.ContainsFunc(
+			r.boardings, func(d boardingInput) bool { return d.outpoint.String() == outpoint },
+		)
+}
+
 func (a *ark) register(proof, message string) error {
 	ptx, err := psbt.NewFromRawBytes(strings.NewReader(proof), true)
 	if err != nil {
@@ -152,7 +342,10 @@ func (a *ark) register(proof, message string) error {
 	r := &registered{id: ptx.UnsignedTx.TxHash().String(), cosigners: msg.CosignersPublicKeys}
 	for i, in := range ptx.UnsignedTx.TxIn[1:] {
 		if _, ok := a.chain.confirmed(in.PreviousOutPoint.String()); ok {
-			r.boardings = append(r.boardings, boardingInput{outpoint: in.PreviousOutPoint, prevOut: ptx.Inputs[i+1].WitnessUtxo})
+			r.boardings = append(
+				r.boardings,
+				boardingInput{outpoint: in.PreviousOutPoint, prevOut: ptx.Inputs[i+1].WitnessUtxo},
+			)
 			continue
 		}
 		r.outpoints = append(r.outpoints, in.PreviousOutPoint.String())
@@ -184,100 +377,6 @@ func (a *ark) register(proof, message string) error {
 	a.sessions.queue = append(a.sessions.queue, r)
 	a.sessions.calls = append(a.sessions.calls, "register")
 	if a.sessions.crashAtRegistration {
-		a.crashLocked()
-	}
-	return nil
-}
-
-func (a *ark) ConfirmRegistration(_ context.Context, id string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	b := a.sessions.cur
-	if b == nil || !slices.ContainsFunc(b.selected, func(r *registered) bool { return r.id == id }) {
-		return status.Errorf(codes.FailedPrecondition, "intent %s is not awaiting confirmation", id)
-	}
-	b.confirmed[id] = true
-	a.sessions.calls = append(a.sessions.calls, "confirm")
-	return nil
-}
-
-func (a *ark) BatchEvents(ctx context.Context) (<-chan ports.BatchEvent, func(), error) {
-	ch := make(chan ports.BatchEvent, 1024)
-	a.mu.Lock()
-	a.sessions.listeners++
-	id := a.sessions.listeners
-	a.sessions.events[id] = ch
-	a.mu.Unlock()
-	stop := func() {
-		a.mu.Lock()
-		defer a.mu.Unlock()
-		delete(a.sessions.events, id)
-	}
-	go func() {
-		<-ctx.Done()
-		stop()
-	}()
-	return ch, stop, nil
-}
-
-func (a *ark) UpdateTopics(context.Context, []string, []string) error { return nil }
-
-func (a *ark) SubmitTreeNonces(_ context.Context, id, cosigner string, nonces tree.TreeNonces) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	b := a.sessions.cur
-	if b == nil || b.id != id {
-		return status.Errorf(codes.FailedPrecondition, "no batch %s", id)
-	}
-	b.nonces[cosigner] = nonces
-	a.sessions.calls = append(a.sessions.calls, "nonces")
-	return nil
-}
-
-func (a *ark) SubmitTreeSignatures(_ context.Context, id, cosigner string, sigs tree.TreePartialSigs) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	b := a.sessions.cur
-	if b == nil || b.id != id {
-		return status.Errorf(codes.FailedPrecondition, "no batch %s", id)
-	}
-	b.sigs[cosigner] = sigs
-	a.sessions.calls = append(a.sessions.calls, "signatures")
-	return nil
-}
-
-func (a *ark) SubmitSignedForfeitTxs(_ context.Context, forfeits []string, signedCommitment string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	b := a.sessions.cur
-	if b == nil {
-		return status.Error(codes.FailedPrecondition, "no batch")
-	}
-	if signedCommitment != "" {
-		commitment, err := psbt.NewFromRawBytes(strings.NewReader(signedCommitment), true)
-		if err != nil {
-			return status.Error(codes.InvalidArgument, err.Error())
-		}
-		leaves := 0
-		for i, in := range commitment.UnsignedTx.TxIn {
-			if b.boardings[in.PreviousOutPoint.String()] && len(commitment.Inputs[i].TaprootLeafScript) == 1 {
-				leaves++
-			}
-		}
-		if leaves == 0 {
-			return status.Error(codes.InvalidArgument, "no boarding input of the commitment tx carries its leaf")
-		}
-		b.signed++
-	}
-	for _, raw := range forfeits {
-		ptx, err := psbt.NewFromRawBytes(strings.NewReader(raw), true)
-		if err != nil {
-			return status.Error(codes.InvalidArgument, err.Error())
-		}
-		b.forfeits[ptx.UnsignedTx.TxIn[0].PreviousOutPoint.String()]++
-	}
-	a.sessions.calls = append(a.sessions.calls, "forfeits")
-	if a.sessions.crashAtForfeits {
 		a.crashLocked()
 	}
 	return nil
@@ -351,20 +450,10 @@ func (a *ark) run(ctx context.Context, b *batch, duration time.Duration) {
 		return
 	}
 	if err := a.settle(ctx, b, taking, duration); err != nil {
-		a.emit(ports.BatchFailed{ID: b.id, Reason: err.Error(), Blamed: ourFault(err.Error(), taking)})
+		a.emit(
+			ports.BatchFailed{ID: b.id, Reason: err.Error(), Blamed: ourFault(err.Error(), taking)},
+		)
 	}
-}
-
-// ourFault blames all of taking when the reason says our nonces, signatures or forfeits were wrong or late.
-func ourFault(reason string, taking []*registered) []string {
-	if !strings.Contains(reason, "nonce") && !strings.Contains(reason, "signature") && !strings.Contains(reason, "forfeit") {
-		return nil
-	}
-	var ids []string
-	for _, r := range taking {
-		ids = append(ids, r.id)
-	}
-	return ids
 }
 
 // take pops the oldest intents into the next batch, nil when there is none.
@@ -377,16 +466,25 @@ func (a *ark) take() *batch {
 	n := min(a.sessions.cap, len(a.sessions.queue))
 	a.sessions.batches++
 	b := &batch{
-		id: fmt.Sprintf("batch-%d", a.sessions.batches), selected: a.sessions.queue[:n], confirmed: map[string]bool{},
-		nonces: map[string]tree.TreeNonces{}, sigs: map[string]tree.TreePartialSigs{}, forfeits: map[string]int{},
+		id: fmt.Sprintf(
+			"batch-%d", a.sessions.batches,
+		),
+		selected:  a.sessions.queue[:n],
+		confirmed: map[string]bool{},
+		nonces:    map[string]tree.TreeNonces{},
+		sigs:      map[string]tree.TreePartialSigs{},
+		forfeits:  map[string]int{},
 	}
 	a.sessions.queue = slices.Clone(a.sessions.queue[n:])
 	a.sessions.cur = b
 	return b
 }
 
-// settle runs the batch of the intents that confirmed: trees, nonces, signatures, forfeits, landing.
-func (a *ark) settle(ctx context.Context, b *batch, taking []*registered, duration time.Duration) error {
+// settle runs the batch of the intents that confirmed: trees, nonces, signatures, forfeits,
+// landing.
+func (a *ark) settle(
+	ctx context.Context, b *batch, taking []*registered, duration time.Duration,
+) error {
 	forfeitKey := newKey(2).PubKey()
 	forfeitScript, err := txscript.PayToTaprootScript(forfeitKey)
 	if err != nil {
@@ -416,7 +514,9 @@ func (a *ark) settle(ctx context.Context, b *batch, taking []*registered, durati
 		a.mu.Unlock()
 		for _, out := range r.outputs {
 			leaves = append(leaves, tree.Leaf{
-				Outputs:             []tree.LeafOutput{{Amount: uint64(out.Value), Script: hex.EncodeToString(out.PkScript)}},
+				Outputs: []tree.LeafOutput{
+					{Amount: uint64(out.Value), Script: hex.EncodeToString(out.PkScript)},
+				},
 				CosignersPublicKeys: r.cosigners,
 			})
 		}
@@ -433,7 +533,9 @@ func (a *ark) settle(ctx context.Context, b *batch, taking []*registered, durati
 	connectorLeaves := make([]tree.Leaf, vtxos)
 	for i := range connectorLeaves {
 		connectorLeaves[i] = tree.Leaf{
-			Outputs:             []tree.LeafOutput{{Amount: 330, Script: hex.EncodeToString(forfeitScript)}},
+			Outputs: []tree.LeafOutput{
+				{Amount: 330, Script: hex.EncodeToString(forfeitScript)},
+			},
 			CosignersPublicKeys: []string{hex.EncodeToString(forfeitKey.SerializeCompressed())},
 		}
 	}
@@ -450,7 +552,9 @@ func (a *ark) settle(ctx context.Context, b *batch, taking []*registered, durati
 	connectorAmount := int64(0)
 	if vtxos > 0 {
 		var connectorScript []byte
-		if connectorScript, connectorAmount, err = tree.BuildConnectorOutput(connectorLeaves); err != nil {
+		if connectorScript, connectorAmount, err = tree.BuildConnectorOutput(
+			connectorLeaves,
+		); err != nil {
 			return err
 		}
 		tx.AddTxOut(wire.NewTxOut(connectorAmount, connectorScript))
@@ -468,13 +572,17 @@ func (a *ark) settle(ctx context.Context, b *batch, taking []*registered, durati
 		return err
 	}
 	txid := tx.TxHash()
-	vtxoTree, err := tree.BuildVtxoTree(&wire.OutPoint{Hash: txid, Index: 0}, leaves, sweepRoot, batchExpiry)
+	vtxoTree, err := tree.BuildVtxoTree(
+		&wire.OutPoint{Hash: txid, Index: 0}, leaves, sweepRoot, batchExpiry,
+	)
 	if err != nil {
 		return err
 	}
 	var connectorTree *tree.TxTree
 	if vtxos > 0 {
-		if connectorTree, err = tree.BuildConnectorTree(&wire.OutPoint{Hash: txid, Index: 1}, connectorLeaves); err != nil {
+		if connectorTree, err = tree.BuildConnectorTree(
+			&wire.OutPoint{Hash: txid, Index: 1}, connectorLeaves,
+		); err != nil {
 			return err
 		}
 	}
@@ -485,7 +593,12 @@ func (a *ark) settle(ctx context.Context, b *batch, taking []*registered, durati
 
 	keys := slices.Collect(maps.Keys(cosigners))
 	a.pause()
-	a.emit(ports.TreeSigningStarted{ID: b.id, UnsignedCommitmentTx: rawCommitment, CosignersPubkeys: keys, VtxoTree: vtxoTree})
+	a.emit(
+		ports.TreeSigningStarted{
+			ID: b.id, UnsignedCommitmentTx: rawCommitment, CosignersPubkeys: keys,
+			VtxoTree: vtxoTree,
+		},
+	)
 	if !a.until(ctx, duration, func() bool { return len(b.nonces) == len(keys) }) {
 		return fmt.Errorf("missing nonces")
 	}
@@ -516,7 +629,11 @@ func (a *ark) settle(ctx context.Context, b *batch, taking []*registered, durati
 	}
 
 	a.pause()
-	a.emit(ports.BatchFinalization{ID: b.id, CommitmentTx: rawCommitment, ConnectorTree: connectorTree})
+	a.emit(
+		ports.BatchFinalization{
+			ID: b.id, CommitmentTx: rawCommitment, ConnectorTree: connectorTree,
+		},
+	)
 	owed := func() bool {
 		if b.signed < b.boarding {
 			return false
@@ -547,7 +664,8 @@ func (a *ark) settle(ctx context.Context, b *batch, taking []*registered, durati
 	return nil
 }
 
-// land spends the vtxos of the intents and creates the ones of the leaves, then tells the subscriptions.
+// land spends the vtxos of the intents and creates the ones of the leaves, then tells the
+// subscriptions.
 func (a *ark) land(commitment string, taking []*registered, vtxoTree *tree.TxTree) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -579,8 +697,10 @@ func (a *ark) land(commitment string, taking []*registered, vtxoTree *tree.TxTre
 		out := leaf.UnsignedTx.TxOut[0]
 		script := hex.EncodeToString(out.PkScript)
 		v := clientlib.Vtxo{
-			Script: script, Amount: uint64(out.Value), CreatedAt: time.Now(), ExpiresAt: time.Now().Add(a.sessions.lifetime),
-			CommitmentTxids: []string{commitment}, Outpoint: clientlib.Outpoint{Txid: txid},
+			Script: script, Amount: uint64(out.Value), CreatedAt: time.Now(),
+			ExpiresAt:       time.Now().Add(a.sessions.lifetime),
+			CommitmentTxids: []string{commitment},
+			Outpoint:        clientlib.Outpoint{Txid: txid},
 		}
 		a.vtxos[txid+":0"] = v
 		event(script).NewVtxos = append(event(script).NewVtxos, v)
@@ -623,13 +743,6 @@ func (a *ark) until(ctx context.Context, timeout time.Duration, cond func() bool
 	}
 }
 
-// SlowPhases makes the stand-in wait d before it moves a batch to its next phase.
-func (a *ark) SlowPhases(d time.Duration) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.sessions.slow = d
-}
-
 func (a *ark) pause() {
 	a.mu.Lock()
 	d := a.sessions.slow
@@ -637,89 +750,10 @@ func (a *ark) pause() {
 	time.Sleep(d)
 }
 
-func (a *ark) InBatch() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.sessions.cur != nil
-}
-
-// RegisteredCoins lists the vtxos the registered intents spend, oldest intent first.
-func (a *ark) RegisteredCoins() []string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	var out []string
-	for _, r := range a.sessions.queue {
-		out = append(out, r.outpoints...)
-	}
-	return out
-}
-
-// FailNextBatch fails the next batch, once its intents confirmed, with reason.
-func (a *ark) FailNextBatch(reason string) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.sessions.failNext = reason
-}
-
-// FailNextBatchBlaming fails the next batch with reason, naming the intent that spends outpoint.
-func (a *ark) FailNextBatchBlaming(outpoint, reason string) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.sessions.failNext, a.sessions.blamed = reason, outpoint
-}
-
-// CrashAfterRegistration ends the batch events of the daemon once an intent is registered, while on.
-func (a *ark) CrashAfterRegistration(on bool) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.sessions.crashAtRegistration = on
-}
-
-// CrashAfterForfeits ends the batch events of the daemon once forfeits arrived, while on.
-func (a *ark) CrashAfterForfeits(on bool) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.sessions.crashAtForfeits = on
-}
-
-// FailAfterForfeits makes batches fail once their forfeits arrived, while on: nothing is spent.
-func (a *ark) FailAfterForfeits(on bool) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.sessions.dropAfter = on
-}
-
-// PauseBatches makes the batches take no intent while on.
-func (a *ark) PauseBatches(on bool) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.sessions.paused = on
-}
-
-// HoldLanding keeps finalized batches from landing while on.
-func (a *ark) HoldLanding(on bool) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.sessions.held = on
-}
-
-func (a *ark) Registered() int {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return len(a.sessions.queue)
-}
-
 func (a *ark) batchCalls() []string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return slices.Clone(a.sessions.calls)
-}
-
-// Commitments lists the commitment txids of the batches that finalized.
-func (a *ark) Commitments() []string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return slices.Clone(a.sessions.commits)
 }
 
 func (a *ark) registeredCount() int {
@@ -734,7 +768,29 @@ func (a *ark) registeredCount() int {
 	return n
 }
 
-// sweepTapTreeRoot is the root of the sweep path arkd gives every vtxo tree output: itself alone, once the batch expired.
+func newSessions() sessions {
+	return sessions{
+		duration: 2 * time.Second, cap: 128, lifetime: 30 * 24 * time.Hour,
+		events: map[int]chan ports.BatchEvent{},
+	}
+}
+
+// ourFault blames all of taking when the reason says our nonces, signatures or forfeits were wrong
+// or late.
+func ourFault(reason string, taking []*registered) []string {
+	if !strings.Contains(reason, "nonce") && !strings.Contains(reason, "signature") &&
+		!strings.Contains(reason, "forfeit") {
+		return nil
+	}
+	var ids []string
+	for _, r := range taking {
+		ids = append(ids, r.id)
+	}
+	return ids
+}
+
+// sweepTapTreeRoot is the root of the sweep path arkd gives every vtxo tree output: itself alone,
+// once the batch expired.
 func sweepTapTreeRoot(forfeitKey *btcec.PublicKey, expiry arklib.RelativeLocktime) ([]byte, error) {
 	sweep, err := (&script.CSVMultisigClosure{
 		MultisigClosure: script.MultisigClosure{PubKeys: []*btcec.PublicKey{forfeitKey}},

@@ -19,17 +19,28 @@ import (
 func TestConvertBatchEvents(t *testing.T) {
 	r := trees{intents: &intents{}}
 	require.Nil(t, r.convert(clientlib.BatchEventChannel{Err: errors.New("stream cut")}))
-	require.Equal(t, ports.StreamReconnected{}, r.convert(connection(clientlib.StreamConnectionStateReconnected)))
+	require.Equal(
+		t, ports.StreamReconnected{},
+		r.convert(connection(clientlib.StreamConnectionStateReconnected)),
+	)
 	require.Nil(t, r.convert(connection(clientlib.StreamConnectionStateReady)))
 	require.Nil(t, r.convert(event(clientlib.StreamStartedEvent{Id: "listener"})))
 	require.Nil(t, r.convert(event(clientlib.TreeSignatureEvent{Id: "b"})))
 
-	started := r.convert(event(clientlib.BatchStartedEvent{Id: "b", HashedIntentIds: []string{"h"}, BatchExpiry: 144}))
+	started := r.convert(
+		event(
+			clientlib.BatchStartedEvent{Id: "b", HashedIntentIds: []string{"h"}, BatchExpiry: 144},
+		),
+	)
 	require.Equal(t, ports.BatchStarted{
-		ID: "b", BatchExpiry: arklib.RelativeLocktime{Type: arklib.LocktimeTypeBlock, Value: 144},
+		ID:          "b",
+		BatchExpiry: arklib.RelativeLocktime{Type: arklib.LocktimeTypeBlock, Value: 144},
 	}, started)
 	started = r.convert(event(clientlib.BatchStartedEvent{Id: "b", BatchExpiry: 1024}))
-	require.Equal(t, arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: 1024}, started.(ports.BatchStarted).BatchExpiry)
+	require.Equal(
+		t, arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: 1024},
+		started.(ports.BatchStarted).BatchExpiry,
+	)
 
 	vtxoNodes, connectorNodes := flatTree(t, 3), flatTree(t, 2)
 	for _, n := range vtxoNodes {
@@ -38,22 +49,46 @@ func TestConvertBatchEvents(t *testing.T) {
 	for _, n := range connectorNodes {
 		require.Nil(t, r.convert(event(clientlib.TreeTxEvent{Id: "b", BatchIndex: 1, Node: n})))
 	}
-	signing := r.convert(event(clientlib.TreeSigningStartedEvent{Id: "b", UnsignedCommitmentTx: "tx", CosignersPubkeys: []string{"k"}}))
+	signing := r.convert(
+		event(
+			clientlib.TreeSigningStartedEvent{
+				Id:                   "b",
+				UnsignedCommitmentTx: "tx",
+				CosignersPubkeys:     []string{"k"},
+			},
+		),
+	)
 	got := signing.(ports.TreeSigningStarted)
 	require.Equal(t, "tx", got.UnsignedCommitmentTx)
 	require.Equal(t, []string{"k"}, got.CosignersPubkeys)
 	require.Len(t, got.VtxoTree.Leaves(), 3)
 
-	require.Equal(t, ports.TreeNoncesAggregated{ID: "b"}, r.convert(event(clientlib.TreeNoncesAggregatedEvent{Id: "b"})))
+	require.Equal(
+		t, ports.TreeNoncesAggregated{ID: "b"},
+		r.convert(event(clientlib.TreeNoncesAggregatedEvent{Id: "b"})),
+	)
 	finalization := r.convert(event(clientlib.BatchFinalizationEvent{Id: "b", Tx: "tx"})).(ports.BatchFinalization)
 	require.Equal(t, "tx", finalization.CommitmentTx)
 	require.Len(t, finalization.ConnectorTree.Leaves(), 2)
-	require.Equal(t, ports.BatchFinalized{ID: "b", CommitmentTxid: "c"}, r.convert(event(clientlib.BatchFinalizedEvent{Id: "b", Txid: "c"})))
-	require.Equal(t, ports.BatchFailed{ID: "b", Reason: "late"}, r.convert(event(clientlib.BatchFailedEvent{Id: "b", Reason: "late"})))
+	require.Equal(
+		t, ports.BatchFinalized{ID: "b", CommitmentTxid: "c"},
+		r.convert(event(clientlib.BatchFinalizedEvent{Id: "b", Txid: "c"})),
+	)
+	require.Equal(
+		t, ports.BatchFailed{ID: "b", Reason: "late"},
+		r.convert(event(clientlib.BatchFailedEvent{Id: "b", Reason: "late"})),
+	)
 
 	r.convert(event(clientlib.BatchStartedEvent{Id: "next"}))
-	require.Nil(t, r.convert(event(clientlib.TreeSigningStartedEvent{Id: "next"})), "no transaction of a tree came in")
-	require.Nil(t, r.convert(event(clientlib.BatchFinalizationEvent{Id: "next"})).(ports.BatchFinalization).ConnectorTree, "no vtxo to forfeit")
+	require.Nil(
+		t, r.convert(event(clientlib.TreeSigningStartedEvent{Id: "next"})),
+		"no transaction of a tree came in",
+	)
+	require.Nil(
+		t,
+		r.convert(event(clientlib.BatchFinalizationEvent{Id: "next"})).(ports.BatchFinalization).ConnectorTree,
+		"no vtxo to forfeit",
+	)
 	r.connectorTree = []tree.TxTreeNode{{Txid: "broken"}}
 	require.Nil(t, r.convert(event(clientlib.BatchFinalizationEvent{Id: "next"})))
 }
@@ -126,7 +161,9 @@ func TestBlamed(t *testing.T) {
 		})
 	}
 	require.Empty(t, blamed("missing nonces", nil))
-	require.Empty(t, blamed("intent  failed", []intent{{"proof", ""}}), "an unknown id names nothing")
+	require.Empty(
+		t, blamed("intent  failed", []intent{{"proof", ""}}), "an unknown id names nothing",
+	)
 }
 
 func TestBatchStartedWaitsForARegistrationInFlight(t *testing.T) {
@@ -138,12 +175,17 @@ func TestBatchStartedWaitsForARegistrationInFlight(t *testing.T) {
 	}()
 	m.settle(time.Second)
 	sum := sha256.Sum256([]byte("id-a"))
-	require.Equal(t, []string{"proof-a"}, proofTxids(m.selected([]string{hex.EncodeToString(sum[:])})))
+	require.Equal(
+		t, []string{"proof-a"}, proofTxids(m.selected([]string{hex.EncodeToString(sum[:])})),
+	)
 
 	m.begin()
 	start := time.Now()
 	m.settle(20 * time.Millisecond)
-	require.Less(t, time.Since(start), time.Second, "a registration that never returns delays a batch by the bound only")
+	require.Less(
+		t, time.Since(start), time.Second,
+		"a registration that never returns delays a batch by the bound only",
+	)
 }
 
 func hashed(id string) string {
@@ -166,11 +208,16 @@ func flatTree(t *testing.T, n int) []tree.TxTreeNode {
 	leaves := make([]tree.Leaf, n)
 	for i := range leaves {
 		leaves[i] = tree.Leaf{
-			Outputs:             []tree.LeafOutput{{Amount: 1000, Script: "5120" + hex.EncodeToString(make([]byte, 32))}},
+			Outputs: []tree.LeafOutput{
+				{Amount: 1000, Script: "5120" + hex.EncodeToString(make([]byte, 32))},
+			},
 			CosignersPublicKeys: []string{cosigner},
 		}
 	}
-	vtxoTree, err := tree.BuildVtxoTree(&wire.OutPoint{Index: 1}, leaves, make([]byte, 32), arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: 1024})
+	vtxoTree, err := tree.BuildVtxoTree(
+		&wire.OutPoint{Index: 1}, leaves, make([]byte, 32),
+		arklib.RelativeLocktime{Type: arklib.LocktimeTypeSecond, Value: 1024},
+	)
 	require.NoError(t, err)
 	flat, err := vtxoTree.Serialize()
 	require.NoError(t, err)

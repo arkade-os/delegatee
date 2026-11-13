@@ -49,7 +49,10 @@ func TestSubscriptionShardsAndMerges(t *testing.T) {
 }
 
 func TestSubscriptionReopensAShardItsIdNoLongerServes(t *testing.T) {
-	idx := &fakeIndexer{streams: map[string]chan clientlib.ScriptEvent{}, updateErr: errors.New("subscription not found")}
+	idx := &fakeIndexer{
+		streams:   map[string]chan clientlib.ScriptEvent{},
+		updateErr: errors.New("subscription not found"),
+	}
 	sub, err := subscribe(t.Context(), idx, []string{"a", "b"})
 	require.NoError(t, err)
 	defer sub.Stop()
@@ -88,7 +91,9 @@ func TestToOutput(t *testing.T) {
 
 func TestScriptEventSpentByFallsBackToItsTxid(t *testing.T) {
 	ev := toScriptEvent(&clientlib.ScriptEventData{
-		Txid: "tx3", NewVtxos: []clientlib.Vtxo{{Script: "aa"}}, SpentVtxos: []clientlib.Vtxo{{Script: "aa"}, {Script: "aa", ArkTxid: "ark"}},
+		Txid:       "tx3",
+		NewVtxos:   []clientlib.Vtxo{{Script: "aa"}},
+		SpentVtxos: []clientlib.Vtxo{{Script: "aa"}, {Script: "aa", ArkTxid: "ark"}},
 	})
 	require.Len(t, ev.Outputs, 3)
 	require.False(t, ev.Outputs[0].Spent, "created first")
@@ -108,7 +113,9 @@ type fakeIndexer struct {
 	stopped   int
 }
 
-func (f *fakeIndexer) NewSubscription(_ context.Context, scripts []string) (string, <-chan clientlib.ScriptEvent, func(), error) {
+func (f *fakeIndexer) NewSubscription(
+	_ context.Context, scripts []string,
+) (string, <-chan clientlib.ScriptEvent, func(), error) {
 	f.sizes = append(f.sizes, len(scripts))
 	id := fmt.Sprint(len(f.sizes))
 	ch := make(chan clientlib.ScriptEvent, 8)

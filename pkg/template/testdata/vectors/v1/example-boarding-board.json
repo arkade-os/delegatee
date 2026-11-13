@@ -1,0 +1,404 @@
+{
+  "artifact_version": "artifact/v1",
+  "artifacts": {
+    "041af65d5443fceebd149c44d9a0b646edae24399ae3dff6c5f82b878826dda5": {
+      "constructorInputs": [
+        {
+          "name": "owner",
+          "type": "pubkey"
+        },
+        {
+          "name": "exitDelay",
+          "type": "int"
+        },
+        {
+          "name": "renewalWindow",
+          "type": "int"
+        },
+        {
+          "name": "maxFee",
+          "type": "int"
+        }
+      ],
+      "contractName": "DelegatedVtxo",
+      "functions": [
+        {
+          "leaves": [
+            {
+              "asm": [
+                "<owner>",
+                "OP_CHECKSIGVERIFY",
+                "<SERVER_KEY>",
+                "OP_CHECKSIG"
+              ],
+              "name": "forfeit",
+              "witness": [
+                {
+                  "encoding": "schnorr-64",
+                  "name": "ownerSig",
+                  "type": "signature"
+                },
+                {
+                  "encoding": "schnorr-64",
+                  "injected": true,
+                  "name": "serverSig",
+                  "type": "signature"
+                }
+              ]
+            }
+          ],
+          "name": "forfeit"
+        },
+        {
+          "leaves": [
+            {
+              "asm": [
+                "<exitDelay>",
+                "OP_CHECKSEQUENCEVERIFY",
+                "OP_DROP",
+                "<owner>",
+                "OP_CHECKSIG"
+              ],
+              "name": "exit",
+              "witness": [
+                {
+                  "encoding": "schnorr-64",
+                  "name": "ownerSig",
+                  "type": "signature"
+                }
+              ]
+            }
+          ],
+          "name": "exit"
+        },
+        {
+          "arkade": {
+            "asm": [
+              "OP_PUSHEXPIRY",
+              "<renewalWindow>",
+              "OP_SUB",
+              "OP_CHECKTIME",
+              "OP_VERIFY",
+              "0x74797065",
+              "OP_INSPECTINTENTMESSAGE",
+              "OP_VERIFY",
+              "0x7265676973746572",
+              "OP_EQUALVERIFY",
+              "0x6f6e636861696e5f6f75747075745f696e6465786573",
+              "OP_INSPECTINTENTMESSAGE",
+              "OP_VERIFY",
+              "0x5b5d",
+              "OP_EQUALVERIFY",
+              "0x636f7369676e6572735f7075626c69635f6b6579732e30",
+              "OP_INSPECTINTENTMESSAGE",
+              "OP_VERIFY",
+              "<COSIGNER_KEY>",
+              "OP_EQUALVERIFY",
+              "0x636f7369676e6572735f7075626c69635f6b6579732e31",
+              "OP_INSPECTINTENTMESSAGE",
+              "OP_NOT",
+              "OP_VERIFY",
+              "OP_DROP",
+              "OP_PUSHCURRENTINPUTINDEX",
+              "OP_1SUB",
+              "OP_INSPECTOUTPUTVALUE",
+              "<maxFee>",
+              "OP_ADD",
+              "OP_PUSHCURRENTINPUTINDEX",
+              "OP_INSPECTINPUTVALUE",
+              "OP_GREATERTHANOREQUAL",
+              "OP_VERIFY",
+              "OP_PUSHCURRENTINPUTINDEX",
+              "OP_1SUB",
+              "5",
+              "0",
+              "OP_TUNNEL"
+            ],
+            "inputs": []
+          },
+          "leaves": [
+            {
+              "asm": [
+                "<SERVER_KEY>",
+                "OP_CHECKSIGVERIFY",
+                "<EMULATOR_KEY:renew>",
+                "OP_CHECKSIG"
+              ],
+              "name": "renew",
+              "witness": [
+                {
+                  "encoding": "schnorr-64",
+                  "injected": true,
+                  "name": "serverSig",
+                  "type": "signature"
+                },
+                {
+                  "encoding": "schnorr-64",
+                  "injected": true,
+                  "name": "emulatorSig",
+                  "type": "signature"
+                }
+              ]
+            }
+          ],
+          "name": "renew"
+        }
+      ],
+      "structs": []
+    },
+    "ba74305355ee2e574ca27bb4f2966884c1927b662b99ad40cb7ed08c3265302c": {
+      "constructorInputs": [
+        {
+          "name": "owner",
+          "type": "pubkey"
+        },
+        {
+          "name": "boardingExitDelay",
+          "type": "int"
+        },
+        {
+          "name": "renewalProgram",
+          "type": "bytes32"
+        },
+        {
+          "name": "maxFee",
+          "type": "int"
+        }
+      ],
+      "contractName": "DelegatedBoarding",
+      "functions": [
+        {
+          "leaves": [
+            {
+              "asm": [
+                "<owner>",
+                "OP_CHECKSIGVERIFY",
+                "<SERVER_KEY>",
+                "OP_CHECKSIG"
+              ],
+              "name": "forfeit",
+              "witness": [
+                {
+                  "encoding": "schnorr-64",
+                  "name": "ownerSig",
+                  "type": "signature"
+                },
+                {
+                  "encoding": "schnorr-64",
+                  "injected": true,
+                  "name": "serverSig",
+                  "type": "signature"
+                }
+              ]
+            }
+          ],
+          "name": "forfeit"
+        },
+        {
+          "leaves": [
+            {
+              "asm": [
+                "<boardingExitDelay>",
+                "OP_CHECKSEQUENCEVERIFY",
+                "OP_DROP",
+                "<owner>",
+                "OP_CHECKSIG"
+              ],
+              "name": "exit",
+              "witness": [
+                {
+                  "encoding": "schnorr-64",
+                  "name": "ownerSig",
+                  "type": "signature"
+                }
+              ]
+            }
+          ],
+          "name": "exit"
+        },
+        {
+          "arkade": {
+            "asm": [
+              "0x74797065",
+              "OP_INSPECTINTENTMESSAGE",
+              "OP_VERIFY",
+              "0x7265676973746572",
+              "OP_EQUALVERIFY",
+              "0x6f6e636861696e5f6f75747075745f696e6465786573",
+              "OP_INSPECTINTENTMESSAGE",
+              "OP_VERIFY",
+              "0x5b5d",
+              "OP_EQUALVERIFY",
+              "0x636f7369676e6572735f7075626c69635f6b6579732e30",
+              "OP_INSPECTINTENTMESSAGE",
+              "OP_VERIFY",
+              "<COSIGNER_KEY>",
+              "OP_EQUALVERIFY",
+              "0x636f7369676e6572735f7075626c69635f6b6579732e31",
+              "OP_INSPECTINTENTMESSAGE",
+              "OP_NOT",
+              "OP_VERIFY",
+              "OP_DROP",
+              "OP_PUSHCURRENTINPUTINDEX",
+              "OP_1SUB",
+              "OP_INSPECTOUTPUTSCRIPTPUBKEY",
+              "1",
+              "OP_EQUALVERIFY",
+              "<renewalProgram>",
+              "OP_EQUALVERIFY",
+              "OP_PUSHCURRENTINPUTINDEX",
+              "OP_1SUB",
+              "OP_INSPECTOUTPUTVALUE",
+              "<maxFee>",
+              "OP_ADD",
+              "OP_PUSHCURRENTINPUTINDEX",
+              "OP_INSPECTINPUTVALUE",
+              "OP_GREATERTHANOREQUAL"
+            ],
+            "inputs": []
+          },
+          "leaves": [
+            {
+              "asm": [
+                "<SERVER_KEY>",
+                "OP_CHECKSIGVERIFY",
+                "<EMULATOR_KEY:board>",
+                "OP_CHECKSIG"
+              ],
+              "name": "board",
+              "witness": [
+                {
+                  "encoding": "schnorr-64",
+                  "injected": true,
+                  "name": "serverSig",
+                  "type": "signature"
+                },
+                {
+                  "encoding": "schnorr-64",
+                  "injected": true,
+                  "name": "emulatorSig",
+                  "type": "signature"
+                }
+              ]
+            }
+          ],
+          "name": "board"
+        }
+      ],
+      "structs": []
+    }
+  },
+  "bindings": {
+    "keys": {
+      "cosigner": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "emulator": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+      "server": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+    },
+    "variables": {
+      "boarding_exit_delay": "020040",
+      "exit_delay": "010040",
+      "max_fee": "e803",
+      "owner": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+      "renewal_window": "0004"
+    }
+  },
+  "expected": {
+    "canonical_hex": "7b2266656573223a7b2266726f6d223a226465706f736974222c226d6178223a223c6d61785f6665653e227d2c22666f726d6174223a2274656d706c6174652f7631222c22696e70757473223a5b7b22636f6e7472616374223a7b22617267756d656e7473223a7b22626f617264696e674578697444656c6179223a223c626f617264696e675f657869745f64656c61793e222c226d6178466565223a223c6d61785f6665653e222c226f776e6572223a223c6f776e65723e222c2272656e6577616c50726f6772616d223a7b2270726f6772616d223a2266756e6473227d7d2c22646566696e6974696f6e223a7b226172746966616374223a2262613734333035333535656532653537346361323762623466323936363838346331393237623636326239396164343063623765643038633332363533303263227d7d2c226e616d65223a226465706f736974222c227370656e64223a7b2266756e6374696f6e223a22626f617264222c226c656166223a22626f617264227d2c2274797065223a226f6e636861696e227d5d2c226f757470757473223a5b7b22696e646578223a302c226c6f636b696e67223a7b22636f6e7472616374223a7b22617267756d656e7473223a7b226578697444656c6179223a223c657869745f64656c61793e222c226d6178466565223a223c6d61785f6665653e222c226f776e6572223a223c6f776e65723e222c2272656e6577616c57696e646f77223a223c72656e6577616c5f77696e646f773e227d2c22646566696e6974696f6e223a7b226172746966616374223a2230343161663635643534343366636565626431343963343464396130623634366564616532343339396165336466663663356638326238373838323664646135227d7d7d2c226e616d65223a2266756e6473222c2276616c7565223a7b2266726f6d223a226465706f736974227d7d5d2c227061636b657473223a7b226f75747075745f696e646578223a317d2c2274797065223a2270726f6f66222c227661726961626c6573223a7b22626f617264696e675f657869745f64656c6179223a22696e74222c22657869745f64656c6179223a22696e74222c226d61785f666565223a22696e74222c226f776e6572223a227075626b6579222c2272656e6577616c5f77696e646f77223a22696e74227d7d",
+    "extension": 1,
+    "fee": "0",
+    "psbt_hex": "70736274ff0100fd4f0102000000012bc1da629568c49297233ca96b0d36fcb87a02afa85618e187215354faa31d980000000000ffffffff02a086010000000000225120aa7c8efd2b9ef1fe5dc1fca56705b49c518446088a6fe0fad919c73bb4cb8d250000000000000000e86a4ce541524b01df01010000d90474797065f86908726567697374657288166f6e636861696e5f6f75747075745f696e6465786573f869025b5d8817636f7369676e6572735f7075626c69635f6b6579732e30f869423032373962653636376566396463626261633535613036323935636538373062303730323962666364623264636532386439353966323831356231366638313739388817636f7369676e6572735f7075626c69635f6b6579732e31f8916975cd8cd1518820aa7c8efd2b9ef1fe5dc1fca56705b49c518446088a6fe0fad919c73bb4cb8d2588cd8ccf02e80393cdc9a20100000000000001012ba086010000000000225120a0e948a6738f32b9619cf3e24a2a08215c84295d9200be93c70f36411d1e99d44215c150929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0b16f5c18637f2d77aa80c6a861423b3c832fd79e48ae1f5b64389c5dea52d0ac452079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ad20be895737ab9171d7c250e6cbbc60671d7dab591f9be6410a0598ecaf269e56ccacc008de74617074726565b901c04420c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5ad2079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac02c02803020040b27520c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5ac02c0442079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ad20be895737ab9171d7c250e6cbbc60671d7dab591f9be6410a0598ecaf269e56ccac000000",
+    "spend_id": "b559685a02cc5da001193deb0fa9c3d924e1037888a46de861a766360a8fb83e",
+    "template_id": "b559685a02cc5da001193deb0fa9c3d924e1037888a46de861a766360a8fb83e",
+    "unsigned_tx_hex": "02000000012bc1da629568c49297233ca96b0d36fcb87a02afa85618e187215354faa31d980000000000ffffffff02a086010000000000225120aa7c8efd2b9ef1fe5dc1fca56705b49c518446088a6fe0fad919c73bb4cb8d250000000000000000e86a4ce541524b01df01010000d90474797065f86908726567697374657288166f6e636861696e5f6f75747075745f696e6465786573f869025b5d8817636f7369676e6572735f7075626c69635f6b6579732e30f869423032373962653636376566396463626261633535613036323935636538373062303730323962666364623264636532386439353966323831356231366638313739388817636f7369676e6572735f7075626c69635f6b6579732e31f8916975cd8cd1518820aa7c8efd2b9ef1fe5dc1fca56705b49c518446088a6fe0fad919c73bb4cb8d2588cd8ccf02e80393cdc9a2010000000000"
+  },
+  "format": "template-test/v1",
+  "name": "example-boarding-board",
+  "request": {
+    "decryption": {},
+    "fee": {
+      "dust": "330",
+      "intent": {
+        "offchain_input": "",
+        "offchain_output": "",
+        "onchain_input": "",
+        "onchain_output": ""
+      }
+    },
+    "sources": [
+      {
+        "amount": "100000",
+        "assets": [],
+        "confirmations": 1,
+        "created_at": "0001-01-01T00:00:00Z",
+        "expiry": "0001-01-01T00:00:00Z",
+        "swept": false,
+        "tx_hex": "0300000001000000000000000000000000000000000000000000000000000000000000000001000000000000000001a086010000000000225120a0e948a6738f32b9619cf3e24a2a08215c84295d9200be93c70f36411d1e99d400000000",
+        "txid": "981da3fa54532187e11856a8af027ab8fc360d6ba93c239792c4689562dac12b",
+        "vout": 0
+      }
+    ]
+  },
+  "template": {
+    "fees": {
+      "from": "deposit",
+      "max": "<max_fee>"
+    },
+    "format": "template/v1",
+    "inputs": [
+      {
+        "contract": {
+          "arguments": {
+            "boardingExitDelay": "<boarding_exit_delay>",
+            "maxFee": "<max_fee>",
+            "owner": "<owner>",
+            "renewalProgram": {
+              "program": "funds"
+            }
+          },
+          "definition": {
+            "artifact": "ba74305355ee2e574ca27bb4f2966884c1927b662b99ad40cb7ed08c3265302c"
+          }
+        },
+        "name": "deposit",
+        "spend": {
+          "function": "board",
+          "leaf": "board"
+        },
+        "type": "onchain"
+      }
+    ],
+    "outputs": [
+      {
+        "index": 0,
+        "locking": {
+          "contract": {
+            "arguments": {
+              "exitDelay": "<exit_delay>",
+              "maxFee": "<max_fee>",
+              "owner": "<owner>",
+              "renewalWindow": "<renewal_window>"
+            },
+            "definition": {
+              "artifact": "041af65d5443fceebd149c44d9a0b646edae24399ae3dff6c5f82b878826dda5"
+            }
+          }
+        },
+        "name": "funds",
+        "value": {
+          "from": "deposit"
+        }
+      }
+    ],
+    "packets": {
+      "output_index": 1
+    },
+    "type": "proof",
+    "variables": {
+      "boarding_exit_delay": "int",
+      "exit_delay": "int",
+      "max_fee": "int",
+      "owner": "pubkey",
+      "renewal_window": "int"
+    }
+  }
+}

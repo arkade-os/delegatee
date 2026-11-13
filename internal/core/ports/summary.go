@@ -22,7 +22,8 @@ type Cursor struct {
 	ID      int64
 }
 
-// SummaryFilter selects summaries: an empty or zero field matches any, a non-zero After the ones that follow it.
+// SummaryFilter selects summaries: an empty or zero field matches any, a non-zero After the ones
+// that follow it.
 type SummaryFilter struct {
 	Status     string
 	StreamID   int64
@@ -39,8 +40,10 @@ type Spawned struct {
 }
 
 type SummaryRepository interface {
-	// List returns the delegations by the earliest due of their present coins, those without coins last by id.
+	// List returns the delegations by the earliest due of their present coins, those without coins
+	// last by id.
 	List(ctx context.Context, f SummaryFilter) ([]Summary, error)
-	// Spawned returns what each stream spawned, by stream id; a stream that spawned nothing is missing.
+	// Spawned returns what each stream spawned, by stream id; a stream that spawned nothing is
+	// missing.
 	Spawned(ctx context.Context) (map[int64]Spawned, error)
 }

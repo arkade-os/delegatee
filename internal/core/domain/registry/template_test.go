@@ -19,7 +19,7 @@ func TestNewTemplateDerivesFieldsFromDocument(t *testing.T) {
 	require.Len(t, tpl.ID, 64)
 	require.Equal(t, doc, tpl.Document)
 	require.Equal(t, []string{testArtifactID(t)}, tpl.ArtifactIDs)
-	require.Equal(t, template.Intent, tpl.Type)
+	require.Equal(t, template.Proof, tpl.Type)
 	require.Equal(t, TemplateStatusActive, tpl.Status)
 	require.Zero(t, tpl.Failures)
 	require.True(t, tpl.CreatedAt.IsZero())
@@ -45,8 +45,7 @@ func TestNewTemplateNeedsNoArtifactsWhenItReferencesNone(t *testing.T) {
 
 func TestNewTemplateRejectsInvalidDocument(t *testing.T) {
 	for name, doc := range map[string][]byte{
-		"not json":     []byte("nope"),
-		"empty":        nil,
+		"not json": []byte("nope"), "empty": nil,
 		"wrong schema": []byte(`{"format":"template/v1"}`),
 	} {
 		_, err := NewTemplate(doc, 0, testArtifacts(t))
@@ -65,7 +64,7 @@ func TestNewTemplateRefusesAnOnchainTemplate(t *testing.T) {
 func TestNewTemplateRefusesAnOffchainTemplateWithoutAnArkadePacket(t *testing.T) {
 	doc, err := os.ReadFile("../../../../pkg/template/testdata/delegate_release.json")
 	require.NoError(t, err)
-	doc = bytes.Replace(doc, []byte(`"type": "intent"`), []byte(`"type": "offchain"`), 1)
+	doc = bytes.Replace(doc, []byte(`"type": "proof"`), []byte(`"type": "virtual"`), 1)
 	doc = bytes.Replace(doc, []byte(`,
   "fees": {"from": "funds", "max": 1000}`), nil, 1)
 	_, err = NewTemplate(doc, 0, nil)

@@ -16,7 +16,8 @@ const (
 	Failed    AttemptStatus = "failed"
 )
 
-// Attempt is one run of a delegation over coins: the transactions it involves, its progress, its outcome.
+// Attempt is one run of a delegation over coins: the transactions it involves, its progress, its
+// outcome.
 type Attempt struct {
 	ID           int64
 	DelegationID int64
@@ -28,12 +29,24 @@ type Attempt struct {
 	UpdatedAt    time.Time
 }
 
-// Tx is a transaction of an attempt; Raw is empty for one the daemon did not build (a batch's commitment).
+// Tx is a transaction of an attempt; Raw is empty for one the daemon did not build (a batch's
+// commitment).
 type Tx struct {
 	Raw     []byte `json:"raw"` // serialized psbt or raw transaction
 	Txid    string `json:"txid"`
 	Onchain bool   `json:"onchain"`
 	Spends  bool   `json:"spends"` // it spends the attempt's coins; an intent's proof does not
+}
+
+type AttemptRepository interface {
+	// AddOrUpdate inserts a when its id is zero, filling the id and times in, else persists its
+	// status, txs and error; ErrAttemptNotFound when no row has its id.
+	AddOrUpdate(ctx context.Context, a *Attempt) error
+	// ListPending returns the attempts that neither succeeded nor failed, oldest first.
+	ListPending(ctx context.Context) ([]Attempt, error)
+	// ListByDelegation returns the attempts of a delegation newest first, below cursor when not
+	// zero.
+	ListByDelegation(ctx context.Context, id, cursor int64, limit int) ([]Attempt, error)
 }
 
 // Spenders returns the txids expected to spend the coins, empty while unknown.
@@ -72,8 +85,9 @@ func (d *Delegation) Attempt(coins []Coin) (Attempt, error) {
 	return Attempt{DelegationID: d.ID, Coins: outpoints, Status: Submitted}, nil
 }
 
-// Submit records the attempt's own transactions: the ark transaction sent to arkd and its checkpoints,
-// the intent proof registered at arkd or the transaction broadcast to the bitcoin network.
+// Submit records the attempt's own transactions: the ark transaction sent to arkd and its
+// checkpoints, the intent proof registered at arkd or the transaction broadcast to the bitcoin
+// network.
 func (a *Attempt) Submit(txs ...Tx) error {
 	if a.Status != Submitted || len(a.Txs) > 0 {
 		return fmt.Errorf("%w: %s", errAttemptState, a.Status)
@@ -105,13 +119,3 @@ func (a *Attempt) Fail(err error) error {
 
 // Pending reports whether something outside still has to happen.
 func (a Attempt) Pending() bool { return a.Status == Submitted }
-
-type AttemptRepository interface {
-	// AddOrUpdate inserts a when its id is zero, filling the id and times in, else persists its status,
-	// txs and error; ErrAttemptNotFound when no row has its id.
-	AddOrUpdate(ctx context.Context, a *Attempt) error
-	// ListPending returns the attempts that neither succeeded nor failed, oldest first.
-	ListPending(ctx context.Context) ([]Attempt, error)
-	// ListByDelegation returns the attempts of a delegation newest first, below cursor when not zero.
-	ListByDelegation(ctx context.Context, id, cursor int64, limit int) ([]Attempt, error)
-}

@@ -136,7 +136,7 @@ message Template {
   string document = 2;
   repeated string artifact_ids = 3;
   repeated Param params = 4;
-  // type is intent or offchain.
+  // type is proof or virtual.
   string type = 5;
   // status is active or disabled.
   string status = 6;

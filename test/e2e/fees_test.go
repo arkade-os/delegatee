@@ -11,7 +11,11 @@ import (
 func TestIntentFees(t *testing.T) {
 	d := start(t)
 	alice := fundedWallet(t)
-	paying, free := renewalDelegation(t, d, newOwner(t, d), 100), renewalDelegation(t, d, newOwner(t, d), 0)
+	paying, free := renewalDelegation(
+		t, d, newOwner(t, d), 100,
+	), renewalDelegation(
+		t, d, newOwner(t, d), 0,
+	)
 
 	chargeIntentFees(t, `{"offchainInputFee":"100.0"}`)
 	pay(t, alice, paying.Address)

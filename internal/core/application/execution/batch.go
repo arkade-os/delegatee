@@ -32,11 +32,6 @@ type registration struct {
 	dead    atomic.Bool // arkd refused the intent
 }
 
-func (r *registration) proofTxid() string {
-	proof, _ := r.attempt.Proof()
-	return proof.Txid
-}
-
 // current is the batch that carries our intents.
 type current struct {
 	id      string
@@ -59,11 +54,9 @@ type batchWorker struct {
 	closing  bool          // no new intent is registered or confirmed
 }
 
-func newBatchWorker(s *Service) *batchWorker {
-	return &batchWorker{
-		s: s, commands: make(chan []execution.Entry, 256), built: make(chan *registration, 256), intents: map[string]*registration{},
-		quiet: make(chan chan struct{}), exited: make(chan struct{}),
-	}
+func (r *registration) proofTxid() string {
+	proof, _ := r.attempt.Proof()
+	return proof.Txid
 }
 
 // register asks the worker to register the entries' intents.
@@ -122,7 +115,8 @@ func (b *batchWorker) run(events <-chan ports.BatchEvent, stop func()) {
 	}
 }
 
-// quiesce stops the worker from taking part in new batches and waits at most d for the batch in flight.
+// quiesce stops the worker from taking part in new batches and waits at most d for the batch in
+// flight.
 func (b *batchWorker) quiesce(d time.Duration) {
 	idle := make(chan struct{})
 	timeout := time.After(d)
@@ -214,11 +208,15 @@ func (b *batchWorker) build(e execution.Entry) {
 		fail(fmt.Errorf("arkd: %w", refusal(ctx, err)))
 		return
 	}
-	log.WithFields(log.Fields{"delegation": e.DelegationID, "intent": proofTxid}).Info("intent registered")
+	log.WithFields(log.Fields{"delegation": e.DelegationID, "intent": proofTxid}).
+		Info("intent registered")
 }
 
-// intentOf builds the intent of the entry's coins, cosigned by the emulator when the covenant needs it.
-func (b *batchWorker) intentOf(ctx context.Context, inst *delegationapp.Instance, e execution.Entry) (*execution.Intent, error) {
+// intentOf builds the intent of the entry's coins, cosigned by the emulator when the covenant needs
+// it.
+func (b *batchWorker) intentOf(
+	ctx context.Context, inst *delegationapp.Instance, e execution.Entry,
+) (*execution.Intent, error) {
 	s := b.s
 	txs, err := s.sources(ctx, e.Coins)
 	if err != nil {
@@ -228,7 +226,10 @@ func (b *batchWorker) intentOf(ctx context.Context, inst *delegationapp.Instance
 	if err != nil {
 		return nil, fmt.Errorf("arkd info: %w", err)
 	}
-	in, err := execution.BuildIntent(inst.Template, inst.Delegation.Inputs, e.Coins, txs, template.Fee{Intent: info.IntentFees, Dust: info.Dust}, s.cosignerKey.PubKey())
+	in, err := execution.BuildIntent(
+		inst.Template, inst.Delegation.Inputs, e.Coins, txs,
+		template.Fee{Intent: info.IntentFees, Dust: info.Dust}, s.cosignerKey.PubKey(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -303,28 +304,25 @@ func (b *batchWorker) started(ev ports.BatchStarted) {
 	var taken []int64
 	for i, h := range ours {
 		if errs[i] != nil {
-			b.s.send(attemptFailed{attempt: h.attempt, err: fmt.Errorf("confirm intent: %w", errs[i]), retryIn: b.s.session.Duration})
+			b.s.send(
+				attemptFailed{
+					attempt: h.attempt, err: fmt.Errorf("confirm intent: %w", errs[i]),
+					retryIn: b.s.session.Duration,
+				},
+			)
 			continue
 		}
 		r.intents = append(r.intents, h)
 		taken = append(taken, h.attempt.DelegationID)
 	}
-	log.WithFields(log.Fields{"batch": ev.ID, "ours": len(ours), "confirmed": len(r.intents)}).Info("batch started")
+	log.WithFields(log.Fields{"batch": ev.ID, "ours": len(ours), "confirmed": len(r.intents)}).
+		Info("batch started")
 	b.s.send(selected{delegations: taken})
 	if len(r.intents) > 0 {
 		b.inFlight = r
 		return
 	}
 	b.unfollow(r)
-}
-
-func topicsOf(cosigner string, intents []*registration) []string {
-	topics := []string{cosigner}
-	for _, h := range intents {
-		topics = append(topics, h.attempt.Coins...)
-	}
-	slices.Sort(topics)
-	return slices.Compact(topics)
 }
 
 // unfollow stops the trees of a batch coming.
@@ -413,7 +411,9 @@ func (b *batchWorker) finalization(ev ports.BatchFinalization) {
 			return
 		}
 		var err error
-		if forfeits[i], err = h.intent.Forfeits(connectors[:n], b.s.info.ForfeitOutputScript); err != nil {
+		if forfeits[i], err = h.intent.Forfeits(
+			connectors[:n], b.s.info.ForfeitOutputScript,
+		); err != nil {
 			b.abort(err)
 			return
 		}
@@ -429,16 +429,20 @@ func (b *batchWorker) finalization(ev ports.BatchFinalization) {
 	}
 }
 
-// forfeit has the emulator cosign the forfeits and the boarding inputs when the covenant needs it, signs
-// them and submits them.
-func (b *batchWorker) forfeit(h *registration, forfeits []string, connectors tree.FlatTxTree, commitmentTx string) error {
+// forfeit has the emulator cosign the forfeits and the boarding inputs when the covenant needs it,
+// signs them and submits them.
+func (b *batchWorker) forfeit(
+	h *registration, forfeits []string, connectors tree.FlatTxTree, commitmentTx string,
+) error {
 	signed, remoteCommitment := forfeits, ""
 	if h.intent.HasArkadePacket {
 		boarding, err := boardingCommitment(h.intent, commitmentTx)
 		if err != nil {
 			return err
 		}
-		if signed, remoteCommitment, err = b.s.emulator.SubmitFinalization(b.s.ctx, *h.intent, forfeits, connectors, boarding); err != nil {
+		if signed, remoteCommitment, err = b.s.emulator.SubmitFinalization(
+			b.s.ctx, *h.intent, forfeits, connectors, boarding,
+		); err != nil {
 			return fmt.Errorf("emulator finalization: %w", refusal(b.s.ctx, err))
 		}
 	}
@@ -476,11 +480,12 @@ func (b *batchWorker) finalized(ev ports.BatchFinalized) {
 		}
 		b.s.send(attemptDone{attempt: h.attempt})
 	}
-	log.WithFields(log.Fields{"batch": ev.ID, "commitment_txid": ev.CommitmentTxid, "intents": len(r.intents)}).Info("batch finalized")
+	log.WithFields(log.Fields{"batch": ev.ID, "commitment_txid": ev.CommitmentTxid, "intents": len(r.intents)}).
+		Info("batch finalized")
 }
 
-// abort fails the attempts of the batch: their coins are tried again on a later one, the blamed ones after a ban.
-// A daemon that is stopping leaves them as they are.
+// abort fails the attempts of the batch: their coins are tried again on a later one, the blamed
+// ones after a ban. A daemon that is stopping leaves them as they are.
 func (b *batchWorker) abort(err error, blamed ...string) {
 	r := b.inFlight
 	b.inFlight = nil
@@ -511,7 +516,9 @@ func (b *batchWorker) expire(now time.Time) {
 			continue
 		}
 		delete(b.intents, id)
-		b.s.send(attemptFailed{attempt: h.attempt, err: errNotSelected, retryIn: b.s.session.Duration})
+		b.s.send(
+			attemptFailed{attempt: h.attempt, err: errNotSelected, retryIn: b.s.session.Duration},
+		)
 	}
 }
 
@@ -520,7 +527,8 @@ func (s *Service) enqueue(ev intentReady) {
 	e := execution.NewEntry(ev.coins, s.limits.Reserve)
 	if _, ok := s.entries[e.DelegationID]; !ok {
 		s.entries[e.DelegationID] = e
-		log.WithFields(log.Fields{"delegation": e.DelegationID, "deadline": e.Deadline}).Debug("queued")
+		log.WithFields(log.Fields{"delegation": e.DelegationID, "deadline": e.Deadline}).
+			Debug("queued")
 	}
 }
 
@@ -528,18 +536,39 @@ func (s *Service) dequeue(delegationID int64) {
 	delete(s.entries, delegationID)
 }
 
-// withdraw takes the delegation's entry out of the queue while it is not reserved, only when it holds one
-// of outpoints if any are given, and gives its coins back.
+// withdraw takes the delegation's entry out of the queue while it is not reserved, only when it
+// holds one of outpoints if any are given, and gives its coins back.
 func (s *Service) withdraw(delegationID int64, outpoints ...string) {
 	e, ok := s.entries[delegationID]
 	if !ok || e.Reserved {
 		return
 	}
-	if len(outpoints) > 0 && !slices.ContainsFunc(e.Outpoints(), func(op string) bool { return slices.Contains(outpoints, op) }) {
+	if len(outpoints) > 0 &&
+		!slices.ContainsFunc(
+			e.Outpoints(), func(op string) bool { return slices.Contains(outpoints, op) },
+		) {
 		return
 	}
 	delete(s.entries, delegationID)
 	s.release(e.Outpoints(), time.Time{})
+}
+
+func newBatchWorker(s *Service) *batchWorker {
+	return &batchWorker{
+		s: s, commands: make(chan []execution.Entry, 256), built: make(chan *registration, 256),
+		intents: map[string]*registration{},
+		quiet:   make(chan chan struct{}),
+		exited:  make(chan struct{}),
+	}
+}
+
+func topicsOf(cosigner string, intents []*registration) []string {
+	topics := []string{cosigner}
+	for _, h := range intents {
+		topics = append(topics, h.attempt.Coins...)
+	}
+	slices.Sort(topics)
+	return slices.Compact(topics)
 }
 
 func sweepTapTreeRoot(forfeitKey *btcec.PublicKey, expiry arklib.RelativeLocktime) ([]byte, error) {

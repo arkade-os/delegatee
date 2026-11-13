@@ -61,8 +61,12 @@ func TestNewDelegationDerivesVtxoAddressAndInputFromTemplate(t *testing.T) {
 
 	decoded, err := arklib.DecodeAddressV0(d.Address)
 	require.NoError(t, err)
-	require.Equal(t, in.Script, "5120"+hex.EncodeToString(schnorr.SerializePubKey(decoded.VtxoTapKey)))
-	require.Equal(t, schnorr.SerializePubKey(p.Keys.Server), schnorr.SerializePubKey(decoded.Signer))
+	require.Equal(
+		t, in.Script, "5120"+hex.EncodeToString(schnorr.SerializePubKey(decoded.VtxoTapKey)),
+	)
+	require.Equal(
+		t, schnorr.SerializePubKey(p.Keys.Server), schnorr.SerializePubKey(decoded.Signer),
+	)
 }
 
 func TestNewDelegationKeepsExpiryAndVariablesChangeTheAddress(t *testing.T) {
@@ -117,7 +121,9 @@ func TestNewDelegationWithSecretsNeedsAnEncryptionKey(t *testing.T) {
 	_, err := NewDelegation(secretParams(t, nil))
 	require.ErrorIs(t, err, ErrNoEncryptionKey)
 
-	d, err := NewDelegation(secretParams(t, func([]byte) ([]byte, error) { return make([]byte, 32), nil }))
+	d, err := NewDelegation(
+		secretParams(t, func([]byte) ([]byte, error) { return make([]byte, 32), nil }),
+	)
 	require.NoError(t, err)
 	require.NotEmpty(t, d.Address)
 }
@@ -142,7 +148,10 @@ func TestNewDelegationInputKeepsTheRefundLeafLocktimeButNotTheClaimLeaf(t *testi
 	p := spawnParams(t)
 	var v struct{ Vars map[string]string }
 	require.NoError(t, json.Unmarshal(fixture(t, "vhtlc_vector.json"), &v))
-	p2 := DelegationParams{Variables: v.Vars, Now: p.Now, Keys: p.Keys, Decrypt: p.Decrypt, Network: arklib.BitcoinRegTest}
+	p2 := DelegationParams{
+		Variables: v.Vars, Now: p.Now, Keys: p.Keys, Decrypt: p.Decrypt,
+		Network: arklib.BitcoinRegTest,
+	}
 	p2.Template = parseDoc(t, fixture(t, "vhtlc_refund.json"))
 	d, err := NewDelegation(p2)
 	require.NoError(t, err)
@@ -214,8 +223,12 @@ func renewalParams(t *testing.T) DelegationParams {
 	return DelegationParams{
 		Template: tmpl,
 		Variables: map[string]string{
-			"owner": hex.EncodeToString(owner.PubKey().SerializeCompressed()), "exit_delay": scriptNum(1<<22 | 1),
-			"renewal_window": scriptNum(1024), "max_fee": scriptNum(1000),
+			"owner": hex.EncodeToString(
+				owner.PubKey().SerializeCompressed(),
+			),
+			"exit_delay":     scriptNum(1<<22 | 1),
+			"renewal_window": scriptNum(1024),
+			"max_fee":        scriptNum(1000),
 		},
 		Now: time.Unix(1_800_000_000, 0), MinExpiry: 24 * time.Hour,
 		Keys: testKeys(t), Network: arklib.BitcoinRegTest,
@@ -227,29 +240,48 @@ func secretParams(t *testing.T, decrypt func([]byte) ([]byte, error)) Delegation
 	p := renewalParams(t)
 	p.Template = parseDoc(t, []byte(`{
   "format": "template/v1",
-  "type": "offchain",
-  "variables": {"ciphertext": "bytes"},
-  "secrets": {"preimage": {"type": "bytes32", "from": "htlc", "ciphertext": "<ciphertext>"}},
-  "inputs": [{
-    "name": "htlc",
-    "contract": {
-      "definition": {
-        "contractName": "HashLock",
-        "constructorInputs": [{"name": "h", "type": "bytes20"}],
-        "structs": [],
-        "functions": [{"name": "claim", "leaves": [{"name": "claim",
-          "asm": ["OP_HASH160", "<h>", "OP_EQUALVERIFY", "<SERVER_KEY>", "OP_CHECKSIG"],
-          "witness": [{"name": "preimage", "type": "bytes32", "encoding": "raw"},
-                      {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true}]}]}]
+  "type": "virtual",
+  "variables": {"preimage": "bytes32"},
+  "inputs": [
+    {
+      "name": "htlc",
+      "contract": {
+        "definition": {
+          "contractName": "HashLock",
+          "constructorInputs": [{"name": "h", "type": "bytes20"}],
+          "structs": [],
+          "functions": [
+            {
+              "name": "claim",
+              "leaves": [
+                {
+                  "name": "claim",
+                  "asm": ["OP_HASH160", "<h>", "OP_EQUALVERIFY", "<SERVER_KEY>", "OP_CHECKSIG"],
+                  "witness": [
+                    {"name": "preimage", "type": "bytes32", "encoding": "raw"},
+                    {"name": "serverSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "arguments": {"h": "$(<preimage> OP_HASH160)"}
       },
-      "arguments": {"h": "$(<preimage> OP_HASH160)"}
-    },
-    "spend": {"function": "claim", "leaf": "claim", "witness": {"preimage": "<preimage>"}}
-  }],
-  "outputs": [{"name": "payout", "index": 0, "value": {"from": "htlc"},
-    "locking": "5120f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"}]
+      "spend": {"function": "claim", "leaf": "claim", "witness": {"preimage": "<preimage>"}}
+    }
+  ],
+  "outputs": [
+    {
+      "name": "payout",
+      "index": 0,
+      "value": {"from": "htlc"},
+      "locking": "5120f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"
+    }
+  ],
+  "delegation": {"sealed": ["preimage"]}
 }`))
-	p.Variables = map[string]string{"ciphertext": "00"}
+	p.Variables = map[string]string{"preimage": "00"}
 	p.Decrypt = decrypt
 	return p
 }

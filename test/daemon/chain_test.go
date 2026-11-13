@@ -24,14 +24,24 @@ func TestFundedUtxoAppearsThenConfirms(t *testing.T) {
 	require.Equal(t, outpoint, coins[0].Outpoint)
 	require.Equal(t, "50000", coins[0].Amount)
 	require.Zero(t, coins[0].Confirmations, "in the mempool")
-	require.Greater(t, atoi(t, coins[0].Due), time.Now().Unix()+1800, "waiting for its confirmation")
+	require.Greater(
+		t, atoi(t, coins[0].Due), time.Now().Unix()+1800, "waiting for its confirmation",
+	)
 
 	d.Chain.Mine(2)
-	require.Eventually(t, func() bool { return coinsOf(t, d, w.ID)[0].Confirmations == 2 }, 5*time.Second, 50*time.Millisecond)
-	require.LessOrEqual(t, atoi(t, coinsOf(t, d, w.ID)[0].Due), time.Now().Unix(), "confirmed, it is due")
+	require.Eventually(
+		t, func() bool { return coinsOf(t, d, w.ID)[0].Confirmations == 2 }, 5*time.Second,
+		50*time.Millisecond,
+	)
+	require.LessOrEqual(
+		t, atoi(t, coinsOf(t, d, w.ID)[0].Due), time.Now().Unix(), "confirmed, it is due",
+	)
 
 	d.Chain.Mine(1)
-	require.Eventually(t, func() bool { return coinsOf(t, d, w.ID)[0].Confirmations == 3 }, 5*time.Second, 50*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return coinsOf(t, d, w.ID)[0].Confirmations == 3 }, 5*time.Second,
+		50*time.Millisecond,
+	)
 	require.Equal(t, 1, tableRows(t, d, "coins WHERE onchain"))
 	require.Equal(t, 3, confirmationRows(t, d))
 }
@@ -45,13 +55,19 @@ func TestRestartListsOnlyTheScriptsThatChanged(t *testing.T) {
 	d.Chain.Fund(scriptB, 2000)
 	waitCoins(t, d, a.ID, 1)
 	waitCoins(t, d, b.ID, 1)
-	require.Eventually(t, func() bool { return tableRows(t, d, "script_status WHERE status <> ''") == 2 }, 5*time.Second, 50*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return tableRows(t, d, "script_status WHERE status <> ''") == 2 },
+		5*time.Second, 50*time.Millisecond,
+	)
 
 	d.Stop()
 	d.Chain.Fund(scriptB, 3000)
 	d = d.Restart(t)
 	require.Len(t, waitCoins(t, d, b.ID, 2), 2)
-	require.Never(t, func() bool { return d.Chain.UnspentCalls(scriptA) > 0 }, 300*time.Millisecond, 20*time.Millisecond)
+	require.Never(
+		t, func() bool { return d.Chain.UnspentCalls(scriptA) > 0 }, 300*time.Millisecond,
+		20*time.Millisecond,
+	)
 	require.Equal(t, 1, d.Chain.UnspentCalls(scriptB))
 	require.Len(t, coinsOf(t, d, a.ID), 1, "its coin comes from the stored coins")
 }
@@ -66,7 +82,12 @@ func TestReconnectListsOnlyTheScriptsThatChanged(t *testing.T) {
 	d.Chain.Fund(scriptB, 2000)
 	d.Chain.Mine(1)
 	for _, id := range []string{a.ID, b.ID} {
-		require.Eventually(t, func() bool { return len(coinsOf(t, d, id)) == 1 && coinsOf(t, d, id)[0].Confirmations == 1 }, 5*time.Second, 50*time.Millisecond)
+		require.Eventually(
+			t,
+			func() bool { return len(coinsOf(t, d, id)) == 1 && coinsOf(t, d, id)[0].Confirmations == 1 },
+			5*time.Second,
+			50*time.Millisecond,
+		)
 	}
 	require.Equal(t, int64(101), tipHeight(t, d))
 	d.Chain.ResetCalls()
@@ -78,11 +99,16 @@ func TestReconnectListsOnlyTheScriptsThatChanged(t *testing.T) {
 	require.Equal(t, int64(101), tipHeight(t, d), "nothing reaches the daemon while it is down")
 	d.Chain.Reconnect()
 
-	require.Eventually(t, func() bool { return tipHeight(t, d) == 103 }, 5*time.Second, 50*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return tipHeight(t, d) == 103 }, 5*time.Second, 50*time.Millisecond,
+	)
 	coins := waitCoins(t, d, b.ID, 2)
 	require.Equal(t, 2, coins[0].Confirmations, "mined at 102, the coin without a known time first")
 	require.Equal(t, 3, coins[1].Confirmations)
-	require.Eventually(t, func() bool { return coinsOf(t, d, a.ID)[0].Confirmations == 3 }, 5*time.Second, 50*time.Millisecond)
+	require.Eventually(
+		t, func() bool { return coinsOf(t, d, a.ID)[0].Confirmations == 3 }, 5*time.Second,
+		50*time.Millisecond,
+	)
 	require.Zero(t, d.Chain.UnspentCalls(scriptA), "its status did not change")
 	require.Equal(t, 1, d.Chain.UnspentCalls(scriptB))
 }
@@ -95,15 +121,22 @@ func TestBoardingInputBoardsThenRenews(t *testing.T) {
 	outpoint := d.Chain.Fund(board.Inputs[0].Script, 20_000)
 	d.Chain.Mine(1)
 	attempts := waitAttempts(t, d, board.ID, 1, "succeeded")
-	require.Equal(t, "intent", attempts[0].Kind)
+	require.Equal(t, "proof", attempts[0].Kind)
 	require.Equal(t, []string{outpoint}, attempts[0].Coins)
 	require.Equal(t, d.Arkd.Commitments()[0], attempts[0].Txid)
-	require.Equal(t, "spent", coinsOf(t, d, board.ID)[0].Status, "the commitment spent the boarding input")
+	require.Equal(
+		t, "spent", coinsOf(t, d, board.ID)[0].Status, "the commitment spent the boarding input",
+	)
 	require.Equal(t, 1, d.Emu.Intents)
 	require.Equal(t, 1, d.Emu.Finalizations)
 
-	require.Eventually(t, func() bool { return len(coinsOf(t, d, renewal.ID)) > 0 }, 5*time.Second, 20*time.Millisecond, "the vtxo landed at the renewal delegation's script")
-	require.Equal(t, "19500", coinsOf(t, d, renewal.ID)[0].Amount, "the boarding input less the fee")
+	require.Eventually(
+		t, func() bool { return len(coinsOf(t, d, renewal.ID)) > 0 }, 5*time.Second,
+		20*time.Millisecond, "the vtxo landed at the renewal delegation's script",
+	)
+	require.Equal(
+		t, "19500", coinsOf(t, d, renewal.ID)[0].Amount, "the boarding input less the fee",
+	)
 
 	waitAttempts(t, d, renewal.ID, 1, "succeeded")
 	require.Eventually(t, func() bool {
@@ -136,12 +169,17 @@ func TestBoardingInputIsRegisteredAtOnce(t *testing.T) {
 	d := Start(t, WithSessions(500*time.Millisecond, 128))
 	d.Arkd.PauseBatches(true)
 	board, renewal := boardingAndRenewal(t, d, 2)
-	d.Arkd.FundAged(renewal.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(6*time.Hour+time.Minute))
+	d.Arkd.FundAged(
+		renewal.Inputs[0].Script, 10_000, time.Hour, time.Now().Add(6*time.Hour+time.Minute),
+	)
 	waitCoins(t, d, renewal.ID, 1)
 
 	d.Chain.Fund(board.Inputs[0].Script, 20_000)
 	d.Chain.Mine(1)
-	require.Eventually(t, func() bool { return d.Arkd.Registered() == 1 }, 2*time.Second, 20*time.Millisecond, "no renewal is waited for")
+	require.Eventually(
+		t, func() bool { return d.Arkd.Registered() == 1 }, 2*time.Second, 20*time.Millisecond,
+		"no renewal is waited for",
+	)
 	require.Empty(t, d.Arkd.RegisteredCoins(), "the vtxo is not registered with it")
 }
 
@@ -184,7 +222,10 @@ func tipHeight(t *testing.T, d *Daemon) int64 {
 func confirmationRows(t *testing.T, d *Daemon) int {
 	t.Helper()
 	var n int
-	require.NoError(t, d.DB.QueryRowContext(t.Context(), "SELECT confirmations FROM coins WHERE onchain").Scan(&n))
+	require.NoError(
+		t,
+		d.DB.QueryRowContext(t.Context(), "SELECT confirmations FROM coins WHERE onchain").Scan(&n),
+	)
 	return n
 }
 
@@ -195,8 +236,8 @@ func atoi(t *testing.T, s string) int64 {
 	return n
 }
 
-// boardingAndRenewal registers a boarding delegation and the renewal delegation whose script its boarding inputs board
-// into; both renew in window seconds.
+// boardingAndRenewal registers a boarding delegation and the renewal delegation whose script its
+// boarding inputs board into; both renew in window seconds.
 func boardingAndRenewal(t *testing.T, d *Daemon, window int64) (board, renewal delegation) {
 	t.Helper()
 	variables := boardingVariables(t)
@@ -205,17 +246,30 @@ func boardingAndRenewal(t *testing.T, d *Daemon, window int64) (board, renewal d
 	_, boardingID := registerShipped(t, d, "board.json")
 	renewing := maps.Clone(variables)
 	delete(renewing, "boarding_exit_delay")
-	return registerDelegationWith(t, d, boardingID, variables), registerDelegationWith(t, d, renewalID, renewing)
+	return registerDelegationWith(
+			t,
+			d,
+			boardingID,
+			variables,
+		), registerDelegationWith(
+			t, d, renewalID, renewing,
+		)
 }
 
-func registerDelegationWith(t *testing.T, d *Daemon, templateID string, variables map[string]string) delegation {
+func registerDelegationWith(
+	t *testing.T, d *Daemon, templateID string, variables map[string]string,
+) delegation {
 	t.Helper()
-	code, body := post(t, d.RestURL+"/v1/delegation", map[string]any{"templateId": templateID, "variables": variables})
+	code, body := post(
+		t, d.RestURL+"/v1/delegation",
+		map[string]any{"templateId": templateID, "variables": variables},
+	)
 	require.Equal(t, http.StatusOK, code, string(body))
 	return decodeDelegation(t, body)
 }
 
-// waitAttempts waits for the delegation to have n attempts, the newest with status, and returns them.
+// waitAttempts waits for the delegation to have n attempts, the newest with status, and returns
+// them.
 func waitAttempts(t *testing.T, d *Daemon, id string, n int, status string) []attempt {
 	t.Helper()
 	var attempts []attempt

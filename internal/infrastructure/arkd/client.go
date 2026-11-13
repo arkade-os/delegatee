@@ -81,9 +81,16 @@ func (c *Client) Info(ctx context.Context) (ports.ArkInfo, error) {
 		return ports.ArkInfo{}, fmt.Errorf("arkd checkpoint tapscript: %w", err)
 	}
 	return ports.ArkInfo{
-		Network: clientlib.NetworkFromString(info.Network), SignerPubkey: signer, ForfeitPubkey: forfeit, ForfeitOutputScript: forfeitScript, Dust: info.Dust,
-		IntentFees: info.Fees.IntentFees, CheckpointTapscript: unroll,
-		SessionDuration: time.Duration(info.SessionDuration) * time.Second,
+		Network: clientlib.NetworkFromString(
+			info.Network,
+		),
+		SignerPubkey:        signer,
+		ForfeitPubkey:       forfeit,
+		ForfeitOutputScript: forfeitScript,
+		Dust:                info.Dust,
+		IntentFees:          info.Fees.IntentFees,
+		CheckpointTapscript: unroll,
+		SessionDuration:     time.Duration(info.SessionDuration) * time.Second,
 	}, nil
 }
 
@@ -106,19 +113,27 @@ func (c *Client) ConfirmRegistration(ctx context.Context, proofTxid string) erro
 	return c.ark.ConfirmRegistration(ctx, id)
 }
 
-func (c *Client) SubmitTreeNonces(ctx context.Context, batchID, cosigner string, nonces tree.TreeNonces) error {
+func (c *Client) SubmitTreeNonces(
+	ctx context.Context, batchID, cosigner string, nonces tree.TreeNonces,
+) error {
 	return c.ark.SubmitTreeNonces(ctx, batchID, cosigner, nonces)
 }
 
-func (c *Client) SubmitTreeSignatures(ctx context.Context, batchID, cosigner string, signatures tree.TreePartialSigs) error {
+func (c *Client) SubmitTreeSignatures(
+	ctx context.Context, batchID, cosigner string, signatures tree.TreePartialSigs,
+) error {
 	return c.ark.SubmitTreeSignatures(ctx, batchID, cosigner, signatures)
 }
 
-func (c *Client) SubmitSignedForfeitTxs(ctx context.Context, signedForfeits []string, signedCommitmentTx string) error {
+func (c *Client) SubmitSignedForfeitTxs(
+	ctx context.Context, signedForfeits []string, signedCommitmentTx string,
+) error {
 	return c.ark.SubmitSignedForfeitTxs(ctx, signedForfeits, signedCommitmentTx)
 }
 
-func (c *Client) SubmitTx(ctx context.Context, signedArkTx string, checkpoints []string) (string, string, []string, error) {
+func (c *Client) SubmitTx(
+	ctx context.Context, signedArkTx string, checkpoints []string,
+) (string, string, []string, error) {
 	return c.ark.SubmitTx(ctx, signedArkTx, checkpoints)
 }
 
@@ -204,8 +219,8 @@ func (c *Client) Close() {
 // batch's commitment, else the ark transaction, else what arkd names.
 func toOutput(v clientlib.Vtxo) ports.Output {
 	o := ports.Output{
-		Outpoint: v.Outpoint.String(), Script: v.Script, Amount: v.Amount, ExpiresAt: v.ExpiresAt, CreatedAt: v.CreatedAt,
-		Spent: v.Spent || v.Swept || v.Unrolled, Swept: v.Swept,
+		Outpoint: v.Outpoint.String(), Script: v.Script, Amount: v.Amount, ExpiresAt: v.ExpiresAt,
+		CreatedAt: v.CreatedAt, Spent: v.Spent || v.Swept || v.Unrolled, Swept: v.Swept,
 	}
 	if o.Spent {
 		o.SpentBy = cmp.Or(v.SettledBy, v.ArkTxid, v.SpentBy)

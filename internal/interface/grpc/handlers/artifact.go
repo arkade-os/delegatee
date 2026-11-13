@@ -23,9 +23,12 @@ type Executor struct {
 }
 
 func NewExecutor(
-	registry *app.Service, delegations *delegationapp.Service, execution *executionapp.Service, version string,
+	registry *app.Service, delegations *delegationapp.Service, execution *executionapp.Service,
+	version string,
 ) *Executor {
-	return &Executor{registry: registry, delegations: delegations, execution: execution, version: version}
+	return &Executor{
+		registry: registry, delegations: delegations, execution: execution, version: version,
+	}
 }
 
 func (h *Executor) RegisterArtifact(
@@ -55,7 +58,9 @@ func (h *Executor) GetArtifact(
 }
 
 func toArtifact(a *registry.Artifact) *executorv1.Artifact {
-	return &executorv1.Artifact{Id: a.ID, Document: string(a.Document), CreatedAt: a.CreatedAt.Unix()}
+	return &executorv1.Artifact{
+		Id: a.ID, Document: string(a.Document), CreatedAt: a.CreatedAt.Unix(),
+	}
 }
 
 func toStatus(err error) error {

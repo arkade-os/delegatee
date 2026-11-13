@@ -115,7 +115,10 @@ func TestMergeAddsSignaturesOnce(t *testing.T) {
 // leafTx spends prev, a one-leaf taproot output whose leaf is <key> OP_CHECKSIG.
 func leafTx(t *testing.T, key *btcec.PublicKey, prev wire.OutPoint) *psbt.Packet {
 	t.Helper()
-	leaf, err := txscript.NewScriptBuilder().AddData(schnorr.SerializePubKey(key)).AddOp(txscript.OP_CHECKSIG).Script()
+	leaf, err := txscript.NewScriptBuilder().
+		AddData(schnorr.SerializePubKey(key)).
+		AddOp(txscript.OP_CHECKSIG).
+		Script()
 	require.NoError(t, err)
 	tree := txscript.AssembleTaprootScriptTree(txscript.NewBaseTapLeaf(leaf))
 	internal := testKey(9).PubKey()
@@ -127,10 +130,15 @@ func leafTx(t *testing.T, key *btcec.PublicKey, prev wire.OutPoint) *psbt.Packet
 	controlBytes, err := control.ToBytes()
 	require.NoError(t, err)
 
-	tx, err := psbt.New([]*wire.OutPoint{&prev}, []*wire.TxOut{wire.NewTxOut(900, pkScript)}, 2, 0, []uint32{wire.MaxTxInSequenceNum})
+	tx, err := psbt.New(
+		[]*wire.OutPoint{&prev}, []*wire.TxOut{wire.NewTxOut(900, pkScript)}, 2, 0,
+		[]uint32{wire.MaxTxInSequenceNum},
+	)
 	require.NoError(t, err)
 	tx.Inputs[0].WitnessUtxo = wire.NewTxOut(1000, pkScript)
-	tx.Inputs[0].TaprootLeafScript = []*psbt.TaprootTapLeafScript{{ControlBlock: controlBytes, Script: leaf, LeafVersion: txscript.BaseLeafVersion}}
+	tx.Inputs[0].TaprootLeafScript = []*psbt.TaprootTapLeafScript{
+		{ControlBlock: controlBytes, Script: leaf, LeafVersion: txscript.BaseLeafVersion},
+	}
 	return tx
 }
 
@@ -180,17 +188,21 @@ func signWith(t *testing.T, tx *psbt.Packet, key *btcec.PrivateKey) {
 	xOnly := schnorr.SerializePubKey(key.PubKey())
 	for i := range tx.Inputs {
 		in := &tx.Inputs[i]
-		if len(in.TaprootLeafScript) == 0 || !bytes.Contains(in.TaprootLeafScript[0].Script, xOnly) {
+		if len(in.TaprootLeafScript) == 0 ||
+			!bytes.Contains(in.TaprootLeafScript[0].Script, xOnly) {
 			continue
 		}
 		leaf := txscript.NewBaseTapLeaf(in.TaprootLeafScript[0].Script)
-		sighash, err := txscript.CalcTapscriptSignaturehash(hashes, txscript.SigHashDefault, tx.UnsignedTx, i, fetcher, leaf)
+		sighash, err := txscript.CalcTapscriptSignaturehash(
+			hashes, txscript.SigHashDefault, tx.UnsignedTx, i, fetcher, leaf,
+		)
 		require.NoError(t, err)
 		sig, err := schnorr.Sign(key, sighash)
 		require.NoError(t, err)
 		hash := leaf.TapHash()
 		in.TaprootScriptSpendSig = append(in.TaprootScriptSpendSig, &psbt.TaprootScriptSpendSig{
-			XOnlyPubKey: xOnly, LeafHash: hash[:], Signature: sig.Serialize(), SigHash: txscript.SigHashDefault,
+			XOnlyPubKey: xOnly, LeafHash: hash[:], Signature: sig.Serialize(),
+			SigHash: txscript.SigHashDefault,
 		})
 	}
 }

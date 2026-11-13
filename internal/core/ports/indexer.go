@@ -23,7 +23,8 @@ type Output struct {
 	SpentBy   string    // the batch or transaction that spent it, empty when unknown
 }
 
-// ScriptEvent is what one transaction did at watched scripts: the outputs it created, then those it spent.
+// ScriptEvent is what one transaction did at watched scripts: the outputs it created, then those it
+// spent.
 type ScriptEvent struct {
 	Txid    string
 	Outputs []Output
@@ -37,7 +38,8 @@ type Indexer interface {
 	Subscribe(ctx context.Context, scripts []string) (Subscription, error)
 	// VirtualTxs returns the transactions by txid; every txid must be found.
 	VirtualTxs(ctx context.Context, txids []string) (map[string]*wire.MsgTx, error)
-	// Transactions follows every ark transaction arkd accepts, as base64 psbts, until ctx ends or stop is called.
+	// Transactions follows every ark transaction arkd accepts, as base64 psbts, until ctx ends or
+	// stop is called.
 	Transactions(ctx context.Context) (txs <-chan string, stop func(), err error)
 }
 

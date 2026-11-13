@@ -63,16 +63,27 @@ func CheckNumbers(v any) error {
 	return nil
 }
 
+// Canonical serializes a decoded value per RFC 8785, restricted to safe integers.
+func Canonical(v any) ([]byte, error) {
+	var b bytes.Buffer
+	if err := writeCanonical(&b, v); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
+}
+
 func safeInt(x json.Number) (int64, error) {
 	s := x.String()
 	n, err := strconv.ParseInt(s, 10, 64)
-	if err != nil || s == "-0" || strings.ContainsAny(s, ".eE") || n > maxSafeInt || n < -maxSafeInt {
+	if err != nil || s == "-0" || strings.ContainsAny(s, ".eE") || n > maxSafeInt ||
+		n < -maxSafeInt {
 		return 0, fmt.Errorf("%w: unsupported number %s", ErrInvalid, s)
 	}
 	return n, nil
 }
 
-// scan rejects excessive nesting and unpaired surrogate escapes, which encoding/json would replace silently.
+// scan rejects excessive nesting and unpaired surrogate escapes, which encoding/json would replace
+// silently.
 func scan(doc []byte) error {
 	depth := 0
 	for i := 0; i < len(doc); i++ {
@@ -99,7 +110,10 @@ func scan(doc []byte) error {
 				if u >= 0xDC00 {
 					return fmt.Errorf("lone low surrogate escape")
 				}
-				if l, ok := hex4(doc, i+3); !ok || doc[i+1] != '\\' || doc[i+2] != 'u' || l < 0xDC00 || l > 0xDFFF {
+				if l, ok := hex4(
+					doc, i+3,
+				); !ok || doc[i+1] != '\\' || doc[i+2] != 'u' || l < 0xDC00 ||
+					l > 0xDFFF {
 					return fmt.Errorf("lone high surrogate escape")
 				}
 				i += 6
@@ -154,15 +168,6 @@ func decodeValue(dec *json.Decoder) (any, error) {
 	}
 	_, err = dec.Token()
 	return obj, err
-}
-
-// Canonical serializes a decoded value per RFC 8785, restricted to safe integers.
-func Canonical(v any) ([]byte, error) {
-	var b bytes.Buffer
-	if err := writeCanonical(&b, v); err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
 }
 
 func writeCanonical(b *bytes.Buffer, v any) error {

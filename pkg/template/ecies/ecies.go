@@ -67,7 +67,9 @@ func Decrypt(key *btcec.PrivateKey, ciphertext []byte, templateID string) ([]byt
 		return nil, fmt.Errorf("ecies: private key is nil")
 	}
 	if len(ciphertext) < minLen {
-		return nil, fmt.Errorf("ecies: ciphertext too short: got %d bytes, need at least %d", len(ciphertext), minLen)
+		return nil, fmt.Errorf(
+			"ecies: ciphertext too short: got %d bytes, need at least %d", len(ciphertext), minLen,
+		)
 	}
 
 	ephPubBytes := ciphertext[:pubKeyLen]

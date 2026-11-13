@@ -17,7 +17,9 @@ func (d *DB) Delegations() *DelegationRepository { return &DelegationRepository{
 
 func (r *DelegationRepository) AddOrUpdate(ctx context.Context, d *delegation.Delegation) error {
 	if d.ID != 0 {
-		n, err := r.db.querier.UpdateDelegationStatus(ctx, queries.UpdateDelegationStatusParams{ID: d.ID, Status: d.Status})
+		n, err := r.db.querier.UpdateDelegationStatus(
+			ctx, queries.UpdateDelegationStatusParams{ID: d.ID, Status: d.Status},
+		)
 		if err != nil {
 			return err
 		}
@@ -46,7 +48,8 @@ func (r *DelegationRepository) AddOrUpdate(ctx context.Context, d *delegation.De
 	}
 	return r.db.inTx(ctx, func(q *queries.Queries) error {
 		row, err := q.InsertDelegation(ctx, queries.InsertDelegationParams{
-			Fingerprint: d.Fingerprint, Address: d.Address, TemplateID: d.TemplateID, Variables: variables, Inputs: inputs,
+			Fingerprint: d.Fingerprint, Address: d.Address, TemplateID: d.TemplateID,
+			Variables: variables, Inputs: inputs,
 			StreamID:  sql.NullInt64{Int64: d.StreamID, Valid: d.StreamID != 0},
 			ExpiresAt: expiresAt,
 		})
@@ -58,7 +61,8 @@ func (r *DelegationRepository) AddOrUpdate(ctx context.Context, d *delegation.De
 				continue
 			}
 			err := q.InsertClaim(ctx, queries.InsertClaimParams{
-				DelegationID: row.ID, Input: int32(i), Script: in.Script, Onchain: in.Onchain, Locktime: int64(in.Locktime),
+				DelegationID: row.ID, Input: int32(i), Script: in.Script, Onchain: in.Onchain,
+				Locktime: int64(in.Locktime),
 			})
 			if err != nil {
 				return err
@@ -77,15 +81,21 @@ func (r *DelegationRepository) Get(ctx context.Context, id int64) (*delegation.D
 	return r.one(r.db.querier.SelectDelegation(ctx, id))
 }
 
-func (r *DelegationRepository) GetByAddress(ctx context.Context, address string) (*delegation.Delegation, error) {
+func (r *DelegationRepository) GetByAddress(
+	ctx context.Context, address string,
+) (*delegation.Delegation, error) {
 	return r.one(r.db.querier.SelectDelegationByAddress(ctx, address))
 }
 
-func (r *DelegationRepository) GetByFingerprint(ctx context.Context, fingerprint string) (*delegation.Delegation, error) {
+func (r *DelegationRepository) GetByFingerprint(
+	ctx context.Context, fingerprint string,
+) (*delegation.Delegation, error) {
 	return r.one(r.db.querier.SelectDelegationByFingerprint(ctx, fingerprint))
 }
 
-func (r *DelegationRepository) Expire(ctx context.Context, before time.Time) ([]delegation.Delegation, error) {
+func (r *DelegationRepository) Expire(
+	ctx context.Context, before time.Time,
+) ([]delegation.Delegation, error) {
 	rows, err := r.db.querier.ExpireDelegations(ctx, before)
 	if err != nil {
 		return nil, err
@@ -93,7 +103,9 @@ func (r *DelegationRepository) Expire(ctx context.Context, before time.Time) ([]
 	return toDelegations(rows)
 }
 
-func (r *DelegationRepository) List(ctx context.Context, f delegation.ListFilter) ([]delegation.Delegation, error) {
+func (r *DelegationRepository) List(
+	ctx context.Context, f delegation.ListFilter,
+) ([]delegation.Delegation, error) {
 	rows, err := r.db.querier.ListDelegations(ctx, queries.ListDelegationsParams{
 		Status: f.Status, Cursor: f.Cursor, MaxCount: int32(f.Limit),
 	})
@@ -105,6 +117,25 @@ func (r *DelegationRepository) List(ctx context.Context, f delegation.ListFilter
 
 func (r *DelegationRepository) Prune(ctx context.Context, before time.Time) (int64, error) {
 	return r.db.querier.PruneDelegations(ctx, before)
+}
+
+func (r *DelegationRepository) CountActive(
+	ctx context.Context,
+) (clients, spawned int64, err error) {
+	row, err := r.db.querier.CountActiveDelegations(ctx)
+	return row.Clients, row.Spawned, err
+}
+
+func (r *DelegationRepository) one(
+	row queries.Delegation, err error,
+) (*delegation.Delegation, error) {
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, delegation.ErrDelegationNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toDelegation(row)
 }
 
 func toDelegations(rows []queries.Delegation) ([]delegation.Delegation, error) {
@@ -119,25 +150,11 @@ func toDelegations(rows []queries.Delegation) ([]delegation.Delegation, error) {
 	return out, nil
 }
 
-func (r *DelegationRepository) CountActive(ctx context.Context) (clients, spawned int64, err error) {
-	row, err := r.db.querier.CountActiveDelegations(ctx)
-	return row.Clients, row.Spawned, err
-}
-
-func (r *DelegationRepository) one(row queries.Delegation, err error) (*delegation.Delegation, error) {
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, delegation.ErrDelegationNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return toDelegation(row)
-}
-
 func toDelegation(row queries.Delegation) (*delegation.Delegation, error) {
 	d := delegation.Delegation{
 		ID: row.ID, Fingerprint: row.Fingerprint, Address: row.Address, TemplateID: row.TemplateID,
-		StreamID: row.StreamID.Int64, Status: row.Status, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		StreamID: row.StreamID.Int64, Status: row.Status, CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
 	}
 	if row.ExpiresAt.Valid {
 		at := row.ExpiresAt.Time

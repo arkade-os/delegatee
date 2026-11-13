@@ -42,7 +42,9 @@ func TestCanonicalBytes(t *testing.T) {
 			} else {
 				require.ErrorIs(t, err, ErrBadValue)
 				if len(tc.raw) > 2 {
-					require.NotContains(t, err.Error(), hex.EncodeToString(tc.raw[1:4]), "no plaintext")
+					require.NotContains(
+						t, err.Error(), hex.EncodeToString(tc.raw[1:4]), "no plaintext",
+					)
 				}
 			}
 		})

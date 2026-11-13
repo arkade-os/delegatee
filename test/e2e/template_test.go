@@ -17,15 +17,24 @@ func TestTemplateRegistry(t *testing.T) {
 	ctx := t.Context()
 	d := start(t)
 	require.Equal(t, registerTemplate(t, d, "renew.json"), registerTemplate(t, d, "renew.json"))
-	_, err := d.client.RegisterTemplate(ctx, &executorv1.RegisterTemplateRequest{Document: `{"format":"template/v1"}`})
+	_, err := d.client.RegisterTemplate(
+		ctx, &executorv1.RegisterTemplateRequest{Document: `{"format":"template/v1"}`},
+	)
 	require.Equal(t, codes.InvalidArgument, status.Code(err), "%v", err)
 
 	boarding := registerTemplate(t, d, "board.json")
 	registerDelegation(t, d, boarding, newOwner(t, d).boardingVariables())
-	_, err = d.admin.UpdateTemplate(ctx, &executorv1.UpdateTemplateRequest{Id: boarding, Status: "disabled"})
+	_, err = d.admin.UpdateTemplate(
+		ctx, &executorv1.UpdateTemplateRequest{Id: boarding, Status: "disabled"},
+	)
 	require.NoError(t, err)
 
-	_, err = d.client.RegisterDelegation(ctx, &executorv1.RegisterDelegationRequest{TemplateId: boarding, Variables: newOwner(t, d).boardingVariables()})
+	_, err = d.client.RegisterDelegation(
+		ctx,
+		&executorv1.RegisterDelegationRequest{
+			TemplateId: boarding, Variables: newOwner(t, d).boardingVariables(),
+		},
+	)
 	require.Equal(t, codes.FailedPrecondition, status.Code(err), "%v", err)
 	_, err = d.admin.DeleteTemplate(ctx, &executorv1.DeleteTemplateRequest{Id: boarding})
 	require.Equal(t, codes.FailedPrecondition, status.Code(err), "%v", err)
@@ -40,7 +49,9 @@ func TestTemplateCannotNameTheCosignerKey(t *testing.T) {
 	d := start(t)
 	release := registerTemplate(t, d, "delegate_release.json")
 
-	_, err := d.client.RegisterDelegation(t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: release})
+	_, err := d.client.RegisterDelegation(
+		t.Context(), &executorv1.RegisterDelegationRequest{TemplateId: release},
+	)
 	require.Equal(t, codes.FailedPrecondition, status.Code(err), "%v", err)
 }
 
@@ -49,10 +60,18 @@ func TestWalletFlowOverREST(t *testing.T) {
 	boarding := registerTemplate(t, d, "board.json")
 	var list struct{ Templates []struct{ Id string } }
 	getJSON(t, d.url+"/v1/templates", &list)
-	require.True(t, slices.ContainsFunc(list.Templates, func(tpl struct{ Id string }) bool { return tpl.Id == boarding }))
+	require.True(
+		t,
+		slices.ContainsFunc(
+			list.Templates, func(tpl struct{ Id string }) bool { return tpl.Id == boarding },
+		),
+	)
 
 	owner := newOwner(t, d)
-	code, out := postJSON(t, d.url+"/v1/delegation", map[string]any{"templateId": boarding, "variables": owner.boardingVariables()})
+	code, out := postJSON(
+		t, d.url+"/v1/delegation",
+		map[string]any{"templateId": boarding, "variables": owner.boardingVariables()},
+	)
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	address := out["delegation"].(map[string]any)["address"].(string)
 	require.Equal(t, owner.boardingAddress(t), address)
@@ -65,9 +84,18 @@ func TestWalletFlowOverREST(t *testing.T) {
 
 	invalid := owner.boardingVariables()
 	invalid["owner"] = "zz"
-	code, _ = postJSON(t, d.url+"/v1/delegation", map[string]any{"templateId": boarding, "variables": invalid})
+	code, _ = postJSON(
+		t, d.url+"/v1/delegation", map[string]any{"templateId": boarding, "variables": invalid},
+	)
 	require.Equal(t, http.StatusBadRequest, code)
-	code, _ = postJSON(t, d.url+"/v1/delegation", map[string]any{"templateId": "nope", "variables": owner.boardingVariables()})
+	code, _ = postJSON(
+		t, d.url+"/v1/delegation",
+		map[string]any{"templateId": "nope", "variables": owner.boardingVariables()},
+	)
 	require.Equal(t, http.StatusNotFound, code)
-	require.Equal(t, http.StatusNotFound, statusOf(t, http.MethodDelete, d.url+"/v1/admin/template/"+boarding), "no admin API on the public port")
+	require.Equal(
+		t, http.StatusNotFound,
+		statusOf(t, http.MethodDelete, d.url+"/v1/admin/template/"+boarding),
+		"no admin API on the public port",
+	)
 }

@@ -11,7 +11,8 @@ import (
 	"github.com/arkade-os/executor/internal/core/domain/registry"
 )
 
-// artifacts is an in-memory registry.ArtifactRepository; Delete checks the references held by templates.
+// artifacts is an in-memory registry.ArtifactRepository; Delete checks the references held by
+// templates.
 type artifacts struct {
 	mu        sync.Mutex
 	rows      map[string]registry.Artifact
@@ -54,7 +55,9 @@ func (r *artifacts) List(_ context.Context) ([]registry.Artifact, error) {
 		a.Document = nil
 		out = append(out, a)
 	}
-	slices.SortFunc(out, func(a, b registry.Artifact) int { return b.CreatedAt.Compare(a.CreatedAt) })
+	slices.SortFunc(
+		out, func(a, b registry.Artifact) int { return b.CreatedAt.Compare(a.CreatedAt) },
+	)
 	return out, nil
 }
 
@@ -122,7 +125,9 @@ func (r *templates) List(_ context.Context, status string) ([]registry.Template,
 			out = append(out, t)
 		}
 	}
-	slices.SortFunc(out, func(a, b registry.Template) int { return b.CreatedAt.Compare(a.CreatedAt) })
+	slices.SortFunc(
+		out, func(a, b registry.Template) int { return b.CreatedAt.Compare(a.CreatedAt) },
+	)
 	return out, nil
 }
 
@@ -173,7 +178,9 @@ func (r *delegations) Get(_ context.Context, id int64) (*delegation.Delegation, 
 	return nil, delegation.ErrDelegationNotFound
 }
 
-func (r *delegations) GetByAddress(_ context.Context, address string) (*delegation.Delegation, error) {
+func (r *delegations) GetByAddress(
+	_ context.Context, address string,
+) (*delegation.Delegation, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	found := -1
@@ -181,7 +188,8 @@ func (r *delegations) GetByAddress(_ context.Context, address string) (*delegati
 		if d.Address != address {
 			continue
 		}
-		if found < 0 || d.Status == delegation.StatusActive || r.rows[found].Status != delegation.StatusActive {
+		if found < 0 || d.Status == delegation.StatusActive ||
+			r.rows[found].Status != delegation.StatusActive {
 			found = i
 		}
 	}
@@ -192,7 +200,9 @@ func (r *delegations) GetByAddress(_ context.Context, address string) (*delegati
 	return &v, nil
 }
 
-func (r *delegations) GetByFingerprint(_ context.Context, fingerprint string) (*delegation.Delegation, error) {
+func (r *delegations) GetByFingerprint(
+	_ context.Context, fingerprint string,
+) (*delegation.Delegation, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if i := r.newest(fingerprint); i >= 0 {
@@ -207,7 +217,8 @@ func (r *delegations) Expire(_ context.Context, before time.Time) ([]delegation.
 	defer r.mu.Unlock()
 	var expired []delegation.Delegation
 	for i := range r.rows {
-		if d := r.rows[i]; d.Status == delegation.StatusActive && d.ExpiresAt != nil && !d.ExpiresAt.After(before) {
+		if d := r.rows[i]; d.Status == delegation.StatusActive && d.ExpiresAt != nil &&
+			!d.ExpiresAt.After(before) {
 			r.rows[i].Status, r.rows[i].UpdatedAt = delegation.StatusExpired, time.Now()
 			expired = append(expired, r.rows[i])
 		}
@@ -215,7 +226,9 @@ func (r *delegations) Expire(_ context.Context, before time.Time) ([]delegation.
 	return expired, nil
 }
 
-func (r *delegations) List(_ context.Context, f delegation.ListFilter) ([]delegation.Delegation, error) {
+func (r *delegations) List(
+	_ context.Context, f delegation.ListFilter,
+) ([]delegation.Delegation, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	out := []delegation.Delegation{}
@@ -248,7 +261,8 @@ func (r *delegations) Prune(_ context.Context, before time.Time) (int64, error) 
 	defer r.mu.Unlock()
 	var n int64
 	r.rows = slices.DeleteFunc(r.rows, func(d delegation.Delegation) bool {
-		gone := d.StreamID != 0 && d.Status == delegation.StatusExpired && !d.ExpiresAt.After(before)
+		gone := d.StreamID != 0 && d.Status == delegation.StatusExpired &&
+			!d.ExpiresAt.After(before)
 		if gone {
 			n++
 		}
@@ -390,7 +404,9 @@ func (r *attempts) ListPending(_ context.Context) ([]delegation.Attempt, error) 
 	return out, nil
 }
 
-func (r *attempts) ListByDelegation(_ context.Context, id, cursor int64, limit int) ([]delegation.Attempt, error) {
+func (r *attempts) ListByDelegation(
+	_ context.Context, id, cursor int64, limit int,
+) ([]delegation.Attempt, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	out := []delegation.Attempt{}

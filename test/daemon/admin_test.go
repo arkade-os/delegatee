@@ -27,7 +27,9 @@ func TestDisableThenEnableTemplate(t *testing.T) {
 	d := Start(t)
 	_, id := registerRenewal(t, d)
 
-	code, body := post(t, d.AdminURL+"/v1/admin/template/"+id, map[string]string{"status": "disabled"})
+	code, body := post(
+		t, d.AdminURL+"/v1/admin/template/"+id, map[string]string{"status": "disabled"},
+	)
 	require.Equal(t, http.StatusOK, code, string(body))
 	code, body = get(t, d.RestURL+"/v1/templates?status=active")
 	require.Equal(t, http.StatusOK, code, string(body))
@@ -115,7 +117,9 @@ func TestDefaultTemplates(t *testing.T) {
 	}
 
 	// the operator's choice survives a restart
-	_, err = d.Admin.UpdateTemplate(t.Context(), &executorv1.UpdateTemplateRequest{Id: id, Status: "disabled"})
+	_, err = d.Admin.UpdateTemplate(
+		t.Context(), &executorv1.UpdateTemplateRequest{Id: id, Status: "disabled"},
+	)
 	require.NoError(t, err)
 	d = d.Restart(t, func(c *config.Config) { c.DefaultTemplates = true })
 	got, err := d.Client.GetTemplate(t.Context(), &executorv1.GetTemplateRequest{Id: id})
@@ -129,10 +133,14 @@ func TestAdminAuthentication(t *testing.T) {
 
 	_, err := d.Admin.ListArtifacts(t.Context(), &executorv1.ListArtifactsRequest{})
 	require.Equal(t, codes.Unauthenticated, status.Code(err))
-	ctx := metadata.AppendToOutgoingContext(t.Context(), "authorization", "Basic "+basic("alice", "secret"))
+	ctx := metadata.AppendToOutgoingContext(
+		t.Context(), "authorization", "Basic "+basic("alice", "secret"),
+	)
 	_, err = d.Admin.ListArtifacts(ctx, &executorv1.ListArtifactsRequest{})
 	require.NoError(t, err)
-	wrong := metadata.AppendToOutgoingContext(t.Context(), "authorization", "Basic "+basic("alice", "nope"))
+	wrong := metadata.AppendToOutgoingContext(
+		t.Context(), "authorization", "Basic "+basic("alice", "nope"),
+	)
 	_, err = d.Admin.ListArtifacts(wrong, &executorv1.ListArtifactsRequest{})
 	require.Equal(t, codes.Unauthenticated, status.Code(err))
 
@@ -144,7 +152,10 @@ func TestAdminAuthentication(t *testing.T) {
 	resp = send(t, d.AdminURL+"/v1/templates", "alice", "secret")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	resp = send(t, d.AdminURL+"/v1/templates", "", "")
-	require.Equal(t, http.StatusUnauthorized, resp.StatusCode, "the public service needs credentials on the admin port too")
+	require.Equal(
+		t, http.StatusUnauthorized, resp.StatusCode,
+		"the public service needs credentials on the admin port too",
+	)
 
 	resp = send(t, d.RestURL+"/v1/templates", "", "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -157,7 +168,8 @@ func registerRenewal(t *testing.T, d *Daemon) (artifactID, templateID string) {
 	return registerShipped(t, d, "renew.json")
 }
 
-// registerShipped registers a template of templates/ with the artifacts it references; artifactID is the DelegatedVtxo one.
+// registerShipped registers a template of templates/ with the artifacts it references; artifactID
+// is the DelegatedVtxo one.
 func registerShipped(t *testing.T, d *Daemon, name string) (artifactID, templateID string) {
 	t.Helper()
 	doc, err := os.ReadFile("../../pkg/template/testdata/" + name)
@@ -171,7 +183,10 @@ func registerShipped(t *testing.T, d *Daemon, name string) (artifactID, template
 		if !bytes.Contains(doc, []byte(a.ID)) {
 			continue
 		}
-		code, body := post(t, d.RestURL+"/v1/artifact", map[string]string{"document": string(templates.Artifacts[file])})
+		code, body := post(
+			t, d.RestURL+"/v1/artifact",
+			map[string]string{"document": string(templates.Artifacts[file])},
+		)
 		require.Equal(t, http.StatusOK, code, string(body))
 		if file == "delegated_vtxo.json" {
 			artifactID = decodeArtifact(t, body).ID
@@ -194,7 +209,11 @@ func decodeTemplates(t *testing.T, body []byte) []template {
 func failures(t *testing.T, d *Daemon, id string) int {
 	t.Helper()
 	var n int
-	require.NoError(t, d.DB.QueryRowContext(t.Context(), "SELECT failures FROM templates WHERE id = $1", id).Scan(&n))
+	require.NoError(
+		t,
+		d.DB.QueryRowContext(t.Context(), "SELECT failures FROM templates WHERE id = $1", id).
+			Scan(&n),
+	)
 	return n
 }
 

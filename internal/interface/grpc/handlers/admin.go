@@ -27,7 +27,9 @@ const (
 )
 
 type Execution interface {
-	Attempts(ctx context.Context, delegationID, cursor int64, limit int) ([]delegation.Attempt, error)
+	Attempts(
+		ctx context.Context, delegationID, cursor int64, limit int,
+	) ([]delegation.Attempt, error)
 	Coins(ctx context.Context, delegationID int64) ([]delegation.Coin, error)
 	Summaries(ctx context.Context, f ports.SummaryFilter) ([]ports.Summary, error)
 	Spawned(ctx context.Context) (map[int64]ports.Spawned, error)
@@ -45,8 +47,12 @@ type Admin struct {
 	health      Health
 }
 
-func NewAdmin(registry *app.Service, delegations *delegationapp.Service, execution Execution, health Health) *Admin {
-	return &Admin{registry: registry, delegations: delegations, execution: execution, health: health}
+func NewAdmin(
+	registry *app.Service, delegations *delegationapp.Service, execution Execution, health Health,
+) *Admin {
+	return &Admin{
+		registry: registry, delegations: delegations, execution: execution, health: health,
+	}
 }
 
 func (h *Admin) UpdateTemplate(
@@ -114,15 +120,23 @@ func (h *Admin) ListDelegations(
 		return nil, toStatus(err)
 	}
 	list, err := h.execution.Summaries(ctx, ports.SummaryFilter{
-		Status: req.GetStatus(), StreamID: req.GetStreamId(), TemplateID: req.GetTemplateId(), After: after, Limit: limit,
+		Status: req.GetStatus(), StreamID: req.GetStreamId(), TemplateID: req.GetTemplateId(),
+		After: after, Limit: limit,
 	})
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	resp := &executorv1.ListDelegationsResponse{Delegations: make([]*executorv1.DelegationSummary, 0, len(list))}
+	resp := &executorv1.ListDelegationsResponse{
+		Delegations: make([]*executorv1.DelegationSummary, 0, len(list)),
+	}
 	for _, s := range list {
 		sum := &executorv1.DelegationSummary{
-			Delegation: toDelegation(&s.Delegation), Coins: int64(s.Coins), Amount: s.Amount, LastAttempt: string(s.LastAttempt),
+			Delegation: toDelegation(
+				&s.Delegation,
+			),
+			Coins:       int64(s.Coins),
+			Amount:      s.Amount,
+			LastAttempt: string(s.LastAttempt),
 		}
 		if !s.NextDue.IsZero() {
 			sum.NextDue = s.NextDue.Unix()
@@ -130,7 +144,9 @@ func (h *Admin) ListDelegations(
 		resp.Delegations = append(resp.Delegations, sum)
 	}
 	if len(list) == limit {
-		resp.NextCursor = encodeCursor(ports.Cursor{NextDue: list[len(list)-1].NextDue, ID: list[len(list)-1].ID})
+		resp.NextCursor = encodeCursor(
+			ports.Cursor{NextDue: list[len(list)-1].NextDue, ID: list[len(list)-1].ID},
+		)
 	}
 	return resp, nil
 }
@@ -172,7 +188,9 @@ func (h *Admin) RegisterStream(
 	return &executorv1.RegisterStreamResponse{Stream: toStream(st)}, nil
 }
 
-func (h *Admin) ListStreams(ctx context.Context, _ *executorv1.ListStreamsRequest) (*executorv1.ListStreamsResponse, error) {
+func (h *Admin) ListStreams(
+	ctx context.Context, _ *executorv1.ListStreamsRequest,
+) (*executorv1.ListStreamsResponse, error) {
 	list, err := h.delegations.ListStreams(ctx)
 	if err != nil {
 		return nil, toStatus(err)
@@ -185,7 +203,11 @@ func (h *Admin) ListStreams(ctx context.Context, _ *executorv1.ListStreamsReques
 	for _, st := range list {
 		out := toStream(&st)
 		if sp, ok := spawned[st.ID]; ok {
-			out.Spawned, out.Active, out.LastSpawnedAt = int64(sp.Delegations), int64(sp.Active), sp.Last.Unix()
+			out.Spawned, out.Active, out.LastSpawnedAt = int64(
+				sp.Delegations,
+			), int64(
+				sp.Active,
+			), sp.Last.Unix()
 		}
 		resp.Streams = append(resp.Streams, out)
 	}
@@ -236,9 +258,13 @@ func (h *Admin) ListAttempts(
 	return resp, nil
 }
 
-func (h *Admin) GetHealth(ctx context.Context, _ *executorv1.GetHealthRequest) (*executorv1.GetHealthResponse, error) {
+func (h *Admin) GetHealth(
+	ctx context.Context, _ *executorv1.GetHealthRequest,
+) (*executorv1.GetHealthResponse, error) {
 	entries := h.health.Check(ctx)
-	resp := &executorv1.GetHealthResponse{Healthy: health.Healthy(entries), Entries: make([]*executorv1.HealthEntry, 0, len(entries))}
+	resp := &executorv1.GetHealthResponse{
+		Healthy: health.Healthy(entries), Entries: make([]*executorv1.HealthEntry, 0, len(entries)),
+	}
 	for _, e := range entries {
 		entry := &executorv1.HealthEntry{Name: e.Name, Healthy: e.Err == nil}
 		if e.Err != nil {
@@ -249,26 +275,44 @@ func (h *Admin) GetHealth(ctx context.Context, _ *executorv1.GetHealthRequest) (
 	return resp, nil
 }
 
-func (h *Admin) GetStatus(ctx context.Context, _ *executorv1.GetStatusRequest) (*executorv1.GetStatusResponse, error) {
+func (h *Admin) GetStatus(
+	ctx context.Context, _ *executorv1.GetStatusRequest,
+) (*executorv1.GetStatusResponse, error) {
 	st, err := h.execution.Status(ctx, true)
 	if err != nil {
 		return nil, toStatus(err)
 	}
 	resp := &executorv1.GetStatusResponse{
-		Active: st.Active, Queued: int64(st.Queued), Registered: int64(st.Registered), Late: int64(st.Late), TipHeight: st.Tip.Height,
-		Coins: int64(st.Coins), Amount: st.Amount, Succeeded: st.Succeeded, Failed: st.Failed, TemplateFailures: st.TemplateFailures,
-		ReserveSeconds: int64(st.Reserve / time.Second), SessionSeconds: int64(st.Session.Duration / time.Second),
-		MaxIntents: int64(st.Session.MaxIntents),
-		Batches:    make([]*executorv1.BatchForecast, 0, len(st.Batches)),
+		Active:     st.Active,
+		Queued:     int64(st.Queued),
+		Registered: int64(st.Registered),
+		Late:       int64(st.Late),
+		TipHeight:  st.Tip.Height,
+		Coins: int64(
+			st.Coins,
+		),
+		Amount:           st.Amount,
+		Succeeded:        st.Succeeded,
+		Failed:           st.Failed,
+		TemplateFailures: st.TemplateFailures,
+		ReserveSeconds: int64(
+			st.Reserve / time.Second,
+		),
+		SessionSeconds: int64(st.Session.Duration / time.Second),
+		MaxIntents:     int64(st.Session.MaxIntents),
+		Batches:        make([]*executorv1.BatchForecast, 0, len(st.Batches)),
 	}
 	if !st.NextDue.IsZero() {
 		resp.NextDue = st.NextDue.Unix()
 	}
 	for _, r := range st.Batches {
-		b := &executorv1.BatchForecast{At: r.At.Unix(), Intents: int64(r.Intents), Coins: int64(r.Coins), Amount: r.Amount}
+		b := &executorv1.BatchForecast{
+			At: r.At.Unix(), Intents: int64(r.Intents), Coins: int64(r.Coins), Amount: r.Amount,
+		}
 		for _, e := range r.Entries {
 			b.Entries = append(b.Entries, &executorv1.ForecastEntry{
-				DelegationId: e.DelegationID, Coins: int64(e.Coins), Amount: e.Amount, Due: e.Due.Unix(), Deadline: e.Deadline.Unix(),
+				DelegationId: e.DelegationID, Coins: int64(e.Coins), Amount: e.Amount,
+				Due: e.Due.Unix(), Deadline: e.Deadline.Unix(),
 			})
 		}
 		resp.Batches = append(resp.Batches, b)
@@ -281,7 +325,9 @@ func listLimit(limit int32) (int, error) {
 	case limit == 0:
 		return defaultListLimit, nil
 	case limit < 0 || limit > maxListLimit:
-		return 0, status.Errorf(codes.InvalidArgument, "limit must be between 1 and %d", maxListLimit)
+		return 0, status.Errorf(
+			codes.InvalidArgument, "limit must be between 1 and %d", maxListLimit,
+		)
 	}
 	return int(limit), nil
 }
@@ -295,8 +341,17 @@ func toStream(s *delegation.Stream) *executorv1.Stream {
 
 func toAttempt(a delegation.Attempt, kind template.Type) *executorv1.Attempt {
 	return &executorv1.Attempt{
-		Id: a.ID, DelegationId: a.DelegationID, Kind: string(kind), Coins: a.Coins, Txid: cmp.Or(a.Spenders()...),
-		Status: string(a.Status), Error: a.Error, CreatedAt: a.CreatedAt.Unix(), UpdatedAt: a.UpdatedAt.Unix(),
+		Id:           a.ID,
+		DelegationId: a.DelegationID,
+		Kind:         string(kind),
+		Coins:        a.Coins,
+		Txid:         cmp.Or(a.Spenders()...),
+		Status: string(
+			a.Status,
+		),
+		Error:     a.Error,
+		CreatedAt: a.CreatedAt.Unix(),
+		UpdatedAt: a.UpdatedAt.Unix(),
 	}
 }
 

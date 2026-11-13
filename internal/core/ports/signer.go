@@ -29,14 +29,21 @@ type Signer interface {
 	RegisterIntent(ctx context.Context, proof, message string) error
 	// ConfirmRegistration confirms the intent of proofTxid, which a batch selected.
 	ConfirmRegistration(ctx context.Context, proofTxid string) error
-	// BatchEvents follows every batch, whoever's intents it takes, until ctx ends or stop is called.
-	// The trees of a batch come only for the topics added: the cosigner keys and the coin outpoints of its intents.
+	// BatchEvents follows every batch, whoever's intents it takes, until ctx ends or stop is
+	// called. The trees of a batch come only for the topics added: the cosigner keys and the coin
+	// outpoints of its intents.
 	BatchEvents(ctx context.Context) (events <-chan BatchEvent, stop func(), err error)
 	UpdateTopics(ctx context.Context, add, remove []string) error
 	SubmitTreeNonces(ctx context.Context, batchID, cosigner string, nonces tree.TreeNonces) error
-	SubmitTreeSignatures(ctx context.Context, batchID, cosigner string, signatures tree.TreePartialSigs) error
-	SubmitSignedForfeitTxs(ctx context.Context, signedForfeits []string, signedCommitmentTx string) error
-	SubmitTx(ctx context.Context, signedArkTx string, checkpoints []string) (arkTxid, finalArkTx string, signedCheckpoints []string, err error)
+	SubmitTreeSignatures(
+		ctx context.Context, batchID, cosigner string, signatures tree.TreePartialSigs,
+	) error
+	SubmitSignedForfeitTxs(
+		ctx context.Context, signedForfeits []string, signedCommitmentTx string,
+	) error
+	SubmitTx(
+		ctx context.Context, signedArkTx string, checkpoints []string,
+	) (arkTxid, finalArkTx string, signedCheckpoints []string, err error)
 }
 
 // BatchEvent is an event of a batch.
@@ -84,14 +91,6 @@ type BatchFailed struct {
 // StreamReconnected says the batch events may have been missed.
 type StreamReconnected struct{}
 
-func (BatchStarted) batchEvent()         {}
-func (TreeSigningStarted) batchEvent()   {}
-func (TreeNoncesAggregated) batchEvent() {}
-func (BatchFinalization) batchEvent()    {}
-func (BatchFinalized) batchEvent()       {}
-func (BatchFailed) batchEvent()          {}
-func (StreamReconnected) batchEvent()    {}
-
 type Database interface {
 	Ping(ctx context.Context) error
 }
@@ -106,7 +105,9 @@ type EmulatorInfo struct {
 type Emulator interface {
 	Info(ctx context.Context) (EmulatorInfo, error)
 	// SubmitTx cosigns an offchain transaction and its checkpoints, given base64 psbts.
-	SubmitTx(ctx context.Context, tx string, checkpoints []string) (signedTx string, signedCheckpoints []string, err error)
+	SubmitTx(
+		ctx context.Context, tx string, checkpoints []string,
+	) (signedTx string, signedCheckpoints []string, err error)
 	// SubmitIntent cosigns the proof of an intent.
 	SubmitIntent(ctx context.Context, in execution.Intent) (signedProof string, err error)
 	// SubmitFinalization cosigns the forfeits of an intent once its batch is validated.
@@ -114,3 +115,11 @@ type Emulator interface {
 		ctx context.Context, in execution.Intent, forfeits []string, connectorTree tree.FlatTxTree, commitmentTx string,
 	) (signedForfeits []string, signedCommitmentTx string, err error)
 }
+
+func (BatchStarted) batchEvent()         {}
+func (TreeSigningStarted) batchEvent()   {}
+func (TreeNoncesAggregated) batchEvent() {}
+func (BatchFinalization) batchEvent()    {}
+func (BatchFinalized) batchEvent()       {}
+func (BatchFailed) batchEvent()          {}
+func (StreamReconnected) batchEvent()    {}

@@ -844,7 +844,7 @@ type Attempt struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	Id           int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	DelegationId int64                  `protobuf:"varint,2,opt,name=delegation_id,json=delegationId,proto3" json:"delegation_id,omitempty"`
-	// kind is the delegation's template type: offchain or intent.
+	// kind is the delegation's template type: virtual or proof.
 	Kind string `protobuf:"bytes,3,opt,name=kind,proto3" json:"kind,omitempty"`
 	// coins are the outpoints the attempt spends.
 	Coins []string `protobuf:"bytes,4,rep,name=coins,proto3" json:"coins,omitempty"`

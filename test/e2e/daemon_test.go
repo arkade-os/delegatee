@@ -1,6 +1,7 @@
 //go:build e2e
 
-// Package e2e drives the daemon in-process against the regtest stack; run `make regtest-up` then `make test-e2e`.
+// Package e2e drives the daemon in-process against the regtest stack; run `make regtest-up` then
+// `make test-e2e`.
 package e2e
 
 import (
@@ -73,8 +74,11 @@ func boot(t *testing.T, cfg config.Config, tweak []func(*config.Config)) executo
 	require.NoError(t, err)
 	t.Cleanup(idx.Close)
 	return executor{
-		cfg: cfg, indexer: idx, stop: d.Stop, url: "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.Port)),
-		client: executorv1.NewExecutorServiceClient(daemon.Dial(t, d.Server.PublicAddr())),
-		admin:  executorv1.NewAdminServiceClient(daemon.Dial(t, d.Server.AdminAddr())),
+		cfg:     cfg,
+		indexer: idx,
+		stop:    d.Stop,
+		url:     "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.Port)),
+		client:  executorv1.NewExecutorServiceClient(daemon.Dial(t, d.Server.PublicAddr())),
+		admin:   executorv1.NewAdminServiceClient(daemon.Dial(t, d.Server.AdminAddr())),
 	}
 }

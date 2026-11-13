@@ -1,4 +1,5 @@
-// Package contract builds the taproot output of a contract definition bound to its arguments and keys.
+// Package contract builds the taproot output of a contract definition bound to its arguments and
+// keys.
 package contract
 
 import (
@@ -10,7 +11,7 @@ import (
 	"github.com/arkade-os/arkd/pkg/ark-lib/script"
 	"github.com/arkade-os/arkd/pkg/ark-lib/txutils"
 	"github.com/arkade-os/emulator/pkg/arkade"
-	"github.com/arkade-os/executor/pkg/template/internal/abi"
+	"github.com/arkade-os/executor/pkg/template/artifact"
 	"github.com/arkade-os/executor/pkg/template/internal/asm"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -29,56 +30,14 @@ type Contract struct {
 	Proofs     map[[2]string]*psbt.TaprootTapLeafScript // {function, leaf} -> leaf with control block
 }
 
-func field(args map[string]asm.Value, name string) (asm.Value, error) {
-	v, ok := args[name]
-	if !ok {
-		return asm.Value{}, fmt.Errorf("unknown constructor value %q", name)
-	}
-	return v, nil
-}
-
-func keyField(args map[string]asm.Value, name string) (asm.Value, error) {
-	v, err := field(args, name)
-	if err != nil || v.Type != "pubkey" {
-		return v, err
-	}
-	pk, err := btcec.ParsePubKey(v.Raw)
-	if err != nil {
-		return asm.Value{}, err
-	}
-	return asm.Value{Type: "bytes32", Raw: schnorr.SerializePubKey(pk)}, nil
-}
-
-func cosigner(keys Keys) (*btcec.PublicKey, error) {
-	if keys.Cosigner == nil {
-		return nil, ErrNoCosigner
-	}
-	return keys.Cosigner, nil
-}
-
-func covenantLookup(keys Keys, args map[string]asm.Value, name string) (asm.Value, error) {
-	if name != "COSIGNER_KEY" {
-		return keyField(args, name)
-	}
-	pk, err := cosigner(keys)
-	if err != nil {
-		return asm.Value{}, err
-	}
-	return asm.Value{Type: "bytes", Raw: []byte(hex.EncodeToString(pk.SerializeCompressed()))}, nil
-}
-
-func tweak(c *Contract, key *btcec.PublicKey, fn string) (asm.Value, error) {
-	cov, ok := c.Covenants[fn]
-	if !ok {
-		return asm.Value{}, fmt.Errorf("function %q has no covenant", fn)
-	}
-	t := arkade.ComputeArkadeScriptPublicKey(key, arkade.ArkadeScriptHash(cov))
-	return asm.Value{Type: "bytes32", Raw: schnorr.SerializePubKey(t)}, nil
-}
+// maxTaptreeBytes bounds a given taptree.
+const maxTaptreeBytes = 8 << 10
 
 // Build assembles the covenants and leaves of def with args and keys. When taptree is given, the
 // declared leaves must be in it, and the tree's leaves and key are taken.
-func Build(def *abi.Definition, args map[string]asm.Value, keys Keys, taptree []byte) (*Contract, error) {
+func Build(
+	def *artifact.Definition, args map[string]asm.Value, keys Keys, taptree []byte,
+) (*Contract, error) {
 	c := &Contract{
 		Covenants: map[string][]byte{},
 		Proofs:    map[[2]string]*psbt.TaprootTapLeafScript{},
@@ -157,7 +116,9 @@ func Build(def *abi.Definition, args map[string]asm.Value, keys Keys, taptree []
 	tree := txscript.AssembleTaprootScriptTree(leaves...)
 	root := tree.RootNode.TapHash()
 	internal := script.UnspendableKey()
-	if c.PkScript, err = script.P2TRScript(txscript.ComputeTaprootOutputKey(internal, root[:])); err != nil {
+	if c.PkScript, err = script.P2TRScript(
+		txscript.ComputeTaprootOutputKey(internal, root[:]),
+	); err != nil {
 		return nil, err
 	}
 	for i, l := range leaves {
@@ -171,21 +132,75 @@ func Build(def *abi.Definition, args map[string]asm.Value, keys Keys, taptree []
 			return nil, err
 		}
 		c.Proofs[names[i]] = &psbt.TaprootTapLeafScript{
-			ControlBlock: cb,
-			Script:       proof.Script,
-			LeafVersion:  txscript.BaseLeafVersion,
+			ControlBlock: cb, Script: proof.Script, LeafVersion: txscript.BaseLeafVersion,
 		}
 	}
 	return c, nil
 }
 
-// maxTaptreeBytes bounds a given taptree.
-const maxTaptreeBytes = 8 << 10
+// TaptreeScript is the P2TR script of a given tree.
+func TaptreeScript(raw []byte) ([]byte, error) {
+	scripts, err := decodeTaptree(raw)
+	if err != nil {
+		return nil, err
+	}
+	root := txscript.AssembleTaprootScriptTree(tapLeaves(scripts)...).RootNode.TapHash()
+	return script.P2TRScript(txscript.ComputeTaprootOutputKey(script.UnspendableKey(), root[:]))
+}
+
+func field(args map[string]asm.Value, name string) (asm.Value, error) {
+	v, ok := args[name]
+	if !ok {
+		return asm.Value{}, fmt.Errorf("unknown constructor value %q", name)
+	}
+	return v, nil
+}
+
+func keyField(args map[string]asm.Value, name string) (asm.Value, error) {
+	v, err := field(args, name)
+	if err != nil || v.Type != "pubkey" {
+		return v, err
+	}
+	pk, err := btcec.ParsePubKey(v.Raw)
+	if err != nil {
+		return asm.Value{}, err
+	}
+	return asm.Value{Type: "bytes32", Raw: schnorr.SerializePubKey(pk)}, nil
+}
+
+func cosigner(keys Keys) (*btcec.PublicKey, error) {
+	if keys.Cosigner == nil {
+		return nil, ErrNoCosigner
+	}
+	return keys.Cosigner, nil
+}
+
+func covenantLookup(keys Keys, args map[string]asm.Value, name string) (asm.Value, error) {
+	if name != "COSIGNER_KEY" {
+		return keyField(args, name)
+	}
+	pk, err := cosigner(keys)
+	if err != nil {
+		return asm.Value{}, err
+	}
+	return asm.Value{Type: "bytes", Raw: []byte(hex.EncodeToString(pk.SerializeCompressed()))}, nil
+}
+
+func tweak(c *Contract, key *btcec.PublicKey, fn string) (asm.Value, error) {
+	cov, ok := c.Covenants[fn]
+	if !ok {
+		return asm.Value{}, fmt.Errorf("function %q has no covenant", fn)
+	}
+	t := arkade.ComputeArkadeScriptPublicKey(key, arkade.ArkadeScriptHash(cov))
+	return asm.Value{Type: "bytes32", Raw: schnorr.SerializePubKey(t)}, nil
+}
 
 // decodeTaptree returns the leaves of a BIP-371 tree whose every leaf is a closure arkd accepts.
 func decodeTaptree(raw []byte) ([]string, error) {
 	if len(raw) > maxTaptreeBytes {
-		return nil, fmt.Errorf("%w: taptree of %d bytes exceeds %d", ErrBadTree, len(raw), maxTaptreeBytes)
+		return nil, fmt.Errorf(
+			"%w: taptree of %d bytes exceeds %d", ErrBadTree, len(raw), maxTaptreeBytes,
+		)
 	}
 	scripts, err := txutils.DecodeTapTree(raw)
 	if err == nil && len(scripts) == 0 {
@@ -209,18 +224,10 @@ func tapLeaves(scripts []string) []txscript.TapLeaf {
 	return leaves
 }
 
-// TaptreeScript is the P2TR script of a given tree.
-func TaptreeScript(raw []byte) ([]byte, error) {
-	scripts, err := decodeTaptree(raw)
-	if err != nil {
-		return nil, err
-	}
-	root := txscript.AssembleTaprootScriptTree(tapLeaves(scripts)...).RootNode.TapHash()
-	return script.P2TRScript(txscript.ComputeTaprootOutputKey(script.UnspendableKey(), root[:]))
-}
-
 // fromTree swaps the declared leaves for the tree's, which must hold each of them.
-func fromTree(raw []byte, declared []txscript.TapLeaf, names [][2]string) ([]txscript.TapLeaf, [][2]string, []string, error) {
+func fromTree(
+	raw []byte, declared []txscript.TapLeaf, names [][2]string,
+) ([]txscript.TapLeaf, [][2]string, []string, error) {
 	scripts, err := decodeTaptree(raw)
 	if err != nil {
 		return nil, nil, nil, err
@@ -233,7 +240,9 @@ func fromTree(raw []byte, declared []txscript.TapLeaf, names [][2]string) ([]txs
 	for i, l := range declared {
 		j, ok := at[hex.EncodeToString(l.Script)]
 		if !ok {
-			return nil, nil, nil, fmt.Errorf("%w: leaf %s/%s is not in the taptree", ErrBadTree, names[i][0], names[i][1])
+			return nil, nil, nil, fmt.Errorf(
+				"%w: leaf %s/%s is not in the taptree", ErrBadTree, names[i][0], names[i][1],
+			)
 		}
 		treeNames[j] = names[i]
 	}

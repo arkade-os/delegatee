@@ -1,4 +1,5 @@
-// Package electrum watches the chain over the Electrum protocol: newline-delimited JSON-RPC over TCP or TLS.
+// Package electrum watches the chain over the Electrum protocol: newline-delimited JSON-RPC over
+// TCP or TLS.
 package electrum
 
 import (
@@ -58,8 +59,6 @@ type rpcError struct {
 	Message string `json:"message"`
 }
 
-func (e *rpcError) Error() string { return fmt.Sprintf("electrum: %s (code %d)", e.Message, e.Code) }
-
 // client keeps one connection to the server, matches answers to requests and queues notifications.
 // After a drop it dials again and runs onReconnect on the new connection.
 type client struct {
@@ -77,20 +76,30 @@ type client struct {
 	cur *session
 }
 
-// newClient dials the server; start runs it once the hooks are set.
-func newClient(rawURL string, times timings) (*client, error) {
-	dial, err := dialer(rawURL)
-	if err != nil {
-		return nil, err
-	}
-	c := &client{dial: dial, times: times, notes: notifications{wake: make(chan struct{}, 1)}}
-	c.ctx, c.cancel = context.WithCancel(context.Background())
-	if err := c.connect(); err != nil {
-		c.cancel()
-		return nil, err
-	}
-	return c, nil
+// session is one connection: its writer lock, the requests waiting for an answer and its end.
+type session struct {
+	conn      net.Conn
+	wmu       sync.Mutex
+	mu        sync.Mutex
+	pending   map[uint64]chan message
+	closed    chan struct{}
+	closeOnce sync.Once
 }
+
+type notification struct {
+	method string
+	params json.RawMessage
+}
+
+// notifications is an unbounded queue: the reader never waits on a consumer that waits on the
+// reader.
+type notifications struct {
+	mu    sync.Mutex
+	items []notification
+	wake  chan struct{}
+}
+
+func (e *rpcError) Error() string { return fmt.Sprintf("electrum: %s (code %d)", e.Message, e.Code) }
 
 func (c *client) start() {
 	c.wg.Add(2)
@@ -214,7 +223,8 @@ func (c *client) reconnect() error {
 	return nil
 }
 
-// dispatch hands notifications to onNotify in order, apart from the reader so that it can make requests.
+// dispatch hands notifications to onNotify in order, apart from the reader so that it can make
+// requests.
 func (c *client) dispatch() {
 	defer c.wg.Done()
 	for {
@@ -226,16 +236,6 @@ func (c *client) dispatch() {
 	}
 }
 
-// session is one connection: its writer lock, the requests waiting for an answer and its end.
-type session struct {
-	conn      net.Conn
-	wmu       sync.Mutex
-	mu        sync.Mutex
-	pending   map[uint64]chan message
-	closed    chan struct{}
-	closeOnce sync.Once
-}
-
 func (s *session) close() {
 	s.closeOnce.Do(func() {
 		close(s.closed)
@@ -243,7 +243,9 @@ func (s *session) close() {
 	})
 }
 
-func (s *session) roundTrip(ctx context.Context, c *client, calls []call, batch bool) ([]json.RawMessage, error) {
+func (s *session) roundTrip(
+	ctx context.Context, c *client, calls []call, batch bool,
+) ([]json.RawMessage, error) {
 	select {
 	case <-s.closed:
 		return nil, ports.ErrDisconnected
@@ -307,7 +309,8 @@ func (s *session) write(v any) error {
 	return err
 }
 
-// read routes each line to the request it answers or to the notification queue, until the connection ends.
+// read routes each line to the request it answers or to the notification queue, until the
+// connection ends.
 func (s *session) read(c *client) {
 	defer c.wg.Done()
 	defer s.close()
@@ -348,7 +351,8 @@ func (s *session) route(c *client, m message) {
 	}
 }
 
-// keepAlive pings so that an idle server does not drop us, and drops a connection that stops answering.
+// keepAlive pings so that an idle server does not drop us, and drops a connection that stops
+// answering.
 func (s *session) keepAlive(c *client) {
 	defer c.wg.Done()
 	t := time.NewTicker(c.times.ping)
@@ -365,18 +369,6 @@ func (s *session) keepAlive(c *client) {
 			}
 		}
 	}
-}
-
-type notification struct {
-	method string
-	params json.RawMessage
-}
-
-// notifications is an unbounded queue: the reader never waits on a consumer that waits on the reader.
-type notifications struct {
-	mu    sync.Mutex
-	items []notification
-	wake  chan struct{}
 }
 
 func (q *notifications) push(n notification) {
@@ -407,6 +399,21 @@ func (q *notifications) pop(ctx context.Context) (notification, bool) {
 	}
 }
 
+// newClient dials the server; start runs it once the hooks are set.
+func newClient(rawURL string, times timings) (*client, error) {
+	dial, err := dialer(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	c := &client{dial: dial, times: times, notes: notifications{wake: make(chan struct{}, 1)}}
+	c.ctx, c.cancel = context.WithCancel(context.Background())
+	if err := c.connect(); err != nil {
+		c.cancel()
+		return nil, err
+	}
+	return c, nil
+}
+
 // dialer returns how to reach rawURL: tcp:// plain, ssl:// and tls:// encrypted.
 func dialer(rawURL string) (func(context.Context) (net.Conn, error), error) {
 	u, err := url.Parse(rawURL)
@@ -420,7 +427,9 @@ func dialer(rawURL string) (func(context.Context) (net.Conn, error), error) {
 		}, nil
 	case "ssl", "tls":
 		return func(ctx context.Context) (net.Conn, error) {
-			return (&tls.Dialer{Config: &tls.Config{MinVersion: tls.VersionTLS12}}).DialContext(ctx, "tcp", u.Host)
+			return (&tls.Dialer{Config: &tls.Config{MinVersion: tls.VersionTLS12}}).DialContext(
+				ctx, "tcp", u.Host,
+			)
 		}, nil
 	}
 	return nil, errors.New("electrum url scheme must be tcp, ssl or tls")

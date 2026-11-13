@@ -20,7 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// the claim stream starts with the defaults and a streamed funding transaction gets its swap claimed.
+// the claim stream starts with the defaults and a streamed funding transaction gets its swap
+// claimed.
 func TestDefaultStreamSpawnsADelegationThatClaims(t *testing.T) {
 	d := Start(t, WithEncryptionKey, WithDefaultTemplates)
 	st := streamsOf(t, d)
@@ -40,12 +41,18 @@ func TestDefaultStreamSpawnsADelegationThatClaims(t *testing.T) {
 
 	d.Arkd.Fund(w.Inputs[0].Script, 10_000, time.Now().Add(time.Hour))
 	attempts := waitAttempts(t, d, w.ID, 1, "submitted")
-	require.Equal(t, "offchain", attempts[0].Kind)
+	require.Equal(t, "virtual", attempts[0].Kind)
 	var raw []byte
-	require.NoError(t, d.DB.QueryRowContext(t.Context(), "SELECT decode(txs->0->>'raw', 'base64') FROM attempts").Scan(&raw))
+	require.NoError(
+		t,
+		d.DB.QueryRowContext(t.Context(), "SELECT decode(txs->0->>'raw', 'base64') FROM attempts").
+			Scan(&raw),
+	)
 	ptx, err := psbt.NewFromRawBytes(bytes.NewReader(raw), false)
 	require.NoError(t, err)
-	require.Equal(t, sw.receiverScript, ptx.UnsignedTx.TxOut[0].PkScript, "the claim pays the receiver")
+	require.Equal(
+		t, sw.receiverScript, ptx.UnsignedTx.TxOut[0].PkScript, "the claim pays the receiver",
+	)
 }
 
 func TestStreamedTransactionsThatDoNotMatchSpawnNothing(t *testing.T) {
@@ -61,7 +68,10 @@ func TestStreamedTransactionsThatDoNotMatchSpawnNothing(t *testing.T) {
 	funding.UnsignedTx.TxOut = funding.UnsignedTx.TxOut[:1]
 	d.Arkd.Stream(funding)
 
-	require.Never(t, func() bool { return rows(d, "delegations") > 0 }, 500*time.Millisecond, 50*time.Millisecond)
+	require.Never(
+		t, func() bool { return rows(d, "delegations") > 0 }, 500*time.Millisecond,
+		50*time.Millisecond,
+	)
 }
 
 func TestDefaultStreamStartsOnceAndStaysCancelled(t *testing.T) {
@@ -78,7 +88,9 @@ func TestDefaultStreamStartsOnceAndStaysCancelled(t *testing.T) {
 	require.Equal(t, "cancelled", st[0].Status)
 	require.Equal(t, 0, d.Arkd.Streaming(), "nothing reads the transactions")
 
-	code, body = post(t, d.AdminURL+"/v1/admin/stream", map[string]any{"templateId": st[0].TemplateID})
+	code, body = post(
+		t, d.AdminURL+"/v1/admin/stream", map[string]any{"templateId": st[0].TemplateID},
+	)
 	require.Equal(t, http.StatusPreconditionFailed, code, string(body))
 }
 
@@ -97,7 +109,10 @@ func TestRegisterStreamOverREST(t *testing.T) {
 	code, _ = post(t, d.RestURL+"/v1/admin/stream", map[string]any{"templateId": id})
 	require.Equal(t, http.StatusNotFound, code, "admin routes stay off the public port")
 
-	code, body = post(t, d.AdminURL+"/v1/admin/stream", map[string]any{"templateId": id, "variables": map[string]string{"ciphertext": "00"}})
+	code, body = post(
+		t, d.AdminURL+"/v1/admin/stream",
+		map[string]any{"templateId": id, "variables": map[string]string{"preimage": "00"}},
+	)
 	require.Equal(t, http.StatusBadRequest, code, string(body))
 	_, renewal := registerRenewal(t, d)
 	code, body = post(t, d.AdminURL+"/v1/admin/stream", map[string]any{"templateId": renewal})
@@ -115,11 +130,17 @@ func TestSpawnedDelegationsHaveTheirOwnCap(t *testing.T) {
 	d.Arkd.Stream(first)
 	waitDelegations(t, d, 1)
 	d.Arkd.Stream(second)
-	require.Never(t, func() bool { return rows(d, "delegations") > 1 }, 500*time.Millisecond, 50*time.Millisecond, "the second hits the cap")
+	require.Never(
+		t, func() bool { return rows(d, "delegations") > 1 }, 500*time.Millisecond,
+		50*time.Millisecond, "the second hits the cap",
+	)
 
 	claimDelegation(t, d)
 	claim := registerClaim(t, d)
-	code, body := post(t, d.RestURL+"/v1/delegation", map[string]any{"templateId": claim, "variables": newSwap(t, d, claim).variables})
+	code, body := post(
+		t, d.RestURL+"/v1/delegation",
+		map[string]any{"templateId": claim, "variables": newSwap(t, d, claim).variables},
+	)
 	require.Equal(t, http.StatusTooManyRequests, code, string(body))
 }
 
@@ -129,11 +150,15 @@ func TestPublicDelegationDoesNotTakeTheCoinOfASpawnedOne(t *testing.T) {
 	sw := newSwap(t, d, claimStreamTemplate(t, d))
 	script, funding := fundingTx(t, d, sw, 10_000)
 
-	// the claim template without its trigger locks the same script, and the public delegation is older
+	// the claim template without its trigger locks the same script, and the public delegation is
+	// older
 	public := registerUntriggeredClaim(t, d)
 	vars := map[string]string{
-		"taptree": hex.EncodeToString(funding.Outputs[0].TaprootTapTree), "receiver_program": sw.variables["receiver_program"],
-		"ciphertext": seal(t, d, sw.preimage, public),
+		"taptree": hex.EncodeToString(
+			funding.Outputs[0].TaprootTapTree,
+		),
+		"receiver_program": sw.variables["receiver_program"],
+		"preimage":         seal(t, d, sw.preimage, public),
 	}
 	older := registerDelegationWith(t, d, public, vars)
 	require.Equal(t, hex.EncodeToString(script), older.Inputs[0].Script)
@@ -158,7 +183,9 @@ func TestPublicDelegationDoesNotTakeTheCoinOfASpawnedOne(t *testing.T) {
 }
 
 func TestSpawnedDelegationExpiresAndIsPruned(t *testing.T) {
-	d := Start(t, WithEncryptionKey, WithDelegationExpiry(time.Second, 100*time.Millisecond, time.Second))
+	d := Start(
+		t, WithEncryptionKey, WithDelegationExpiry(time.Second, 100*time.Millisecond, time.Second),
+	)
 	id := registerStreamTemplate(t, d, 2)
 	code, body := post(t, d.AdminURL+"/v1/admin/stream", map[string]any{"templateId": id})
 	require.Equal(t, http.StatusOK, code, string(body))
@@ -173,7 +200,10 @@ func TestSpawnedDelegationExpiresAndIsPruned(t *testing.T) {
 		list := decodeDelegations(t, body)
 		return len(list) == 1 && list[0].Status == "expired"
 	}, 10*time.Second, 50*time.Millisecond)
-	require.Eventually(t, func() bool { return tableRows(t, d, "delegations") == 0 }, 10*time.Second, 50*time.Millisecond, "pruned after the delay")
+	require.Eventually(
+		t, func() bool { return tableRows(t, d, "delegations") == 0 }, 10*time.Second,
+		50*time.Millisecond, "pruned after the delay",
+	)
 }
 
 func TestRefundWaitsForTheTipToReachItsLocktime(t *testing.T) {
@@ -202,15 +232,24 @@ func TestRefundWaitsForTheTipToReachItsLocktime(t *testing.T) {
 
 			d.Arkd.Fund(w.Inputs[0].Script, 10_000, time.Now().Add(time.Hour))
 			waitCoins(t, d, w.ID, 1)
-			require.Never(t, func() bool { return rows(d, "attempts") > 0 }, time.Second, 50*time.Millisecond)
+			require.Never(
+				t, func() bool { return rows(d, "attempts") > 0 }, time.Second, 50*time.Millisecond,
+			)
 
 			tc.reach(d)
 			waitAttempts(t, d, w.ID, 1, "submitted")
 			var raw []byte
-			require.NoError(t, d.DB.QueryRowContext(t.Context(), "SELECT decode(txs->0->>'raw', 'base64') FROM attempts").Scan(&raw))
+			require.NoError(
+				t,
+				d.DB.QueryRowContext(t.Context(), "SELECT decode(txs->0->>'raw', 'base64') FROM attempts").
+					Scan(&raw),
+			)
 			ptx, err := psbt.NewFromRawBytes(bytes.NewReader(raw), false)
 			require.NoError(t, err)
-			require.Equal(t, append([]byte{0x51, 0x20}, mustHex(t, sw.variables["sender_program"])...), ptx.UnsignedTx.TxOut[0].PkScript, "it pays the sender")
+			require.Equal(
+				t, append([]byte{0x51, 0x20}, mustHex(t, sw.variables["sender_program"])...),
+				ptx.UnsignedTx.TxOut[0].PkScript, "it pays the sender",
+			)
 		})
 	}
 }
@@ -232,7 +271,8 @@ func streamsOf(t *testing.T, d *Daemon) []streamRow {
 	return resp.Streams
 }
 
-// rows counts the rows of table, 0 when the database cannot be read: it serves conditions that run past their test.
+// rows counts the rows of table, 0 when the database cannot be read: it serves conditions that run
+// past their test.
 func rows(d *Daemon, table string) int {
 	var n int
 	_ = d.DB.QueryRow("SELECT COUNT(*) FROM " + table).Scan(&n)
@@ -241,7 +281,10 @@ func rows(d *Daemon, table string) int {
 
 func waitStreaming(t *testing.T, d *Daemon) {
 	t.Helper()
-	require.Eventually(t, func() bool { return d.Arkd.Streaming() == 1 }, 5*time.Second, 20*time.Millisecond, "nothing reads the transactions")
+	require.Eventually(
+		t, func() bool { return d.Arkd.Streaming() == 1 }, 5*time.Second, 20*time.Millisecond,
+		"nothing reads the transactions",
+	)
 }
 
 func listDelegationRows(t *testing.T, d *Daemon) []delegation {
@@ -263,7 +306,10 @@ func waitDelegations(t *testing.T, d *Daemon, n int) []delegation {
 
 func claimStreamTemplate(t *testing.T, d *Daemon) string {
 	t.Helper()
-	code, body := post(t, d.RestURL+"/v1/template", map[string]string{"document": string(templates.Templates["claim.json"])})
+	code, body := post(
+		t, d.RestURL+"/v1/template",
+		map[string]string{"document": string(templates.Templates["claim.json"])},
+	)
 	require.Equal(t, http.StatusOK, code, string(body))
 	return decodeTemplate(t, body).ID
 }
@@ -271,14 +317,20 @@ func claimStreamTemplate(t *testing.T, d *Daemon) string {
 // registerStreamTemplate registers the claim template with delegations living ttl seconds.
 func registerStreamTemplate(t *testing.T, d *Daemon, ttl int) string {
 	t.Helper()
-	doc := editClaim(t, func(doc map[string]any) { doc["trigger"].(map[string]any)["expires_after_seconds"] = ttl })
+	doc := editClaim(t, func(doc map[string]any) {
+		rule := doc["delegation"].(map[string]any)["trigger"].(map[string]any)["htlc"].(map[string]any)
+		rule["expires_after_seconds"] = ttl
+	})
 	return registerDoc(t, d, doc)
 }
 
-// registerUntriggeredClaim registers the claim template without its trigger, which clients may register delegations of.
+// registerUntriggeredClaim registers the claim template without its trigger, which clients may
+// register delegations of.
 func registerUntriggeredClaim(t *testing.T, d *Daemon) string {
 	t.Helper()
-	return registerDoc(t, d, editClaim(t, func(doc map[string]any) { delete(doc, "trigger") }))
+	return registerDoc(t, d, editClaim(t, func(doc map[string]any) {
+		delete(doc["delegation"].(map[string]any), "trigger")
+	}))
 }
 
 func editClaim(t *testing.T, edit func(map[string]any)) []byte {
@@ -298,8 +350,8 @@ func registerDoc(t *testing.T, d *Daemon, doc []byte) string {
 	return decodeTemplate(t, body).ID
 }
 
-// fundingTx is the transaction funding a swap's VHTLC the way covclaimd does: the output carries its
-// taptree and the packet seals the preimage to the daemon. It returns the output's script.
+// fundingTx is the transaction funding a swap's VHTLC the way covclaimd does: the output carries
+// its taptree and the packet seals the preimage to the daemon. It returns the output's script.
 func fundingTx(t *testing.T, d *Daemon, sw swap, amount int64) ([]byte, *psbt.Packet) {
 	t.Helper()
 	parsed, err := tpl.Parse(fixture(t, "vhtlc_claim.json"), artifactDocs())
@@ -319,12 +371,19 @@ func fundingTx(t *testing.T, d *Daemon, sw swap, amount int64) ([]byte, *psbt.Pa
 	tree, err := txutils.TapTree(inst.Tapscripts(0)).Encode()
 	require.NoError(t, err)
 	program := mustHex(t, sw.variables["receiver_program"])
-	body := TLV(mustHex(t, sw.variables["ciphertext"]), EnforcePayTo(t, program), encryptionKey(t, d))
+	body := TLV(mustHex(t, sw.variables["preimage"]), EnforcePayTo(t, program), encryptionKey(t, d))
 	ext, err := extension.Extension{packets.Raw(4, body)}.TxOut()
 	require.NoError(t, err)
 
 	tx := wire.NewMsgTx(3)
-	tx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Hash: [32]byte(bytes.Repeat([]byte{byte(amount)}, 32)), Index: uint32(time.Now().UnixNano())}})
+	tx.AddTxIn(
+		&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{
+				Hash:  [32]byte(bytes.Repeat([]byte{byte(amount)}, 32)),
+				Index: uint32(time.Now().UnixNano()),
+			},
+		},
+	)
 	tx.AddTxOut(wire.NewTxOut(amount, inst.PkScript(0)))
 	tx.AddTxOut(ext)
 	ptx, err := psbt.NewFromUnsignedTx(tx)

@@ -26,7 +26,12 @@ func TestCheckExpression(t *testing.T) {
 	} {
 		require.ErrorIs(t, CheckExpression([]string{op}), ErrBadExpression, op)
 	}
-	require.NoError(t, CheckExpression(strings.Fields("2 OP_PUSHCURRENTINPUTINDEX OP_INSPECTINPUTPACKET OP_VERIFY")))
+	require.NoError(
+		t,
+		CheckExpression(
+			strings.Fields("2 OP_PUSHCURRENTINPUTINDEX OP_INSPECTINPUTPACKET OP_VERIFY"),
+		),
+	)
 	require.True(t, ContextFree([]string{"<preimage>", "OP_HASH160"}))
 	for _, op := range []string{"OP_INSPECTINPUTPACKET", "OP_PUSHCURRENTINPUTINDEX", "OP_INSPECTINPUTVALUE", "OP_PUSHEXPIRY", "OP_CHECKTIME", "OP_INSPECTVERSION", "OP_INSPECTLOCKTIME",
 		"OP_CHECKLOCKTIMEVERIFY", "OP_NOP2", "OP_CHECKSEQUENCEVERIFY", "OP_NOP3"} {
@@ -36,7 +41,10 @@ func TestCheckExpression(t *testing.T) {
 
 func TestPushOpcodesRefused(t *testing.T) {
 	hidden := func(op byte) string { return fmt.Sprintf("0x01%02x", op) }
-	require.ErrorIs(t, CheckExpression([]string{"OP_DATA_2", hidden(arkade.OP_INSPECTNUMOUTPUTS), "OP_NIP"}), ErrBadExpression)
+	require.ErrorIs(
+		t, CheckExpression([]string{"OP_DATA_2", hidden(arkade.OP_INSPECTNUMOUTPUTS), "OP_NIP"}),
+		ErrBadExpression,
+	)
 	many := []string{}
 	for range 100 {
 		many = append(many, "OP_DATA_2", hidden(arkade.OP_INSPECTINTENTMESSAGE), "OP_NIP")
@@ -46,4 +54,40 @@ func TestPushOpcodesRefused(t *testing.T) {
 		_, err := Assemble([]string{op, "0x01"}, nil)
 		require.Error(t, err, op)
 	}
+}
+
+func TestSplice(t *testing.T) {
+	terms := []byte{0x02, 0x10, 0x27, 0xa2} // 10000 OP_GREATERTHANOREQUAL
+	script, err := Assemble([]string{"<quote>", "<!terms>"}, func(n string) (Value, error) {
+		if n == "terms" {
+			return Value{Type: "bytes", Raw: terms}, nil
+		}
+		return Value{Type: "int", Raw: ScriptNum(10_000)}, nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, append([]byte{0x02, 0x10, 0x27}, terms...), script)
+	require.NoError(t, CheckScript(script, true))
+
+	require.NoError(t, CheckScript([]byte{0x01, 0x00}, true), "a zero byte pushed as data")
+	require.ErrorIs(
+		t, CheckScript([]byte{0x4c, 0x01, 0x07}, false), ErrBadExpression, "a non-minimal push",
+	)
+	require.ErrorIs(t, CheckScript([]byte{0x02, 0x07}, false), ErrBadExpression, "a truncated push")
+	require.ErrorIs(
+		t, CheckScript([]byte{arkade.OP_TXID}, false), ErrBadExpression, "a forbidden opcode",
+	)
+	require.NoError(t, CheckScript([]byte{arkade.OP_PUSHCURRENTINPUTINDEX}, false))
+	require.ErrorIs(
+		t, CheckScript([]byte{arkade.OP_PUSHCURRENTINPUTINDEX}, true), ErrBadExpression,
+		"context where it must be free",
+	)
+	modexp := []byte{}
+	for range 65 {
+		modexp = append(modexp, 0x52, 0x53, 0x55, arkade.OP_MODEXP, 0x75)
+	}
+	require.ErrorIs(
+		t, CheckScript(modexp, false), ErrBadExpression,
+		"spliced occurrences count against the limits",
+	)
+	require.NoError(t, CheckExpression([]string{"<quote>", "<!terms>"}))
 }

@@ -50,9 +50,11 @@ type Options struct {
 	Health                handlers.Health
 }
 
-// Listen binds both ports. The admin port serves AdminService as well, the operator UI, /metrics and /healthz,
-// and, when there are users, checks their credentials on every call.
-func Listen(ctx context.Context, opts Options, executor *handlers.Executor, admin *handlers.Admin) (*Server, error) {
+// Listen binds both ports. The admin port serves AdminService as well, the operator UI, /metrics
+// and /healthz, and, when there are users, checks their credentials on every call.
+func Listen(
+	ctx context.Context, opts Options, executor *handlers.Executor, admin *handlers.Admin,
+) (*Server, error) {
 	publicServices := func(s *grpc.Server, mux *gateway.ServeMux, conn *grpc.ClientConn) {
 		executorv1.RegisterExecutorServiceServer(s, executor)
 		executorv1.RegisterExecutorServiceHandler(ctx, mux, conn)
@@ -74,7 +76,9 @@ func Listen(ctx context.Context, opts Options, executor *handlers.Executor, admi
 		return nil, err
 	}
 	if opts.PublicRateLimit > 0 {
-		publicSrv.http.Handler = newRateLimiter(opts.PublicRateLimit).middleware(publicSrv.http.Handler)
+		publicSrv.http.Handler = newRateLimiter(
+			opts.PublicRateLimit,
+		).middleware(publicSrv.http.Handler)
 	}
 	adminSrv, err := listen(opts.AdminPort, adminServices, pages, interceptors...)
 	if err != nil {
@@ -105,6 +109,16 @@ func (s *Server) Stop() {
 	s.admin.close()
 }
 
+func (p *port) close() {
+	p.grpc.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := p.http.Shutdown(ctx); err != nil {
+		log.WithError(err).Warn("shutdown server")
+	}
+	_ = p.conn.Close()
+}
+
 // listen serves on portNumber; without pages it is the public port, which allows any origin.
 func listen(
 	portNumber int, register func(*grpc.Server, *gateway.ServeMux, *grpc.ClientConn),
@@ -114,11 +128,15 @@ func listen(
 	if err != nil {
 		return nil, err
 	}
-	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(maxRequestBodySize), grpc.ChainUnaryInterceptor(interceptors...))
+	grpcServer := grpc.NewServer(
+		grpc.MaxRecvMsgSize(maxRequestBodySize), grpc.ChainUnaryInterceptor(interceptors...),
+	)
 
 	// the gateway reaches grpc through the same port
 	_, boundPort, _ := net.SplitHostPort(listener.Addr().String())
-	conn, err := grpc.NewClient("127.0.0.1:"+boundPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(
+		"127.0.0.1:"+boundPort, grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
 		_ = listener.Close()
 		return nil, err
@@ -142,16 +160,6 @@ func listen(
 			IdleTimeout: 2 * time.Minute,
 		},
 	}, nil
-}
-
-func (p *port) close() {
-	p.grpc.Stop()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	if err := p.http.Shutdown(ctx); err != nil {
-		log.WithError(err).Warn("shutdown server")
-	}
-	_ = p.conn.Close()
 }
 
 func route(grpcServer *grpc.Server, gatewayMux, pages http.Handler) http.Handler {
@@ -183,7 +191,8 @@ func adminPages(status StatusSource, checks handlers.Health) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/{$}", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Content-Security-Policy", "default-src 'self' 'unsafe-inline'; frame-ancestors 'none'")
+		w.Header().
+			Set("Content-Security-Policy", "default-src 'self' 'unsafe-inline'; frame-ancestors 'none'")
 		_, _ = w.Write(index)
 	})
 	mux.Handle("/metrics", metrics)
@@ -225,7 +234,8 @@ func isRest(r *http.Request) bool {
 
 // restError answers FailedPrecondition with 412 where the gateway would send 400.
 func restError(
-	ctx context.Context, mux *gateway.ServeMux, m gateway.Marshaler, w http.ResponseWriter, r *http.Request, err error,
+	ctx context.Context, mux *gateway.ServeMux, m gateway.Marshaler, w http.ResponseWriter,
+	r *http.Request, err error,
 ) {
 	if status.Code(err) == codes.FailedPrecondition {
 		err = gateway.HTTPStatusError{HTTPStatus: http.StatusPreconditionFailed, Err: err}
@@ -234,10 +244,14 @@ func restError(
 }
 
 // logUnary logs failures as warnings, the rest at debug level.
-func logUnary(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+func logUnary(
+	ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+) (any, error) {
 	start := time.Now()
 	resp, err := handler(ctx, req)
-	entry := log.WithFields(log.Fields{"method": info.FullMethod, "duration": time.Since(start).String()})
+	entry := log.WithFields(
+		log.Fields{"method": info.FullMethod, "duration": time.Since(start).String()},
+	)
 	if err != nil {
 		entry.WithError(err).Warn("grpc call failed")
 	} else {

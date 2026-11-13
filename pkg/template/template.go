@@ -1,184 +1,104 @@
-// Package template parses delegation templates, binds them to keys, variables and sources, and
-// builds the transactions they describe.
-//
-// A document is decoded into its typed form by internal/schema, compiled into a Template, and
-// hashed in its canonical form to get its id. A Template bound to a Context is an Instance,
-// which builds one Action per set of sources.
+// Package template compiles versioned JSON templates and contract artifacts into
+// unsigned transactions. It does not load dependencies, sign or broadcast.
 package template
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
-	"maps"
-	"slices"
 	"time"
 
-	"github.com/arkade-os/executor/pkg/template/internal/asm"
-	"github.com/arkade-os/executor/pkg/template/internal/schema"
+	arklib "github.com/arkade-os/arkd/pkg/ark-lib"
+	v1 "github.com/arkade-os/executor/pkg/template/internal/version/v1"
+	"github.com/btcsuite/btcd/psbt/v2"
 )
 
-// Type is the kind of transaction a template builds.
-type Type string
-
-const (
-	// Intent is an Ark intent: a message input, then the template inputs.
-	Intent Type = "intent"
-	// Offchain is an Ark transaction spending virtual outputs.
-	Offchain Type = "offchain"
-	// Onchain is a Bitcoin transaction.
-	Onchain Type = "onchain"
-)
-
-// Schedule is when an input becomes eligible; the zero value is immediately.
-type Schedule struct {
-	BeforeExpiry     time.Duration // offchain
-	MinConfirmations int           // onchain
-}
-
-// Slot describes one template input.
-type Slot struct {
-	Name     string
-	Onchain  bool
-	Schedule Schedule
-}
-
-// Template is a parsed, validated template.
+// Template is immutable and safe for concurrent use. Its zero value is invalid.
 type Template struct {
-	id        string
-	typ       Type
-	variables map[string]string
-	secrets   map[string]secret
-	inputs    []input
-	outputs   []output
-	fee       *fee
-	packets   *packetSpec
-	trigger   *Trigger
-	artifacts []string
+	version string
+	v1      *v1.Template
 }
 
-// ArtifactIDs lists the artifact ids a document references, in order of first appearance.
-func ArtifactIDs(doc []byte) ([]string, error) {
-	d, err := schema.Decode(doc)
-	if err != nil {
-		return nil, err
-	}
-	var ids []string
-	add := func(c *schema.Construction) {
-		if id := c.Definition.Artifact; c.Definition.Def == nil && !slices.Contains(ids, id) {
-			ids = append(ids, id)
-		}
-	}
-	for i := range d.Inputs {
-		add(&d.Inputs[i].Contract)
-	}
-	for i := range d.Outputs {
-		if c := d.Outputs[i].Locking.Contract; c != nil {
-			add(c)
-		}
-	}
-	return ids, nil
-}
+// BoundTemplate holds keys and variables; each Build starts from its request alone.
+type BoundTemplate struct{ v1 *v1.BoundTemplate }
 
-// Parse decodes and validates a template, with the documents of the artifacts it references keyed
-// by id; its id is the hash of the normalized document.
-func Parse(doc []byte, artifacts map[string][]byte) (*Template, error) {
-	d, err := schema.Decode(doc)
-	if err != nil {
-		return nil, err
-	}
-	t, err := compile(d, artifacts)
-	if err != nil {
-		return nil, err
-	}
-	d.Normalize()
-	b, err := d.Canonical()
-	if err != nil {
-		return nil, err
-	}
-	sum := sha256.Sum256(b)
-	t.id = hex.EncodeToString(sum[:])
-	return t, nil
-}
+type Instance struct{ v1 *v1.Instance }
 
-// ID is the hex SHA-256 of the canonical document.
-func (t *Template) ID() string { return t.id }
+type Trigger struct{ v1 *v1.Trigger }
 
-func (t *Template) Type() Type { return t.typ }
+func (t *Template) Version() string     { return t.version }
+func (t *Template) ID() string          { return t.v1.ID() }
+func (t *Template) SpendID() string     { return t.v1.SpendID() }
+func (t *Template) Type() Type          { return t.v1.Type() }
+func (t *Template) Variables() []Field  { return t.v1.Variables() }
+func (t *Template) Inputs() []Slot      { return t.v1.Inputs() }
+func (t *Template) Arkade() bool        { return t.v1.Arkade() }
+func (t *Template) Artifacts() []string { return t.v1.Artifacts() }
+func (t *Template) Sealed() []string    { return t.v1.Sealed() }
+func (t *Template) ContextFree() bool   { return t.v1.ContextFree() }
 
-// Variables lists the declared variables, sorted by name.
-func (t *Template) Variables() []Field {
-	out := make([]Field, 0, len(t.variables))
-	for _, n := range slices.Sorted(maps.Keys(t.variables)) {
-		out = append(out, Field{Name: n, Type: t.variables[n]})
+// Triggers lists one stream rule per triggered input, in input order.
+func (t *Template) Triggers() []*Trigger {
+	var out []*Trigger
+	for _, tr := range t.v1.Triggers() {
+		out = append(out, &Trigger{tr})
 	}
 	return out
 }
 
-func (t *Template) Inputs() []Slot {
-	out := make([]Slot, 0, len(t.inputs))
-	for _, in := range t.inputs {
-		out = append(out, Slot{Name: in.name, Onchain: in.onchain, Schedule: in.schedule})
+// Instantiate without sources derives the input contracts of a watch.
+func (t *Template) Instantiate(c Context) (*Instance, error) {
+	i, err := t.v1.Instantiate(c)
+	if err != nil {
+		return nil, wrap("instantiate", err)
 	}
-	return out
+	return &Instance{i}, nil
 }
 
-// Arkade reports whether a spend carries an arkade packet: an input runs a covenant function.
-func (t *Template) Arkade() bool {
-	return slices.ContainsFunc(t.inputs, func(in input) bool {
-		fn := in.contract.def.FindFunction(in.function)
-		return fn != nil && fn.Arkade != nil
-	})
-}
-
-// Artifacts lists the referenced artifact ids in order of first appearance.
-func (t *Template) Artifacts() []string { return slices.Clone(t.artifacts) }
-
-// Secrets reports whether the template declares secrets, which Instantiate must decrypt.
-func (t *Template) Secrets() bool { return len(t.secrets) > 0 }
-
-func bad(format string, args ...any) error {
-	return fmt.Errorf("%w: %s", ErrInvalidTemplate, fmt.Sprintf(format, args...))
-}
-
-// ContextFree reports whether the input contracts can be built without sources.
-func (t *Template) ContextFree() bool {
-	for _, in := range t.inputs {
-		if !t.argsFree(in.contract.args) {
-			return false
-		}
+func (t *Template) Bind(b Bindings) (*BoundTemplate, error) {
+	bound, err := t.v1.Bind(b)
+	if err != nil {
+		return nil, wrap("bind", err)
 	}
-	return true
+	return &BoundTemplate{bound}, nil
 }
 
-func (t *Template) argsFree(args map[string]byteTemplate) bool {
-	for _, b := range args {
-		if !exprsFree(b) {
-			return false
-		}
-		for _, n := range b.names() {
-			if s, ok := t.secrets[n]; ok && !exprsFree(s.ciphertext) {
-				return false
-			}
-		}
-		for _, p := range b {
-			if p.program != "" && !t.argsFree(t.outputs[t.output(p.program)].locking.contract.args) {
-				return false
-			}
-		}
+func (b *BoundTemplate) Build(r BuildRequest) (*Action, error) {
+	a, err := b.v1.Build(r)
+	return a, wrap("build", err)
+}
+
+func (b *BoundTemplate) InputContracts(r Runtime) (*Instance, error) {
+	i, err := b.v1.InputContracts(r)
+	if err != nil {
+		return nil, wrap("derive", err)
 	}
-	return true
+	return &Instance{i}, nil
 }
 
-func (t *Template) output(name string) int {
-	return slices.IndexFunc(t.outputs, func(o output) bool { return o.name == name })
+func (i *Instance) Build(s []*Source, f Fee) (*Action, error) {
+	a, err := i.v1.Build(s, f)
+	return a, wrap("build", err)
 }
 
-func exprsFree(b byteTemplate) bool {
-	return !slices.ContainsFunc(b, func(p piece) bool { return p.expr != nil && !asm.ContextFree(p.expr) })
+func (i *Instance) PkScript(slot int) []byte     { return i.v1.PkScript(slot) }
+func (i *Instance) Tapscripts(slot int) []string { return i.v1.Tapscripts(slot) }
+
+func (i *Instance) Locktime(slot int) (arklib.AbsoluteLocktime, bool) {
+	return i.v1.Locktime(slot)
 }
 
-// isTaptree: the variable holds a given tree, decoded and never pushed.
-func (t *Template) isTaptree(name string) bool {
-	return slices.ContainsFunc(t.inputs, func(in input) bool { return in.contract.taptree == name })
+func (i *Instance) DueAt(slot int, s *Source, now time.Time) time.Time {
+	return i.v1.DueAt(slot, s, now)
+}
+
+func (t *Trigger) Input() int         { return t.v1.Input() }
+func (t *Trigger) TTL() time.Duration { return t.v1.TTL() }
+func (t *Trigger) Captured() []string { return t.v1.Captured() }
+
+// Match returns the candidate outputs of p. given holds the stream's registered variables;
+// decrypt opens a sealed variable a requirement reads. A requirement on a variable another
+// rule captures is left to whoever completes the group.
+func (t *Trigger) Match(
+	p *psbt.Packet, k TriggerKeys, given map[string][]byte, decrypt func([]byte) ([]byte, error),
+) ([]Capture, error) {
+	c, err := t.v1.Match(p, k, given, decrypt)
+	return c, wrap("match", err)
 }

@@ -4,7 +4,6 @@
   "inputs": [
     {
       "name": "funds",
-      "schedule": {"min_confirmations": 1},
       "contract": {
         "definition": {
           "contractName": "OnchainRelease",
@@ -17,9 +16,7 @@
                 {
                   "name": "release",
                   "asm": ["<COSIGNER_KEY>", "OP_CHECKSIG"],
-                  "witness": [
-                    {"name": "delegateSig", "type": "signature", "encoding": "schnorr-64", "injected": true}
-                  ]
+                  "witness": [{"name": "delegateSig", "type": "signature", "encoding": "schnorr-64", "injected": true}]
                 }
               ]
             }
@@ -37,5 +34,6 @@
       "locking": "5120f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"
     }
   ],
-  "fees": {"from": "funds", "max": 1000}
+  "fees": {"from": "funds", "max": 1000},
+  "delegation": {"schedule": {"funds": {"min_confirmations": 1}}}
 }

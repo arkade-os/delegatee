@@ -8,7 +8,9 @@ import (
 )
 
 func TestAliveFailsWhenWorkIsDueAndTheLoopIsSilent(t *testing.T) {
-	s := NewService(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, Limits{LoopStall: time.Minute})
+	s := NewService(
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, Limits{LoopStall: time.Minute},
+	)
 	now := time.Unix(1_800_000_000, 0)
 
 	require.NoError(t, s.Alive(now), "nothing is armed")
@@ -19,5 +21,7 @@ func TestAliveFailsWhenWorkIsDueAndTheLoopIsSilent(t *testing.T) {
 	require.Error(t, s.Alive(now.Add(time.Hour+2*time.Minute)))
 
 	s.beat.Store(now.Add(time.Hour + 90*time.Second).UnixNano())
-	require.NoError(t, s.Alive(now.Add(time.Hour+2*time.Minute)), "the loop handled something since")
+	require.NoError(
+		t, s.Alive(now.Add(time.Hour+2*time.Minute)), "the loop handled something since",
+	)
 }

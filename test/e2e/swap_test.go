@@ -63,11 +63,14 @@ func TestStreamClaimRefusesASecretSealedToAnotherTemplate(t *testing.T) {
 	require.EqualValues(t, 10_000, paid.Amount)
 }
 
-// the secret seals the receiver and the least amount with the preimage: a funding short of either keeps it
+// the secret seals the receiver and the least amount with the preimage: a funding short of either
+// keeps it
 func TestStreamClaimEnforcesTheSealedTerms(t *testing.T) {
 	d := start(t)
 	claim := registerTemplate(t, d, "offline_receive.json")
-	_, err := d.admin.RegisterStream(t.Context(), &executorv1.RegisterStreamRequest{TemplateId: claim})
+	_, err := d.admin.RegisterStream(
+		t.Context(), &executorv1.RegisterStreamRequest{TemplateId: claim},
+	)
 	require.NoError(t, err)
 	alice := fundedWallet(t)
 
@@ -89,12 +92,15 @@ func TestVHTLCRefundAfterLocktime(t *testing.T) {
 	d := start(t)
 	refund := registerTemplate(t, d, "vhtlc_refund.json")
 	swap := newSwap(t, d, refund)
-	// arkd compares a timestamp with the median time past, which an idle regtest leaves far behind the clock
+	// arkd compares a timestamp with the median time past, which an idle regtest leaves far behind
+	// the clock
 	swap.variables["refund_locktime"] = daemon.ScriptNum(medianTime(t))
 
 	w := registerDelegation(t, d, refund, swap.variables)
 	alice := fundedWallet(t)
-	funding, err := alice.SendOffChain(t.Context(), []clientlib.Receiver{{To: w.Address, Amount: 10_000}})
+	funding, err := alice.SendOffChain(
+		t.Context(), []clientlib.Receiver{{To: w.Address, Amount: 10_000}},
+	)
 	require.NoError(t, err)
 
 	sender, err := hex.DecodeString(swap.variables["sender_program"])
@@ -128,8 +134,10 @@ func newSwap(t *testing.T, d executor, templateID string) swap {
 			"unilateral_refund_delay": daemon.ScriptNum(1<<22 | 3),
 			"unilateral_refund_without_receiver_delay": daemon.ScriptNum(1<<22 | 4),
 			"receiver_program":                         hex.EncodeToString(program),
-			"sender_program":                           hex.EncodeToString(schnorr.SerializePubKey(sender)),
-			"ciphertext":                               seal(t, d, templateID, preimage),
+			"sender_program": hex.EncodeToString(
+				schnorr.SerializePubKey(sender),
+			),
+			"preimage": seal(t, d, templateID, preimage),
 		},
 		receiverScript: append([]byte{0x51, 0x20}, program...),
 		preimage:       preimage,
@@ -151,7 +159,7 @@ func (s swap) sealTerms(t *testing.T, d executor, templateID, program string, le
 	t.Helper()
 	terms, err := hex.DecodeString(program + daemon.ScriptNum(least))
 	require.NoError(t, err)
-	s.variables["ciphertext"] = seal(t, d, templateID, slices.Concat(s.preimage, terms))
+	s.variables["preimage"] = seal(t, d, templateID, slices.Concat(s.preimage, terms))
 }
 
 // swapClaim funds a VHTLC watched under the claim template and waits for its claim.
@@ -162,7 +170,9 @@ func swapClaim(t *testing.T, d executor) (clientlib.Vtxo, time.Duration) {
 
 	w := registerDelegation(t, d, claim, swap.variables)
 	alice := fundedWallet(t)
-	funding, err := alice.SendOffChain(t.Context(), []clientlib.Receiver{{To: w.Address, Amount: 10_000}})
+	funding, err := alice.SendOffChain(
+		t.Context(), []clientlib.Receiver{{To: w.Address, Amount: 10_000}},
+	)
 	require.NoError(t, err)
 	sent := time.Now()
 	paid := waitForVtxo(t, d, hex.EncodeToString(swap.receiverScript), funding)
@@ -181,11 +191,16 @@ func streamFunding(t *testing.T, d executor, alice testWallet, swap swap) string
 	require.NoError(t, err)
 	program, err := hex.DecodeString(swap.variables["receiver_program"])
 	require.NoError(t, err)
-	ciphertext, err := hex.DecodeString(swap.variables["ciphertext"])
+	ciphertext, err := hex.DecodeString(swap.variables["preimage"])
 	require.NoError(t, err)
-	funding, err := alice.SendOffChain(t.Context(), []clientlib.Receiver{{To: addr, Amount: 10_000}},
-		offchaintx.WithExtraPacket(packets.Raw(4, daemon.TLV(ciphertext, daemon.EnforcePayTo(t, program), key))),
-		offchaintx.WithTxOutsTaprootTree(map[string][]byte{hex.EncodeToString(pkScript): tree}))
+	funding, err := alice.SendOffChain(
+		t.Context(),
+		[]clientlib.Receiver{{To: addr, Amount: 10_000}},
+		offchaintx.WithExtraPacket(
+			packets.Raw(4, daemon.TLV(ciphertext, daemon.EnforcePayTo(t, program), key)),
+		),
+		offchaintx.WithTxOutsTaprootTree(map[string][]byte{hex.EncodeToString(pkScript): tree}),
+	)
 	require.NoError(t, err)
 	return funding
 }
@@ -205,7 +220,9 @@ func streamChild(t *testing.T, d executor) *executorv1.Delegation {
 	t.Helper()
 	var child *executorv1.Delegation
 	require.Eventually(t, func() bool {
-		resp, err := d.admin.ListDelegations(t.Context(), &executorv1.ListDelegationsRequest{Limit: 1000})
+		resp, err := d.admin.ListDelegations(
+			t.Context(), &executorv1.ListDelegationsRequest{Limit: 1000},
+		)
 		if err != nil {
 			return false
 		}
@@ -245,14 +262,19 @@ func oneSucceeded(t *testing.T, d executor, id int64) {
 
 func succeededOf(t *testing.T, d executor, id int64) []*executorv1.Attempt {
 	t.Helper()
-	return slices.DeleteFunc(attemptsOf(t, d, id), func(a *executorv1.Attempt) bool { return a.Status != "succeeded" })
+	return slices.DeleteFunc(
+		attemptsOf(t, d, id), func(a *executorv1.Attempt) bool { return a.Status != "succeeded" },
+	)
 }
 
 // swapOutput is the Ark address of swap, its script and its BIP-371 tree, derived as a funder does.
 func swapOutput(t *testing.T, d executor, swap swap) (string, []byte, []byte) {
 	t.Helper()
 	keys := keysOf(t, d)
-	inst := instantiate(t, "vhtlc_claim.json", keys, swap.variables, func([]byte) ([]byte, error) { return swap.preimage, nil })
+	inst := instantiate(
+		t, "vhtlc_claim.json", keys, swap.variables,
+		func([]byte) ([]byte, error) { return swap.preimage, nil },
+	)
 	tree, err := txutils.TapTree(inst.Tapscripts(0)).Encode()
 	require.NoError(t, err)
 	tapKey, err := schnorr.ParsePubKey(inst.PkScript(0)[2:])

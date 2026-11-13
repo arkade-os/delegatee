@@ -14,7 +14,9 @@ import (
 
 func TestRegisterTemplateThenGetAndList(t *testing.T) {
 	h := testHandler(t, 10)
-	art, err := h.RegisterArtifact(t.Context(), &executorv1.RegisterArtifactRequest{Document: testDocument(t)})
+	art, err := h.RegisterArtifact(
+		t.Context(), &executorv1.RegisterArtifactRequest{Document: testDocument(t)},
+	)
 	require.NoError(t, err)
 	doc := testTemplateDocument(t, "renew.json")
 
@@ -24,7 +26,7 @@ func TestRegisterTemplateThenGetAndList(t *testing.T) {
 	require.Len(t, tpl.GetId(), 64)
 	require.Equal(t, doc, tpl.GetDocument())
 	require.Equal(t, []string{art.GetArtifact().GetId()}, tpl.GetArtifactIds())
-	require.Equal(t, "intent", tpl.GetType())
+	require.Equal(t, "proof", tpl.GetType())
 	require.Equal(t, "active", tpl.GetStatus())
 	require.NotEmpty(t, tpl.GetParams())
 	require.NotZero(t, tpl.GetCreatedAt())
@@ -53,16 +55,24 @@ func TestRegisterTemplateErrors(t *testing.T) {
 
 	onchain, err := os.ReadFile("../../../../pkg/template/testdata/onchain_release.json")
 	require.NoError(t, err)
-	_, err = h.RegisterTemplate(t.Context(), &executorv1.RegisterTemplateRequest{Document: string(onchain)})
+	_, err = h.RegisterTemplate(
+		t.Context(), &executorv1.RegisterTemplateRequest{Document: string(onchain)},
+	)
 	require.Equal(t, codes.FailedPrecondition, status.Code(err), "unsupported")
 
 	renewal := testTemplateDocument(t, "renew.json")
 	_, err = h.RegisterTemplate(t.Context(), &executorv1.RegisterTemplateRequest{Document: renewal})
 	require.Equal(t, codes.NotFound, status.Code(err))
 
-	_, err = h.RegisterTemplate(t.Context(), &executorv1.RegisterTemplateRequest{Document: testTemplateDocument(t, "vhtlc_claim.json")})
+	_, err = h.RegisterTemplate(
+		t.Context(),
+		&executorv1.RegisterTemplateRequest{Document: testTemplateDocument(t, "vhtlc_claim.json")},
+	)
 	require.NoError(t, err)
-	_, err = h.RegisterTemplate(t.Context(), &executorv1.RegisterTemplateRequest{Document: testTemplateDocument(t, "vhtlc_refund.json")})
+	_, err = h.RegisterTemplate(
+		t.Context(),
+		&executorv1.RegisterTemplateRequest{Document: testTemplateDocument(t, "vhtlc_refund.json")},
+	)
 	require.Equal(t, codes.ResourceExhausted, status.Code(err))
 }
 

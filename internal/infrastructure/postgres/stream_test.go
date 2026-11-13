@@ -62,7 +62,10 @@ func TestStreamListAndSetStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []int64{a.ID}, streamIDs(active))
 
-	require.ErrorIs(t, repo.AddOrUpdate(t.Context(), &delegation.Stream{ID: b.ID + 1}), delegation.ErrStreamNotFound)
+	require.ErrorIs(
+		t, repo.AddOrUpdate(t.Context(), &delegation.Stream{ID: b.ID + 1}),
+		delegation.ErrStreamNotFound,
+	)
 }
 
 func TestTemplateDeleteRefusedWhileAStreamReferencesIt(t *testing.T) {

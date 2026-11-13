@@ -23,7 +23,9 @@ func TestTemplateAddOrUpdate(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, registry.TemplateStatusDisabled, got.Status)
 	require.Equal(t, 2, got.Failures)
-	require.Equal(t, testTemplate("a").Document, got.Document, "a template's document never changes")
+	require.Equal(
+		t, testTemplate("a").Document, got.Document, "a template's document never changes",
+	)
 
 	n, err := repo.Count(t.Context())
 	require.NoError(t, err)
@@ -46,7 +48,9 @@ func TestTemplateList(t *testing.T) {
 		tpl := testTemplate(id)
 		require.NoError(t, repo.AddOrUpdate(t.Context(), &tpl))
 	}
-	_, err := repo.db.db.ExecContext(t.Context(), "UPDATE templates SET status = 'disabled' WHERE id = 'b'")
+	_, err := repo.db.db.ExecContext(
+		t.Context(), "UPDATE templates SET status = 'disabled' WHERE id = 'b'",
+	)
 	require.NoError(t, err)
 
 	active, err := repo.List(t.Context(), registry.TemplateStatusActive)
@@ -99,14 +103,22 @@ func TestTemplateGetNotFound(t *testing.T) {
 
 func testTemplate(id string) registry.Template {
 	return registry.Template{
-		ID: id, Document: []byte("doc " + id), ArtifactIDs: []string{"x"},
-		Params: []registry.Param{{Name: "owner", Type: "pubkey"}}, Type: "intent", Status: registry.TemplateStatusActive,
+		ID:          id,
+		Document:    []byte("doc " + id),
+		ArtifactIDs: []string{"x"},
+		Params: []registry.Param{
+			{Name: "owner", Type: "pubkey"},
+		},
+		Type:   "proof",
+		Status: registry.TemplateStatusActive,
 	}
 }
 
 func templateCount(t *testing.T, repo *TemplateRepository) int {
 	t.Helper()
 	var n int
-	require.NoError(t, repo.db.db.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM templates").Scan(&n))
+	require.NoError(
+		t, repo.db.db.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM templates").Scan(&n),
+	)
 	return n
 }

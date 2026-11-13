@@ -14,7 +14,9 @@ type ArtifactRepository struct{ db *DB }
 func (d *DB) Artifacts() *ArtifactRepository { return &ArtifactRepository{db: d} }
 
 func (r *ArtifactRepository) Add(ctx context.Context, a *registry.Artifact) error {
-	row, err := r.db.querier.InsertArtifact(ctx, queries.InsertArtifactParams{ID: a.ID, Document: a.Document})
+	row, err := r.db.querier.InsertArtifact(
+		ctx, queries.InsertArtifactParams{ID: a.ID, Document: a.Document},
+	)
 	if err != nil {
 		return err
 	}

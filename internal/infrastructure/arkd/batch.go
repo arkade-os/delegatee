@@ -14,6 +14,14 @@ import (
 // blockExpiryLimit is the first batch expiry arkd gives in seconds rather than blocks.
 const blockExpiryLimit = 512
 
+// trees collects the transactions of the trees, which arkd streams one by one.
+type trees struct {
+	intents                 *intents
+	batch                   string   // the batch our intents are in
+	ours                    []intent // the ones it selected
+	vtxoTree, connectorTree []tree.TxTreeNode
+}
+
 func (c *Client) BatchEvents(ctx context.Context) (<-chan ports.BatchEvent, func(), error) {
 	events, stop, err := c.ark.GetEventStream(ctx, nil)
 	if err != nil {
@@ -51,14 +59,6 @@ func (c *Client) UpdateTopics(ctx context.Context, add, remove []string) error {
 	return err
 }
 
-// trees collects the transactions of the trees, which arkd streams one by one.
-type trees struct {
-	intents                 *intents
-	batch                   string   // the batch our intents are in
-	ours                    []intent // the ones it selected
-	vtxoTree, connectorTree []tree.TxTreeNode
-}
-
 // convert turns a client-lib event into the domain's, nil when the daemon has no use for it.
 func (r *trees) convert(ev clientlib.BatchEventChannel) ports.BatchEvent {
 	if ev.Err != nil {
@@ -76,7 +76,9 @@ func (r *trees) convert(ev clientlib.BatchEventChannel) ports.BatchEvent {
 		r.vtxoTree, r.connectorTree = nil, nil
 		r.intents.settle(time.Second)
 		r.batch, r.ours = e.Id, r.intents.selected(e.HashedIntentIds)
-		expiry := arklib.RelativeLocktime{Type: arklib.LocktimeTypeBlock, Value: uint32(e.BatchExpiry)}
+		expiry := arklib.RelativeLocktime{
+			Type: arklib.LocktimeTypeBlock, Value: uint32(e.BatchExpiry),
+		}
 		if e.BatchExpiry >= blockExpiryLimit {
 			expiry.Type = arklib.LocktimeTypeSecond
 		}
@@ -97,7 +99,8 @@ func (r *trees) convert(ev clientlib.BatchEventChannel) ports.BatchEvent {
 			return nil
 		}
 		return ports.TreeSigningStarted{
-			ID: e.Id, UnsignedCommitmentTx: e.UnsignedCommitmentTx, CosignersPubkeys: e.CosignersPubkeys, VtxoTree: vtxoTree,
+			ID: e.Id, UnsignedCommitmentTx: e.UnsignedCommitmentTx,
+			CosignersPubkeys: e.CosignersPubkeys, VtxoTree: vtxoTree,
 		}
 	case clientlib.TreeNoncesAggregatedEvent:
 		return ports.TreeNoncesAggregated{ID: e.Id, TreeNonces: e.Nonces}

@@ -18,7 +18,11 @@ func TestNewStreamIsActiveForATriggerTemplate(t *testing.T) {
 	p := streamParams(t)
 	s, err := NewStream(p)
 	require.NoError(t, err)
-	require.Equal(t, &Stream{TemplateID: p.Template.ID(), Variables: map[string]string{}, Status: StatusActive}, s)
+	require.Equal(
+		t,
+		&Stream{TemplateID: p.Template.ID(), Variables: map[string]string{}, Status: StatusActive},
+		s,
+	)
 }
 
 func TestNewStreamRefusesInvalidTemplateKeyTTLOrVariables(t *testing.T) {
@@ -30,7 +34,7 @@ func TestNewStreamRefusesInvalidTemplateKeyTTLOrVariables(t *testing.T) {
 		"no key":     {func(p *StreamParams) { p.Encryption = false }, ErrNoEncryptionKey},
 		"short ttl":  {func(p *StreamParams) { p.MinExpiry = 48 * time.Hour }, ErrInvalidArgs},
 		"given and captured": {func(p *StreamParams) {
-			p.Variables = map[string]string{"ciphertext": "00"}
+			p.Variables = map[string]string{"preimage": "00"}
 		}, ErrInvalidArgs},
 		"undeclared": {func(p *StreamParams) { p.Variables = map[string]string{"other": "00"} }, ErrInvalidArgs},
 		"neither given nor captured": {func(p *StreamParams) {
@@ -120,7 +124,8 @@ func unboundTrigger(t *testing.T) *template.Template {
 	t.Helper()
 	var doc map[string]any
 	require.NoError(t, json.Unmarshal(templates.Templates["claim.json"], &doc))
-	delete(doc["trigger"].(map[string]any)["capture"].(map[string]any), "receiver_program")
+	rule := doc["delegation"].(map[string]any)["trigger"].(map[string]any)["htlc"].(map[string]any)
+	delete(rule["capture"].(map[string]any), "receiver_program")
 	raw, err := json.Marshal(doc)
 	require.NoError(t, err)
 	return parseDoc(t, raw)
@@ -141,10 +146,22 @@ func spawnParams(t *testing.T) SpawnParams {
 	require.NoError(t, err)
 	tmpl := parseDoc(t, templates.Templates["claim.json"])
 	return SpawnParams{
-		Stream: Stream{ID: 7, TemplateID: tmpl.ID(), Variables: map[string]string{}}, Template: tmpl, Output: output,
-		Captured: map[string]string{"taptree": hex.EncodeToString(tree), "receiver_program": v.ReceiverProgram, "ciphertext": v.Preimage},
-		Now:      time.Unix(1_800_000_000, 0),
-		Keys:     template.Keys{Server: scalarKey(1), Emulator: scalarKey(3), Cosigner: scalarKey(99)}, Network: arklib.BitcoinRegTest,
+		Stream: Stream{
+			ID:         7,
+			TemplateID: tmpl.ID(),
+			Variables:  map[string]string{},
+		},
+		Template: tmpl,
+		Output:   output,
+		Captured: map[string]string{
+			"taptree": hex.EncodeToString(tree), "receiver_program": v.ReceiverProgram,
+			"preimage": v.Preimage,
+		},
+		Now: time.Unix(1_800_000_000, 0),
+		Keys: template.Keys{
+			Server: scalarKey(1), Emulator: scalarKey(3), Cosigner: scalarKey(99),
+		},
+		Network: arklib.BitcoinRegTest,
 		Decrypt: func(ciphertext []byte) ([]byte, error) { return ciphertext, nil },
 	}
 }

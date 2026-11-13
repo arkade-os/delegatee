@@ -1,4 +1,5 @@
-// Package execution turns a delegation's coins into the transactions arkd takes, and schedules them.
+// Package execution turns a delegation's coins into the transactions arkd takes, and schedules
+// them.
 package execution
 
 import (
@@ -69,13 +70,9 @@ func (in *Intent) Forfeited() int {
 	return n
 }
 
-func (in *Intent) boarding(i int) bool  { return i < len(in.Boarding) && in.Boarding[i] }
-func (in *Intent) swept(i int) bool     { return i < len(in.Swept) && in.Swept[i] }
-func (in *Intent) forfeited(i int) bool { return !in.boarding(i) && !in.swept(i) }
-
 func BuildOffchain(
-	inst *template.Instance, inputs []delegation.Input, coins []delegation.Coin, txs map[string]*wire.MsgTx,
-	fee template.Fee, unroll []byte,
+	inst *template.Instance, inputs []delegation.Input, coins []delegation.Coin,
+	txs map[string]*wire.MsgTx, fee template.Fee, unroll []byte,
 ) ([]delegation.Tx, error) {
 	sources, err := sourcesOf(coins, txs)
 	if err != nil {
@@ -96,8 +93,11 @@ func BuildOffchain(
 			return nil, err
 		}
 		ins[i] = offchain.VtxoInput{
-			Outpoint: &sources[i].Outpoint, Amount: int64(c.Amount),
-			Tapscript:          &waddrmgr.Tapscript{ControlBlock: ctrl, RevealedScript: leaf.Script},
+			Outpoint: &sources[i].Outpoint,
+			Amount:   int64(c.Amount),
+			Tapscript: &waddrmgr.Tapscript{
+				ControlBlock: ctrl, RevealedScript: leaf.Script,
+			},
 			RevealedTapscripts: inputs[c.Input].Tapscripts,
 		}
 	}
@@ -113,10 +113,14 @@ func BuildOffchain(
 		if witness == nil {
 			continue
 		}
-		if err = txutils.SetArkPsbtField(ark, i, txutils.ConditionWitnessField, witness); err != nil {
+		if err = txutils.SetArkPsbtField(
+			ark, i, txutils.ConditionWitnessField, witness,
+		); err != nil {
 			return nil, err
 		}
-		if err = txutils.SetArkPsbtField(checkpoints[i], 0, txutils.ConditionWitnessField, witness); err != nil {
+		if err = txutils.SetArkPsbtField(
+			checkpoints[i], 0, txutils.ConditionWitnessField, witness,
+		); err != nil {
 			return nil, err
 		}
 	}
@@ -126,124 +130,19 @@ func BuildOffchain(
 		if err := p.Serialize(&raw); err != nil {
 			return nil, err
 		}
-		out = append(out, delegation.Tx{Raw: raw.Bytes(), Txid: p.UnsignedTx.TxHash().String(), Spends: i == 0})
+		out = append(
+			out,
+			delegation.Tx{Raw: raw.Bytes(), Txid: p.UnsignedTx.TxHash().String(), Spends: i == 0},
+		)
 	}
 	return out, nil
-}
-
-// sourcesOf pairs each coin with the transaction that created it, which must pay it exactly.
-func sourcesOf(coins []delegation.Coin, txs map[string]*wire.MsgTx) ([]*template.Source, error) {
-	sources := make([]*template.Source, len(coins))
-	for i, c := range coins {
-		op, err := wire.NewOutPointFromString(c.Outpoint)
-		if err != nil {
-			return nil, err
-		}
-		script, err := hex.DecodeString(c.Script)
-		if err != nil {
-			return nil, err
-		}
-		tx := txs[op.Hash.String()]
-		if tx == nil || int(op.Index) >= len(tx.TxOut) {
-			return nil, fmt.Errorf("coin %s: missing source output", c.Outpoint)
-		}
-		if prev := tx.TxOut[op.Index]; prev.Value != int64(c.Amount) || !bytes.Equal(prev.PkScript, script) {
-			return nil, fmt.Errorf("coin %s differs from its source output", c.Outpoint)
-		}
-		held, err := heldAt(tx, op.Index)
-		if err != nil {
-			return nil, fmt.Errorf("coin %s: %w", c.Outpoint, err)
-		}
-		sources[i] = &template.Source{Outpoint: *op, Tx: tx, Amount: c.Amount, Assets: held, Expiry: c.ExpiresAt, CreatedAt: c.CreatedAt}
-	}
-	return sources, nil
-}
-
-// heldAt lists the assets the asset packet of tx puts on its output at index.
-func heldAt(tx *wire.MsgTx, index uint32) ([]template.Asset, error) {
-	ext, err := extension.NewExtensionFromTx(tx)
-	if errors.Is(err, extension.ErrExtensionNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	var held []template.Asset
-	for i, g := range ext.GetAssetPacket() {
-		id := g.AssetId
-		if id == nil {
-			if id, err = asset.NewAssetId(tx.TxHash().String(), uint16(i)); err != nil {
-				return nil, err
-			}
-		}
-		raw, err := id.Serialize()
-		if err != nil {
-			return nil, err
-		}
-		for _, o := range g.Outputs {
-			if uint32(o.Vout) == index {
-				held = append(held, template.Asset{ID: raw, Amount: o.Amount})
-			}
-		}
-	}
-	return held, nil
-}
-
-// checkTx checks that the template transaction spends exactly the coins, at the inputs' scripts,
-// through leaves of their trees.
-func checkTx(tx *psbt.Packet, coins []delegation.Coin, inputs []delegation.Input) error {
-	if tx == nil || tx.UnsignedTx == nil {
-		return errEmptyTemplateTx
-	}
-	if len(tx.Inputs) != len(coins) || len(tx.UnsignedTx.TxIn) != len(coins) {
-		return fmt.Errorf("template tx has %d inputs for %d coins", len(tx.Inputs), len(coins))
-	}
-	for i, c := range coins {
-		in := tx.Inputs[i]
-		if in.WitnessUtxo == nil || len(in.TaprootLeafScript) != 1 {
-			return fmt.Errorf("template tx input %d lacks its witness utxo or tap leaf", i)
-		}
-		if tx.UnsignedTx.TxIn[i].PreviousOutPoint.String() != c.Outpoint {
-			return fmt.Errorf("template tx input %d spends another coin", i)
-		}
-		script, err := hex.DecodeString(c.Script)
-		if err != nil {
-			return err
-		}
-		if in.WitnessUtxo.Value != int64(c.Amount) || !bytes.Equal(in.WitnessUtxo.PkScript, script) {
-			return fmt.Errorf("template tx input %d witness utxo does not match", i)
-		}
-		if c.Input >= len(inputs) || inputs[c.Input].Script != c.Script {
-			return fmt.Errorf("coin %d is not at the script of its input", i)
-		}
-		leaf := in.TaprootLeafScript[0]
-		if !slices.Contains(inputs[c.Input].Tapscripts, hex.EncodeToString(leaf.Script)) {
-			return errLeafNotInTree
-		}
-		control, err := txscript.ParseControlBlock(leaf.ControlBlock)
-		if err != nil {
-			return err
-		}
-		if !txscript.IsPayToTaproot(script) {
-			return errNotTaproot
-		}
-		if err := txscript.VerifyTaprootLeafCommitment(control, script[2:], leaf.Script); err != nil {
-			return err
-		}
-	}
-	for _, out := range tx.UnsignedTx.TxOut {
-		if out == nil || out.Value < 0 {
-			return errInvalidTemplateOutput
-		}
-	}
-	return nil
 }
 
 // BuildIntent builds the transaction of inst spending coins, one per input in order, and the intent
 // registering it under the cosigner key; txs hold the transactions that created the coins.
 func BuildIntent(
-	inst *template.Instance, inputs []delegation.Input, coins []delegation.Coin, txs map[string]*wire.MsgTx,
-	fee template.Fee, cosigner *btcec.PublicKey,
+	inst *template.Instance, inputs []delegation.Input, coins []delegation.Coin,
+	txs map[string]*wire.MsgTx, fee template.Fee, cosigner *btcec.PublicKey,
 ) (*Intent, error) {
 	sources, err := sourcesOf(coins, txs)
 	if err != nil {
@@ -299,47 +198,6 @@ func BuildIntent(
 	return in, nil
 }
 
-// proof shifts every reference to a transaction input by one: the message is input 0.
-func (in *Intent) proof(sources []*template.Source, ext extension.Extension, extIndex int) (*intent.Proof, error) {
-	tx := in.Tx.UnsignedTx
-	proof, err := intent.New(in.Message, in.proofInputs(), slices.Clone(tx.TxOut))
-	if err != nil {
-		return nil, fmt.Errorf("build intent proof: %w", err)
-	}
-	for i := range proof.Inputs {
-		src := in.Tx.Inputs[max(i-1, 0)] // the message shares input 1's script
-		proof.Inputs[i].TaprootLeafScript = src.TaprootLeafScript
-		proof.Inputs[i].Unknowns = append(proof.Inputs[i].Unknowns, src.Unknowns...)
-		if i == 0 || !in.HasArkadePacket {
-			continue
-		}
-		// the emulator reads the transaction funding each input
-		if err := txutils.SetArkPsbtField(&proof.Packet, i, arkade.PrevArkTxField, *sources[i-1].Tx); err != nil {
-			return nil, err
-		}
-	}
-	if extIndex >= 0 {
-		shifted, err := shiftInputs(ext, 1)
-		if err != nil {
-			return nil, err
-		}
-		out, err := shifted.TxOut()
-		if err != nil {
-			return nil, err
-		}
-		proof.UnsignedTx.TxOut[extIndex] = out
-	}
-	return proof, nil
-}
-
-func (in *Intent) proofInputs() []intent.Input {
-	inputs := make([]intent.Input, len(in.Tx.UnsignedTx.TxIn))
-	for i, txin := range in.Tx.UnsignedTx.TxIn {
-		inputs[i] = intent.Input{OutPoint: &txin.PreviousOutPoint, Sequence: txin.Sequence, WitnessUtxo: in.Tx.Inputs[i].WitnessUtxo}
-	}
-	return inputs
-}
-
 // Forfeits builds one forfeit per forfeited input, each spending its coin and a connector.
 func (in *Intent) Forfeits(connectors []*psbt.Packet, forfeitScript []byte) ([]string, error) {
 	tx := in.Tx.UnsignedTx
@@ -363,7 +221,10 @@ func (in *Intent) Forfeits(connectors []*psbt.Packet, forfeitScript []byte) ([]s
 			return nil, fmt.Errorf("connector not found for vtxo %s", txin.PreviousOutPoint)
 		}
 		forfeit, err := tree.BuildForfeitTx(
-			[]*wire.OutPoint{&txin.PreviousOutPoint, {Hash: connector.TxHash(), Index: uint32(vout)}},
+			[]*wire.OutPoint{
+				&txin.PreviousOutPoint,
+				{Hash: connector.TxHash(), Index: uint32(vout)},
+			},
 			[]uint32{wire.MaxTxInSequenceNum, wire.MaxTxInSequenceNum},
 			[]*wire.TxOut{in.Tx.Inputs[i].WitnessUtxo, connector.TxOut[vout]},
 			forfeitScript,
@@ -380,6 +241,173 @@ func (in *Intent) Forfeits(connectors []*psbt.Packet, forfeitScript []byte) ([]s
 		forfeits = append(forfeits, raw)
 	}
 	return forfeits, nil
+}
+
+func (in *Intent) boarding(i int) bool  { return i < len(in.Boarding) && in.Boarding[i] }
+func (in *Intent) swept(i int) bool     { return i < len(in.Swept) && in.Swept[i] }
+func (in *Intent) forfeited(i int) bool { return !in.boarding(i) && !in.swept(i) }
+
+// proof shifts every reference to a transaction input by one: the message is input 0.
+func (in *Intent) proof(
+	sources []*template.Source, ext extension.Extension, extIndex int,
+) (*intent.Proof, error) {
+	tx := in.Tx.UnsignedTx
+	proof, err := intent.New(in.Message, in.proofInputs(), slices.Clone(tx.TxOut))
+	if err != nil {
+		return nil, fmt.Errorf("build intent proof: %w", err)
+	}
+	for i := range proof.Inputs {
+		src := in.Tx.Inputs[max(i-1, 0)] // the message shares input 1's script
+		proof.Inputs[i].TaprootLeafScript = src.TaprootLeafScript
+		proof.Inputs[i].Unknowns = append(proof.Inputs[i].Unknowns, src.Unknowns...)
+		if i == 0 || !in.HasArkadePacket {
+			continue
+		}
+		// the emulator reads the transaction funding each input
+		if err := txutils.SetArkPsbtField(
+			&proof.Packet, i, arkade.PrevArkTxField, *sources[i-1].Tx,
+		); err != nil {
+			return nil, err
+		}
+	}
+	if extIndex >= 0 {
+		shifted, err := shiftInputs(ext, 1)
+		if err != nil {
+			return nil, err
+		}
+		out, err := shifted.TxOut()
+		if err != nil {
+			return nil, err
+		}
+		proof.UnsignedTx.TxOut[extIndex] = out
+	}
+	return proof, nil
+}
+
+func (in *Intent) proofInputs() []intent.Input {
+	inputs := make([]intent.Input, len(in.Tx.UnsignedTx.TxIn))
+	for i, txin := range in.Tx.UnsignedTx.TxIn {
+		inputs[i] = intent.Input{
+			OutPoint: &txin.PreviousOutPoint, Sequence: txin.Sequence,
+			WitnessUtxo: in.Tx.Inputs[i].WitnessUtxo,
+		}
+	}
+	return inputs
+}
+
+// sourcesOf pairs each coin with the transaction that created it, which must pay it exactly.
+func sourcesOf(coins []delegation.Coin, txs map[string]*wire.MsgTx) ([]*template.Source, error) {
+	sources := make([]*template.Source, len(coins))
+	for i, c := range coins {
+		op, err := wire.NewOutPointFromString(c.Outpoint)
+		if err != nil {
+			return nil, err
+		}
+		script, err := hex.DecodeString(c.Script)
+		if err != nil {
+			return nil, err
+		}
+		tx := txs[op.Hash.String()]
+		if tx == nil || int(op.Index) >= len(tx.TxOut) {
+			return nil, fmt.Errorf("coin %s: missing source output", c.Outpoint)
+		}
+		if prev := tx.TxOut[op.Index]; prev.Value != int64(c.Amount) ||
+			!bytes.Equal(prev.PkScript, script) {
+			return nil, fmt.Errorf("coin %s differs from its source output", c.Outpoint)
+		}
+		held, err := heldAt(tx, op.Index)
+		if err != nil {
+			return nil, fmt.Errorf("coin %s: %w", c.Outpoint, err)
+		}
+		sources[i] = &template.Source{
+			Outpoint: *op, Tx: tx, Amount: c.Amount, Assets: held, Expiry: c.ExpiresAt,
+			CreatedAt: c.CreatedAt,
+		}
+	}
+	return sources, nil
+}
+
+// heldAt lists the assets the asset packet of tx puts on its output at index.
+func heldAt(tx *wire.MsgTx, index uint32) ([]template.Asset, error) {
+	ext, err := extension.NewExtensionFromTx(tx)
+	if errors.Is(err, extension.ErrExtensionNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var held []template.Asset
+	for i, g := range ext.GetAssetPacket() {
+		id := g.AssetId
+		if id == nil {
+			if id, err = asset.NewAssetId(tx.TxHash().String(), uint16(i)); err != nil {
+				return nil, err
+			}
+		}
+		raw, err := id.Serialize()
+		if err != nil {
+			return nil, err
+		}
+		for _, o := range g.Outputs {
+			if uint32(o.Vout) == index {
+				held = append(held, template.Asset{ID: raw, Amount: o.Amount})
+			}
+		}
+	}
+	return held, nil
+}
+
+// checkTx checks that the template transaction spends exactly the coins, at the inputs' scripts,
+// through leaves of their trees.
+func checkTx(tx *psbt.Packet, coins []delegation.Coin, inputs []delegation.Input) error {
+	if tx == nil || tx.UnsignedTx == nil {
+		return errEmptyTemplateTx
+	}
+	if len(tx.Inputs) != len(coins) || len(tx.UnsignedTx.TxIn) != len(coins) {
+		return fmt.Errorf("template tx has %d inputs for %d coins", len(tx.Inputs), len(coins))
+	}
+	for i, c := range coins {
+		in := tx.Inputs[i]
+		if in.WitnessUtxo == nil || len(in.TaprootLeafScript) != 1 {
+			return fmt.Errorf("template tx input %d lacks its witness utxo or tap leaf", i)
+		}
+		if tx.UnsignedTx.TxIn[i].PreviousOutPoint.String() != c.Outpoint {
+			return fmt.Errorf("template tx input %d spends another coin", i)
+		}
+		script, err := hex.DecodeString(c.Script)
+		if err != nil {
+			return err
+		}
+		if in.WitnessUtxo.Value != int64(c.Amount) ||
+			!bytes.Equal(in.WitnessUtxo.PkScript, script) {
+			return fmt.Errorf("template tx input %d witness utxo does not match", i)
+		}
+		if c.Input >= len(inputs) || inputs[c.Input].Script != c.Script {
+			return fmt.Errorf("coin %d is not at the script of its input", i)
+		}
+		leaf := in.TaprootLeafScript[0]
+		if !slices.Contains(inputs[c.Input].Tapscripts, hex.EncodeToString(leaf.Script)) {
+			return errLeafNotInTree
+		}
+		control, err := txscript.ParseControlBlock(leaf.ControlBlock)
+		if err != nil {
+			return err
+		}
+		if !txscript.IsPayToTaproot(script) {
+			return errNotTaproot
+		}
+		if err := txscript.VerifyTaprootLeafCommitment(
+			control, script[2:], leaf.Script,
+		); err != nil {
+			return err
+		}
+	}
+	for _, out := range tx.UnsignedTx.TxOut {
+		if out == nil || out.Value < 0 {
+			return errInvalidTemplateOutput
+		}
+	}
+	return nil
 }
 
 func boardingOf(coins []delegation.Coin) []bool {
@@ -425,7 +453,9 @@ func shiftInputs(ext extension.Extension, by uint16) (extension.Extension, error
 						ins[i].Vin += by
 					}
 				}
-				shifted, err := asset.NewAssetGroup(g.AssetId, g.ControlAsset, ins, g.Outputs, g.Metadata)
+				shifted, err := asset.NewAssetGroup(
+					g.AssetId, g.ControlAsset, ins, g.Outputs, g.Metadata,
+				)
 				if err != nil {
 					return nil, err
 				}

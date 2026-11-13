@@ -28,7 +28,10 @@ var now = time.Unix(1_800_000_000, 0)
 
 func TestBuildIntentRenewsTheCoinInFullWithProofAndMessage(t *testing.T) {
 	r := newRenewal(t, 1000)
-	in, err := BuildIntent(r.inst, r.inputs, []delegation.Coin{r.coin}, r.txs, template.Fee{Dust: 330}, r.cosigner.PubKey())
+	in, err := BuildIntent(
+		r.inst, r.inputs, []delegation.Coin{r.coin}, r.txs, template.Fee{Dust: 330},
+		r.cosigner.PubKey(),
+	)
 	require.NoError(t, err)
 	require.True(t, in.HasArkadePacket)
 	require.Len(t, in.Outputs, 1)
@@ -39,7 +42,10 @@ func TestBuildIntentRenewsTheCoinInFullWithProofAndMessage(t *testing.T) {
 	var msg intent.RegisterMessage
 	require.NoError(t, msg.Decode(in.Message))
 	require.Equal(t, []int{}, msg.OnchainOutputIndexes)
-	require.Equal(t, []string{hex.EncodeToString(r.cosigner.PubKey().SerializeCompressed())}, msg.CosignersPublicKeys)
+	require.Equal(
+		t, []string{hex.EncodeToString(r.cosigner.PubKey().SerializeCompressed())},
+		msg.CosignersPublicKeys,
+	)
 	require.Contains(t, in.Message, `"onchain_output_indexes":[]`)
 
 	proof, err := psbt.NewFromRawBytes(strings.NewReader(in.Proof), true)
@@ -47,7 +53,10 @@ func TestBuildIntentRenewsTheCoinInFullWithProofAndMessage(t *testing.T) {
 	require.Len(t, proof.Inputs, 2, "the message, then the coin")
 	require.Equal(t, r.coin.Outpoint, proof.UnsignedTx.TxIn[1].PreviousOutPoint.String())
 	require.Equal(t, in.Tx.Inputs[0].TaprootLeafScript, proof.Inputs[1].TaprootLeafScript)
-	require.Equal(t, in.Tx.Inputs[0].TaprootLeafScript, proof.Inputs[0].TaprootLeafScript, "the message shares input 1's script")
+	require.Equal(
+		t, in.Tx.Inputs[0].TaprootLeafScript, proof.Inputs[0].TaprootLeafScript,
+		"the message shares input 1's script",
+	)
 
 	own, err := arkade.FindEmulatorPacket(in.Tx.UnsignedTx)
 	require.NoError(t, err)
@@ -60,38 +69,60 @@ func TestBuildIntentRenewsTheCoinInFullWithProofAndMessage(t *testing.T) {
 func TestBuildIntentDeductsTheIntentFeeAndRefusesAboveMaxFee(t *testing.T) {
 	r := newRenewal(t, 1000)
 	fee := template.Fee{Dust: 330, Intent: arkfee.Config{IntentOffchainInputProgram: "500.0"}}
-	in, err := BuildIntent(r.inst, r.inputs, []delegation.Coin{r.coin}, r.txs, fee, r.cosigner.PubKey())
+	in, err := BuildIntent(
+		r.inst, r.inputs, []delegation.Coin{r.coin}, r.txs, fee, r.cosigner.PubKey(),
+	)
 	require.NoError(t, err)
 	require.Equal(t, int64(9_500), in.Outputs[0].Value)
 
 	capped := newRenewal(t, 100)
-	_, err = BuildIntent(capped.inst, capped.inputs, []delegation.Coin{capped.coin}, capped.txs, fee, capped.cosigner.PubKey())
+	_, err = BuildIntent(
+		capped.inst, capped.inputs, []delegation.Coin{capped.coin}, capped.txs, fee,
+		capped.cosigner.PubKey(),
+	)
 	require.ErrorIs(t, err, template.ErrIneligible)
 	require.ErrorContains(t, err, "exceeds the cap 100")
 	free := newRenewal(t, 0)
-	_, err = BuildIntent(free.inst, free.inputs, []delegation.Coin{free.coin}, free.txs, fee, free.cosigner.PubKey())
+	_, err = BuildIntent(
+		free.inst, free.inputs, []delegation.Coin{free.coin}, free.txs, fee, free.cosigner.PubKey(),
+	)
 	require.ErrorContains(t, err, "exceeds the cap 0")
-	_, err = BuildIntent(free.inst, free.inputs, []delegation.Coin{free.coin}, free.txs, template.Fee{Dust: 330}, free.cosigner.PubKey())
+	_, err = BuildIntent(
+		free.inst, free.inputs, []delegation.Coin{free.coin}, free.txs, template.Fee{Dust: 330},
+		free.cosigner.PubKey(),
+	)
 	require.NoError(t, err, "no fee, no cap to exceed")
 }
 
 func TestBuildIntentRefusesCoinNotMatchingItsFundingTxOrTree(t *testing.T) {
 	r := newRenewal(t, 1000)
-	_, err := BuildIntent(r.inst, r.inputs, []delegation.Coin{r.coin}, nil, template.Fee{Dust: 330}, r.cosigner.PubKey())
+	_, err := BuildIntent(
+		r.inst, r.inputs, []delegation.Coin{r.coin}, nil, template.Fee{Dust: 330},
+		r.cosigner.PubKey(),
+	)
 	require.ErrorContains(t, err, "missing source output")
 	moved := r.coin
 	moved.Script = "5120" + strings.Repeat("00", 32)
-	_, err = BuildIntent(r.inst, r.inputs, []delegation.Coin{moved}, r.txs, template.Fee{Dust: 330}, r.cosigner.PubKey())
+	_, err = BuildIntent(
+		r.inst, r.inputs, []delegation.Coin{moved}, r.txs, template.Fee{Dust: 330},
+		r.cosigner.PubKey(),
+	)
 	require.ErrorContains(t, err, "differs from its source output")
 	wrong := r.inputs[0]
 	wrong.Tapscripts = nil
-	_, err = BuildIntent(r.inst, []delegation.Input{wrong}, []delegation.Coin{r.coin}, r.txs, template.Fee{Dust: 330}, r.cosigner.PubKey())
+	_, err = BuildIntent(
+		r.inst, []delegation.Input{wrong}, []delegation.Coin{r.coin}, r.txs,
+		template.Fee{Dust: 330}, r.cosigner.PubKey(),
+	)
 	require.ErrorContains(t, err, "not in the registered tree")
 }
 
 func TestIntentForfeitSpendsTheVtxoIntoItsBatchConnector(t *testing.T) {
 	r := newRenewal(t, 1000)
-	in, err := BuildIntent(r.inst, r.inputs, []delegation.Coin{r.coin}, r.txs, template.Fee{Dust: 330}, r.cosigner.PubKey())
+	in, err := BuildIntent(
+		r.inst, r.inputs, []delegation.Coin{r.coin}, r.txs, template.Fee{Dust: 330},
+		r.cosigner.PubKey(),
+	)
 	require.NoError(t, err)
 	b := newBatch(t, []*wire.TxOut{in.Outputs[0]}, 1)
 
@@ -118,7 +149,10 @@ func TestIntentForfeitSpendsTheVtxoIntoItsBatchConnector(t *testing.T) {
 
 func TestBoardingIntentSpendsOnchainInputAndNeedsNoForfeit(t *testing.T) {
 	b := newBoarding(t)
-	in, err := BuildIntent(b.inst, b.inputs, []delegation.Coin{b.coin}, b.txs, template.Fee{Dust: 330}, b.cosigner.PubKey())
+	in, err := BuildIntent(
+		b.inst, b.inputs, []delegation.Coin{b.coin}, b.txs, template.Fee{Dust: 330},
+		b.cosigner.PubKey(),
+	)
 	require.NoError(t, err)
 	require.Equal(t, []bool{true}, in.Boarding)
 	require.Zero(t, in.Vtxos())
@@ -131,7 +165,10 @@ func TestBoardingIntentSpendsOnchainInputAndNeedsNoForfeit(t *testing.T) {
 
 func TestForfeitsSkipTheBoardingInputs(t *testing.T) {
 	r := newRenewal(t, 1000)
-	in, err := BuildIntent(r.inst, r.inputs, []delegation.Coin{r.coin}, r.txs, template.Fee{Dust: 330}, r.cosigner.PubKey())
+	in, err := BuildIntent(
+		r.inst, r.inputs, []delegation.Coin{r.coin}, r.txs, template.Fee{Dust: 330},
+		r.cosigner.PubKey(),
+	)
 	require.NoError(t, err)
 	b := newBatch(t, []*wire.TxOut{in.Outputs[0]}, 1)
 
@@ -150,14 +187,20 @@ func TestForfeitsSkipTheBoardingInputs(t *testing.T) {
 	require.Len(t, forfeits, 1)
 	forfeit, err := psbt.NewFromRawBytes(strings.NewReader(forfeits[0]), true)
 	require.NoError(t, err)
-	require.Equal(t, r.coin.Outpoint, forfeit.UnsignedTx.TxIn[0].PreviousOutPoint.String(), "the vtxo, not the boarding input")
+	require.Equal(
+		t, r.coin.Outpoint, forfeit.UnsignedTx.TxIn[0].PreviousOutPoint.String(),
+		"the vtxo, not the boarding input",
+	)
 	_, err = mixed.Forfeits(nil, b.forfeitScript)
 	require.ErrorContains(t, err, "got 0 connectors for 1 vtxos")
 }
 
 func TestForfeitsSkipTheSweptInputs(t *testing.T) {
 	r := newRenewal(t, 1000)
-	in, err := BuildIntent(r.inst, r.inputs, []delegation.Coin{r.coin}, r.txs, template.Fee{Dust: 330}, r.cosigner.PubKey())
+	in, err := BuildIntent(
+		r.inst, r.inputs, []delegation.Coin{r.coin}, r.txs, template.Fee{Dust: 330},
+		r.cosigner.PubKey(),
+	)
 	require.NoError(t, err)
 	require.Equal(t, 1, in.Forfeited())
 
@@ -206,14 +249,28 @@ func newRenewal(t *testing.T, maxFee int64) renewal {
 	source.AddTxOut(wire.NewTxOut(10_000, inst.PkScript(0)))
 	pkScript := hex.EncodeToString(inst.PkScript(0))
 	return renewal{
-		inst:   inst,
-		inputs: []delegation.Input{{Name: "funds", Script: pkScript, Tapscripts: inst.Tapscripts(0)}},
-		coin: delegation.Coin{
-			Outpoint: source.TxHash().String() + ":0", DelegationID: 1, Script: pkScript, Amount: 10_000,
-			ExpiresAt: now.Add(500e9), CreatedAt: now.Add(-3600e9), Due: now, Status: delegation.Present,
+		inst: inst,
+		inputs: []delegation.Input{
+			{Name: "funds", Script: pkScript, Tapscripts: inst.Tapscripts(0)},
 		},
-		txs:    map[string]*wire.MsgTx{source.TxHash().String(): source},
-		server: server, emulator: emulator, cosigner: cosigner,
+		coin: delegation.Coin{
+			Outpoint: source.TxHash().
+				String() +
+				":0",
+			DelegationID: 1,
+			Script:       pkScript,
+			Amount:       10_000,
+			ExpiresAt: now.Add(
+				500e9,
+			),
+			CreatedAt: now.Add(-3600e9),
+			Due:       now,
+			Status:    delegation.Present,
+		},
+		txs:      map[string]*wire.MsgTx{source.TxHash().String(): source},
+		server:   server,
+		emulator: emulator,
+		cosigner: cosigner,
 	}
 }
 
@@ -230,22 +287,39 @@ func newBoarding(t *testing.T) boarding {
 	t.Helper()
 	server, emulator, cosigner, owner := testKey(1), testKey(2), testKey(3), testKey(4)
 	inst := instantiateWith(t, templates.Templates["board.json"], map[string][]byte{
-		"owner": owner.PubKey().SerializeCompressed(), "boarding_exit_delay": scriptNum(1<<22 | 2), "exit_delay": scriptNum(1<<22 | 1),
-		"renewal_window": scriptNum(1024), "max_fee": scriptNum(1000),
+		"owner": owner.PubKey().
+			SerializeCompressed(),
+		"boarding_exit_delay": scriptNum(1<<22 | 2),
+		"exit_delay":          scriptNum(1<<22 | 1),
+		"renewal_window":      scriptNum(1024),
+		"max_fee":             scriptNum(1000),
 	}, template.Keys{Server: server.PubKey(), Emulator: emulator.PubKey(), Cosigner: cosigner.PubKey()})
 	boardingTx := wire.NewMsgTx(3)
 	boardingTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Index: 1}})
 	boardingTx.AddTxOut(wire.NewTxOut(20_000, inst.PkScript(0)))
 	pkScript := hex.EncodeToString(inst.PkScript(0))
 	return boarding{
-		inst:   inst,
-		inputs: []delegation.Input{{Name: "deposit", Onchain: true, Script: pkScript, Tapscripts: inst.Tapscripts(0)}},
-		coin: delegation.Coin{
-			Outpoint: boardingTx.TxHash().String() + ":0", DelegationID: 1, Script: pkScript, Amount: 20_000, Onchain: true,
-			Height: 100, Confirmations: 1, Due: now, Status: delegation.Present,
+		inst: inst,
+		inputs: []delegation.Input{
+			{Name: "deposit", Onchain: true, Script: pkScript, Tapscripts: inst.Tapscripts(0)},
 		},
-		txs:    map[string]*wire.MsgTx{boardingTx.TxHash().String(): boardingTx},
-		server: server, emulator: emulator, cosigner: cosigner,
+		coin: delegation.Coin{
+			Outpoint: boardingTx.TxHash().
+				String() +
+				":0",
+			DelegationID:  1,
+			Script:        pkScript,
+			Amount:        20_000,
+			Onchain:       true,
+			Height:        100,
+			Confirmations: 1,
+			Due:           now,
+			Status:        delegation.Present,
+		},
+		txs:      map[string]*wire.MsgTx{boardingTx.TxHash().String(): boardingTx},
+		server:   server,
+		emulator: emulator,
+		cosigner: cosigner,
 	}
 }
 
@@ -268,14 +342,18 @@ func newBatch(t *testing.T, outputs []*wire.TxOut, connectors int) testBatch {
 	leaves := make([]tree.Leaf, len(outputs))
 	for i, out := range outputs {
 		leaves[i] = tree.Leaf{
-			Outputs:             []tree.LeafOutput{{Amount: uint64(out.Value), Script: hex.EncodeToString(out.PkScript)}},
+			Outputs: []tree.LeafOutput{
+				{Amount: uint64(out.Value), Script: hex.EncodeToString(out.PkScript)},
+			},
 			CosignersPublicKeys: []string{cosigner},
 		}
 	}
 	connectorLeaves := make([]tree.Leaf, connectors)
 	for i := range connectorLeaves {
 		connectorLeaves[i] = tree.Leaf{
-			Outputs:             []tree.LeafOutput{{Amount: 330, Script: hex.EncodeToString(forfeitScript)}},
+			Outputs: []tree.LeafOutput{
+				{Amount: 330, Script: hex.EncodeToString(forfeitScript)},
+			},
 			CosignersPublicKeys: []string{hex.EncodeToString(forfeit.SerializeCompressed())},
 		}
 	}
@@ -300,7 +378,9 @@ func newBatch(t *testing.T, outputs []*wire.TxOut, connectors int) testBatch {
 	txid := tx.TxHash()
 	b := testBatch{CommitmentTx: mustEncode(t, commitment), forfeitScript: forfeitScript}
 	if connectors > 0 {
-		b.ConnectorTree, err = tree.BuildConnectorTree(&wire.OutPoint{Hash: txid, Index: 1}, connectorLeaves)
+		b.ConnectorTree, err = tree.BuildConnectorTree(
+			&wire.OutPoint{Hash: txid, Index: 1}, connectorLeaves,
+		)
 		require.NoError(t, err)
 	}
 	return b
@@ -313,7 +393,9 @@ func mustEncode(t *testing.T, p *psbt.Packet) string {
 	return out
 }
 
-func sweepTapTreeRoot(t *testing.T, forfeitKey *btcec.PublicKey, expiry arklib.RelativeLocktime) []byte {
+func sweepTapTreeRoot(
+	t *testing.T, forfeitKey *btcec.PublicKey, expiry arklib.RelativeLocktime,
+) []byte {
 	t.Helper()
 	sweep, err := (&script.CSVMultisigClosure{
 		MultisigClosure: script.MultisigClosure{PubKeys: []*btcec.PublicKey{forfeitKey}},
@@ -324,7 +406,9 @@ func sweepTapTreeRoot(t *testing.T, forfeitKey *btcec.PublicKey, expiry arklib.R
 	return root.CloneBytes()
 }
 
-func instantiateWith(t *testing.T, doc []byte, variables map[string][]byte, keys template.Keys) *template.Instance {
+func instantiateWith(
+	t *testing.T, doc []byte, variables map[string][]byte, keys template.Keys,
+) *template.Instance {
 	t.Helper()
 	tmpl, err := template.Parse(doc, artifactDocs())
 	require.NoError(t, err)

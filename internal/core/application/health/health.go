@@ -27,11 +27,14 @@ type Checker struct {
 	timeout  time.Duration
 }
 
-func NewChecker(db ports.Database, ark ports.Signer, emulator ports.Emulator, loop *executionapp.Service) *Checker {
+func NewChecker(
+	db ports.Database, ark ports.Signer, emulator ports.Emulator, loop *executionapp.Service,
+) *Checker {
 	return &Checker{db: db, ark: ark, emulator: emulator, loop: loop, timeout: defaultTimeout}
 }
 
-// Check asks every dependency at once, each within a short timeout, and lists the answers in a fixed order.
+// Check asks every dependency at once, each within a short timeout, and lists the answers in a
+// fixed order.
 func (c *Checker) Check(ctx context.Context) []Entry {
 	checks := []struct {
 		name string
@@ -40,7 +43,10 @@ func (c *Checker) Check(ctx context.Context) []Entry {
 		{"db", c.db.Ping},
 		{"arkd", func(ctx context.Context) error { _, err := c.ark.Info(ctx); return err }},
 		{"electrum", func(context.Context) error { return c.loop.ChainConnected() }},
-		{"emulator", func(ctx context.Context) error { _, err := c.emulator.Info(ctx); return err }},
+		{
+			"emulator",
+			func(ctx context.Context) error { _, err := c.emulator.Info(ctx); return err },
+		},
 		{"loop", func(context.Context) error { return c.loop.Alive(time.Now()) }},
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
